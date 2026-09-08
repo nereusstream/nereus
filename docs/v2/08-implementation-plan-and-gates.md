@@ -21,10 +21,15 @@ protocol proof production and complete physical deletion remain OPEN.
 The later M5DA version-4 observation slice adds READ_FENCED takeover, epoch invalidation and a required native owner
 verifier. `v2M5ReadFencedRecoveryCheck` validates the state machine; the later `v2M5ReadFencedOxiaCheck` and
 `bash scripts/run-v2-m5-read-fenced-oxia-check.sh` exercise native fact versions, actual CAS competition and the same
-Oxia container restarted between two JVMs. The runner archives six suites/39 cases and phases, captures its checked
+Oxia container restarted between two JVMs. The runner archives six suites/47 cases and phases, captures its checked
 sources/projection and requires unchanged inputs plus zero failures/errors/skips. This proves metadata recovery with
 synthetic owner/eligibility/external facts; native protocol owner fencing, actual external reads/deletion and M5-E
 remain separate requirements.
+The coordinator now persists validation rejection as one bounded same-key recovery veto and blocks intent until a
+qualified refresh clears it; veto response loss remains failed/unknown and stale failures cannot overwrite successors.
+The restart phase verifies this persisted veto. Ordinary wire-4 authority bytes remain unchanged; the wire-5 extension
+is used only for READ_FENCED veto values.
+
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part
 verification through `v2M5BookKeeperCompactionCarrierCheck`. `v2M5BookKeeperDescriptorCheck` adds typed sealed

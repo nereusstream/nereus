@@ -27,6 +27,7 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
+import com.nereusstream.storage.object.gc.DeleteRecoveryVetoV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.Outcome;
@@ -124,7 +125,8 @@ class M5ReadFencedOxiaIntegrationTest {
                     .hasRootCauseInstanceOf(UnsupportedOperationException.class);
             assertThatThrownBy(() -> await(unsupported.bindDeleteIntent(old, external(old), digest("unsupported"))))
                     .hasRootCauseInstanceOf(UnsupportedOperationException.class);
-            assertThat(await(fixture.nativeFixture.route.read(old.key()))).contains(old);
+            var stored = await(fixture.nativeFixture.route.read(old.key())).orElseThrow();
+            verifyVeto(old, stored, DeleteRecoveryVetoV2.Reason.PREDECESSOR_OWNER_AUTHORITY_REJECTED);
         }
     }
 
@@ -154,8 +156,76 @@ class M5ReadFencedOxiaIntegrationTest {
                     Optional.of(semanticBefore), semantic.key(), bytes("different recovery semantics")));
             assertThatThrownBy(() -> await(fixture.coordinator.refreshIdentityRead(old, context, snapshot)))
                     .hasRootCauseMessage("eligibility authority changed: " + semantic.key());
-            assertThat(await(fixture.nativeFixture.route.read(old.key()))).contains(old);
+            verifyVeto(
+                    old,
+                    await(fixture.nativeFixture.route.read(old.key())).orElseThrow(),
+                    DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
         }
+    }
+
+    @Test
+    void delayedRejectionCannotPersistVetoOverAnotherNativeClientsSuccessfulRefresh() throws Exception {
+        try (var first = new RecoveryFixture(Fixture.root());
+                var other = new RecoveryFixture(first.nativeFixture.root)) {
+            var old = first.fence();
+            var context = first.next(old, true);
+            var snapshot = first.snapshot(decode(old).authorityRevision() + 1);
+            var validation = new CompletableFuture<Void>();
+            var heldOwner = new DeleteObservationAuthorityVerifierV2() {
+                public CompletionStage<Void> requireCurrent(
+                        PhysicalResourceIdV2 resource, DeleteObservationContextV2 current) {
+                    return validation;
+                }
+
+                public CompletionStage<Void> requirePredecessorFenced(
+                        PhysicalResourceIdV2 resource,
+                        DeleteObservationContextV2 previous,
+                        DeleteObservationContextV2 successor) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            };
+            var delayed = new M5TargetDeleteAuthorityCoordinatorV1(first.nativeFixture.route, heldOwner);
+            var pending = delayed.refreshIdentityRead(old, context, snapshot);
+            var winner = await(other.coordinator.refreshIdentityRead(old, context, snapshot))
+                    .observed()
+                    .orElseThrow();
+            validation.completeExceptionally(new IllegalStateException("delayed synthetic owner rejection"));
+            try {
+                await(pending);
+                throw new AssertionError("rejected native recovery unexpectedly succeeded");
+            } catch (java.util.concurrent.ExecutionException failure) {
+                Throwable cause = failure;
+                while (!(cause instanceof M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException)
+                        && cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                assertThat(cause).isInstanceOf(M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException.class);
+                assertThat(((M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException) cause)
+                                .vetoResult()
+                                .outcome())
+                        .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+            }
+            assertThat(await(first.nativeFixture.route.read(old.key()))).contains(winner);
+            assertThat(decode(winner).recoveryVeto()).isEmpty();
+        }
+    }
+
+    static void verifyVeto(VersionedValue old, VersionedValue stored, DeleteRecoveryVetoV2.Reason reason) {
+        var previous = decode(old);
+        var current = decode(stored);
+        assertThat(current.state()).isEqualTo(TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        assertThat(current.target()).isEqualTo(previous.target());
+        assertThat(current.closedWriterFenceEpoch()).isEqualTo(previous.closedWriterFenceEpoch());
+        assertThat(current.readFence().orElseThrow().attemptIdSha256())
+                .isEqualTo(previous.readFence().orElseThrow().attemptIdSha256());
+        assertThat(current.readFence().orElseThrow().observationContext())
+                .isEqualTo(previous.readFence().orElseThrow().observationContext());
+        assertThat(current.recoveryVeto().orElseThrow().reason()).isEqualTo(reason);
+        assertThat(current.recoveryVeto().orElseThrow().rejectedAuthoritySha256())
+                .isEqualTo(old.canonicalStoredSha256());
+        assertThat(stored.canonicalStoredBytes().length()
+                        - old.canonicalStoredBytes().length())
+                .isEqualTo(73);
     }
 
     static void verifyRefresh(VersionedValue old, VersionedValue fresh, DeleteObservationContextV2 context) {
@@ -171,6 +241,7 @@ class M5ReadFencedOxiaIntegrationTest {
         assertThat(after.authorityRevision()).isEqualTo(before.authorityRevision() + 1);
         assertThat(after.externalIdentity()).isEmpty();
         assertThat(after.deleteIntent()).isEmpty();
+        assertThat(after.recoveryVeto()).isEmpty();
     }
 
     static TargetDeleteAuthorityV1 decode(VersionedValue value) {

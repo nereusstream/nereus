@@ -191,7 +191,7 @@ def validate_sources(root: Path) -> None:
         codec,
         (
             "0x4d354441",
-            "VERSION = 4",
+            "BASE_VERSION = 4",
             "PhysicalResourceIdCodecV2.decode(targetBytes)",
             "Math.addExact(current.authorityRevision(), 1)",
             "Sha256Digest.hash(predecessor)",

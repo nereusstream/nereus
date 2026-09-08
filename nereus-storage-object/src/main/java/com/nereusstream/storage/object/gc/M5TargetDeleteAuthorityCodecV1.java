@@ -44,7 +44,8 @@ import java.util.Optional;
 /** Strict canonical M5DA wire codec for one permanent target-scoped delete-authority value. */
 public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int MAGIC = 0x4d354441; // M5DA
-    private static final int VERSION = 4;
+    private static final int BASE_VERSION = 4;
+    private static final int VERSION = 5;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -85,6 +86,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 externalIdentity,
                 deleteIntent,
                 deleteDone,
+                current.recoveryVeto(),
                 PLACEHOLDER));
     }
 
@@ -106,7 +108,9 @@ public final class M5TargetDeleteAuthorityCodecV1 {
             throw new IllegalArgumentException("target delete authority exceeds the metadata value hard cap");
         }
         TargetDeleteAuthorityV1 value = decode(encoded, input -> {
-            if (input.readInt() != MAGIC || input.readInt() != VERSION) {
+            int magic = input.readInt();
+            int wireVersion = input.readInt();
+            if (magic != MAGIC || (wireVersion != BASE_VERSION && wireVersion != VERSION)) {
                 throw new IllegalArgumentException("target delete authority preamble differs");
             }
             String authorityKey = readString(input, ExactMetadataTransactionStoreV1.MAX_KEY_BYTES);
@@ -202,6 +206,16 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                     externalIdentity,
                     deleteIntent,
                     deleteDone,
+                    wireVersion == VERSION
+                            ? Optional.of(new DeleteRecoveryVetoV2(
+                                    enumValue(
+                                            DeleteRecoveryVetoV2.Reason.values(),
+                                            input.readUnsignedByte(),
+                                            "recovery veto"),
+                                    input.readLong(),
+                                    readDigest(input),
+                                    readDigest(input)))
+                            : Optional.empty(),
                     readDigest(input));
         });
         if (!encoded.equals(encodeAuthority(value))) {
@@ -227,13 +241,14 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 value.externalIdentity(),
                 value.deleteIntent(),
                 value.deleteDone(),
+                value.recoveryVeto(),
                 canonicalSha256);
     }
 
     private static CanonicalBytes encodeUnchecked(TargetDeleteAuthorityV1 value) {
         return encode(output -> {
             output.writeInt(MAGIC);
-            output.writeInt(VERSION);
+            output.writeInt(value.recoveryVeto().isPresent() ? VERSION : BASE_VERSION);
             writeString(output, value.authorityKey());
             writeBytes(output, value.target().resourceId().canonicalBytes());
             writeDigest(output, value.target().targetIdentitySha256());
@@ -308,8 +323,19 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 writeDigest(output, done.absenceInventoryRootSha256());
                 writeDigest(output, done.completionProofDigestSha256());
             }
+            if (value.recoveryVeto().isPresent()) {
+                DeleteRecoveryVetoV2 veto = value.recoveryVeto().orElseThrow();
+                output.writeByte(veto.reason().ordinal());
+                output.writeLong(veto.rejectedObservationEpoch());
+                writeDigest(output, veto.rejectedContextSha256());
+                writeDigest(output, veto.rejectedAuthoritySha256());
+            }
             writeDigest(output, value.authorityCanonicalSha256());
         });
+    }
+
+    static Sha256Digest observationContextSha256(DeleteObservationContextV2 context) {
+        return Sha256Digest.hash(encode(output -> writeObservationContext(output, context)));
     }
 
     private static void writeObservationContext(DataOutputStream out, DeleteObservationContextV2 context)

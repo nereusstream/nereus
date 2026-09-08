@@ -46,7 +46,7 @@ def validate(root: Path) -> None:
         (codec, ("0x4d355249", "VERSION = 2", EXPECTED["wire"]["hashDomain"], "CanonicalUtf8.fromBytes",
                  "input.available() != 0", "length > input.available()")),
         (records, ("PhysicalDeleteTargetV1(PhysicalResourceIdV2 resourceId", "resourceId.sha256()")),
-        (authority_codec, ("VERSION = 4", "PhysicalResourceIdCodecV2.decode(targetBytes)", "resourceId().canonicalBytes()")),
+        (authority_codec, ("BASE_VERSION = 4", "PhysicalResourceIdCodecV2.decode(targetBytes)", "resourceId().canonicalBytes()")),
     ):
         if any(literal not in text for literal in literals):
             raise ValueError("stable resource implementation no longer matches its wire projection")

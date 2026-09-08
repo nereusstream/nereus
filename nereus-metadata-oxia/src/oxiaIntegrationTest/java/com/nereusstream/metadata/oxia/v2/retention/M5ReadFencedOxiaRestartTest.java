@@ -22,10 +22,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.metadata.oxia.v2.retention.M5PermanentDoneOxiaIntegrationTest.Fixture;
 import com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest.RecoveryFixture;
+import com.nereusstream.storage.object.gc.DeleteRecoveryVetoV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.Outcome;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -45,13 +47,24 @@ class M5ReadFencedOxiaRestartTest {
             assertThat(fixture.nativeFixture.faults.loseCas).isFalse();
             var stored = result.observed().orElseThrow();
             M5ReadFencedOxiaIntegrationTest.verifyRefresh(old, stored, context);
+            var capability =
+                    await(fixture.facts.read(context.capability().key())).orElseThrow();
+            await(fixture.facts.compareAndSet(
+                    Optional.of(capability), capability.key(), capability.canonicalStoredBytes()));
+            assertThatThrownBy(() ->
+                            await(fixture.coordinator.bindDeleteIntent(stored, external(stored), digest("revoked"))))
+                    .hasRootCauseMessage("eligibility authority changed: " + capability.key());
+            var vetoed = await(fixture.nativeFixture.route.read(stored.key())).orElseThrow();
+            M5ReadFencedOxiaIntegrationTest.verifyVeto(
+                    stored, vetoed, DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
+
             Files.write(
                     checkpoint(),
                     List.of(
                             fixture.nativeFixture.root,
-                            stored.key(),
-                            stored.canonicalStoredSha256().toHex(),
-                            stored.metadataVersion().value().toHex()));
+                            vetoed.key(),
+                            vetoed.canonicalStoredSha256().toHex(),
+                            vetoed.metadataVersion().value().toHex()));
         }
     }
 
@@ -70,6 +83,11 @@ class M5ReadFencedOxiaRestartTest {
                             .observationContext()
                             .observationEpoch())
                     .isEqualTo(2);
+            assertThat(decode(old).recoveryVeto().orElseThrow().reason())
+                    .isEqualTo(DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
+            assertThatThrownBy(() -> fixture.coordinator.bindDeleteIntent(old, external(old), digest("before-repair")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("qualified observation refresh");
             var late = external(old);
             var context = fixture.next(old, true);
             var snapshot = fixture.snapshot(decode(old).authorityRevision() + 1);
@@ -79,9 +97,8 @@ class M5ReadFencedOxiaRestartTest {
             M5ReadFencedOxiaIntegrationTest.verifyRefresh(old, fresh, context);
             assertThatThrownBy(() -> fixture.coordinator.bindDeleteIntent(fresh, late, digest("late-after-restart")))
                     .isInstanceOf(IllegalArgumentException.class);
-            assertThat(await(fixture.coordinator.bindDeleteIntent(old, late, digest("old-after-restart")))
-                            .outcome())
-                    .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+            assertThatThrownBy(() -> fixture.coordinator.bindDeleteIntent(old, late, digest("old-after-restart")))
+                    .isInstanceOf(IllegalStateException.class);
             assertThat(await(fixture.coordinator.bindDeleteIntent(fresh, external(fresh), digest("after-restart")))
                             .exactCandidateIsAuthoritative())
                     .isTrue();

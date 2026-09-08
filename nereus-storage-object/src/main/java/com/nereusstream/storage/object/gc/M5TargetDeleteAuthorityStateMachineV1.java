@@ -77,6 +77,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 zeroDigest()));
     }
 
@@ -102,6 +103,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 snapshot.sha256(),
                 Optional.of(snapshot),
                 List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -221,6 +223,49 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
+                zeroDigest()));
+    }
+
+    /** Persists one visible veto without reopening admission or changing the physical target/read attempt. */
+    public static TargetDeleteAuthorityV1 recordRecoveryVeto(
+            TargetDeleteAuthorityV1 current,
+            DeleteRecoveryVetoV2.Reason reason,
+            DeleteObservationContextV2 rejectedContext) {
+        requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        Objects.requireNonNull(rejectedContext, "rejectedContext");
+        long revision = Math.addExact(current.authorityRevision(), 1);
+        var previous = current.readFence().orElseThrow();
+        var predecessorSha = Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current));
+        var veto = new DeleteRecoveryVetoV2(
+                reason,
+                rejectedContext.observationEpoch(),
+                M5TargetDeleteAuthorityCodecV1.observationContextSha256(rejectedContext),
+                predecessorSha);
+        var fence = new TargetReadFenceV1(
+                previous.attemptIdSha256(),
+                revision,
+                previous.fenceEpoch(),
+                previous.openAuthorityValueSha256(),
+                previous.proofSnapshotDigest(),
+                previous.eligibilityRootSha256(),
+                previous.observationContext());
+        return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
+                current.authorityKey(),
+                current.target(),
+                revision,
+                Optional.of(predecessorSha),
+                current.state(),
+                current.closedWriterFenceEpoch(),
+                current.writerEnrollment(),
+                current.proofSnapshotDigest(),
+                current.eligibilitySnapshot(),
+                List.of(),
+                Optional.of(fence),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(veto),
                 zeroDigest()));
     }
 
@@ -230,6 +275,9 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             ExactExternalIdentityV1 externalIdentity,
             Sha256Digest deleteAttemptIdSha256) {
         requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        if (current.recoveryVeto().isPresent()) {
+            throw new IllegalStateException("recovery veto requires a qualified observation refresh before intent");
+        }
         Objects.requireNonNull(externalIdentity, "externalIdentity");
         if (!externalIdentity.resourceId().equals(current.target().resourceId())
                 || !externalIdentity

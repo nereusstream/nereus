@@ -1804,6 +1804,70 @@ native leader authority and requires a returned `WalRunObjectSession`. It does n
 callback or the complete asynchronous read-owner population lifetime. No fake Object-WAL session, fork edit, source
 lock change or native owner-fencing claim was introduced. That adapter/composition remains required.
 
+## 2026-09-08 persistent READ_FENCED recovery veto
+
+Status: bounded recovery failure persistence and qualified repair are integrated in the coordinator and verified with
+real source-locked Oxia. Native owner/fence, semantic/M4 release and external identity facts remain synthetic in these
+tests; this result grants no physical deletion, M5-E receipt or aggregate Final authority.
+
+`DeleteRecoveryVetoV2` is one 73-byte diagnostic extension in the same permanent resource authority. It stores a
+rejection reason, attempted observation epoch/context hash and exact rejected predecessor hash. It is valid only in
+READ_FENCED, preserves the physical resource, original read attempt and closed-admission fence, and does not append
+history. Refresh and CAS-2 native owner/capability/full-fact validation failures now attempt an exact same-key veto CAS
+before reporting `RecoveryRejectedException`; its `vetoResult()` distinguishes authoritative persistence from conflict,
+unchanged predecessor or unknown response. Repeated identical failures only reread the current veto. New intent
+binding is rejected while vetoed. Only the explicit next-observation refresh, with freshly verified owner/capability
+and a complete snapshot at the next authority revision, clears the veto.
+
+The V4 base encoding is preserved exactly. Only a veto-bearing READ_FENCED value selects the V5 extension. Before
+rebuilding, the previously published `4167886e` runtime and fixture JARs were inspected (codec constant VERSION=4)
+and used to capture ordinary OPEN, READ_FENCED, INTENT and DONE bytes for resource 600. The retained artifacts are in
+`build/m5-read-fenced-oxia/wire4-predecessor-4167886e`; runtime JAR SHA
+`965043dacb9b8c23ab3def0049c36c077cfa7c2db6b8f0ce105ee9991fc23ab1`, fixture JAR SHA
+`5210e96ef6745d5b31adf1f9b9a22e6736cc1ab0e28ff604c746b388419274c1`.
+The new compatibility case verifies all four exact encoded hashes and decode roundtrips. No persisted ordinary
+intent/done or frozen source-lock bytes are rewritten.
+
+The 26-case coordinator suite adds seven veto/compatibility cases: successful qualified repair, 128 repeated veto
+rejections without revision growth, unapplied/unknown veto writes, stale delayed failure losing to a successful
+refresh, cancelled observer retaining its veto-persistence lifetime, explicit proof-collection failure without a
+fabricated complete successor snapshot, and V4 byte compatibility. Existing pure
+eligibility/foundation tests also passed. Focused style/compilation/tests passed 21 tasks (13 executed, 8 up-to-date); the added proof-collection entry and its
+case then passed 14 tasks (7 executed, 7 up-to-date). The public coordinator method provides the same bounded,
+conservative veto transition when proof collection fails before `refreshIdentityRead` can receive a complete snapshot.
+
+Real Oxia adds a fifth integration case: a delayed failed validator cannot overwrite another native client's successful
+same-key refresh. The separate JVM restart checkpoint now binds a durable veto by route/key/hash/version only. The
+new JVM reads it before mutation, rejects intent, refreshes with new authority facts, verifies veto removal and persists
+an exact synthetic-identity intent. The native runner passed 56/56 main tasks and 15 restart tasks (1 executed), with
+six archives/47 cases or phases and zero failure/error/skip. Output:
+`build/m5-read-fenced-oxia/nereus-m5-read-fenced-oxia-64572`; log `/tmp/nereus-m5-veto-native2.log`.
+All 508 captured inputs and every archived XML were independently rehash-checked. Input manifest SHA
+`a5c2292e87445110b6a257634a638826da9f554525cb1d2be1d1e48d59d16d49`; summary SHA
+`2fce4c674ab7f13401ff850bc1fd8c164b29e088631b04e3afe96bcf2dd7a6c2`.
+The source-locked container `3514d3158b78e4edea111b1cda8d92844df0a75952e378f0e4e9f90c276c6abe` kept its ID/image
+through restart, from `2026-09-08T06:07:40.160885469Z` to `2026-09-08T06:08:25.337985337Z`.
+
+The final-source BK regression also passed. The bound run executed 89/89 main tasks and 22 restart tasks (3 executed),
+archiving 18 suites/90 cases and phases at `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-75031`. Its 728-input manifest SHA is
+`d9e0f1e71d626902bdd7b3d810334d0e71de2e8255a844a4367b2a42c5fabdaa`; summary SHA
+`8c06584c8eba418ac7735304bb56c04d84fad3deb50ddd55b9e02a64969f4d18`. Log: `/tmp/nereus-m5-veto-bk-regression2.log`.
+The independent legacy task-terminal run executed 93/93 main tasks and 22 restart tasks (3 executed), archiving
+17 suites/71 cases and phases at `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-75064`.
+Its 703-input manifest SHA is `bc51abea17cacc774b1cc1f786fe02be0351f3deb243901286afa1664bc0dbc9`; summary SHA
+`9d5abd48ff297565623d4295a17fab145a2ca2a0e8113f0f9de5d9828e0b97bd`. Both source maps and every XML were independently verified,
+as were the copied legacy manifest/summary. Each run retained its own Oxia container and all four BK/ZK container
+IDs/images while their start times changed. Bound Oxia `130c77815cfd0f3b901d03c1061c9d098ca68c236a04412f406483605879b286` restarted
+from `2026-09-08T06:12:08.499387052Z` to `2026-09-08T06:15:08.371204427Z`; independent legacy Oxia
+`8601a02a780bd8d6a457588a3f084cc18f8ae7fb3bc9d2d42d4dc7564448ab3f` restarted from `2026-09-08T06:09:46.048929097Z` to
+`2026-09-08T06:11:33.882457383Z`. The unchanged 90/71-case native paths include publication, protected reads,
+raw and selected-generation recapture, task termination and fresh-JVM restart without changing ordinary V4 authority bytes.
+
+Supplemental documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-veto-final-check.log`). All 17 acceptance obligations remain
+OPEN/null; M6 012/013/022 remain PLANNED/null in both registries. The owned native containers were cleaned up; the
+unrelated connector was retained. This implementation creates no M5-E child, aggregate Final or physical-delete authority.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -1814,7 +1878,8 @@ lock change or native owner-fencing claim was introduced. That adapter/compositi
    authority admission, quota/restart accounting and Cell I/O/operator metrics around the native M4/history route. Admit the configured durable GC quota route for every actual writer,
    provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.
 3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, current capability refresh,
-   fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.
+   fenced identity observation, dispatch/done and protocol-proof repair above the same-key coordinator; the bounded
+   READ_FENCED veto is now persisted, while those native integrations remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

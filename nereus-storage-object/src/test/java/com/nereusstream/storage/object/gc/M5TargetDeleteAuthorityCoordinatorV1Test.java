@@ -347,7 +347,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseMessage("eligibility authority changed: /reference/READ_GENERATION_PIN_OR_OPEN_HANDLE");
-        assertThat(secondStore.readNow(fenced.key())).isEqualTo(fenced);
+        assertVeto(fenced, secondStore.readNow(fenced.key()), DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
         assertThat(decode(fenced).deleteIntent()).isEmpty();
     }
 
@@ -475,8 +475,11 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseMessage("native previous owner is still active");
-        assertThat(harness.store.casCalls).isEqualTo(calls);
-        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+        assertThat(harness.store.casCalls).isEqualTo(calls + 1);
+        assertVeto(
+                harness.fenced,
+                harness.store.readNow(harness.fenced.key()),
+                DeleteRecoveryVetoV2.Reason.PREDECESSOR_OWNER_AUTHORITY_REJECTED);
     }
 
     @Test
@@ -491,8 +494,11 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                         .join())
                 .hasRootCauseMessage(
                         "eligibility authority changed: " + context.capability().key());
-        assertThat(harness.store.casCalls).isEqualTo(calls);
-        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+        assertThat(harness.store.casCalls).isEqualTo(calls + 1);
+        assertVeto(
+                harness.fenced,
+                harness.store.readNow(harness.fenced.key()),
+                DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
 
         var next = nextObservation(true);
         var snapshot = M5DeleteEligibilityTestFixtures.replacement(
@@ -504,8 +510,11 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseMessage("eligibility authority changed: /semantic/RECOVERY");
-        assertThat(harness.store.casCalls).isEqualTo(calls);
-        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+        assertThat(harness.store.casCalls).isEqualTo(calls + 2);
+        assertVeto(
+                harness.fenced,
+                harness.store.readNow(harness.fenced.key()),
+                DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
     }
 
     @Test
@@ -560,6 +569,227 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                         harness.fenced, context, previous.eligibilitySnapshot().orElseThrow()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(harness.store.casCalls).isEqualTo(calls);
+    }
+
+    @Test
+    void vetoExtensionPreservesPreviouslyEncodedVersionFourAuthoritiesByteForByte() {
+        // Captured from the ordinary V4 runtime/fixture JARs built at source 4167886e before this extension.
+        var hashes = List.of(
+                "80809392e51d7de465fe7e4b7a6559f77bfebd0a623399507e2011cf786ad348",
+                "3ecb6993aaf160084a52dc7e0d7e86acb2264d735971dfaf6e3b86e67f5b5743",
+                "106ba63af2d8171a6aff3948108c84e20b34e5899534c0e9d4f47bf62d550e21",
+                "8ecc4fc242d03671c031efc3cad789e4ac9459a54c564d9ee98d5eabca48aeea");
+        var phases = SyntheticDeleteAuthorityFixturesV2.phases(SyntheticDeleteAuthorityFixturesV2.resource(600));
+        for (int i = 0; i < phases.size(); i++) {
+            var encoded = M5TargetDeleteAuthorityCodecV1.encodeAuthority(phases.get(i));
+            assertThat(Sha256Digest.hash(encoded).toHex()).isEqualTo(hashes.get(i));
+            assertThat(ByteBuffer.wrap(encoded.toByteArray()).getInt(4)).isEqualTo(4);
+            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(encoded)).isEqualTo(phases.get(i));
+        }
+    }
+
+    @Test
+    void persistedVetoRequiresFreshQualifiedObservationBeforeIntent() {
+        var harness = new ObservationHarness();
+        var old = harness.fenced;
+        var context = nextObservation(true);
+        var snapshot =
+                M5DeleteEligibilityTestFixtures.replacement(decode(old).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        harness.store.seed("/semantic/RECOVERY", bytes("lost replacement recovery"));
+        var failure = rejected(harness.coordinator.refreshIdentityRead(old, context, snapshot));
+        assertThat(failure.vetoResult().exactCandidateIsAuthoritative()).isTrue();
+        var vetoed = harness.store.readNow(old.key());
+        assertVeto(old, vetoed, DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
+        assertThatThrownBy(() -> harness.coordinator.bindDeleteIntent(vetoed, exactPresent(vetoed, 161), digest(162)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("qualified observation refresh");
+        var repaired =
+                M5DeleteEligibilityTestFixtures.replacement(decode(old).target().resourceId(), 4);
+        harness.store.seedSnapshot(repaired);
+        var fresh = harness.coordinator
+                .refreshIdentityRead(vetoed, context, repaired)
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        assertThat(decode(fresh).recoveryVeto()).isEmpty();
+        assertThatThrownBy(() -> harness.coordinator.bindDeleteIntent(fresh, exactPresent(old, 163), digest(164)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(harness.coordinator
+                        .bindDeleteIntent(fresh, exactPresent(fresh, 165), digest(166))
+                        .toCompletableFuture()
+                        .join()
+                        .exactCandidateIsAuthoritative())
+                .isTrue();
+    }
+
+    @Test
+    void failedProofCollectionCanPersistVetoWithoutInventingACompleteEligibilitySnapshot() {
+        var harness = new ObservationHarness();
+        var old = harness.fenced;
+        var attempted = nextObservation(true);
+        // No successor snapshot or owner facts can be supplied when collection fails.
+        var result = harness.coordinator
+                .recordRecoveryVeto(old, DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED, attempted)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.exactCandidateIsAuthoritative()).isTrue();
+        var vetoed = result.observed().orElseThrow();
+        assertVeto(old, vetoed, DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED);
+        assertThatThrownBy(() -> harness.coordinator.bindDeleteIntent(vetoed, exactPresent(vetoed, 167), digest(168)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("qualified observation refresh");
+        var invalid = new DeleteObservationContextV2(
+                3, attempted.coordinatorOwner(), attempted.capability(), attempted.predecessorOwnerFenced());
+        int calls = harness.store.casCalls;
+        assertThatThrownBy(() -> harness.coordinator.recordRecoveryVeto(
+                        vetoed, DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED, invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("observation epoch");
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+        assertThat(harness.store.readNow(old.key())).isEqualTo(vetoed);
+    }
+
+    @Test
+    void repeatedIdenticalRecoveryRejectionRereadsOneVetoWithoutGrowingRevision() {
+        var harness = new ObservationHarness();
+        var context = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        var unsupported = new M5TargetDeleteAuthorityCoordinatorV1(harness.store);
+        rejected(unsupported.refreshIdentityRead(harness.fenced, context, snapshot));
+        var vetoed = harness.store.readNow(harness.fenced.key());
+        int calls = harness.store.casCalls;
+        var retrySnapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(vetoed).target().resourceId(), 4);
+        for (int i = 0; i < 128; i++) {
+            var failure = rejected(unsupported.refreshIdentityRead(vetoed, context, retrySnapshot));
+            assertThat(failure.vetoResult().outcome()).isEqualTo(Outcome.EXISTING_EXACT);
+        }
+        assertThat(harness.store.readNow(vetoed.key())).isEqualTo(vetoed);
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+    }
+
+    @Test
+    void unresolvedVetoWriteNeverTurnsRejectedRecoveryIntoSuccessOrInventsDurability() {
+        for (boolean applied : new boolean[] {false, true}) {
+            var harness = new ObservationHarness();
+            var context = nextObservation(true);
+            var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                    decode(harness.fenced).target().resourceId(), 3);
+            harness.store.seedSnapshot(snapshot);
+            harness.store.seedObservation(context);
+            harness.store.nextCas =
+                    applied ? NextCas.RESPONSE_UNKNOWN_AFTER_APPLY : NextCas.RESPONSE_UNKNOWN_WITHOUT_APPLY;
+            harness.store.failReadAfterCas = applied;
+            var unsupported = new M5TargetDeleteAuthorityCoordinatorV1(harness.store);
+            var failure = rejected(unsupported.refreshIdentityRead(harness.fenced, context, snapshot));
+            assertThat(failure.vetoResult().outcome())
+                    .isEqualTo(applied ? Outcome.RESPONSE_UNKNOWN : Outcome.PREDECESSOR_UNCHANGED);
+            assertThat(failure.vetoResult().exactCandidateIsAuthoritative()).isFalse();
+            var stored = harness.store.readNow(harness.fenced.key());
+            assertThat(decode(stored).state()).isEqualTo(TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+            assertThat(decode(stored).recoveryVeto().isPresent()).isEqualTo(applied);
+        }
+    }
+
+    @Test
+    void delayedFailedValidationCannotOverwriteAnotherOwnersQualifiedRefresh() {
+        var harness = new ObservationHarness();
+        var context = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        var validation = new CompletableFuture<Void>();
+        var delayed = new M5TargetDeleteAuthorityCoordinatorV1(harness.store, heldVerifier(validation));
+        var failedLater = delayed.refreshIdentityRead(harness.fenced, context, snapshot);
+        var winner = harness.coordinator
+                .refreshIdentityRead(harness.fenced, context, snapshot)
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        validation.completeExceptionally(new IllegalStateException("old validation failed"));
+        assertThat(rejected(failedLater).vetoResult().outcome()).isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+        assertThat(harness.store.readNow(winner.key())).isEqualTo(winner);
+        assertThat(decode(winner).recoveryVeto()).isEmpty();
+    }
+
+    @Test
+    void cancellingTheRecoveryObserverCannotAbandonPendingVetoPersistence() {
+        var harness = new ObservationHarness();
+        var context = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        var validation = new CompletableFuture<Void>();
+        var delayed = new M5TargetDeleteAuthorityCoordinatorV1(harness.store, heldVerifier(validation));
+        var observer =
+                delayed.refreshIdentityRead(harness.fenced, context, snapshot).toCompletableFuture();
+        assertThat(observer.cancel(true)).isTrue();
+        validation.completeExceptionally(new IllegalStateException("native current owner rejected"));
+        assertVeto(
+                harness.fenced,
+                harness.store.readNow(harness.fenced.key()),
+                DeleteRecoveryVetoV2.Reason.CURRENT_OBSERVATION_AUTHORITY_REJECTED);
+    }
+
+    private static DeleteObservationAuthorityVerifierV2 heldVerifier(CompletionStage<Void> validation) {
+        return new DeleteObservationAuthorityVerifierV2() {
+            public CompletionStage<Void> requireCurrent(
+                    PhysicalResourceIdV2 resource, DeleteObservationContextV2 current) {
+                return validation;
+            }
+
+            public CompletionStage<Void> requirePredecessorFenced(
+                    PhysicalResourceIdV2 resource,
+                    DeleteObservationContextV2 previous,
+                    DeleteObservationContextV2 successor) {
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+    }
+
+    private static M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException rejected(CompletionStage<?> stage) {
+        try {
+            stage.toCompletableFuture().join();
+            throw new AssertionError("rejected recovery unexpectedly completed successfully");
+        } catch (java.util.concurrent.CompletionException failure) {
+            Throwable cause = failure;
+            while (!(cause instanceof M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException)
+                    && cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            assertThat(cause).isInstanceOf(M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException.class);
+            return (M5TargetDeleteAuthorityCoordinatorV1.RecoveryRejectedException) cause;
+        }
+    }
+
+    private static void assertVeto(VersionedValue previous, VersionedValue stored, DeleteRecoveryVetoV2.Reason reason) {
+        var old = decode(previous);
+        var current = decode(stored);
+        assertThat(current.state()).isEqualTo(TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        assertThat(current.target()).isEqualTo(old.target());
+        assertThat(current.closedWriterFenceEpoch()).isEqualTo(old.closedWriterFenceEpoch());
+        assertThat(current.readFence().orElseThrow().attemptIdSha256())
+                .isEqualTo(old.readFence().orElseThrow().attemptIdSha256());
+        assertThat(current.readFence().orElseThrow().observationContext())
+                .isEqualTo(old.readFence().orElseThrow().observationContext());
+        assertThat(current.recoveryVeto().orElseThrow().reason()).isEqualTo(reason);
+        assertThat(ByteBuffer.wrap(stored.canonicalStoredBytes().toByteArray()).getInt(4))
+                .isEqualTo(5);
+        assertThat(current.recoveryVeto().orElseThrow().rejectedAuthoritySha256())
+                .isEqualTo(previous.canonicalStoredSha256());
+        assertThat(stored.canonicalStoredBytes().length()
+                        - previous.canonicalStoredBytes().length())
+                .isEqualTo(73);
+        assertThat(current.authorityRevision()).isEqualTo(old.authorityRevision() + 1);
     }
 
     private static DeleteObservationContextV2 nextObservation(boolean newOwner) {
@@ -656,6 +886,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         private int casCalls;
         private int transactionCalls;
         private NextCas nextCas = NextCas.NORMAL;
+        private boolean failReadAfterCas;
+        private boolean failNextRead;
 
         InMemoryStore() {
             seedEligibility(open(1));
@@ -693,6 +925,10 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
 
         @Override
         public synchronized CompletionStage<Optional<VersionedValue>> read(String key) {
+            if (failNextRead) {
+                failNextRead = false;
+                return CompletableFuture.failedFuture(new IllegalStateException("injected veto reread loss"));
+            }
             return CompletableFuture.completedFuture(Optional.ofNullable(values.get(key)));
         }
 
@@ -715,6 +951,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
             }
             values.put(key, stored(key, exactCandidate));
+            failNextRead = failReadAfterCas;
+            failReadAfterCas = false;
             return CompletableFuture.completedFuture(
                     behavior == NextCas.RESPONSE_UNKNOWN_AFTER_APPLY
                             ? MutationOutcome.RESPONSE_UNKNOWN

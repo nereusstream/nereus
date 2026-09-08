@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * Persists every M5-D authority transition with exact same-key CAS and authoritative reread.
@@ -102,6 +103,29 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             return (outcome == Outcome.APPLIED_EXACT || outcome == Outcome.EXISTING_EXACT)
                     && observed.map(value -> value.canonicalStoredBytes().equals(exactCandidate))
                             .orElse(false);
+        }
+    }
+
+    /** A rejected recovery remains failed even if its conservative veto could not be durably reconciled. */
+    public static final class RecoveryRejectedException extends IllegalStateException {
+        private final MutationResultV1 vetoResult;
+
+        private RecoveryRejectedException(Throwable rejection, MutationResultV1 vetoResult) {
+            super("READ_FENCED recovery rejected; veto persistence outcome: " + vetoResult.outcome(), rejection);
+            this.vetoResult = vetoResult;
+        }
+
+        public MutationResultV1 vetoResult() {
+            return vetoResult;
+        }
+    }
+
+    private static final class AuthorityRejection extends IllegalStateException {
+        private final DeleteRecoveryVetoV2.Reason reason;
+
+        private AuthorityRejection(DeleteRecoveryVetoV2.Reason reason, Throwable failure) {
+            super(reason.name(), failure);
+            this.reason = reason;
         }
     }
 
@@ -221,14 +245,12 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 exact.authority().readFence().orElseThrow().observationContext();
         CompletionStage<Void> fenced = previous.coordinatorOwner().equals(successor.coordinatorOwner())
                 ? CompletableFuture.completedFuture(null)
-                : observationAuthority.requirePredecessorFenced(
-                        exact.authority().target().resourceId(), previous, successor);
-        return fenced.thenCompose(ignored -> requireObservationAuthority(candidate))
-                .thenCompose(ignored -> mutate(
-                        candidate.authorityKey(),
-                        Optional.of(exact.exactStoredValue()),
-                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                        false));
+                : checkedAuthority(
+                        () -> observationAuthority.requirePredecessorFenced(
+                                exact.authority().target().resourceId(), previous, successor),
+                        DeleteRecoveryVetoV2.Reason.PREDECESSOR_OWNER_AUTHORITY_REJECTED);
+        return validateOrRecordRecoveryVeto(
+                exact, candidate, successor, fenced.thenCompose(ignored -> requireObservationAuthority(candidate)));
     }
 
     public CompletionStage<MutationResultV1> bindDeleteIntent(
@@ -238,12 +260,79 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         VersionedAuthorityV1 exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
         TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
                 exact.authority(), externalIdentity, deleteAttemptIdSha256);
-        return requireObservationAuthority(exact.authority())
-                .thenCompose(ignored -> mutate(
-                        exact.authority().authorityKey(),
-                        Optional.of(exact.exactStoredValue()),
-                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                        false));
+        return validateOrRecordRecoveryVeto(
+                exact,
+                candidate,
+                exact.authority().readFence().orElseThrow().observationContext(),
+                requireObservationAuthority(exact.authority()));
+    }
+
+    private CompletionStage<MutationResultV1> validateOrRecordRecoveryVeto(
+            VersionedAuthorityV1 exact,
+            TargetDeleteAuthorityV1 candidate,
+            DeleteObservationContextV2 rejectedContext,
+            CompletionStage<Void> validation) {
+        // The exposed observer does not own either validation or the durable veto/CAS lifetime.
+        return validation
+                .<CompletionStage<MutationResultV1>>handle((ignored, failure) -> {
+                    if (failure == null) {
+                        return mutate(
+                                candidate.authorityKey(),
+                                Optional.of(exact.exactStoredValue()),
+                                M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                                false);
+                    }
+                    Throwable rejection = failure;
+                    while (!(rejection instanceof AuthorityRejection) && rejection.getCause() != null) {
+                        rejection = rejection.getCause();
+                    }
+                    DeleteRecoveryVetoV2.Reason reason = rejection instanceof AuthorityRejection authorityRejection
+                            ? authorityRejection.reason
+                            : DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED;
+                    return recordRecoveryVeto(exact, reason, rejectedContext)
+                            .thenCompose(vetoResult ->
+                                    CompletableFuture.failedFuture(new RecoveryRejectedException(failure, vetoResult)));
+                })
+                .thenCompose(stage -> stage);
+    }
+
+    /**
+     * Records conservative proof-collection failure even when no complete eligibility snapshot can be built.
+     * This diagnostic grants no owner/eligibility authority and can only retain a closed READ_FENCED resource.
+     */
+    public CompletionStage<MutationResultV1> recordRecoveryVeto(
+            VersionedValue exactFencedAuthority,
+            DeleteRecoveryVetoV2.Reason reason,
+            DeleteObservationContextV2 rejectedContext) {
+        return recordRecoveryVeto(
+                exactAuthority(exactFencedAuthority.key(), exactFencedAuthority), reason, rejectedContext);
+    }
+
+    private CompletionStage<MutationResultV1> recordRecoveryVeto(
+            VersionedAuthorityV1 exact,
+            DeleteRecoveryVetoV2.Reason reason,
+            DeleteObservationContextV2 rejectedContext) {
+        var current = exact.authority();
+        var contextSha = M5TargetDeleteAuthorityCodecV1.observationContextSha256(rejectedContext);
+        if (current.recoveryVeto()
+                .filter(veto -> veto.reason() == reason
+                        && veto.rejectedObservationEpoch() == rejectedContext.observationEpoch()
+                        && veto.rejectedContextSha256().equals(contextSha))
+                .isPresent()) {
+            // Repeated rejection never grows a history or consumes a new authority revision.
+            return reconcile(
+                    current.authorityKey(),
+                    Optional.of(exact.exactStoredValue()),
+                    exact.exactStoredValue().canonicalStoredBytes(),
+                    false,
+                    new Attempt(MutationOutcome.RESPONSE_UNKNOWN, null));
+        }
+        var vetoed = M5TargetDeleteAuthorityStateMachineV1.recordRecoveryVeto(current, reason, rejectedContext);
+        return mutate(
+                current.authorityKey(),
+                Optional.of(exact.exactStoredValue()),
+                M5TargetDeleteAuthorityCodecV1.encodeAuthority(vetoed),
+                false);
     }
 
     public CompletionStage<MutationResultV1> takeOverDispatch(
@@ -300,12 +389,33 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         for (AuthorityFactV1 fact : context.authorityFacts()) {
             AuthorityFactV1 previous = facts.putIfAbsent(fact.key(), fact);
             if (previous != null && !previous.equals(fact)) {
-                throw new IllegalArgumentException("observation and eligibility authority conflict");
+                return CompletableFuture.failedFuture(new AuthorityRejection(
+                        DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED,
+                        new IllegalArgumentException("observation and eligibility authority conflict")));
             }
         }
-        return observationAuthority
-                .requireCurrent(authority.target().resourceId(), context)
-                .thenCompose(ignored -> requireFreshFacts(List.copyOf(facts.values())));
+        return checkedAuthority(
+                        () -> observationAuthority.requireCurrent(
+                                authority.target().resourceId(), context),
+                        DeleteRecoveryVetoV2.Reason.CURRENT_OBSERVATION_AUTHORITY_REJECTED)
+                .thenCompose(ignored -> checkedAuthority(
+                        () -> requireFreshFacts(List.copyOf(facts.values())),
+                        DeleteRecoveryVetoV2.Reason.ELIGIBILITY_FACTS_REJECTED));
+    }
+
+    private static CompletionStage<Void> checkedAuthority(
+            Supplier<CompletionStage<Void>> operation, DeleteRecoveryVetoV2.Reason reason) {
+        try {
+            return Objects.requireNonNull(operation.get(), "authority validation stage")
+                    .handle((ignored, failure) -> {
+                        if (failure != null) {
+                            throw new AuthorityRejection(reason, failure);
+                        }
+                        return null;
+                    });
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(new AuthorityRejection(reason, failure));
+        }
     }
 
     private CompletionStage<Void> requireFreshFacts(List<AuthorityFactV1> facts) {

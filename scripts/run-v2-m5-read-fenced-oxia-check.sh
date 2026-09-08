@@ -109,10 +109,10 @@ for path, expected in json.loads(inputs).items():
         raise SystemExit("native Java input changed during real history execution: " + path)
 results = []
 for module, task, name, count in (
-    ("nereus-storage-object", "v2M5TargetDeleteAuthorityCoordinatorTest", "com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test", 19),
+    ("nereus-storage-object", "v2M5TargetDeleteAuthorityCoordinatorTest", "com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test", 26),
     ("nereus-storage-object", "v2M5DeleteEligibilityTest", "com.nereusstream.storage.object.gc.M5DeleteEligibilityV2Test", 10),
     ("nereus-metadata-oxia", "v2M5TargetDeleteRouteTest", "com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2Test", 4),
-    ("nereus-metadata-oxia", "v2M5ReadFencedRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest", 4),
+    ("nereus-metadata-oxia", "v2M5ReadFencedRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest", 5),
     ("nereus-metadata-oxia", "v2M5ReadFencedOxiaRestartWriteTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaRestartTest", 1),
     ("nereus-metadata-oxia", "v2M5ReadFencedOxiaRestartReadTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaRestartTest", 1),
 ):
@@ -142,6 +142,12 @@ summary = {
     "sameBytesNewFactVersionVetoesIntent": True,
     "missingNativeOwnerVerifierRejectsRecovery": True,
     "readFenceSurvivedServerRestart": True,
+    "durableRecoveryVetoSurvivedServerRestart": True,
+    "qualifiedRefreshClearsPersistedVeto": True,
+    "lateRejectedValidationCannotOverwriteWinningRefresh": True,
+    "ordinaryV4AuthorityBytesPreserved": True,
+    "vetoWireVersion": 5,
+    "maximumVetoEncodedBytes": 73,
     "checkpointContainsAuthorityBodies": False,
     "nativeProtocolOwnerAdaptersIntegrated": False,
     "externalFullIdentityReaderIntegrated": False,

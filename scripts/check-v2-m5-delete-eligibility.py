@@ -66,7 +66,7 @@ def validate(root):
                  "snapshot.generation() != Math.addExact(current.authorityRevision(), 1)"]),
         (coordinator, ["requireFreshEligibility(snapshot)", "snapshot.authorityFacts()",
                        "eligibility authority changed", "eligibility authority is absent"]),
-        (codec, ["VERSION = 4", "DeleteEligibilityCodecV2.decode", "current.eligibilitySnapshot()",
+        (codec, ["BASE_VERSION = 4", "DeleteEligibilityCodecV2.decode", "current.eligibilitySnapshot()",
                  "tickets.isEmpty()", "DeleteEligibilityCodecV2.encode"]),
     ):
         if any(literal not in source for literal in literals):

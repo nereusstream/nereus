@@ -23,18 +23,26 @@
     "sameOwnerCapabilityRefreshSupported": true,
     "failedRefreshPreservesPredecessor": true,
     "cas2DerivesOwnerAndCapabilityFromFence": true,
-    "timeoutClearsFence": false
+    "timeoutClearsFence": false,
+    "failedQualifiedRefreshRecordsVetoAtSameKey": true,
+    "failedCas2ValidationRecordsVetoAtSameKey": true,
+    "vetoBlocksIntentUntilQualifiedRefresh": true,
+    "identicalVetoRetryDoesNotGrowRevision": true,
+    "lateRejectedValidationCannotOverwriteWinningRefresh": true,
+    "cancelledObserverCannotAbandonVetoPersistence": true,
+    "proofCollectionFailureCanRecordVetoWithoutFabricatedSnapshot": true
   },
   "focusedTests": {
-    "coordinatorAndGuardTests": 19,
+    "coordinatorAndGuardTests": 26,
     "newObservationRecoveryTests": 7,
     "failures": 0,
     "errors": 0,
-    "skipped": 0
+    "skipped": 0,
+    "newRecoveryVetoAndCompatibilityTests": 7
   },
   "nativeProtocolOwnerAdaptersIntegrated": false,
   "externalFullIdentityReaderIntegrated": false,
-  "durableRecoveryVetoRecordImplemented": false,
+  "durableRecoveryVetoRecordImplemented": true,
   "intentTakeoverCapabilityRefreshIntegrated": false,
   "realOxiaRecoveryExecutionPresent": true,
   "completePhysicalDeleteComposition": false,
@@ -45,7 +53,7 @@
     "gate": "v2M5ReadFencedOxiaCheck",
     "runner": "scripts/run-v2-m5-read-fenced-oxia-check.sh",
     "semanticAuthority": "SYNTHETIC_FACTS_WITH_NATIVE_KEYS_VERSIONS_AND_HASHES",
-    "integrationCases": 4,
+    "integrationCases": 5,
     "separateJvmRestartPhases": 2,
     "sameServerContainerRestarted": true,
     "oldCallbackRejectedAfterRefresh": true,
@@ -53,6 +61,10 @@
     "sameBytesNewFactVersionRejected": true,
     "missingOwnerVerifierRejectsRecovery": true,
     "checkpointContainsAuthorityBodies": false,
-    "physicalDeletionInvoked": false
-  }
+    "physicalDeletionInvoked": false,
+    "durableVetoSurvivedServerRestart": true,
+    "qualifiedRefreshClearsVetoAfterServerRestart": true
+  },
+  "recoveryVetoAuthorityWireVersion": 5,
+  "ordinaryVersionFourBytesPreserved": true
 }

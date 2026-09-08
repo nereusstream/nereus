@@ -260,6 +260,7 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             Optional<ExactExternalIdentityV1> externalIdentity,
             Optional<TargetDeleteIntentV1> deleteIntent,
             Optional<TargetDeleteDoneV1> deleteDone,
+            Optional<DeleteRecoveryVetoV2> recoveryVeto,
             Sha256Digest authorityCanonicalSha256) {
         public TargetDeleteAuthorityV1 {
             authorityKey = requireKey(authorityKey);
@@ -288,6 +289,21 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             externalIdentity = Objects.requireNonNull(externalIdentity, "externalIdentity");
             deleteIntent = Objects.requireNonNull(deleteIntent, "deleteIntent");
             deleteDone = Objects.requireNonNull(deleteDone, "deleteDone");
+            recoveryVeto = Objects.requireNonNull(recoveryVeto, "recoveryVeto");
+            if (recoveryVeto.isPresent()) {
+                DeleteRecoveryVetoV2 veto = recoveryVeto.orElseThrow();
+                if (state != TargetDeleteAuthorityStateV1.READ_FENCED_V1
+                        || !predecessorAuthoritySha256.equals(Optional.of(veto.rejectedAuthoritySha256()))
+                        || readFence.isEmpty()) {
+                    throw new IllegalArgumentException("recovery veto lacks its exact closed predecessor");
+                }
+                long epoch = readFence.orElseThrow().observationContext().observationEpoch();
+                if (veto.rejectedObservationEpoch() != epoch
+                        && veto.rejectedObservationEpoch() != Math.addExact(epoch, 1)) {
+                    throw new IllegalArgumentException("recovery veto observation epoch differs");
+                }
+            }
+
             Objects.requireNonNull(authorityCanonicalSha256, "authorityCanonicalSha256");
             requirePositive(authorityRevision, "authorityRevision");
             if ((authorityRevision == 1) != predecessorAuthoritySha256.isEmpty()) {
