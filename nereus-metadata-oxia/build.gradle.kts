@@ -2518,3 +2518,13 @@ mapOf(
         }
     }
 }
+
+
+tasks.register<Test>("v2M5KafkaRunRootTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test") }
+    outputs.upToDateWhen { false }
+}

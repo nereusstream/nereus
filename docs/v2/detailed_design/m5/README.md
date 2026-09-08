@@ -193,6 +193,12 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   removals. The full physical set enters ticket identity. Logical source catalog/admission and eligibility remain
   fixtures; complete native writer integration, READ_FENCED and physical deletion remain OPEN.
 
+- The [Kafka run-root projection](m5-kafka-run-roots-projection.json) adds persisted root transport under the actual
+  namespace binding. A permanent genesis or exact SEALED-parent CAS selects one child; pending unselected roots remain
+  invisible. Physical tickets cover the child and its parent, and actual NBKE2 headers/closed footers constrain publication.
+  Native internal-topic run bytes and restart recovery are exercised with synthetic resource/owner admission. Complete
+  input membership, root metadata quota, ordinary reads, internal-topic compaction and physical deletion remain OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

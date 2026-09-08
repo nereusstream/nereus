@@ -75,6 +75,11 @@ performance-first BookKeeper WAL.
   Native input/output bytes are exercised, while source catalog/ownership and eligibility are still fixtures. Complete
   writer admission, READ_FENCED integration, external deletion and M5 Final remain outstanding.
 
+  The [native Kafka run-root adapter](detailed_design/m5/m5-kafka-run-roots-projection.json) now persists exact
+  genesis/successor selection under the bound Oxia namespace and checks actual BK headers/seals. Physical tickets guard
+  root mutations. The native internal-topic run lifecycle still uses synthetic owner/resource admission; native input
+  membership, root quota, ordinary reads, complete compaction/delete integration and M5 Final remain outstanding.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived

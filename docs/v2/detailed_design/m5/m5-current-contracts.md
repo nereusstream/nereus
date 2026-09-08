@@ -18,7 +18,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, and a permanent BK binding now selects one actual Oxia namespace; Object namespace, complete writer/Cell admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; native run roots now have an exact-header/seal adapter; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
 | Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction/cache recovery and a configured durable quota route pass; pre-reserved intent writes continue at exhaustion and pending grants/refunds recover after restart; unique namespace/all-writer admission, backend disk provisioning and GC scheduling remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; sorted multi-resource tickets now wrap the guarded native BK publication path; complete native input membership, owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
@@ -152,6 +152,33 @@ READ_FENCED owner verification, physical deletion or any of the 17 aggregate obl
 The final native runner passes 75 executed main tasks and a 20-task post-restart JVM (one executed). Its 28 archived
 cases/phases pass without skips; both the 706-input new manifest and 685-input legacy manifest remain exact. The
 71-case legacy regression is reused only after source/XML revalidation.
+
+The [Kafka run-root projection](m5-kafka-run-roots-projection.json) adds `OxiaKafkaRunRootAuthorityV2` through the
+actual bound namespace factory. M5KR records bind the full protocol scope and stable native ledger identity. A permanent
+genesis choice or a single SEALED-parent CAS selects an immutable child identity; unselected prewrites remain invisible.
+The selected child's admission bit is a positive cache of that permanent choice. A fresh reader can recover a selected
+pending child with one parent/genesis read, without walking lifetime history or rewriting the root. SEALED roots remain
+readable after selecting a successor. These permanent records are not a bounded lifetime history or quota solution.
+Every root mutation acquires its ledger ticket; successor selection acquires both parent and child tickets before
+native verification or prewrites. The exact root and optional parent enter the context. Only irreversible native root
+or selection facts reconcile prior invocations; unknown results retain tickets and observer cancellation does not stop
+completion. The factory rereads both actual namespace assignments before each root operation.
+`KafkaBookKeeperNativeRootVerifierV2` observes NBKE2 entry zero through an independent native handle without recovery
+fencing. The header-only read bypasses reader LAC because a newly quorum-written header can still have reader LAC -1.
+It validates exact native metadata, entry identity and bytes, then closes the handle; this observation is not ACK/quorum
+or current-owner admission proof. Publication requires the complete header binding and configuration; SEALED publication additionally requires closed
+native metadata and the exact terminal footer/end. This does not verify all DATA/index contents or current protocol
+ownership. The native fixture explicitly admits synthetic OPEN resource authority after actual ledger creation; the
+production root adapter never creates missing authority or expands quota implicitly. Root metadata quota, resource-birth
+admission, native source-cut/membership production, ordinary reads, all writer rows and physical deletion remain OPEN.
+The internal-topic cases exercise native run/header/DATA/footer/root lifecycle for `__consumer_offsets` and
+`__transaction_state`; complete internal message semantics and compaction/delete acceptance remain separate.
+
+The final root runner passes 81 executed main tasks and a separate 21-task post-restart JVM (two executed). Its nine
+archived suites contain 41 cases/phases, including seven root unit cases, four native cases and two root restart phases,
+with zero failures/errors/skips. Both the 713-input root manifest and 691-input legacy manifest remain unchanged. The
+legacy regression was rerun on an independent cluster: 93 executed main tasks, three executed post-restart reads and
+71 archived cases/phases. These focused results do not close any aggregate obligation.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

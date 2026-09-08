@@ -14,13 +14,20 @@
 
 package com.nereusstream.storage.bookkeeper;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCapabilitySnapshotV1;
+import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver;
 
@@ -118,6 +125,68 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
     public java.util.concurrent.CompletionStage<M5BookKeeperDeleteAdapterV1.CaptureResult> captureExactTarget(
             com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1 handle) {
         return new M5BookKeeperDeleteAdapterV1(client, capability, new byte[0]).captureExactTarget(handle);
+    }
+
+    /**
+     * Observes only entry zero without fencing or a reader-LAC requirement. A newly quorum-written header can still
+     * have reader LAC -1. These exact bytes are not an ACK/quorum or protocol-owner proof; the lifecycle retains those
+     * admission obligations. Every call validates native run metadata and closes its independent read handle.
+     */
+    public CompletionStage<ExactLedgerEntryV1> readNativeRunHeader(RunLedgerHandleV1 handle) {
+        var configuration = RunLedgerConfigurationV1.from(capability, handle.runId());
+        if (!spec.configurations().contains(configuration)
+                || !handle.providerScopeId().equals(capability.providerScopeId())
+                || !handle.configurationDigest().equals(capability.configurationDigest())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("header handle is outside native scope"));
+        }
+        var digest = org.apache.bookkeeper.client.api.DigestType.valueOf(
+                capability.digestType().name());
+        return client.newOpenLedgerOp()
+                .withLedgerId(handle.ledgerIdentity().ledgerId())
+                .withDigestType(digest)
+                .withPassword(new byte[0])
+                .withRecovery(false)
+                .execute()
+                .thenCompose(open -> {
+                    CompletionStage<ExactLedgerEntryV1> read;
+                    try {
+                        var metadata = open.getLedgerMetadata();
+                        if (!RealBookKeeperCellSessionV1.metadataMatches(metadata, handle)
+                                || metadata.getEnsembleSize() != capability.ensembleSize()
+                                || metadata.getWriteQuorumSize() != capability.writeQuorumSize()
+                                || metadata.getAckQuorumSize() != capability.ackQuorumSize()
+                                || metadata.getDigestType() != digest
+                                || !Arrays.equals(metadata.getPassword(), new byte[0])) {
+                            throw new IllegalArgumentException("native run header metadata differs from its handle");
+                        }
+                        read = open.readUnconfirmedAsync(0, 0).thenApply(entries -> {
+                            try (var owned = entries) {
+                                var entry = owned.getEntry(0);
+                                if (entry.getLedgerId()
+                                                != handle.ledgerIdentity().ledgerId()
+                                        || entry.getEntryId() != 0) {
+                                    throw new IllegalStateException("native header read returned another entry");
+                                }
+                                var bytes = CanonicalBytes.copyOf(entry.getEntryBytes());
+                                return new ExactLedgerEntryV1(handle, 0, bytes, Sha256Digest.hash(bytes));
+                            }
+                        });
+                    } catch (RuntimeException failure) {
+                        read = CompletableFuture.failedFuture(failure);
+                    }
+                    var terminal = new CompletableFuture<ExactLedgerEntryV1>();
+                    read.whenComplete((entry, failure) -> open.closeAsync().whenComplete((ignored, closeFailure) -> {
+                        if (failure != null) {
+                            terminal.completeExceptionally(failure);
+                        } else if (closeFailure != null) {
+                            terminal.completeExceptionally(closeFailure);
+                        } else {
+                            terminal.complete(entry);
+                        }
+                    }));
+                    return terminal;
+                });
     }
 
     public CompletableFuture<Void> fenceCreates() {

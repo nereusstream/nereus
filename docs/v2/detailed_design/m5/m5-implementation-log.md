@@ -838,8 +838,8 @@ Both captured source maps were independently rechecked after the native run; all
 Status: guarded runtime integration validated after `e91253c9f520659c4fa1efbb4a348dd49effd1d1`.
 The [publication ticket projection](m5-publication-tickets-projection.json) records the current boundary. All 17 amended
 obligations remain OPEN/null. Native input catalog/owner admission, all concrete writers, READ_FENCED recovery and
-physical deletion remain required. `KafkaRunRootAuthority` currently has an interface and test implementations only;
-the production persisted run-root/source adapter still needs to supply native input membership.
+physical deletion remain required. At this publication-ticket slice, `KafkaRunRootAuthority` had only an interface and test implementations;
+the subsequent run-root slice adds persisted transport, while native input membership remains required.
 
 `M5TargetDeleteMultiWriterGuardV2` deduplicates full physical identities in unsigned canonical-byte order and acquires
 every ticket before invoking one concrete writer. It caps raw target count at 2,048 and aggregate canonical bytes at
@@ -907,6 +907,77 @@ only the runner's owned containers and compose volumes. No M5-E receipt, Final, 
 is issued by this focused runner. Supplemental documentation, frozen design/M4 dependency, lifecycle, coordinator and
 recovery source checks passed **13/13 tasks** in `/tmp/nereus-m5-publication-final-check.log`. All 17 acceptance rows
 remain OPEN/null; only the unrelated pre-existing connector container remains running.
+
+## 2026-09-08 native persisted Kafka run roots
+
+Status: focused native transport and restart validation after `c37f0155c7508d32beb6b6e207aa5f41ba52b085`.
+The [run-root projection](m5-kafka-run-roots-projection.json) retains all 17 obligations OPEN/null. This slice supplies
+persisted root transport and native header/seal observation. It does not yet derive compaction input membership,
+protocol-owner admission, all writer integration, ordinary reads, physical deletion or complete internal-topic semantics.
+
+`KafkaRunRootRecordV2` binds actual stable BK resource identity and the full Binding/topic/partition/storage/provider
+scope. Strict M5KR and M5KL codecs cap one record at 32 KiB and one selection at 86 bytes. The immutable initial digest
+survives admission, seal and successor selection. A root prewrite begins pending; a permanent genesis choice or one
+exact native parent CAS selects it. Unselected pending records are not visible through `openRoot`. The admission bit
+caches a permanent selection, so a selected pending child is recoverable by reading one parent/genesis record. Root
+lookups do not traverse lifetime history. Parent selection accepts only a matching SEALED boundary, distinct child
+ledger, exact predecessor and nonregressing creator/leader epochs; it can never select two different children.
+SEALED roots stay readable after selecting successors. Pending records and permanent run history are not yet covered
+by a root-specific quota/retirement mechanism; bounded record size does not bound lifetime metadata growth.
+
+`OxiaPhysicalMetadataNamespaceV2.openKafkaRunRoots` provides the actual namespace-guarded native client and existing
+physical authority route. It rereads the actual Oxia marker and BK namespace assignment before every root operation.
+`OxiaKafkaRunRootAuthorityV2` acquires the root ledger's durable physical ticket before native validation/prewrite;
+successor selection acquires both parent and child tickets. Complete root/parent bytes bind the invocation context.
+Unknown native outcomes retain tickets. Exact irreversible root or genesis/parent choices allow terminal reconciliation
+of earlier matching invocation nonces. Observer cancellation leaves admitted work running. The adapter never creates
+missing resource authority or expands quota. Test-only resource admission runs after actual ledger creation and writes
+synthetic OPEN eligibility into the real quota route; this is not production birth or protocol-owner admission.
+
+`KafkaBookKeeperNativeRootVerifierV2` verifies exact native run/configuration metadata, the NBKE2 header and full scope.
+A SEALED root also requires actual closed metadata and the exact last-entry footer, physical end and Kafka end. It
+performs no recovery fence. Full DATA/index consistency, owner authorization and Add/ACK proof are separate obligations.
+
+The first real run exposed reader LAC -1 immediately after the lifecycle's quorum-written header. A non-recovery
+BookKeeper reader correctly rejects ordinary confirmed `readAsync(0, 0)` at that point. Both ACTIVE lifecycle cases
+failed at root creation; the preclosed-source negatives passed. The fix adds `readNativeRunHeader` on the same guarded
+native client: it opens an independent non-recovery handle, validates full native metadata, reads only entry zero using
+`readUnconfirmedAsync`, validates ledger/entry identity and closes the handle before completion. It observes exact
+header bytes and grants no ACK/quorum authority. The lifecycle still owns its exact append-quorum proof. Native tests
+also require the ledger to remain open after root creation and then append DATA, drain and seal normally. No LAC
+threshold, native dependency or frozen M2 source contract was changed.
+
+The native suite exercises actual header/DATA/footer/root lifecycle for both `__consumer_offsets` and
+`__transaction_state`, rejects wrong header/footer candidates, races two successors at a held native parent CAS and
+compares the winning native bytes/version after the loser completes. A synthetic physical fence prevents root writes.
+For restart, native genesis selection applies but its response and subsequent root reads are withheld, leaving a
+pending selected root and a durable ticket. The runner restarts ZooKeeper, all three bookies and Oxia with the same
+container IDs/images and retained data. An independent JVM must compare native root/genesis/authority hashes and
+versions, recover the selected pending root, reconcile tickets without rewriting root/genesis, then verify the actual
+closed footer and DATA. Checkpoints contain configuration and identities, not copied authority bodies.
+
+Validation: final `scripts/run-v2-m5-kafka-run-roots-check.sh` passed **81/81 executed main tasks** and a separate
+**21-task** post-restart JVM (**2 executed**, 19 up-to-date). Its nine archived suites contain **41 cases/phases**:
+7 root unit cases, 4 native root cases, 2 root restart phases, and 28 publication/descriptor regression cases/phases,
+with zero failures/errors/skips. The final source has **713** unchanged captured inputs, manifest SHA-256
+`36c21443cbe5a73a2670dac3b23fbfa0b53cbeaa93101c1e16e0a89ffc40fdf8`. Result:
+`build/m5-kafka-run-roots/nereus-v2-m5-kafka-run-roots-82017/run-summary.json`; log:
+`/tmp/nereus-m5-run-root-native-gate2.log`. The actual Oxia container
+`e2a946042f3b9af5c16ca42265b48ae67dd333334a5569aabc7b284f65aaa145` retained data and exact image while its
+start time changed from `2026-09-08T02:07:06.966232512Z` to `2026-09-08T02:09:10.70539493Z`. The four BK/ZooKeeper
+containers likewise retained IDs/images and changed start times. Actual locked client artifact checks passed.
+
+The final invocation reran the legacy gate in
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-82028`: **93/93 executed main tasks**,
+**22 post-restart tasks** (3 executed) and **71 archived cases/phases**, with zero failures/errors/skips. Its **691**
+unchanged captured inputs have manifest SHA `9dfa4e1e8f23b2a4123a2af0e8e9a9c07a497ad08835f3b3544501cd9609adc8`;
+the copied legacy summary SHA is `58a5b27601ae51a2762bb56ff862bbcc044faf69561f79a18fa2dc1d7e956268`.
+The two source maps are checked independently. All-service restart preserves exact root/genesis/authority identities
+before ticket reconciliation. Cleanup removed only this runner's containers/compose volumes; the unrelated connector
+remains. No M5-E, Final, physical-delete, staging or production authority is issued by this focused result.
+Supplemental documentation, frozen design/M4 dependency, lifecycle, coordinator and recovery source checks passed
+**13/13 tasks** in `/tmp/nereus-m5-run-root-final-check.log`. Both complete source maps and all passing XML archives
+were independently rechecked afterward. All 17 acceptance rows remain OPEN/null.
 
 ## Design freeze
 
@@ -1355,7 +1426,8 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Derive complete physical input membership from native run-root/source metadata and integrate the guarded ticketed
+1. Derive complete physical input membership and source-cut content from the persisted native run-root adapter,
+   with full DATA/index verification, and integrate the guarded ticketed
    publisher with real protocol ownership. Extend create/selection/drain terminal to stale-task and complete writer/adoption
    admission, then connect M4-protected BK recovery to ordinary reads, internal topics and grace/rescan cleanup.
 2. Extend the native BK-to-Oxia namespace assignment to Object and cross-Cell resource ownership; complete Binding

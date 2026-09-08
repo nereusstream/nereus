@@ -3080,3 +3080,21 @@ tasks.register("v2M5PublicationTicketsCheck") {
         ":nereus-kafka-bookkeeper:checkstyleRealBookKeeperTest",
     )
 }
+
+
+tasks.register("v2M5KafkaRunRootsCheck") {
+    group = "verification"
+    description = "Verify native persisted Kafka run roots, exact NBKE2 headers and seals, and physical writer tickets."
+    dependsOn(
+        "v2M5PublicationTicketsCheck",
+        ":nereus-storage-bookkeeper:spotlessCheck",
+        ":nereus-storage-bookkeeper:checkstyleMain",
+        ":nereus-metadata-oxia:v2M5KafkaRunRootTest",
+        ":nereus-kafka-bookkeeper:v2M5KafkaRunRootsRealTest",
+        ":nereus-storage-api:spotlessCheck",
+        ":nereus-storage-api:checkstyleMain",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+    )
+}

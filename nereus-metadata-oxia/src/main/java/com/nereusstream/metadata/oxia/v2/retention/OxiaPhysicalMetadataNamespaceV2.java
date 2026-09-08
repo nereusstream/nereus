@@ -121,26 +121,44 @@ public final class OxiaPhysicalMetadataNamespaceV2 {
         Objects.requireNonNull(backend, "backend");
         Objects.requireNonNull(authoritativeFacts, "authoritativeFacts");
         return currentBinding(backend).thenApply(binding -> {
-            var guarded = new OxiaConditionalClient() {
-                public CompletionStage<Optional<AuthorityRecord>> read(String key) {
-                    return currentBinding(backend).thenCompose(ignored -> conditional.read(key));
-                }
-
-                public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes value) {
-                    return currentBinding(backend).thenCompose(ignored -> conditional.createIfAbsent(key, value));
-                }
-
-                public CompletionStage<Void> compareAndSet(String key, CanonicalBytes value, long version) {
-                    return currentBinding(backend)
-                            .thenCompose(ignored -> conditional.compareAndSet(key, value, version));
-                }
-            };
             return new OxiaQuotaTargetDeleteStoreV2(
                     client,
-                    guarded,
+                    guardedClient(backend),
                     new Layout(binding.authorityRoot(), binding.physicalNamespace()),
                     authoritativeFacts);
         });
+    }
+
+    /** Run roots share the actual bound metadata namespace and pre-admitted permanent physical ticket route. */
+    public CompletionStage<com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2> openKafkaRunRoots(
+            NativePhysicalNamespaceAuthorityV2 backend,
+            ExactMetadataTransactionStoreV1 authoritativeFacts,
+            com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Scope scope,
+            com.nereusstream.storage.api.kafka.KafkaRunRootVerifierV2 verifier) {
+        return openAuthorityRoute(backend, authoritativeFacts).thenCompose(route -> currentBinding(backend)
+                .thenApply(binding -> new com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2(
+                        guardedClient(backend),
+                        binding,
+                        scope,
+                        verifier,
+                        new com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2(
+                                new com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1(route)))));
+    }
+
+    private OxiaConditionalClient guardedClient(NativePhysicalNamespaceAuthorityV2 backend) {
+        return new OxiaConditionalClient() {
+            public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+                return currentBinding(backend).thenCompose(ignored -> conditional.read(key));
+            }
+
+            public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes value) {
+                return currentBinding(backend).thenCompose(ignored -> conditional.createIfAbsent(key, value));
+            }
+
+            public CompletionStage<Void> compareAndSet(String key, CanonicalBytes value, long version) {
+                return currentBinding(backend).thenCompose(ignored -> conditional.compareAndSet(key, value, version));
+            }
+        };
     }
 
     private CompletionStage<PhysicalNamespaceAuthorityBindingV2> currentBinding(

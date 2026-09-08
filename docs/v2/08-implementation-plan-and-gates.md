@@ -78,6 +78,11 @@ publication writes, private invocation identities, exact selected/cancelled Task
 The runner uses separate legacy and bound namespace clusters, then restarts all five bound-profile services and verifies
 old tickets from a fresh JVM. Native source catalog/owner admission and OPEN eligibility remain synthetic, so this
 [focused projection](detailed_design/m5/m5-publication-tickets-projection.json) does not close WRITER_RACES or M5-E.
+`v2M5KafkaRunRootsCheck` and `scripts/run-v2-m5-kafka-run-roots-check.sh` extend that regression with persisted
+root choices, actual native NBKE2 header/footer checks, parent/child tickets and retained-data root recovery in a fresh
+JVM. Both internal-topic names exercise the run lifecycle. Synthetic resource admission and owner facts remain explicit;
+the [root projection](detailed_design/m5/m5-kafka-run-roots-projection.json) is not native input-catalog admission,
+complete internal-topic compaction, root metadata quota, all-writer verification or aggregate M5 evidence.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

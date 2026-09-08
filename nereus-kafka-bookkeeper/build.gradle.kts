@@ -453,3 +453,37 @@ listOf("v2M5PublicationTicketsRealTest", "v2M5PublicationTicketsRestartWriteTest
         }
     }
 }
+
+
+listOf("v2M5KafkaRunRootsRealTest", "v2M5KafkaRunRootsRestartWriteTest", "v2M5KafkaRunRootsRestartReadTest").forEach { taskName ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter {
+            val base = "com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunRootsV2RealTest"
+            when (taskName) {
+                "v2M5KafkaRunRootsRestartWriteTest" -> includeTestsMatching("$base.writeBeforeServerRestart")
+                "v2M5KafkaRunRootsRestartReadTest" -> includeTestsMatching("$base.readAfterServerRestart")
+                else -> {
+                    includeTestsMatching(base)
+                    excludeTestsMatching("$base.writeBeforeServerRestart")
+                    excludeTestsMatching("$base.readAfterServerRestart")
+                }
+            }
+        }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri", providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get())
+            systemProperty("nereus.m5.oxia.serviceAddress", providers.gradleProperty("v2M5RetentionOxiaServiceAddress").get())
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.runroot.restartCheckpoint", providers.gradleProperty("v2M5KafkaRunRootsRestartCheckpoint").get())
+            }
+        }
+        if (taskName == "v2M5KafkaRunRootsRestartWriteTest") {
+            mustRunAfter("v2M5KafkaRunRootsRealTest")
+        }
+    }
+}
