@@ -18,6 +18,8 @@ dependencies {
     api(project(":nereus-storage-object"))
     implementation(libs.kafka.clients)
 
+    testImplementation(project(":nereus-metadata-spi"))
+    testImplementation(project(mapOf("path" to ":nereus-storage-object", "configuration" to "m5DeleteTestFixtures")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -538,5 +540,14 @@ tasks.register<Test>("v2M5KafkaSelectedSourceTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
     filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test") }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5KafkaReadOwnerTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadOwnerV2Test") }
     outputs.upToDateWhen { false }
 }

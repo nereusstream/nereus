@@ -217,11 +217,17 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   generation can enter the semantic compiler with no invented data batch. Native verification passed exact M4
   fallback closure, new source protection and second publication while retaining old PROTECTED records. Complete M4
   release, mixed catalogs, native owner admission and deletion remain OPEN.
-  The final run passed 77 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
+  The final run passed 90 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
   First-generation checkpoints are retained; four separate second-generation checkpoints now pass fresh-JVM native
   descriptor/task recovery for the user topic, both internal topics and index-only output, without republishing.
   New fallback protection starts at the introduced E+1, while existing fallback identities inherit their earlier first
   epoch. Shared Object/Kafka validation rejects the old preferred-only epoch; native stored epochs survive restart.
+
+- The [scoped BK read owner](m5-kafka-read-owner-projection.json) holds every physical member's ticket from before
+  native session creation through actual read/session termination. It closes local admission before exact M4 closure
+  and supports exact retry after unknown response. Five owner tests, seven unchanged M4 recovery tests and a new
+  native delayed-read/close case pass within the 90-case/phase source-bound run. It creates no M4 terminal or RELEASED
+  record; full native owner admission and crash reconciliation remain required.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

@@ -3109,6 +3109,8 @@ tasks.register("v2M5KafkaRunSourceCheck") {
         ":nereus-kafka-bookkeeper:v2M5KafkaCompactionTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaRecordBatchBudgetTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaSelectedSourceTest",
+        ":nereus-kafka-bookkeeper:v2M5KafkaReadOwnerTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperM4RecoveryTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest",
     )
 }

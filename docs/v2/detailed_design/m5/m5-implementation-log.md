@@ -1263,6 +1263,57 @@ M5-B and semantic-core source/contract checks passed 19/19 executed tasks in
 `/tmp/nereus-m5-fallback-epoch-final-check.log`. All 17 acceptance obligations remain OPEN/null; both the lifecycle
 deferred list and active registry retain V2-KAF-DATA-012/013/022 as PLANNED with null receipts.
 
+## 2026-09-08 scoped BK read-owner admission and drain
+
+Status: scoped runtime and native read-owner drain verified; no global M4 release or Final authority. This follows published
+`13467ede0cf17cfa682de8f0b5c89614a61c2826`, verified as the clean current main before this slice.
+
+`KafkaBookKeeperReadOwnerV2.run` gives one selected descriptor a structured read lifetime. It acquires the complete
+physical data/index ticket set before creating an owned session, rechecks exact durable selection and capability,
+and runs the existing M4 recovery planner/hazard kernel on the supplied bounded owner executor. The owner caps
+concurrent recoveries; decoding bounds remain per admitted recovery and aggregate Cell reservation remains external.
+Read observers and the outer scope observer are detached from actual IO/cleanup completion. Normal, failed or cancelled
+work stops new admission and waits for accepted reads, a clean owned hazard pool and actual session close before the
+guard can release its own tickets. Unknown session close retains every ticket. A leaked owner cannot admit more reads
+or execute a late selector transition after its lifetime ends.
+
+`closeFallbackAndDrain` closes this owner's local admission before the existing exact M4 selector CAS. Unknown/conflict
+does not produce evidence; an exact retry can reconcile while the old read remains pinned. Only the exact closure
+anchor plus actual native session termination yields the privately constructed local `DrainEvidence`. The structured
+scope also requires ticket release before returning its result. This class writes no M4 terminal/proof, no RELEASED
+record and no physical delete. Its local evidence cannot prove the full native protocol-owner reader population or
+replace owner admission, crash/fencing proof, all-writer integration or source-bound M5-E acceptance.
+
+Five deterministic owner cases pass: cancelled read/outer observer, cancelled work lifetime, missing physical
+authority, unknown session close and exact retry after unknown selector closure. The seven existing M4 recovery cases
+remain unchanged and pass. Native test compilation plus all affected Java style checks pass (25 tasks, 9 executed).
+The native case delays an actual BK read result and actual session-close acknowledgment, asserting all physical
+tickets survive both delays; new reads fail after closure and old source protection remains PROTECTED. It also checks
+that no M4 terminal was created.
+
+Final current-source validation passed 89/89 main tasks and a separate 22-task restart JVM (3 executed), with 18
+archives/90 cases and phases and zero failures/errors/skips. Independent legacy validation passed 93/93 main tasks,
+17 archives/71 cases and phases and three fresh-JVM restart reads. Both full source maps and every archived XML were
+independently rechecked. The 725-input map is SHA-256
+`a8fb0be6ee7f1a1fb4c7871ba2cb6b4513ed7bbd9c06d6ec0349dfa274ca6656`; the 702-input legacy map is
+`4b9afb24315225d10f24a5f6dedb6b568b35239021c4b4d0aea678af47d5b4ee`.
+
+Local summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-40922/run-summary.json`, SHA-256
+`937dfc5ca5d0bbccba02c5f162649b9b5e5077ed71bb90d63cd4df43af314967`; log `/tmp/nereus-m5-read-owner-native1.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-40950`, summary SHA-256
+`04bb07be212684b24a00460729e5419cb9d2b65b09a321239e64a6a59b563d75`.
+Oxia container `5ec1fa0794858bda8c654bc1133fe37515f527fe4b80490af2a8ee098dc1dd27` retained its ID/image and restarted
+from `2026-09-08T05:07:50.497237294Z` to `2026-09-08T05:10:51.852664128Z`; the four BK/ZooKeeper containers likewise
+retained IDs/images and changed start times. Cleanup retained the unrelated connector. The new owner drain executes
+in the main JVM; existing first/second-generation restart checks do not prove crash recovery of its local evidence.
+All global/native owner admission, old-ticket crash recovery, complete Cell budgeting, M4 RELEASED, all 17 obligations,
+five M5-E children and aggregate/source-bound Final remain unclaimed.
+
+Final documentation, historical design/M4 dependency, lifecycle, coordinator and READ_FENCED checks plus M5-A,
+M5-B and semantic-core source/contract checks passed 19/19 executed tasks in
+`/tmp/nereus-m5-read-owner-final-check.log`. All 17 acceptance obligations remain OPEN/null; the deferred list and
+active registry both retain V2-KAF-DATA-012/013/022 as PLANNED with null evidence receipts.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

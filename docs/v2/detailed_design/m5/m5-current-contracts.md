@@ -245,15 +245,25 @@ Existing fallback identities retain their original first epochs and exact set di
 identities at both publications and after both generations' restart; the unit proof/release case uses synthetic drain
 facts only. Actual M4 RELEASED and admitted native read-owner drain remain OPEN.
 
-The final native run passed 87 executed main tasks and a separate 22-task restart JVM (three executed), with 77
+The final native run passed 89 executed main tasks and a separate 22-task restart JVM (three executed), with 90
 archived cases/phases and no failures/errors/skips. The independent legacy regression passed 71 cases/phases. Both
-the 723-input map and 700-input legacy map were independently unchanged, including the amended descriptor checker and
+the 725-input map and 702-input legacy map were independently unchanged, including the amended descriptor checker and
 its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
 now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route
 loads the current native descriptor and immutable task; the checkpoint supplies only client configuration and expected
 hashes. Exact source extent, selector, all data/index parts and old PROTECTED records survive restart. Both control
 clients report zero record creates and selector CAS calls, while temporary physical read tickets still use their
 separate native authority route. This focused recovery does not complete protocol-owner admission or M4 RELEASED.
+
+The [scoped BK read owner](m5-kafka-read-owner-projection.json) now composes complete physical read tickets, an owned
+native session, exact durable selection and the existing M4 planner/hazard kernel. Its structured lifetime closes
+local admission, waits for accepted reads and native session termination, then releases only its own tickets. The
+exact M4 closure path closes local admission before CAS; unknown/conflicting closure cannot return local drain
+material, and exact retry retains the old read until actual completion. Cancellation of reads, work or an outer
+observer cannot bypass cleanup; an ended owner cannot issue another read or late selector transition. Native delayed
+read/close verification passes. Its privately constructed local evidence is not an M4 terminal/proof or RELEASED
+record. Full protocol-owner population admission, aggregate Cell reservation, crash-ticket reconciliation and actual
+M4 release remain OPEN. Existing service-restart cases do not prove reconstruction of this new owner's local drain.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

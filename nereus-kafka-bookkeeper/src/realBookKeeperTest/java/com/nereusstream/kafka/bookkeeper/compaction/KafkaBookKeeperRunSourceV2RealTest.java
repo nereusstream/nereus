@@ -32,6 +32,8 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
@@ -49,6 +51,8 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -58,6 +62,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -341,6 +346,127 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(repeated.indexes()).hasSize(8);
                 recompactSelected(f, published, input, selected, 4320);
             }
+        }
+    }
+
+    @Test
+    void nativeReadOwnerClosesAdmissionAndRetainsTicketsUntilSessionTermination() throws Exception {
+        try (var f = new Fixture(2530, "orders", null)) {
+            var root = admit(f, f.prepareSealedSource());
+            var source = reader(f, f.roots, BOUNDS);
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var input = input(f, raw, 3530);
+            try (var published = new Published(f, input, NativeContext.root())) {
+                var descriptor = published.writeAndPublish(source);
+                var ready = new CompletableFuture<KafkaBookKeeperReadOwnerV2>();
+                var entered = new CompletableFuture<RunLedgerReadResultV1>();
+                var delivered = new CompletableFuture<RunLedgerReadResultV1>();
+                var closeEntered = new CompletableFuture<Void>();
+                var closeDelivered = new CompletableFuture<Void>();
+                var lifetime = new CompletableFuture<KafkaBookKeeperReadOwnerV2.DrainEvidence>();
+                var read = new AtomicReference<CompletableFuture<KafkaBookKeeperM4RecoveryV2.RecoveryResult>>();
+                var calls = new AtomicInteger();
+                var closes = new AtomicInteger();
+                var scope = KafkaBookKeeperReadOwnerV2.run(
+                        descriptor,
+                        published.context.m4,
+                        new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                        () -> {
+                            var nativeSession = published.output.newSession();
+                            return (BookKeeperCellSession) Proxy.newProxyInstance(
+                                    BookKeeperCellSession.class.getClassLoader(),
+                                    new Class<?>[] {BookKeeperCellSession.class},
+                                    (proxy, method, args) -> {
+                                        Object result;
+                                        try {
+                                            result = method.invoke(nativeSession, args);
+                                        } catch (InvocationTargetException failure) {
+                                            throw failure.getCause();
+                                        }
+                                        if (method.getName().equals("readExactEntry") && calls.incrementAndGet() == 1) {
+                                            ((CompletionStage<?>) result).whenComplete((value, failure) -> {
+                                                if (failure == null) {
+                                                    entered.complete((RunLedgerReadResultV1) value);
+                                                } else {
+                                                    entered.completeExceptionally(failure);
+                                                }
+                                            });
+                                            return delivered;
+                                        }
+                                        if (method.getName().equals("closeAsync")) {
+                                            closes.incrementAndGet();
+                                            return ((CompletionStage<?>) result).thenCompose(ignored -> {
+                                                closeEntered.complete(null);
+                                                return closeDelivered;
+                                            });
+                                        }
+                                        return result;
+                                    });
+                        },
+                        published.output::captureExactTarget,
+                        published.context.owner,
+                        new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000),
+                        2,
+                        owner -> {
+                            ready.complete(owner);
+                            read.set(owner.recover());
+                            return lifetime;
+                        });
+                var actual = await(entered);
+                var owner = await(ready);
+                assertThat(read.get().cancel(true)).isTrue();
+                var drained = owner.closeFallbackAndDrain(published.context.protections);
+                drained.whenComplete((value, failure) -> {
+                    if (failure == null) {
+                        lifetime.complete(value);
+                    } else {
+                        lifetime.completeExceptionally(failure);
+                    }
+                });
+                assertThatThrownBy(() -> await(owner.recover()))
+                        .hasRootCauseMessage("BK read owner admission is closed");
+                assertThat(closes.get()).isZero();
+                assertNativeReadTickets(f, descriptor, 1);
+                assertThat(drained.toCompletableFuture()).isNotDone();
+                delivered.complete(actual);
+                await(closeEntered);
+                assertThat(closes.get()).isEqualTo(1);
+                assertThat(drained.toCompletableFuture()).isNotDone();
+                assertNativeReadTickets(f, descriptor, 1);
+                closeDelivered.complete(null);
+                var evidence = await(scope);
+                assertThat(evidence.anchor().closedReadAdmissionEpoch())
+                        .isEqualTo(evidence.predecessor().readAdmissionEpoch());
+                assertThat(evidence.successor().mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_ONLY);
+                assertNativeReadTickets(f, descriptor, 0);
+                var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                        7, published.context.binding);
+                assertThat(published.context.onOwner(() -> published.context.store.get(
+                                keys.terminal(evidence.predecessor().readAdmissionEpoch()))))
+                        .isEmpty();
+                for (var old : published.context.protections) {
+                    var protection = published.context.onOwner(() -> M4ReadControlCodecV1.decodeProtection(published
+                            .context
+                            .store
+                            .get(keys.protection(old.sourceIdentitySha256(), old.protectionGeneration()))
+                            .orElseThrow()));
+                    assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
+                }
+            }
+        }
+    }
+
+    private static void assertNativeReadTickets(Fixture f, KafkaSealedBookKeeperDescriptorV2 descriptor, int expected)
+            throws Exception {
+        for (var part : descriptor.sealedParts()) {
+            var resource = new PhysicalResourceIdV2.BookKeeperLedger(
+                    descriptor.task().namespace(),
+                    part.handle().ledgerIdentity().ledgerId());
+            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(resource.authorityKey()))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .activeWriterTickets())
+                    .hasSize(expected);
         }
     }
 
