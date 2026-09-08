@@ -330,7 +330,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
      * Caller must first prove the exact M5 intent/eligibility/admission. Identity is re-read and its native version
      * participates in the same server transaction as owner/capability, namespace and closed-create fences.
      */
-    public CompletionStage<DeleteResult> deleteExact(Snapshot expected, BookKeeperDeleteTargetV1 target) {
+    CompletionStage<DeleteResult> deleteExact(Snapshot expected, BookKeeperDeleteTargetV1 target) {
         return deleteExact(expected, Optional.empty(), target);
     }
 

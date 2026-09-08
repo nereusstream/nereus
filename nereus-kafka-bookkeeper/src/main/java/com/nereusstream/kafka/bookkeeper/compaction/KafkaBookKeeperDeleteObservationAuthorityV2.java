@@ -25,6 +25,7 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2.Snapshot;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteIntentV2;
+import com.nereusstream.storage.object.gc.BoundPhysicalDeleteAuthorityRouteV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
@@ -42,6 +43,7 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
     private static final String FACT_PREFIX = "v2/bk-native-delete-epoch/";
     private static final int VERSION_MAGIC = 0x4d354556; // M5EV
     private final M5BookKeeperNativeDeleteAuthorityV2 nativeAuthority;
+    private final M5BookKeeperNativeCreateClientV2 client;
     private final KafkaBookKeeperDeleteIdentityReaderV2 reader;
     private final UUID owner;
     private final PhysicalResourceIdV2.BookKeeperLedger resource;
@@ -51,6 +53,7 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
     public KafkaBookKeeperDeleteObservationAuthorityV2(
             M5BookKeeperNativeCreateClientV2 client, RunLedgerHandleV1 handle, UUID owner) {
         this.nativeAuthority = client.deleteAuthority(handle);
+        this.client = client;
         this.reader = new KafkaBookKeeperDeleteIdentityReaderV2(client, handle);
         this.owner = Objects.requireNonNull(owner, "owner");
         if (owner.equals(new UUID(0, 0))) {
@@ -66,8 +69,40 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
     }
 
     /** Claim is explicit and separate from observing/binding; every successor invalidates old native operations. */
-    public CompletionStage<Snapshot> claim(Optional<Snapshot> previous) {
+    CompletionStage<Snapshot> claim(Optional<Snapshot> previous) {
         return nativeAuthority.claim(previous, owner);
+    }
+
+    /** Public admission requires the unique native route and an active durable M5 quota reservation. */
+    public CompletionStage<Snapshot> claim(BoundPhysicalDeleteAuthorityRouteV2 route, Optional<Snapshot> previous) {
+        CompletionStage<Snapshot> operation = requireRoute(route)
+                .thenCompose(ignored -> claim(previous))
+                .thenCompose(value -> requireRoute(route).thenApply(ignored -> value));
+        return operation.thenApply(value -> value);
+    }
+
+    public CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
+            BoundPhysicalDeleteAuthorityRouteV2 route, VersionedValue exactIntent) {
+        CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireRoute(route)
+                .thenCompose(ignored -> bindIntent((ExactMetadataTransactionStoreV1) route, exactIntent))
+                .thenCompose(value -> requireRoute(route).thenApply(ignored -> value));
+        return operation.thenApply(value -> value);
+    }
+
+    private CompletionStage<Void> requireRoute(BoundPhysicalDeleteAuthorityRouteV2 route) {
+        Objects.requireNonNull(route, "route");
+        return client.requireNamespaceBinding()
+                .thenCompose(expected -> route.requireActiveResource(resource).thenCompose(actual -> {
+                    if (!expected.equals(actual)) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalStateException("GC authority route differs from native client binding"));
+                    }
+                    return client.requireNamespaceBinding().thenAccept(current -> {
+                        if (!current.equals(actual)) {
+                            throw new IllegalStateException("native GC binding changed during route admission");
+                        }
+                    });
+                }));
     }
 
     public CompletionStage<DeleteObservationContextV2> observe(
@@ -159,7 +194,7 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
      * Binds the actual stored M5 INTENT to native epoch/token/full identity. This does not dispatch deletion or
      * supply eligibility/grace/Cell capacity. Changed metadata retains a fenced native binding for later recovery.
      */
-    public CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
+    CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
             ExactMetadataTransactionStoreV1 metadata, VersionedValue exactIntent) {
         Objects.requireNonNull(metadata, "metadata");
         var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());

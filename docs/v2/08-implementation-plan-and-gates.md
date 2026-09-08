@@ -41,7 +41,13 @@ Its 21 archived suites contain 81 cases/phases; the bound run-source runner requ
 81-case archive. `v2M5BookKeeperNativeDeleteAuthorityRealTest` supplies actual native GC owner/capability facts to
 READ_FENCED/INTENT recovery and binds the exact stored M5 intent/token to a permanent native intent record. Every
 changed token requires a newer GC epoch; actual native deletion checks intent version and ledger version atomically.
-Protocol owner and eligibility proof production, grace, per-Cell budgets and complete dispatch remain required.
+The bound run-source runner now adds `v2M5BoundDeleteRealTest` and independent bound-delete restart write/read
+phases: 21 archives / 93 cases and phases. Public GC claim/bind require `BoundPhysicalDeleteAuthorityRouteV2`,
+actual native namespace equality and an active quota-reserved M5 authority. Manually constructed routes, missing
+active authorities and settled resources are rejected. Native epoch/intent and exact M5 authority survive the same
+services restarting; a new GC owner refreshes intent before fixture deletion and permanent done/quota settlement.
+Protocol owner and eligibility proof production, grace, native record capacity, per-Cell dispatch budgets and complete
+dispatch remain required.
 
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part

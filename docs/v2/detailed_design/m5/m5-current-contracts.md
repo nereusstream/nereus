@@ -114,9 +114,27 @@ Three real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch re
 rejection, exact intent binding and changed-M5-intent recovery. One fixture performs the bound low-level native delete
 and current-owner absence completion/compaction; protocol/M4 eligibility remains synthetic and M4 selection remains
 unchanged. The adapter does not prove grace, reserve Cell dispatch/unknown capacity, or account durable native epoch
-and intent capacity. Fixed-size per-resource state does not bound lifetime resource count. The composition must also
-admit the unique native namespace/authority route. Complete protocol proof production, unguarded legacy ledgers,
-all-provider dispatch and full writer coverage remain OPEN.
+and intent capacity. Fixed-size per-resource state does not bound lifetime resource count. Complete protocol proof
+production, unguarded legacy ledgers, all-provider dispatch and full writer coverage remain OPEN.
+
+`BoundPhysicalDeleteAuthorityRouteV2` now supplies explicit unique-route and active-resource admission to public GC
+claim/bind. `OxiaPhysicalMetadataNamespaceV2.openAuthorityRoute` installs actual native marker/binding revalidation;
+raw constructors have no such admission and fail closed. The route checks the deterministic root, physical namespace,
+existing permanent quota grant and current nonterminal M5 authority. A grant without an authority is insufficient;
+full/compact done and settled grants reject new GC work. `M5BookKeeperNativeCreateClientV2.requireNamespaceBinding`
+rereads INSTANCEID and permanent binding through the same owned native connection. The GC adapter compares both
+native assignments before and after claim/bind. Endpoint aliases and caller roots cannot select a second authority.
+The old generic-store binding and route-free claim helpers are package-private; the public native delete method now
+requires a durable native intent. Failure after accepted native work retains the record for reconciliation.
+
+The bound runner adds one active-route case and two independent-JVM restart phases. They reject manually constructed
+routes, unreserved resources and grants lacking active authorities, then verify persisted native epoch/intent and
+exact M5 value/hash/version before takeover. The new owner advances native epoch, refreshes M5 intent, binds the new
+token, removes the fixture ledger through the native intent path and completes/compacts done. Durable quota settles,
+then rejects another claim without changing the epoch. This reuses the existing authority-byte reservation; it does
+not charge permanent native epoch/intent bytes, reserve Cell dispatch/unknown slots or prove grace. Protocol/M4
+eligibility remains synthetic. The unique guarded BK route is exercised; complete cross-Cell/all-writer admission and
+the full dispatcher still require implementation and source-bound evidence.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.

@@ -28,8 +28,10 @@ The current guarded BK delete primitive adds a permanent native GC epoch and one
 namespace/task/reservation/epoch and exact ledger version before metadata deletion. Real competing clients, lost
 responses and separate JVMs across service restart validate that native boundary. Actual native GC owner/capability
 facts now feed the coordinator, and one permanent native intent record binds its exact M5 token/authority and ledger
-fingerprint. New tokens require a new GC epoch. Protocol eligibility, grace, Cell admission and complete dispatch
-composition remain OPEN; this result creates no M5-E child or aggregate Final.
+fingerprint. New tokens require a new GC epoch. Public GC claim/bind also verify the permanent unique metadata
+route and an active quota-reserved M5 authority, including after service restart. Protocol eligibility, grace, native
+record capacity, Cell dispatch admission and complete dispatch composition remain OPEN; this result creates no
+M5-E child or aggregate Final.
 
 ## Historical inputs and implementation predecessors
 

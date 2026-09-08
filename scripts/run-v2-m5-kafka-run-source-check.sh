@@ -122,9 +122,11 @@ PY
   "-Pv2M5PublicationTicketsRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
   "-Pv2M5KafkaRunRootsRestartCheckpoint=$m5_output/run-root-checkpoint" \
   "-Pv2M5KafkaRunSourceRestartCheckpoint=$m5_output/run-source-checkpoint" \
+  "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
   v2M5KafkaRunSourceCheck :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartWriteTest \
-  :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartWriteTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartWriteTest \
+  :nereus-kafka-bookkeeper:v2M5BoundDeleteRealTest :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartWriteTest --console=plain
 
 docker compose -p "$m5_project" -f "$m5_compose" ps -q > "$m5_output/bookkeeper-container-ids.txt"
 while IFS= read -r m5_id; do
@@ -148,9 +150,11 @@ m5_wait_ready
   "-Pv2M5PublicationTicketsRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
   "-Pv2M5KafkaRunRootsRestartCheckpoint=$m5_output/run-root-checkpoint" \
   "-Pv2M5KafkaRunSourceRestartCheckpoint=$m5_output/run-source-checkpoint" \
+  "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
   :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartReadTest \
-  :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartReadTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartReadTest \
+  :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartReadTest --console=plain
 
 docker logs "$m5_oxia_owned_id" > "$m5_output/oxia-server.log" 2>&1
 docker compose -p "$m5_project" -f "$m5_compose" logs > "$m5_output/bookkeeper.log" 2>&1
@@ -177,6 +181,9 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
+    ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
+    ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
+    ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartWriteTest','KafkaBookKeeperRunRootsV2RealTest',1),
@@ -195,7 +202,8 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
+summary={'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
+    'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,
     'sameZooKeeperAndBookieContainersRestarted':True,

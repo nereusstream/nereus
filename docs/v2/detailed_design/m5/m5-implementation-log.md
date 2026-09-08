@@ -2052,6 +2052,55 @@ connector was retained. Complete unique namespace/authority-route admission rema
 All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final
 or production authority is created. Permanent native epoch/intent capacity still requires durable quota admission.
 
+## 2026-09-08 bound native GC route and active quota admission
+
+Status: implemented unique native authority-route checks around GC claim/bind; NON_PROMOTABLE. Grace, native
+record capacity, Cell dispatch/unknown budgets and full protocol eligibility remain OPEN.
+
+`BoundPhysicalDeleteAuthorityRouteV2` requires actual native namespace binding, the deterministic authority root,
+an existing permanent quota reservation and a current nonterminal M5 resource authority. Only the native metadata
+namespace factory installs binding revalidation; manually configured quota stores fail this admission even if their
+root string matches. A grant without an authority, full/compact terminal authority or settled grant cannot qualify.
+The native owned BK client rereads INSTANCEID and the permanent assignment from its own connection. Public GC claim
+and intent binding compare that assignment with the route before and after accepted native work. A late failure
+retains native state for recovery. Generic-store binding/route-free claim are package-private fixture primitives;
+public native deletion requires a durable native intent, closing the snapshot-only external API path.
+
+The bound integration creates and seals actual native data, rejects raw/unreserved/unmaterialized-authority routes,
+then qualifies OPEN, native owner observation and exact intent at the permanent route. Separate JVMs retain the
+original native epoch, native intent and M5 authority over the same ZooKeeper/bookie/Oxia restarts. The new JVM
+reads all three records and verifies their expected hashes and exact M5 version before any GC mutation; checkpoint
+contains input spec, ledger ID, M5 key/hash/version and native record hashes only. A new native owner takes over,
+refreshes M5 intent and performs low-level fixture deletion, exact absence completion, compaction and quota settlement.
+A subsequent claim is rejected and leaves the native epoch unchanged.
+
+Locked native validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`:
+legacy 96/96 main tasks (1m 45s), 24/24 restart tasks (11s), 21 archives / 81 cases and phases;
+bound-profile 91/91 main tasks (2m 55s), 23/23 restart tasks (27s),
+21 archives / 93 cases and phases. Log: `/tmp/nereus-m5-bound-gc-real.log`. Legacy output:
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-63298`. Its 724-input manifest SHA is
+`2cfabc7c24a429b0d5071a9f12c6f165e7d63a8a26d3d10fba72d8ec38f134de`; summary SHA
+`ec3398cd39b31bcd72a58327679c9846d1be7051b8929461a5c4e877578e6bee`. The same legacy Oxia
+`2ed5d368f7e43d4fabbf74719315e85ece24143e397e8cdc5586eac4d0bdb5c9` restarted from `2026-09-08T08:45:02.477555673Z`
+to `2026-09-08T08:47:01.802672714Z`. Bound output:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-63287`. Its 739-input manifest SHA is
+`7931d46ebd670007e112074d0f36b34f5770a3d09517cae939ad63fbcaf2c7a7`; summary SHA
+`17927b1f2fdb09d60472ff7f922b207ea8c663f932cbdd74d2bab6954249f49c`. The same bound Oxia
+`53d6843f3056c015b58057fceeb89a1e0c33017b9a7801ddc1d611c96bdaad8a` restarted from `2026-09-08T08:47:37.32092555Z`
+to `2026-09-08T08:50:46.544356679Z`. Both runs retained all four exact ZooKeeper/bookie container IDs and image
+IDs with changed start times. Every captured input and archived XML was independently rehashed; every suite has
+zero failures, errors and skips. The copied legacy summary and manifest are byte-identical to the originals.
+Compile/style preflight passed 32 tasks (`/tmp/nereus-m5-bound-gc-compile.log`); contract/source preflight passed
+19 tasks (`/tmp/nereus-m5-bound-gc-preflight.log`). Final documentation, historical freeze/M4 dependency, lifecycle,
+coordinator, materialization and Kafka contract/source checks passed 19/19 tasks
+(`/tmp/nereus-m5-bound-gc-final-check.log`). All owned test containers were cleaned up; the unrelated connector
+was retained.
+
+This admission reuses authority-byte reservations; it does not account permanent native GC records or provide
+per-Cell dispatch/unknown capacity and authority-time grace. Protocol/M4 eligibility remains synthetic. All 17
+acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final or
+production authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2065,7 +2114,8 @@ or production authority is created. Permanent native epoch/intent capacity still
    physical dispatch and protocol-proof repair above the same-key coordinator. Bounded READ_FENCED veto, typed
    INTENT capability refresh, native BK identity/absence reconciliation and server-fenced guarded BK deletion are
    implemented. Guarded BK native GC owner/capability facts and permanent M5 intent-token binding now compose with
-   the coordinator; complete protocol proof production, grace/Cell admission and dispatch composition remain incomplete.
+   the coordinator. Public native GC claim/bind now require the unique bound authority route and active quota;
+   complete protocol proof production, native record capacity, grace/Cell admission and dispatch remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

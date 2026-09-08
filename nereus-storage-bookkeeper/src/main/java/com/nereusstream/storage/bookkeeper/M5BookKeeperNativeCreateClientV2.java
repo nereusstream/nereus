@@ -121,6 +121,11 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
         return capability;
     }
 
+    /** Reads the permanent assignment through this same owned connection; an unbound client cannot qualify. */
+    public CompletionStage<PhysicalNamespaceAuthorityBindingV2> requireNamespaceBinding() {
+        return driver().guard().requireNamespaceBinding();
+    }
+
     public RealBookKeeperCellSessionV1 newSession() {
         return new RealBookKeeperCellSessionV1(client, capability, new byte[0]);
     }

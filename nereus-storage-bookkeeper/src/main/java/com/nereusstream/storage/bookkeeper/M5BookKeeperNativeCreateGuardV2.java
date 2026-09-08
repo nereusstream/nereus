@@ -43,6 +43,8 @@ final class M5BookKeeperNativeCreateGuardV2 {
     private final byte[] fenced;
     private final String namespaceGatePath;
     private final int namespaceGateVersion;
+    private final M5BookKeeperNamespaceGateV2 namespaceGate;
+    private final Optional<PhysicalNamespaceAuthorityBindingV2> admittedBinding;
 
     M5BookKeeperNativeCreateGuardV2(
             ZooKeeper zk,
@@ -59,7 +61,8 @@ final class M5BookKeeperNativeCreateGuardV2 {
         if (!actualInstance.equals(spec.nativeInstanceId())) {
             throw new IllegalStateException("native BookKeeper INSTANCEID differs from the task create scope");
         }
-        var namespaceGate = new M5BookKeeperNamespaceGateV2(zk, ledgerRoot, actualInstance, acls);
+        namespaceGate = new M5BookKeeperNamespaceGateV2(zk, ledgerRoot, actualInstance, acls);
+        admittedBinding = binding;
         var namespaceSnapshot = binding.isPresent()
                 ? namespaceGate.read().get()
                 : namespaceGate.initializeUnbound().get();
@@ -95,6 +98,22 @@ final class M5BookKeeperNativeCreateGuardV2 {
 
     String taskPath() {
         return taskPath;
+    }
+
+    CompletableFuture<PhysicalNamespaceAuthorityBindingV2> requireNamespaceBinding() {
+        if (admittedBinding.isEmpty()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("native client was not opened bound"));
+        }
+        return namespaceGate
+                .read()
+                .thenApply(actual -> {
+                    if (actual.nativeVersion() != namespaceGateVersion
+                            || !actual.binding().equals(admittedBinding)) {
+                        throw new IllegalStateException("native client namespace binding changed");
+                    }
+                    return actual.binding().orElseThrow();
+                })
+                .toCompletableFuture();
     }
 
     String reservationPath(long ledgerId) {

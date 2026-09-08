@@ -553,3 +553,30 @@ tasks.register<Test>("v2M5KafkaReadOwnerTest") {
     filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadOwnerV2Test") }
     outputs.upToDateWhen { false }
 }
+
+// Bound native GC admission and separate-JVM recovery on the existing permanent namespace route.
+mapOf(
+    "v2M5BoundDeleteRealTest" to "boundNativeClientRequiresActiveQuotaAuthorityAndRejectsRawRoutesBeforeEpochOrIntentMutation",
+    "v2M5BoundDeleteRestartWriteTest" to "writeBeforeServerRestart",
+    "v2M5BoundDeleteRestartReadTest" to "readAfterServerRestart",
+).forEach { (taskName, method) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperBoundDeleteV2RealTest.$method") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri",
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull ?: error("native BK URI is required"))
+            systemProperty("nereus.m5.oxia.serviceAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("native Oxia address is required"))
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.boundDelete.restartCheckpoint",
+                    providers.gradleProperty("v2M5BoundDeleteRestartCheckpoint").orNull ?: error("bound GC checkpoint is required"))
+            }
+        }
+    }
+}

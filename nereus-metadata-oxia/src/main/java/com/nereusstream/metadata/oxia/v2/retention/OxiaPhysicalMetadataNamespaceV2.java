@@ -125,7 +125,8 @@ public final class OxiaPhysicalMetadataNamespaceV2 {
                     client,
                     guardedClient(backend),
                     new Layout(binding.authorityRoot(), binding.physicalNamespace()),
-                    authoritativeFacts);
+                    authoritativeFacts,
+                    () -> currentBinding(backend));
         });
     }
 

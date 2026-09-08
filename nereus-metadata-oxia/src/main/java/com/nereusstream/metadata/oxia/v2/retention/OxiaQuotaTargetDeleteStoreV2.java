@@ -19,6 +19,9 @@ import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.object.gc.BoundPhysicalDeleteAuthorityRouteV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Entry;
@@ -41,12 +44,13 @@ import java.util.concurrent.CompletionStage;
  * The owner must exclude older/raw writers and assign one root per native physical namespace before initialization.
  * Canonical byte reservations do not reserve backend WAL, replica, filesystem or unrelated namespace capacity.
  */
-public final class OxiaQuotaTargetDeleteStoreV2 implements ExactMetadataTransactionStoreV1 {
+public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAuthorityRouteV2 {
     private final AsyncOxiaClient scans;
     private final Layout layout;
     private final OxiaTargetDeleteAuthorityStoreV2 authorities;
     private final Accounting accounting;
     private final M5GcQuotaCoordinatorV2 quota;
+    private final java.util.function.Supplier<CompletionStage<PhysicalNamespaceAuthorityBindingV2>> bindingAuthority;
 
     public OxiaQuotaTargetDeleteStoreV2(
             AsyncOxiaClient client, Layout layout, ExactMetadataTransactionStoreV1 authoritativeFacts) {
@@ -59,12 +63,68 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements ExactMetadataTransact
             OxiaConditionalClient conditional,
             Layout layout,
             ExactMetadataTransactionStoreV1 authoritativeFacts) {
+        this(
+                scans,
+                conditional,
+                layout,
+                authoritativeFacts,
+                () -> CompletableFuture.failedFuture(new UnsupportedOperationException(
+                        "native physical namespace route admission is not installed")));
+    }
+
+    OxiaQuotaTargetDeleteStoreV2(
+            AsyncOxiaClient scans,
+            OxiaConditionalClient conditional,
+            Layout layout,
+            ExactMetadataTransactionStoreV1 authoritativeFacts,
+            java.util.function.Supplier<CompletionStage<PhysicalNamespaceAuthorityBindingV2>> bindingAuthority) {
         this.scans = Objects.requireNonNull(scans, "scans");
+        this.bindingAuthority = Objects.requireNonNull(bindingAuthority, "bindingAuthority");
         this.layout = Objects.requireNonNull(layout, "layout");
         authorities = new OxiaTargetDeleteAuthorityStoreV2(
                 conditional, layout.nativeRoot(), layout.namespace(), authoritativeFacts);
         accounting = new Accounting(Objects.requireNonNull(conditional, "conditional"));
         quota = new M5GcQuotaCoordinatorV2(layout, accounting, authorities);
+    }
+
+    @Override
+    public CompletionStage<PhysicalNamespaceAuthorityBindingV2> requireActiveResource(PhysicalResourceIdV2 resource) {
+        layout.requireResource(resource);
+        return currentRouteBinding()
+                .thenCompose(
+                        binding -> quota.requireExistingReservation(resource).thenCompose(grant -> {
+                            if (grant.settled()) {
+                                return CompletableFuture.failedFuture(
+                                        new IllegalStateException("native resource quota is settled"));
+                            }
+                            return authorities.read(resource.authorityKey()).thenApply(value -> {
+                                var stored = M5TargetDeleteStoredValueV2.decode(value.orElseThrow(() ->
+                                        new IllegalStateException("reserved native resource has no active authority")));
+                                if (stored.compactDone().isPresent()
+                                        || stored.fullAuthority().orElseThrow().state()
+                                                == com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1
+                                                        .TargetDeleteAuthorityStateV1.DELETE_DONE_V1) {
+                                    throw new IllegalStateException("native resource authority is terminal");
+                                }
+                                return binding;
+                            });
+                        }))
+                .thenCompose(binding -> currentRouteBinding().thenApply(current -> {
+                    if (!current.equals(binding)) {
+                        throw new IllegalStateException("native resource route changed during admission");
+                    }
+                    return current;
+                }));
+    }
+
+    private CompletionStage<PhysicalNamespaceAuthorityBindingV2> currentRouteBinding() {
+        return bindingAuthority.get().thenApply(binding -> {
+            if (!binding.physicalNamespace().equals(layout.namespace())
+                    || !binding.authorityRoot().equals(layout.nativeRoot())) {
+                throw new IllegalStateException("native resource route differs from the permanent assignment");
+            }
+            return binding;
+        });
     }
 
     public M5GcQuotaCoordinatorV2 quota() {

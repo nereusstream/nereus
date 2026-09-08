@@ -48,6 +48,8 @@ class M5BookKeeperNativeDeleteV2RealTest {
         var owner = UUID.randomUUID();
         try (var first = connect(spec);
                 var second = connect(spec)) {
+            assertThatThrownBy(() -> await(first.requireNamespaceBinding()))
+                    .hasRootCauseMessage("native client was not opened bound");
             var handle = sealed(first, spec);
             var target = await(first.captureExactTarget(handle)).exactTarget().orElseThrow();
             var authority = first.deleteAuthority(handle);
