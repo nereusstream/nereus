@@ -81,17 +81,29 @@ public final class KafkaBookKeeperDeleteIdentityReaderV2 implements DeleteExtern
         if (!expected.resourceId().equals(resource)) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("native BK namespace/ledger differs"));
         }
+        return rereadTarget(expected)
+                .thenApply(target -> target.isPresent()
+                        ? ExternalIdentityObservationV1.PRESENT_EXACT_V1
+                        : ExternalIdentityObservationV1.ABSENT_EXACT_V1);
+    }
+
+    /** Returns the exact native target used for intent binding; only native NoSuchLedger yields empty. */
+    public CompletionStage<Optional<BookKeeperDeleteTargetV1>> rereadTarget(ExactExternalIdentityV1 expected) {
+        Objects.requireNonNull(expected, "expected");
+        if (!expected.resourceId().equals(resource)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("native BK namespace/ledger differs"));
+        }
         return client.captureExactTarget(handle).thenApply(result -> switch (result.outcome()) {
             case EXACT_TARGET -> {
                 if (expected.observation() != ExternalIdentityObservationV1.PRESENT_EXACT_V1
                         || !expected.exactIdentityBytes().equals(encodeIdentity(result.exactTarget()))) {
                     throw new IllegalStateException("native BK sealed identity changed or an absent ledger reappeared");
                 }
-                yield ExternalIdentityObservationV1.PRESENT_EXACT_V1;
+                yield result.exactTarget();
             }
             // Native metadata absence identifies this immutable ledger in this actual instance. No cached
             // fingerprint or caller-supplied absence statement can produce this branch.
-            case DEFINITIVELY_ABSENT -> ExternalIdentityObservationV1.ABSENT_EXACT_V1;
+            case DEFINITIVELY_ABSENT -> Optional.empty();
             case DIFFERENT_OR_UNSEALED, OUTCOME_UNKNOWN ->
                 throw new IllegalStateException("native BK identity is changed, unsealed or unknown");
         });

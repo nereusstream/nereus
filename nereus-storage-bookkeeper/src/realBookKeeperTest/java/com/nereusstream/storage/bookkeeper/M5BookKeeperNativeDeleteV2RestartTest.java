@@ -46,8 +46,18 @@ class M5BookKeeperNativeDeleteV2RestartTest {
             await(client.fenceCreates());
             var authority = client.deleteAuthority(handle);
             var previous = await(authority.claim(Optional.empty(), UUID.randomUUID()));
-            var current = await(authority.claim(Optional.of(previous), UUID.randomUUID()));
             var target = await(client.captureExactTarget(handle)).exactTarget().orElseThrow();
+            await(authority.bindIntent(
+                    previous,
+                    M5BookKeeperNativeDeleteV2RealTest.digest("restart-token-1"),
+                    M5BookKeeperNativeDeleteV2RealTest.digest("restart-intent-1"),
+                    target.metadataSha256()));
+            var current = await(authority.claim(Optional.of(previous), UUID.randomUUID()));
+            var intent = await(authority.bindIntent(
+                    current,
+                    M5BookKeeperNativeDeleteV2RealTest.digest("restart-token-2"),
+                    M5BookKeeperNativeDeleteV2RealTest.digest("restart-intent-2"),
+                    target.metadataSha256()));
             Files.write(
                     checkpoint(),
                     List.of(
@@ -57,14 +67,16 @@ class M5BookKeeperNativeDeleteV2RestartTest {
                             Integer.toString(current.nativeVersion()),
                             target.metadataSha256().toHex(),
                             previous.owner().toString(),
-                            Sha256Digest.hash(previous.encode()).toHex()));
+                            Sha256Digest.hash(previous.encode()).toHex(),
+                            Sha256Digest.hash(intent.encode()).toHex(),
+                            Integer.toString(intent.nativeVersion())));
         }
     }
 
     @Test
     void readAfterServerRestart() throws Exception {
         var lines = Files.readAllLines(checkpoint());
-        assertThat(lines).hasSize(7);
+        assertThat(lines).hasSize(9);
         var spec = M5BookKeeperNativeCreateSpecV2.decode(
                 CanonicalBytes.copyOf(HexFormat.of().parseHex(lines.get(0))));
         var run = spec.configurations().get(0);
@@ -86,7 +98,11 @@ class M5BookKeeperNativeDeleteV2RestartTest {
             assertThatThrownBy(() -> await(authority.deleteExact(previous, target)))
                     .hasRootCauseMessage("native delete owner is fenced");
             assertThat(await(client.captureExactTarget(handle)).exactTarget()).contains(target);
-            assertThat(await(authority.deleteExact(current, target)).outcome())
+            var intent = await(authority.readIntent()).orElseThrow();
+            assertThat(intent.epoch()).isEqualTo(current);
+            assertThat(Sha256Digest.hash(intent.encode()).toHex()).isEqualTo(lines.get(7));
+            assertThat(intent.nativeVersion()).isEqualTo(Integer.parseInt(lines.get(8)));
+            assertThat(await(authority.deleteExact(intent, target)).outcome())
                     .isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
             assertThat(await(authority.read())).contains(current);
         }

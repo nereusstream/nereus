@@ -397,6 +397,7 @@ class M5BookKeeperNativeCreateV2RealTest {
     static final class FaultZooKeeper extends org.apache.zookeeper.ZooKeeper {
         volatile boolean holdNextMulti;
         volatile boolean loseNextMulti;
+        volatile boolean loseNextIntentMutation;
         volatile boolean loseNextSet;
         final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>
                 lostMultiDelivery = new java.util.concurrent.atomic.AtomicReference<>();
@@ -416,7 +417,18 @@ class M5BookKeeperNativeCreateV2RealTest {
                 org.apache.zookeeper.AsyncCallback.MultiCallback callback,
                 Object context) {
             multis.incrementAndGet();
-            boolean lose = loseNextMulti;
+            boolean intentMutation = false;
+            for (var op : ops) {
+                if (op.getPath().endsWith("-intent")
+                        && (op.getType() == org.apache.zookeeper.ZooDefs.OpCode.create
+                                || op.getType() == org.apache.zookeeper.ZooDefs.OpCode.setData)) {
+                    intentMutation = true;
+                }
+            }
+            boolean lose = loseNextMulti || (loseNextIntentMutation && intentMutation);
+            if (intentMutation) {
+                loseNextIntentMutation = false;
+            }
             loseNextMulti = false;
             Runnable dispatch = () -> super.multi(
                     ops,

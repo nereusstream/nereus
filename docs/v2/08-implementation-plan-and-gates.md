@@ -37,9 +37,11 @@ terminal reconciliation; physical-delete dispatch and full native owner/proof in
 The guarded BK native delete primitive now supplies permanent resource-scoped GC epochs and atomic server checks
 for namespace/task/reservation/epoch plus the exact ledger metadata version. The task-terminal runner includes
 `v2M5NativeDeleteRealTest` and separate `v2M5NativeDeleteRestartWriteTest` / `v2M5NativeDeleteRestartReadTest` phases.
-Its 20 archived suites contain 77 cases/phases; the bound run-source runner requires and rehashes this independent
-77-case archive. This validates native fencing and identity-specific deletion only: M5 intent/token admission,
-protocol owner and eligibility proof production, grace and per-Cell budgets remain required composition work.
+Its 21 archived suites contain 81 cases/phases; the bound run-source runner requires and rehashes this independent
+81-case archive. `v2M5BookKeeperNativeDeleteAuthorityRealTest` supplies actual native GC owner/capability facts to
+READ_FENCED/INTENT recovery and binds the exact stored M5 intent/token to a permanent native intent record. Every
+changed token requires a newer GC epoch; actual native deletion checks intent version and ledger version atomically.
+Protocol owner and eligibility proof production, grace, per-Cell budgets and complete dispatch remain required.
 
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part

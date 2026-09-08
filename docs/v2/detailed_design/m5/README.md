@@ -26,8 +26,10 @@ Start with [ADR 0148 and the current contract view](m5-current-contracts.md). Th
 supersession of the historical clauses below. Earlier focused gates do not satisfy revised implementation or Final.
 The current guarded BK delete primitive adds a permanent native GC epoch and one server transaction checking
 namespace/task/reservation/epoch and exact ledger version before metadata deletion. Real competing clients, lost
-responses and separate JVMs across service restart validate that native boundary. Full M5 intent/eligibility/grace
-and Cell admission composition remains OPEN; this result creates no M5-E child or aggregate Final.
+responses and separate JVMs across service restart validate that native boundary. Actual native GC owner/capability
+facts now feed the coordinator, and one permanent native intent record binds its exact M5 token/authority and ledger
+fingerprint. New tokens require a new GC epoch. Protocol eligibility, grace, Cell admission and complete dispatch
+composition remain OPEN; this result creates no M5-E child or aggregate Final.
 
 ## Historical inputs and implementation predecessors
 

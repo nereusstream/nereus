@@ -56,7 +56,7 @@ for path,sha in json.loads(inputs).items():
     candidate=(root/path).resolve()
     if not candidate.is_relative_to(root.resolve()) or hashlib.sha256(candidate.read_bytes()).hexdigest()!=sha:
         raise SystemExit('Legacy tested source changed: '+path)
-if sum(suite['tests'] for suite in summary['suites'])!=77:
+if sum(suite['tests'] for suite in summary['suites'])!=81:
     raise SystemExit('Legacy focused suite count differs')
 for suite in summary['suites']:
     data=(previous/(suite['task']+'.xml')).read_bytes(); actual=ET.fromstring(data)

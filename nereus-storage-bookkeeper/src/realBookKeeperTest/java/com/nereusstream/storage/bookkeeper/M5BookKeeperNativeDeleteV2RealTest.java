@@ -171,6 +171,68 @@ class M5BookKeeperNativeDeleteV2RealTest {
         }
     }
 
+    @Test
+    void nativeIntentBindingRejectsTokenReuseAndFencesPausedDispatchAfterSameOwnerEpochAdvance() throws Exception {
+        var spec = spec();
+        try (var state = new NativeFaults(uri(), CAPABILITY, spec)) {
+            var handle = sealed(state);
+            var target = M5BookKeeperDeleteAdapterV1.exactTarget(
+                            await(state.manager.readLedgerMetadata(
+                                            handle.ledgerIdentity().ledgerId()))
+                                    .getValue(),
+                            handle,
+                            CAPABILITY,
+                            new byte[0])
+                    .orElseThrow();
+            var ready = new CompletableFuture<Void>();
+            var gate = new CompletableFuture<Void>();
+            var delayed = authority(state, handle, () -> {
+                ready.complete(null);
+                return gate;
+            });
+            var immediate = authority(state, handle, () -> CompletableFuture.completedFuture(null));
+            var owner = UUID.randomUUID();
+            var epoch = await(immediate.claim(Optional.empty(), owner));
+            var token = digest("token-1");
+            var intentSha = digest("intent-1");
+            state.zk.loseNextIntentMutation = true;
+            var intent = await(immediate.bindIntent(epoch, token, intentSha, target.metadataSha256()));
+            assertThat(state.zk.lost.get()).isOne();
+            assertThat(await(immediate.bindIntent(epoch, token, intentSha, target.metadataSha256())))
+                    .isEqualTo(intent);
+            assertThatThrownBy(() ->
+                            await(immediate.bindIntent(epoch, digest("token-2"), intentSha, target.metadataSha256())))
+                    .hasRootCauseMessage("changed native intent requires a newer GC epoch");
+            assertThatThrownBy(() -> await(
+                            immediate.bindIntent(epoch, token, digest("changed intent"), target.metadataSha256())))
+                    .hasRootCauseMessage("changed native intent requires a newer GC epoch");
+            assertThatThrownBy(() -> await(immediate.bindIntent(epoch, token, intentSha, digest("changed metadata"))))
+                    .hasRootCauseMessage("changed native intent requires a newer GC epoch");
+            var pending = delayed.deleteExact(intent, target);
+            await(ready);
+            var nextEpoch = await(immediate.claim(Optional.of(epoch), owner));
+            var next = await(
+                    immediate.bindIntent(nextEpoch, digest("token-2"), digest("intent-2"), target.metadataSha256()));
+            assertThat(next.nativeVersion()).isEqualTo(intent.nativeVersion() + 1);
+            assertThat(next.encode().length()).isEqualTo(intent.encode().length());
+            gate.complete(null);
+            assertThatThrownBy(() -> await(pending))
+                    .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.BadVersionException.class);
+            assertThat(await(state.manager.readLedgerMetadata(
+                            handle.ledgerIdentity().ledgerId())))
+                    .isNotNull();
+            assertThat(await(immediate.deleteExact(next, target)).outcome())
+                    .isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
+            assertThat(await(immediate.readIntent())).contains(next);
+            assertThat(await(immediate.deleteExact(next, target)).outcome())
+                    .isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
+        }
+    }
+
+    static Sha256Digest digest(String value) {
+        return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
     private static M5BookKeeperNativeDeleteAuthorityV2 authority(
             NativeFaults state,
             RunLedgerHandleV1 handle,

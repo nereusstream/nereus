@@ -86,14 +86,37 @@ invalidates the captured version. Native NoSuchLedger alone proves absence; unkn
 until actual native rereads resolve it, and current epoch is revalidated before reporting. Observer cancellation
 does not cancel accepted work. The epoch remains after ledger deletion and retains constant-size latest state.
 
-Three real native cases plus two independent-JVM phases verify these boundaries, including full BK append/seal,
-actual server BADVERSION, applied-but-lost epoch/delete replies and retained epoch after the same ZooKeeper/bookie
-services restart. Each JVM verifies the locked BK client artifact. The restart checkpoint carries input spec, ledger
-ID and expected hashes/version/old-owner identifier; the new JVM must read the surviving native epoch itself.
-These are low-level native operations on guarded test ledgers. The adapter does not collect protocol eligibility,
-prove grace, reserve Cell dispatch/unknown capacity or bind a durable M5 intent token. Durable quota accounting
-for the permanent native epoch also remains required; fixed-size per-resource state does not bound lifetime resource
-count. Those admission layers, unguarded legacy ledgers, all-provider dispatch and full writer coverage remain OPEN.
+Four real native cases plus two independent-JVM phases verify these boundaries, including full BK append/seal,
+actual server BADVERSION, applied-but-lost epoch/intent/delete replies and retained epoch/intent after the same
+ZooKeeper/bookie services restart. Each JVM verifies the locked BK client artifact. The restart checkpoint carries
+input spec, ledger ID and expected hashes/versions/old-owner identifier; the new JVM reads the surviving native epoch
+and intent itself before deletion. These remain low-level native operations on guarded test ledgers.
+
+`KafkaBookKeeperDeleteObservationAuthorityV2` now verifies the configured GC owner's UUID and complete admitted
+capability against the actual permanent epoch. Its read-only fact route returns that exact native M5DE body and a
+resource-scoped native version, never an invented or separately stored proof body. Both owner and capability roles
+refer to the same exact fact. A same-named Oxia record cannot shadow native facts, foreign-resource routes fail, and
+native facts cannot be written through the metadata port. Predecessor fencing requires a strictly newer native epoch;
+multiple native claims may precede one successful Oxia observation refresh. These native GC facts do not establish
+Kafka/Pulsar protocol semantics, replacement coverage or M4 RELEASED.
+
+`M5BookKeeperNativeDeleteIntentV2` stores one permanent M5DI binding per physical resource. The body fixes native
+epoch, M5 dispatch token, exact M5 authority SHA and full ledger metadata SHA. An identical retry reconciles the same
+record; changing any bound identity under the same native epoch fails closed. A successor epoch replaces only this
+bounded record by exact native CAS. `bindIntent` on the Kafka adapter rereads the exact current M5 intent, validates
+native owner/capability, reads full native identity, binds the native record, then revalidates owner and exact M5
+metadata. If M5 changes during binding, the old binding remains for explicit epoch/observation recovery. Native
+delete using this binding atomically checks both epoch and intent versions with the ledger metadata version, and
+revalidates current native binding before reporting. Epoch and intent survive ledger absence; neither is recreated
+from a checkpoint or appended as per-attempt history.
+
+Three real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch refresh, forged/shadowed native fact
+rejection, exact intent binding and changed-M5-intent recovery. One fixture performs the bound low-level native delete
+and current-owner absence completion/compaction; protocol/M4 eligibility remains synthetic and M4 selection remains
+unchanged. The adapter does not prove grace, reserve Cell dispatch/unknown capacity, or account durable native epoch
+and intent capacity. Fixed-size per-resource state does not bound lifetime resource count. The composition must also
+admit the unique native namespace/authority route. Complete protocol proof production, unguarded legacy ledgers,
+all-provider dispatch and full writer coverage remain OPEN.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.

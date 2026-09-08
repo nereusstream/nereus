@@ -1997,6 +1997,61 @@ M4 RELEASED or grace, reserve Cell dispatch/unknown capacity, account durable na
 durable M5 intent token. The coordinator and all-writer/provider composition must supply those layers.
 All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final or production authority is created.
 
+## 2026-09-08 actual native GC observation facts and M5 intent binding
+
+Status: implemented native GC owner/capability observation and permanent intent binding; NON_PROMOTABLE.
+Protocol eligibility, grace, Cell admission and complete dispatcher composition remain OPEN.
+
+`KafkaBookKeeperDeleteObservationAuthorityV2` replaces synthetic GC ownership for the new BK/Oxia integration.
+The configured owner must match the native permanent epoch and the admitted full capability. Its fact port returns
+the exact canonical native epoch body, with a version scoped to the complete physical resource, and is read-only.
+The owner/capability roles reference the same fact. A same-named Oxia record cannot shadow it; changed hashes, wrong
+owners, foreign routes and non-advanced predecessor proofs fail. Native epoch advances may outnumber successful
+Oxia observation revisions; takeover still requires a strict native version increase and exact next observation.
+Kafka production now depends on the metadata SPI for this adapter; native Oxia remains confined to test composition.
+
+`M5BookKeeperNativeDeleteIntentV2` adds one permanent native M5DI binding for the GC epoch, dispatch token, exact M5
+intent authority SHA and full ledger metadata SHA. Only exact retries reuse it within an epoch. Changed bindings
+require a newer native GC epoch and one exact native CAS; no attempt list accumulates. The Kafka adapter verifies
+the actual stored M5 INTENT and current native owner/capability around full identity capture and native binding.
+M5 metadata changes during binding fail the caller while retaining the old binding for explicit recovery. The bound
+native delete checks epoch, intent and ledger versions in the same server transaction; a paused old request loses
+after the same owner advances epoch and installs a new token. Current binding is revalidated before reporting.
+
+Real tests add native GC takeover through READ_FENCED/INTENT, forged/shadowed fact rejection, M5 intent changes
+during native binding and recovery after explicit epoch advance. The low-level native test also verifies a lost
+applied intent reply, same-epoch token/authority/metadata rejection, bounded replacement and paused stale dispatch.
+The independent-JVM checkpoint now retains only expected epoch/intent hashes and versions plus input identities;
+a fresh JVM reads both surviving native records before deletion. Protocol eligibility and M4 statements remain
+synthetic, and fixture deletion does not supply grace, per-Cell reservations or full dispatcher admission.
+
+Final locked native validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`:
+legacy 96/96 main tasks (1m 45s), 24/24 restart tasks (12s), 21 archives / 81 cases and phases;
+bound-profile 89/89 main tasks (2m 53s), 22/22 restart tasks (24s), 18 archives / 90 cases and phases.
+Log: `/tmp/nereus-m5-native-intent-real-final.log`. Legacy output:
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-24310`. Its 722-input manifest SHA is
+`b8ae0b0cfc3ea579ad5344131f1498b735a002a156d3b3267f8e12624050c390`; summary SHA
+`3703176c265b4619922db0be678518f470febc775e9c04efdb3b4e9550f838e2`. The same legacy Oxia
+`38f3ee06eefbe848e203224df7d1cf861922ab4774bd96e48f989b9b08a91ff0` restarted from `2026-09-08T08:23:25.900365711Z`
+to `2026-09-08T08:25:25.79098342Z`. Bound output:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-24299`. Its 737-input manifest SHA is
+`03d6de4016293b5a63229de8bfa1de3f180f0a72bdf8d047e263c82c1ffad0df`; summary SHA
+`31431e6af4e63f54c20321406af5c56d7acda0cef7df86ea77b85d247546e750`. The same bound Oxia
+`7b4df0d3dffb55983d6324df57adc8523ecb24f7e6f274da4ffdb02e6d0480a5` restarted from `2026-09-08T08:26:01.799302297Z`
+to `2026-09-08T08:29:09.650882176Z`. Both runs retained all four exact ZooKeeper/bookie container IDs and image
+IDs, with changed start times. Every manifest input and every archived XML was independently rehashed, including
+both new production classes and the new joint integration class. The copied legacy summary/manifest are byte-identical.
+Every final suite has zero failures, errors and skips. An earlier assertion inspected a wrapper message instead of
+the expected native-epoch rejection root cause; it was corrected before this full successful run.
+
+Compile/style/contract preflight passed 46 tasks (`/tmp/nereus-m5-native-intent-preflight2.log`). Final documentation,
+historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka contract/source checks passed
+19/19 tasks (`/tmp/nereus-m5-native-intent-final-check.log`). All owned test containers were cleaned up; the unrelated
+connector was retained. Complete unique namespace/authority-route admission remains part of dispatcher composition.
+
+All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final
+or production authority is created. Permanent native epoch/intent capacity still requires durable quota admission.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2009,8 +2064,8 @@ All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/nu
 3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, all-provider identity observation,
    physical dispatch and protocol-proof repair above the same-key coordinator. Bounded READ_FENCED veto, typed
    INTENT capability refresh, native BK identity/absence reconciliation and server-fenced guarded BK deletion are
-   implemented; complete native owner/proof production, intent-token/grace/Cell admission and dispatch composition
-   remain incomplete.
+   implemented. Guarded BK native GC owner/capability facts and permanent M5 intent-token binding now compose with
+   the coordinator; complete protocol proof production, grace/Cell admission and dispatch composition remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

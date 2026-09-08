@@ -33,8 +33,9 @@ performance-first BookKeeper WAL.
   The guarded BK native delete primitive now stores a permanent per-resource GC epoch and atomically checks that
   epoch, closed-create fences and the exact ledger metadata version in the native delete transaction. Separate
   clients and JVMs verify stale-owner/version rejection, lost replies and durable restart recovery. This native
-  primitive still requires M5 intent, protocol eligibility, grace and Cell admission composition before use as an
-  admitted lifecycle dispatcher.
+  primitive now has a permanent native binding to an exact M5 intent/token and ledger fingerprint. Actual native
+  GC owner/capability facts feed the coordinator through a read-only route; changed tokens require a new GC epoch.
+  Protocol eligibility, grace, Cell admission and complete lifecycle dispatch composition remain required.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation

@@ -14,6 +14,7 @@
 
 dependencies {
     api(project(":nereus-storage-api"))
+    api(project(":nereus-metadata-spi"))
     implementation(project(":nereus-storage-bookkeeper"))
     api(project(":nereus-storage-object"))
     implementation(libs.kafka.clients)
@@ -354,7 +355,7 @@ tasks.register<Test>("v2M5BookKeeperM4RecoveryRealTest") {
     }
 }
 
-// Only the joint native test composes Oxia and Kafka; published production module dependencies stay unchanged.
+// Only joint native tests depend on Oxia; the production GC adapter uses the metadata SPI.
 dependencies {
     add(realBookKeeperTest.implementationConfigurationName, project(":nereus-metadata-oxia"))
 }
@@ -377,6 +378,7 @@ val m5BookKeeperOxiaCases = mapOf(
     "v2M5BookKeeperNativeCreateRestartWriteTest" to "KafkaBookKeeperNativeCreateV2RestartTest.writeBeforeServerRestart",
     "v2M5BookKeeperNativeCreateRestartReadTest" to "KafkaBookKeeperNativeCreateV2RestartTest.readAfterServerRestart",
     "v2M5BookKeeperNativeCreateRealTest" to "KafkaBookKeeperNativeCreateV2RealTest",
+    "v2M5BookKeeperNativeDeleteAuthorityRealTest" to "KafkaBookKeeperNativeDeleteAuthorityV2RealTest",
     "v2M5BookKeeperOxiaControlRealTest" to "KafkaBookKeeperOxiaControlV2RealTest",
     "v2M5BookKeeperOxiaRestartWriteTest" to "KafkaBookKeeperOxiaControlV2RestartTest.writeBeforeServerRestart",
     "v2M5BookKeeperOxiaRestartReadTest" to "KafkaBookKeeperOxiaControlV2RestartTest.readAfterServerRestart",

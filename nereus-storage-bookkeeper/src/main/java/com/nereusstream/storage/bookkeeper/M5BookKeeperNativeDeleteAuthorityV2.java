@@ -225,11 +225,132 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                 });
     }
 
+    /** Actual permanent native intent bytes; no caller-supplied checkpoint can reconstruct missing authority. */
+    public CompletionStage<Optional<M5BookKeeperNativeDeleteIntentV2>> readIntent() {
+        var result = new CompletableFuture<Optional<M5BookKeeperNativeDeleteIntentV2>>();
+        zk.getData(
+                intentPath(),
+                false,
+                (rc, actualPath, ignored, data, stat) -> {
+                    try {
+                        if (rc == KeeperException.Code.NONODE.intValue()) {
+                            result.complete(Optional.empty());
+                        } else if (rc != KeeperException.Code.OK.intValue()) {
+                            result.completeExceptionally(M5BookKeeperNativeCreateGuardV2.failure(rc, intentPath()));
+                        } else {
+                            if (!intentPath().equals(actualPath) || stat.getEphemeralOwner() != 0) {
+                                throw new IllegalStateException(
+                                        "native delete intent is not the exact permanent record");
+                            }
+                            var value = M5BookKeeperNativeDeleteIntentV2.decode(
+                                    CanonicalBytes.copyOf(data), stat.getVersion());
+                            if (!resource.equals(value.epoch().resource())) {
+                                throw new IllegalStateException("native delete intent belongs to another resource");
+                            }
+                            result.complete(Optional.of(value));
+                        }
+                    } catch (Throwable failure) {
+                        result.completeExceptionally(failure);
+                    }
+                },
+                null);
+        return result;
+    }
+
+    /** The caller must reread and verify the full actual M5 intent before and after this low-level binding. */
+    public CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
+            Snapshot expected, Sha256Digest dispatchToken, Sha256Digest intentAuthority, Sha256Digest ledgerMetadata) {
+        CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireCurrent(expected)
+                .thenCompose(ignored -> readIntent())
+                .thenCompose(previous -> {
+                    int version = previous.map(value -> value.epoch().equals(expected)
+                                    ? value.nativeVersion()
+                                    : Math.addExact(value.nativeVersion(), 1))
+                            .orElse(0);
+                    var candidate = new M5BookKeeperNativeDeleteIntentV2(
+                            expected, dispatchToken, intentAuthority, ledgerMetadata, version);
+                    if (previous.equals(Optional.of(candidate))) {
+                        return requireIntent(candidate).thenApply(ignored -> candidate);
+                    }
+                    if (previous.isPresent() && previous.orElseThrow().epoch().epoch() >= expected.epoch()) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalStateException("changed native intent requires a newer GC epoch"));
+                    }
+                    var ops = new ArrayList<>(checks(expected));
+                    ops.add(
+                            previous.isPresent()
+                                    ? Op.setData(
+                                            intentPath(),
+                                            candidate.encode().toByteArray(),
+                                            previous.orElseThrow().nativeVersion())
+                                    : Op.create(
+                                            intentPath(),
+                                            candidate.encode().toByteArray(),
+                                            acls,
+                                            CreateMode.PERSISTENT));
+                    return multi(ops)
+                            .handle((rc, failure) -> null)
+                            .thenCompose(ignored -> readIntent())
+                            .thenApply(stored -> {
+                                if (!stored.equals(Optional.of(candidate))) {
+                                    throw new IllegalStateException(
+                                            "native delete intent mutation is not exactly reconciled");
+                                }
+                                return candidate;
+                            });
+                });
+        return operation
+                .thenCompose(value -> requireIntent(value).thenApply(ignored -> value))
+                .thenApply(value -> value);
+    }
+
+    public CompletionStage<Void> requireIntent(M5BookKeeperNativeDeleteIntentV2 expected) {
+        Objects.requireNonNull(expected, "expected");
+        return requireCurrent(expected.epoch())
+                .thenCompose(ignored -> readIntent())
+                .thenCompose(stored -> {
+                    if (!stored.equals(Optional.of(expected))) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalStateException("native delete intent is fenced"));
+                    }
+                    var ops = new ArrayList<>(checks(expected.epoch()));
+                    ops.add(Op.check(intentPath(), expected.nativeVersion()));
+                    return multi(ops).thenApply(rc -> {
+                        requireOk(rc);
+                        return null;
+                    });
+                });
+    }
+
+    private String intentPath() {
+        return path + "-intent";
+    }
+
     /**
      * Caller must first prove the exact M5 intent/eligibility/admission. Identity is re-read and its native version
      * participates in the same server transaction as owner/capability, namespace and closed-create fences.
      */
     public CompletionStage<DeleteResult> deleteExact(Snapshot expected, BookKeeperDeleteTargetV1 target) {
+        return deleteExact(expected, Optional.empty(), target);
+    }
+
+    /** Dispatch using an exact durable native intent binding; admission must still be supplied by the M5 owner. */
+    public CompletionStage<DeleteResult> deleteExact(
+            M5BookKeeperNativeDeleteIntentV2 intent, BookKeeperDeleteTargetV1 target) {
+        Objects.requireNonNull(intent, "intent");
+        Objects.requireNonNull(target, "target");
+        if (!intent.ledgerMetadataSha256().equals(target.metadataSha256())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native intent ledger identity differs"));
+        }
+        return requireIntent(intent)
+                .thenCompose(ignored -> deleteExact(intent.epoch(), Optional.of(intent), target))
+                .thenCompose(result -> requireIntent(intent).thenApply(ignored -> result))
+                .thenApply(result -> result);
+    }
+
+    private CompletionStage<DeleteResult> deleteExact(
+            Snapshot expected, Optional<M5BookKeeperNativeDeleteIntentV2> intent, BookKeeperDeleteTargetV1 target) {
         Objects.requireNonNull(target, "target");
         if (!handle.equals(target.handle())) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("native delete target handle differs"));
@@ -268,6 +389,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                                 new IllegalStateException("native ledger version exceeds bound"));
                     }
                     var ops = new ArrayList<>(checks(expected));
+                    intent.ifPresent(value -> ops.add(Op.check(intentPath(), value.nativeVersion())));
                     ops.add(Op.delete(manager.nativeLedgerPath(resource.ledgerId()), (int) version));
                     return Objects.requireNonNull(beforeDelete.get(), "beforeDelete stage")
                             .thenCompose(ignored -> multi(ops))
@@ -327,7 +449,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                         || bk.getCode() == BKException.Code.NoSuchLedgerExistsOnMetadataServerException);
     }
 
-    private static Snapshot decode(CanonicalBytes bytes, int nativeVersion) {
+    static Snapshot decode(CanonicalBytes bytes, int nativeVersion) {
         if (bytes.length() > MAX_BYTES) {
             throw new IllegalArgumentException("native delete epoch exceeds bound");
         }
