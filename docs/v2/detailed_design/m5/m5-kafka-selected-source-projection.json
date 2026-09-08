@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M5_KAFKA_SELECTED_SOURCE_PROJECTION_V2",
-  "status": "NATIVE_SELECTED_GENERATION_INPUT_AND_SECOND_PUBLICATION_FOCUSED_NON_PROMOTABLE",
-  "predecessorSource": "99b4b6cb4fcbfdb85c77ffa76a1c1f4b74ea5094",
+  "status": "NATIVE_SELECTED_GENERATION_INPUT_SECOND_PUBLICATION_AND_RESTART_FOCUSED_NON_PROMOTABLE",
+  "predecessorSource": "c97aefcfb1bd3e1d7c6ef145ba1f610bcf8f5f98",
   "sourceReader": "KafkaBookKeeperSelectedSourceV2",
   "sourceKind": "KAFKA_BK_COMPACTED_GENERATION_V2",
   "sourceKindOrdinal": 4,
@@ -51,15 +51,26 @@
   },
   "oldFallbackProtectionsRemainProtected": true,
   "firstSelectedGenerationSourceReverifiedAfterRestart": true,
-  "secondGenerationRestartAdmissionVerified": false,
+  "secondGenerationRestartAdmissionVerified": true,
   "verifiedLegacyRegressionCasesAndPhases": 71,
   "nativeMainExecutedTasks": 85,
   "restartJvmTasks": 22,
   "restartJvmExecutedTasks": 3,
   "sameFiveNativeServicesRestarted": true,
   "testedInputCount": 722,
-  "testedInputManifestSha256": "0ee2790f619384790d2460fa7a4c9ab4758f3f2a8119b9a7c2a312b9e4e6fb5d",
+  "testedInputManifestSha256": "0705e6493fb203c3cf981eedcadb344fd67cd420e4a19712a6331fbc0a05494b",
   "legacyTestedInputCount": 699,
-  "legacyTestedInputManifestSha256": "4aee7803cb76b5754669fc48bccbcfb4f3c35c05e6daf9ccd77896737c025fb7",
-  "everyCapturedSourceManifestCheckedIndependently": true
+  "legacyTestedInputManifestSha256": "b80ddb7e1e1905201cd9ec6f0e17ff12b221c846b00ea76af9e5edbd626faf4e",
+  "everyCapturedSourceManifestCheckedIndependently": true,
+  "secondGenerationRestartRoutes": [
+    "orders",
+    "__consumer_offsets",
+    "__transaction_state",
+    "orders/index-only"
+  ],
+  "secondGenerationRestartReadsNativeDescriptorAndTask": true,
+  "secondGenerationRestartUsesCopiedDescriptorOrTaskBody": false,
+  "secondGenerationRestartControlRecordCreates": 0,
+  "secondGenerationRestartSelectorCasCalls": 0,
+  "restartPhysicalReadTicketWritesStillRequired": true
 }

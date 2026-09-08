@@ -242,8 +242,12 @@ protocol-owner semantics remain required. No aggregate obligation closes from th
 The final native run passed 85 executed main tasks and a separate 22-task restart JVM (three executed), with 55
 archived cases/phases and no failures/errors/skips. The independent legacy regression passed 71 cases/phases. Both
 the 722-input map and 699-input legacy map were independently unchanged, including the amended descriptor checker and
-its negative tests. Restart checkpoints reverify the first selected generation's source identity and complete native
-parts; second publication/read is exercised in the main JVM. Second-generation restart admission remains required.
+its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
+now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route
+loads the current native descriptor and immutable task; the checkpoint supplies only client configuration and expected
+hashes. Exact source extent, selector, all data/index parts and old PROTECTED records survive restart. Both control
+clients report zero record creates and selector CAS calls, while temporary physical read tickets still use their
+separate native authority route. This focused recovery does not complete protocol-owner admission or M4 RELEASED.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

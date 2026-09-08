@@ -1169,6 +1169,49 @@ Final documentation, historical design/M4 dependency, lifecycle, coordinator and
 13/13 executed tasks in `/tmp/nereus-m5-selected-source-final-check.log`. All 17 acceptance obligations remain OPEN
 with null receipts; the three deferred M6 Kafka scenarios remain PLANNED with null receipts.
 
+## 2026-09-08 second selected-generation restart recovery
+
+Status: focused second-generation native restart recovery verified; no new receipt or lifecycle Final authority.
+This follows published `c97aefcfb1bd3e1d7c6ef145ba1f610bcf8f5f98`; local and remote main matched exactly.
+
+The two existing run-source restart phases retain the three first-generation checkpoints and add four separate
+second-generation fixtures: user topic, both internal topics and index-only output. Each fixture performs the exact
+M4 fallback closure and a second native publication before the retained-data restart. Checkpoints contain native
+client configuration plus expected descriptor/source/selector hashes, never a copied task or descriptor body.
+Fresh JVM startup uses the known Binding route to read the actual selected descriptor and its native immutable task,
+requires a different task from the first generation, then connects the saved client configuration against that task's
+native namespace/capability. M4 recovery and the ticketed selected-source reader independently verify real BK parts,
+all eight indexes, gaps and source extent identity. Both bootstrap and selected-task control clients must report zero
+record-create calls and zero selector CAS calls during that recovery. The separate physical-authority route still
+acquires and releases temporary read tickets; the counters do not claim zero metadata writes across every route.
+Old source protections must remain PROTECTED after restart; this does not fabricate M4 RELEASED or physical deletion.
+
+Compilation and native-test style checks passed (21 tasks, 4 executed) after correcting a source-cut accessor name.
+The new checks extend the existing two restart phases; archived suite/case counts remain 14/55 and require a fresh run.
+First-generation checkpoints alone are not accepted as evidence for the newly added second-generation checks.
+
+Final validation passed 85/85 main tasks and a separate 22-task restart JVM (3 executed). The 14 archived suites contain
+55 cases/phases with zero failures/errors/skips, now including all four second-generation fixtures in the existing
+restart phases. The independent legacy cluster passed 93/93 main tasks and 71 archived cases/phases, including its
+three fresh-JVM restart reads. Both complete source maps and every archived XML were independently rechecked.
+The 722-input map is SHA-256 `0705e6493fb203c3cf981eedcadb344fd67cd420e4a19712a6331fbc0a05494b`; the 699-input legacy
+map is `b80ddb7e1e1905201cd9ec6f0e17ff12b221c846b00ea76af9e5edbd626faf4e`.
+
+Local summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-44882/run-summary.json`, SHA-256
+`4f63b19695e796646c3f1367dd41ee08dcb9f1ef6e6f8a38f795f8b65ac21351`; log `/tmp/nereus-m5-second-restart-native1.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-44893`, with summary SHA-256
+`71c8dc9bf544184c3183601d148f9b2ea7c02706415fd465fd285e1c6ce93879`.
+Oxia container `2248d4560a147864a450ca88b97d6e01a82043cae0645d0b75c3c47144e83489` retained its ID/image and restarted
+from `2026-09-08T04:25:53.969664338Z` to `2026-09-08T04:28:48.71891446Z`; all four BK/ZooKeeper containers likewise
+retained their IDs/images and changed start times. Runner cleanup completed and preserved the unrelated connector.
+All 17 lifecycle obligations remain OPEN/null and the three deferred M6 scenarios remain PLANNED/null. Full native
+protocol owner/birth admission, mixed-source catalogs, old-read ticket recovery, complete Cell budgets, exact M4
+RELEASED, physical deletion, five M5-E children and source-bound aggregate Final remain required.
+
+Final documentation, historical design/M4 dependency, lifecycle, coordinator and READ_FENCED source checks passed
+13/13 executed tasks in `/tmp/nereus-m5-second-restart-final-check.log`. The active scenario registry independently
+retains V2-KAF-DATA-012/013/022 as PLANNED with null evidence receipts.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

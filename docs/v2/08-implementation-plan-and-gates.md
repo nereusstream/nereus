@@ -95,10 +95,11 @@ input port from source-cut membership to exact native batch-list verification. I
 cases/phases and 71 independent legacy cases/phases; omitted input issued no candidate-pointer write or selector CAS.
 The [selected-generation source slice](detailed_design/m5/m5-kafka-selected-source-projection.json) extends the same
 runner with typed descriptor inputs, all native ledger members, shared decoding bounds, index-only recompilation and
-first-generation restart identity recovery. Validation passed second publication after exact M4 closure/new protection:
+first- and second-generation restart identity recovery. Validation passed second publication after exact M4 closure:
 55 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
 Old source protection and active retirement batches must remain intact; complete M4 release, mixed-source catalogs,
-native owner admission, second-generation restart admission and physical deletion remain required.
+native owner admission and physical deletion remain required. Fresh-JVM second-generation recovery covers the user
+topic, both internal topics and index-only output without republishing or copying descriptor/task bodies.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

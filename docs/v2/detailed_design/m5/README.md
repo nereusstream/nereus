@@ -218,7 +218,8 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   fallback closure, new source protection and second publication while retaining old PROTECTED records. Complete M4
   release, mixed catalogs, native owner admission and deletion remain OPEN.
   The final run passed 55 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
-  First-generation restart capture is verified; second-generation restart admission remains OPEN.
+  First-generation checkpoints are retained; four separate second-generation checkpoints now pass fresh-JVM native
+  descriptor/task recovery for the user topic, both internal topics and index-only output, without republishing.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

@@ -16,6 +16,7 @@ package com.nereusstream.kafka.bookkeeper.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2RealTest.NativeContext;
@@ -37,6 +38,7 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
@@ -375,6 +377,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 }
             }
         }
+        writeSecondGenerationsBeforeRestart();
     }
 
     @Test
@@ -408,6 +411,149 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             .isEqualTo(lines.get(9));
                     assertThat(published.context.faults.recordCreates.get()).isZero();
                     assertThat(published.context.faults.selectorCas.get()).isZero();
+                }
+                assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            }
+        }
+        readSecondGenerationsAfterRestart();
+    }
+
+    private static void writeSecondGenerationsBeforeRestart() throws Exception {
+        for (int i = 0; i <= TOPICS.size(); i++) {
+            var topic = TOPICS.get(i % TOPICS.size());
+            try (var f = new Fixture(2500 + i, topic, null)) {
+                var root = admit(f, i == TOPICS.size() ? customSource(f, 3) : f.prepareSealedSource());
+                var source = reader(f, f.roots, BOUNDS);
+                var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                var input = input(f, raw, 3500 + i);
+                try (var first = new Published(f, input, NativeContext.root())) {
+                    var firstDescriptor = first.writeAndPublish(source);
+                    var firstSelected =
+                            await(selectedReader(f, first, 1000, 500000).capture());
+                    var second = recompactSelected(f, first, input, firstSelected, 4500 + i);
+                    var selected = second.snapshot();
+                    assertThat(selected.view().descriptor().descriptorSha256())
+                            .isNotEqualTo(firstDescriptor.descriptorSha256());
+                    Files.write(
+                            checkpoint().resolve("second-" + i),
+                            List.of(
+                                    f.source.spec().encode().toHex(),
+                                    first.context.root,
+                                    second.spec().encode().toHex(),
+                                    selected.view()
+                                            .descriptor()
+                                            .descriptorSha256()
+                                            .toHex(),
+                                    selected.extent().sourceIdentitySha256().toHex(),
+                                    M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
+                                            .toHex(),
+                                    Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selected.selector()))
+                                            .toHex(),
+                                    firstDescriptor.descriptorSha256().toHex(),
+                                    firstSelected
+                                            .extent()
+                                            .sourceIdentitySha256()
+                                            .toHex()));
+                }
+            }
+        }
+    }
+
+    private static void readSecondGenerationsAfterRestart() throws Exception {
+        for (int i = 0; i <= TOPICS.size(); i++) {
+            var lines = Files.readAllLines(checkpoint().resolve("second-" + i));
+            assertThat(lines).hasSize(9);
+            try (var f = new Fixture(2500 + i, TOPICS.get(i % TOPICS.size()), lines)) {
+                var root = await(f.roots.openRoot(f.runBinding(0).runId())).orElseThrow();
+                var raw = await(reader(f, f.roots, BOUNDS).capture(f.roots.nativeRootKey(root.runId())));
+                var previous = input(f, raw, 3500 + i);
+                // The old task supplies only the admitted Binding route; it cannot recover the current task.
+                try (var bootstrap = new Published(f, previous, lines.get(1))) {
+                    var descriptor = bootstrap.context.onOwner(() -> {
+                        var selector = bootstrap.context.m4.readSelector().orElseThrow();
+                        assertThat(Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selector))
+                                        .toHex())
+                                .isEqualTo(lines.get(6));
+                        var actual = KafkaSealedBookKeeperDescriptorCodecV2.decode(bootstrap
+                                .context
+                                .store
+                                .get(KafkaBookKeeperCompactionPublicationV2.descriptorKey(
+                                        selector.selectedViewSha256()))
+                                .orElseThrow());
+                        var task = KafkaBookKeeperInventoryCodecV2.decodeTask(bootstrap
+                                .context
+                                .store
+                                .get(KafkaBookKeeperInventoryV2.taskKey(
+                                        actual.task().taskIdSha256()))
+                                .orElseThrow());
+                        assertThat(task)
+                                .isEqualTo(actual.task())
+                                .isNotEqualTo(previous.layout().task());
+                        return actual;
+                    });
+                    assertThat(descriptor.descriptorSha256().toHex()).isEqualTo(lines.get(3));
+                    assertThat(descriptor.sourceCut().predecessorViewSha256().toHex())
+                            .isEqualTo(lines.get(7));
+                    assertThat(descriptor.sourceCut().sources()).singleElement().satisfies(extent -> assertThat(
+                                    extent.sourceIdentitySha256().toHex())
+                            .isEqualTo(lines.get(8)));
+                    var spec = M5BookKeeperNativeCreateSpecV2.decode(
+                            CanonicalBytes.copyOf(java.util.HexFormat.of().parseHex(lines.get(2))));
+                    assertThat(spec.taskId()).isEqualTo(descriptor.task().taskIdSha256());
+                    assertThat(spec.namespace()).isEqualTo(descriptor.task().namespace());
+                    try (var output = M5BookKeeperNativeCreateClientV2.connect(
+                                    System.getProperty("nereus.bookkeeper.metadataServiceUri"),
+                                    descriptor.task().capability(),
+                                    spec,
+                                    f.binding);
+                            var context = new NativeContext(descriptor.task(), lines.get(1), output.newSession())) {
+                        var view = context.recover();
+                        assertThat(view.descriptor()).isEqualTo(descriptor);
+                        assertThat(view.parsedBatches())
+                                .isEqualTo(previous.semantic().outputBatches());
+                        assertThat(view.gaps()).isEqualTo(previous.semantic().gaps());
+                        assertThat(view.allowsPredecessorOffset(0)).isFalse();
+                        var selected = await(new KafkaBookKeeperSelectedSourceV2(
+                                        context.store,
+                                        context.m4,
+                                        output,
+                                        new M5TargetDeleteMultiWriterGuardV2(
+                                                new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                                        new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000),
+                                        context.owner)
+                                .capture());
+                        verifySelected(selected, descriptor);
+                        assertThat(selected.extent().sourceIdentitySha256().toHex())
+                                .isEqualTo(lines.get(4));
+                        assertThat(M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
+                                        .toHex())
+                                .isEqualTo(lines.get(5));
+                        assertThat(Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selected.selector()))
+                                        .toHex())
+                                .isEqualTo(lines.get(6));
+                        var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                                7, context.binding);
+                        for (var batch : selected.selector().activeBatches()) {
+                            for (var old : batch.sources()) {
+                                var protection =
+                                        context.onOwner(() -> M4ReadControlCodecV1.decodeProtection(context.store
+                                                .get(keys.protection(
+                                                        old.sourceIdentitySha256(), old.protectionGeneration()))
+                                                .orElseThrow()));
+                                assertThat(protection.state())
+                                        .isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
+                            }
+                        }
+                        if (i == TOPICS.size()) {
+                            assertThat(selected.batches()).isEmpty();
+                            assertThat(descriptor.task().parts())
+                                    .allMatch(part -> part.kind() == KafkaBookKeeperInventoryV2.PartKind.INDEX);
+                        }
+                        assertThat(context.faults.recordCreates.get()).isZero();
+                        assertThat(context.faults.selectorCas.get()).isZero();
+                    }
+                    assertThat(bootstrap.context.faults.recordCreates.get()).isZero();
+                    assertThat(bootstrap.context.faults.selectorCas.get()).isZero();
                 }
                 assertThat(f.tickets(root.ledgerIdentity())).isZero();
             }
@@ -653,7 +799,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 published.context.owner);
     }
 
-    private static void recompactSelected(
+    private static SelectedRestart recompactSelected(
             Fixture f,
             Published first,
             KafkaBookKeeperCompactionTestSupportV2.Input previous,
@@ -686,6 +832,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         512,
                         1024),
                 previous.capabilityEvidence());
+        SelectedRestart restart;
         try (var second = new Published(f, input, first.context.root)) {
             var next = second.writeAndPublish(source);
             var view = second.context.recover();
@@ -707,6 +854,9 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         .orElseThrow()));
                 assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
             }
+            restart = new SelectedRestart(
+                    second.output.spec(),
+                    await(selectedReader(f, second, 1000, 500000).capture()));
         }
         for (var resource : captured.resources()) {
             assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(resource.authorityKey()))
@@ -715,7 +865,11 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             .activeWriterTickets())
                     .isEmpty();
         }
+        return restart;
     }
+
+    private record SelectedRestart(
+            M5BookKeeperNativeCreateSpecV2 spec, KafkaBookKeeperSelectedSourceV2.Snapshot snapshot) {}
 
     private static void verifySelected(
             KafkaBookKeeperSelectedSourceV2.Snapshot selected, KafkaSealedBookKeeperDescriptorV2 descriptor) {
