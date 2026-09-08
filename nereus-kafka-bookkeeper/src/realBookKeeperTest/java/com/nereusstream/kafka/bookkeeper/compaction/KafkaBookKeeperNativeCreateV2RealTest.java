@@ -16,12 +16,30 @@ package com.nereusstream.kafka.bookkeeper.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2RealTest.NativeContext;
+import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2;
+import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
+import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityStateMachineV1;
+import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IndexKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PublicationOutcome;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -123,6 +141,128 @@ class KafkaBookKeeperNativeCreateV2RealTest {
             assertThatThrownBy(context::recover)
                     .hasRootCauseMessage("selected BK native sealed metadata is missing, changed or unknown");
             assertThat(context.faults.selectorCas.get()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void nativeSealedIdentityRefreshAndAbsenceCompletionPersistOnRealOxia() throws Exception {
+        var input = nativeInput(false, 904);
+        var spec = spec(input);
+        try (var guarded = connect(input, spec);
+                var context = new NativeContext(input.layout().task(), NativeContext.root(), guarded.newSession())) {
+            var descriptor = context.write(input);
+            var selectedBefore = context.onOwner(context.m4::readSelector);
+            var handle = descriptor.sealedParts().get(0).handle();
+            var resource = new PhysicalResourceIdV2.BookKeeperLedger(
+                    spec.namespace(), handle.ledgerIdentity().ledgerId());
+            var facts = new Oxia09ExactMetadataTransactionStoreV1(context.faults);
+            var route = new OxiaTargetDeleteAuthorityStoreV2(
+                    context.faults, context.root + "/delete", spec.namespace(), facts);
+            BiFunction<String, CanonicalBytes, AuthorityFactV1> fact = (suffix, bytes) -> {
+                String key = context.root + "/synthetic-dispatch" + suffix;
+                var prior = await(facts.read(key));
+                if (prior.isEmpty()) {
+                    await(facts.compareAndSet(Optional.empty(), key, bytes));
+                }
+                var stored = await(facts.read(key)).orElseThrow();
+                assertThat(stored.canonicalStoredBytes()).isEqualTo(bytes);
+                return new AuthorityFactV1(key, stored.metadataVersion(), stored.canonicalStoredSha256());
+            };
+            // Only BK identity and Oxia versions/CAS are native here; owner and semantic claims are synthetic.
+            var verifier = new DeleteObservationAuthorityVerifierV2() {
+                public CompletionStage<Void> requireCurrent(
+                        PhysicalResourceIdV2 target, DeleteObservationContextV2 current) {
+                    return CompletableFuture.completedFuture(null);
+                }
+
+                public CompletionStage<Void> requirePredecessorFenced(
+                        PhysicalResourceIdV2 target,
+                        DeleteObservationContextV2 previous,
+                        DeleteObservationContextV2 successor) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            };
+            var reader = new KafkaBookKeeperDeleteIdentityReaderV2(guarded, handle);
+            var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(route, verifier, reader);
+            var template = SyntheticDeleteAuthorityFixturesV2.phases(resource).get(0);
+            var open = await(coordinator.create(M5TargetDeleteAuthorityStateMachineV1.open(
+                            template.target(),
+                            template.writerEnrollment(),
+                            SyntheticDeleteAuthorityFixturesV2.replacement(resource, 1, fact))))
+                    .observed()
+                    .orElseThrow();
+            var owner = fact.apply(
+                    "/dispatch-owner",
+                    CanonicalUtf8.fromString("synthetic owner").bytes());
+            var cap = fact.apply(
+                    "/dispatch-capability",
+                    CanonicalUtf8.fromString("synthetic capability").bytes());
+            var fenced = await(coordinator.prepareIdentityRead(
+                            open,
+                            SyntheticDeleteAuthorityFixturesV2.digest("read"),
+                            new DeleteObservationContextV2(1, owner, cap, Optional.empty())))
+                    .observed()
+                    .orElseThrow();
+            var fencedValue = M5TargetDeleteAuthorityCodecV1.decodeAuthority(fenced.canonicalStoredBytes());
+            var external = await(reader.capture(fencedValue));
+            assertThat(external.observation()).isEqualTo(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+            assertThat(await(reader.rereadExact(external))).isEqualTo(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+            var changedBytes = ExactExternalIdentityV1.create(
+                    fencedValue,
+                    ExternalIdentityObservationV1.PRESENT_EXACT_V1,
+                    CanonicalUtf8.fromString("wrong metadata").bytes());
+            assertThatThrownBy(() -> await(reader.rereadExact(changedBytes)))
+                    .hasRootCauseMessage("native BK sealed identity changed or an absent ledger reappeared");
+            var wrongResource = SyntheticDeleteAuthorityFixturesV2.phases(
+                            SyntheticDeleteAuthorityFixturesV2.resource(999))
+                    .get(1);
+            assertThatThrownBy(() -> await(reader.capture(wrongResource)))
+                    .hasRootCauseMessage("capture requires this exact read fence");
+            var intent = await(coordinator.bindDeleteIntent(
+                            fenced, external, SyntheticDeleteAuthorityFixturesV2.digest("delete")))
+                    .observed()
+                    .orElseThrow();
+            var nextCap = fact.apply(
+                    "/capability-2",
+                    CanonicalUtf8.fromString("synthetic refreshed capability").bytes());
+            var refreshed = await(coordinator.refreshDispatch(
+                            intent,
+                            new DeleteObservationContextV2(2, owner, nextCap, Optional.empty()),
+                            SyntheticDeleteAuthorityFixturesV2.replacement(resource, 4, fact)))
+                    .observed()
+                    .orElseThrow();
+            var decoded = M5TargetDeleteAuthorityCodecV1.decodeAuthority(refreshed.canonicalStoredBytes());
+            assertThat(decoded.deleteIntent()
+                            .orElseThrow()
+                            .dispatchRefresh()
+                            .orElseThrow()
+                            .externalObservation())
+                    .isEqualTo(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+            assertThatThrownBy(() -> await(coordinator.completeAbsent(refreshed)))
+                    .hasRootCauseMessage("native target absence was not established");
+            // Fixture cleanup removes unselected output; this does not certify a production dispatch adapter.
+            context.bk
+                    .newDeleteLedgerOp()
+                    .withLedgerId(handle.ledgerIdentity().ledgerId())
+                    .execute()
+                    .get(10, TimeUnit.SECONDS);
+            assertThat(await(reader.rereadExact(external))).isEqualTo(ExternalIdentityObservationV1.ABSENT_EXACT_V1);
+            var done = await(coordinator.completeAbsent(refreshed)).observed().orElseThrow();
+            assertThat(await(coordinator.compactDone(done)).exactTerminalIsAuthoritative())
+                    .isTrue();
+            assertThat(await(coordinator.completeAbsent(refreshed)).exactTerminalIsAuthoritative())
+                    .isTrue();
+            assertThat(await(coordinator.inspect(done.key())).orElseThrow().compactDone())
+                    .isPresent();
+            assertThat(context.onOwner(context.m4::readSelector)).isEqualTo(selectedBefore);
+        }
+    }
+
+    private static <T> T await(CompletionStage<T> stage) {
+        try {
+            return stage.toCompletableFuture().get(30, TimeUnit.SECONDS);
+        } catch (Exception failure) {
+            throw new IllegalStateException("native dispatch test operation failed", failure);
         }
     }
 

@@ -209,7 +209,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             Sha256Digest dispatchOwnerFenceSha256,
             Optional<Sha256Digest> ownerTakeoverProofSha256,
             Sha256Digest capabilityDigestSha256,
-            Sha256Digest dispatchTokenSha256) {
+            Sha256Digest dispatchTokenSha256,
+            Optional<DeleteDispatchRefreshV2> dispatchRefresh) {
         public TargetDeleteIntentV1 {
             requireDigest(deleteAttemptIdSha256, "deleteAttemptIdSha256");
             requirePositive(intentAuthorityRevision, "intentAuthorityRevision");
@@ -219,6 +220,27 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             ownerTakeoverProofSha256.ifPresent(value -> requireDigest(value, "ownerTakeoverProofSha256"));
             requireDigest(capabilityDigestSha256, "capabilityDigestSha256");
             requireDigest(dispatchTokenSha256, "dispatchTokenSha256");
+            dispatchRefresh = Objects.requireNonNull(dispatchRefresh, "dispatchRefresh");
+        }
+
+        /** Original wire4 intent constructor, retained for exact historical decoding. */
+        public TargetDeleteIntentV1(
+                Sha256Digest deleteAttemptIdSha256,
+                long intentAuthorityRevision,
+                long dispatchEpoch,
+                Sha256Digest dispatchOwnerFenceSha256,
+                Optional<Sha256Digest> ownerTakeoverProofSha256,
+                Sha256Digest capabilityDigestSha256,
+                Sha256Digest dispatchTokenSha256) {
+            this(
+                    deleteAttemptIdSha256,
+                    intentAuthorityRevision,
+                    dispatchEpoch,
+                    dispatchOwnerFenceSha256,
+                    ownerTakeoverProofSha256,
+                    capabilityDigestSha256,
+                    dispatchTokenSha256,
+                    Optional.empty());
         }
     }
 
@@ -312,6 +334,17 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             if (!authorityKey.equals(M5TargetDeleteAuthorityKeysV1.authorityKey(target))) {
                 throw new IllegalArgumentException("authority key differs from its immutable target");
             }
+            if (deleteIntent.flatMap(TargetDeleteIntentV1::dispatchRefresh).isPresent()) {
+                validateRefresh(
+                        deleteIntent.orElseThrow().dispatchRefresh().orElseThrow(),
+                        authorityRevision,
+                        predecessorAuthoritySha256,
+                        state,
+                        eligibilitySnapshot,
+                        readFence,
+                        externalIdentity,
+                        deleteIntent.orElseThrow());
+            }
             validateTickets(activeWriterTickets, authorityRevision, writerEnrollment);
             validateState(
                     authorityKey,
@@ -373,8 +406,11 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             TargetReadFenceV1 fence = readFence.orElseThrow();
             if (fence.fencedAuthorityRevision() > authorityRevision
                     || fence.fenceEpoch() != closedWriterFenceEpoch
-                    || !fence.proofSnapshotDigest().equals(proofSnapshotDigest)
-                    || !fence.eligibilityRootSha256().equals(proofSnapshotDigest)) {
+                    || (deleteIntent
+                                    .flatMap(TargetDeleteIntentV1::dispatchRefresh)
+                                    .isEmpty()
+                            && (!fence.proofSnapshotDigest().equals(proofSnapshotDigest)
+                                    || !fence.eligibilityRootSha256().equals(proofSnapshotDigest)))) {
                 throw new IllegalArgumentException("stored read fence differs from the qualified authority");
             }
         }
@@ -407,7 +443,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                         state,
                         readFence.orElseThrow(),
                         externalIdentity.orElseThrow(),
-                        deleteIntent.orElseThrow());
+                        deleteIntent.orElseThrow(),
+                        proofSnapshotDigest);
             }
             case DELETE_DONE_V1 -> {
                 if (closedWriterFenceEpoch <= 0 || !hasRead || !hasExternal || !hasIntent || !hasDone) {
@@ -416,7 +453,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                 TargetReadFenceV1 fence = readFence.orElseThrow();
                 ExactExternalIdentityV1 external = externalIdentity.orElseThrow();
                 TargetDeleteIntentV1 intent = deleteIntent.orElseThrow();
-                validateIntent(authorityKey, target, authorityRevision, state, fence, external, intent);
+                validateIntent(
+                        authorityKey, target, authorityRevision, state, fence, external, intent, proofSnapshotDigest);
                 TargetDeleteDoneV1 done = deleteDone.orElseThrow();
                 if (done.intentAuthorityRevision() != intent.intentAuthorityRevision()
                         || !done.deleteAttemptIdSha256().equals(intent.deleteAttemptIdSha256())
@@ -436,7 +474,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             TargetDeleteAuthorityStateV1 state,
             TargetReadFenceV1 readFence,
             ExactExternalIdentityV1 external,
-            TargetDeleteIntentV1 intent) {
+            TargetDeleteIntentV1 intent,
+            Sha256Digest proofSnapshotDigest) {
         if (!external.resourceId().equals(target.resourceId())) {
             throw new IllegalArgumentException("external identity resource differs");
         }
@@ -445,6 +484,7 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                 || (intent.dispatchEpoch() == 1
                         && intent.ownerTakeoverProofSha256().isPresent())
                 || (intent.dispatchEpoch() > 1
+                        && intent.dispatchRefresh().isEmpty()
                         && intent.ownerTakeoverProofSha256().isEmpty())) {
             throw new IllegalArgumentException("delete intent revision/ownership history differs from its authority");
         }
@@ -456,8 +496,55 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                 intent.dispatchEpoch(),
                 intent.dispatchOwnerFenceSha256(),
                 external.externalIdentitySha256());
+        if (intent.dispatchRefresh().isPresent()) {
+            expected = M5TargetDeleteAuthorityKeysV1.refreshedDispatchTokenSha256(
+                    expected,
+                    intent.capabilityDigestSha256(),
+                    proofSnapshotDigest,
+                    intent.dispatchRefresh().orElseThrow().sha256());
+        }
         if (!intent.dispatchTokenSha256().equals(expected)) {
             throw new IllegalArgumentException("delete intent dispatch token differs");
+        }
+    }
+
+    private static void validateRefresh(
+            DeleteDispatchRefreshV2 refresh,
+            long authorityRevision,
+            Optional<Sha256Digest> predecessor,
+            TargetDeleteAuthorityStateV1 state,
+            Optional<DeleteEligibilitySnapshotV2> eligibility,
+            Optional<TargetReadFenceV1> readFence,
+            Optional<ExactExternalIdentityV1> external,
+            TargetDeleteIntentV1 intent) {
+        long refreshRevision = Math.addExact(refresh.predecessorAuthorityRevision(), 1);
+        if ((state != TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                        && state != TargetDeleteAuthorityStateV1.DELETE_DONE_V1)
+                || authorityRevision
+                        != Math.addExact(refreshRevision, state == TargetDeleteAuthorityStateV1.DELETE_DONE_V1 ? 1 : 0)
+                || (state == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                        && !predecessor.equals(Optional.of(refresh.predecessorAuthoritySha256())))
+                || eligibility.isEmpty()
+                || eligibility.orElseThrow().generation() != refreshRevision
+                || readFence.isEmpty()
+                || external.isEmpty()
+                || refresh.predecessorAuthorityRevision() < intent.intentAuthorityRevision()
+                || intent.dispatchEpoch() != Math.addExact(refresh.predecessorDispatchEpoch(), 1)
+                || !intent.dispatchOwnerFenceSha256()
+                        .equals(refresh.current().coordinatorOwner().valueSha256())
+                || !intent.capabilityDigestSha256()
+                        .equals(refresh.current().capability().valueSha256())
+                || !intent.ownerTakeoverProofSha256()
+                        .equals(refresh.current().predecessorOwnerFenced().map(value -> value.valueSha256()))) {
+            throw new IllegalArgumentException("dispatch refresh differs from its exact authority/context");
+        }
+        if (refresh.predecessorDispatchEpoch() == 1
+                && !refresh.previous().equals(readFence.orElseThrow().observationContext())) {
+            throw new IllegalArgumentException("first dispatch refresh differs from its initial observation");
+        }
+        if (external.orElseThrow().observation() == ExternalIdentityObservationV1.ABSENT_EXACT_V1
+                && refresh.externalObservation() != ExternalIdentityObservationV1.ABSENT_EXACT_V1) {
+            throw new IllegalArgumentException("an absent immutable resource cannot reappear");
         }
     }
 

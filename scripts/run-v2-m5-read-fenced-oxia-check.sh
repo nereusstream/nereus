@@ -65,6 +65,7 @@ paths.extend((root / "nereus-storage-object/src/test/java/com/nereusstream/stora
 paths.extend((root / "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/retention").glob("*.java"))
 paths.extend((root / "scripts").glob("check-v2-m5-*.py"))
 paths.append(root / "docs/v2/detailed_design/m5/m5-read-fenced-recovery-projection.json")
+paths.append(root / "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/compaction/KafkaBookKeeperDeleteIdentityReaderV2.java")
 paths.extend(root / name for name in ("gradle/libs.versions.toml", "settings.gradle.kts", "build.gradle.kts", "nereus-storage-object/build.gradle.kts",
     "nereus-metadata-oxia/build.gradle.kts", "scripts/run-v2-m5-read-fenced-oxia-check.sh"))
 source = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(paths)}
@@ -109,10 +110,10 @@ for path, expected in json.loads(inputs).items():
         raise SystemExit("native Java input changed during real history execution: " + path)
 results = []
 for module, task, name, count in (
-    ("nereus-storage-object", "v2M5TargetDeleteAuthorityCoordinatorTest", "com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test", 26),
+    ("nereus-storage-object", "v2M5TargetDeleteAuthorityCoordinatorTest", "com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test", 35),
     ("nereus-storage-object", "v2M5DeleteEligibilityTest", "com.nereusstream.storage.object.gc.M5DeleteEligibilityV2Test", 10),
     ("nereus-metadata-oxia", "v2M5TargetDeleteRouteTest", "com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2Test", 4),
-    ("nereus-metadata-oxia", "v2M5ReadFencedRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest", 5),
+    ("nereus-metadata-oxia", "v2M5ReadFencedRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest", 6),
     ("nereus-metadata-oxia", "v2M5ReadFencedOxiaRestartWriteTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaRestartTest", 1),
     ("nereus-metadata-oxia", "v2M5ReadFencedOxiaRestartReadTest", "com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaRestartTest", 1),
 ):
@@ -147,6 +148,10 @@ summary = {
     "lateRejectedValidationCannotOverwriteWinningRefresh": True,
     "ordinaryV4AuthorityBytesPreserved": True,
     "vetoWireVersion": 5,
+    "typedIntentWireVersion": 6,
+    "typedIntentSurvivedServerRestart": True,
+    "typedIntentLateReadCannotOverwriteWinner": True,
+    "typedIntentPostReadFactChangeRejected": True,
     "maximumVetoEncodedBytes": 73,
     "checkpointContainsAuthorityBodies": False,
     "nativeProtocolOwnerAdaptersIntegrated": False,

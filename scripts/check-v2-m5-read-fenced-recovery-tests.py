@@ -36,6 +36,14 @@ class RecoveryContractTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     module.validate_projection(value)
 
+    def test_rejects_intent_recovery_predicate_changes(self):
+        for key, expected in module.EXPECTED["intentRecovery"].items():
+            with self.subTest(key=key):
+                value = copy.deepcopy(module.EXPECTED)
+                value["intentRecovery"][key] = not expected if isinstance(expected, bool) else None
+                with self.assertRaises(ValueError):
+                    module.validate_projection(value)
+
     def test_rejects_native_integration_and_evidence_overclaims(self):
         for key, expected in module.EXPECTED.items():
             if expected is False:

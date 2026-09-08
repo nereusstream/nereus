@@ -210,6 +210,49 @@ class M5ReadFencedOxiaIntegrationTest {
         }
     }
 
+    @Test
+    void typedIntentRefreshUsesNativeCasAndRechecksChangedFactsAfterExternalRead() throws Exception {
+        try (var first = new RecoveryFixture(Fixture.root());
+                var other = new RecoveryFixture(first.nativeFixture.root)) {
+            var fenced = first.fence();
+            var intent = await(first.coordinator.bindDeleteIntent(fenced, external(fenced), digest("intent")))
+                    .observed()
+                    .orElseThrow();
+            var context = first.next(fenced, true);
+            var snapshot = first.snapshot(4);
+            var read = new CompletableFuture<ExternalIdentityObservationV1>();
+            var delayed = new M5TargetDeleteAuthorityCoordinatorV1(
+                    first.nativeFixture.route, first.syntheticOwner, expected -> read);
+            var pending = delayed.refreshDispatch(intent, context, snapshot);
+            var winnerCoordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                    other.nativeFixture.route,
+                    other.syntheticOwner,
+                    expected -> CompletableFuture.completedFuture(ExternalIdentityObservationV1.PRESENT_EXACT_V1));
+            var winner = await(winnerCoordinator.refreshDispatch(intent, context, snapshot))
+                    .observed()
+                    .orElseThrow();
+            read.complete(ExternalIdentityObservationV1.ABSENT_EXACT_V1);
+            assertThat(await(pending).outcome()).isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+            assertThat(await(first.nativeFixture.route.read(intent.key()))).contains(winner);
+            assertThat(decode(winner).externalIdentity())
+                    .isEqualTo(decode(intent).externalIdentity());
+            var previous = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(decode(winner));
+            var third = new DeleteObservationContextV2(
+                    3, previous.coordinatorOwner(), previous.capability(), Optional.empty());
+            var nextSnapshot = first.snapshot(5);
+            var held = new CompletableFuture<ExternalIdentityObservationV1>();
+            var stale = new M5TargetDeleteAuthorityCoordinatorV1(
+                    first.nativeFixture.route, first.syntheticOwner, expected -> held);
+            var rejected = stale.refreshDispatch(winner, third, nextSnapshot);
+            var cap = await(first.facts.read(third.capability().key())).orElseThrow();
+            await(first.facts.compareAndSet(Optional.of(cap), cap.key(), cap.canonicalStoredBytes()));
+            held.complete(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+            assertThatThrownBy(() -> await(rejected))
+                    .hasRootCauseMessage("eligibility authority changed: " + cap.key());
+            assertThat(await(first.nativeFixture.route.read(intent.key()))).contains(winner);
+        }
+    }
+
     static void verifyVeto(VersionedValue old, VersionedValue stored, DeleteRecoveryVetoV2.Reason reason) {
         var previous = decode(old);
         var current = decode(stored);
@@ -259,6 +302,7 @@ class M5ReadFencedOxiaIntegrationTest {
 
     static final class RecoveryFixture implements AutoCloseable {
         final Fixture nativeFixture;
+        final DeleteObservationAuthorityVerifierV2 syntheticOwner;
         final PhysicalResourceIdV2 resource = SyntheticDeleteAuthorityFixturesV2.resource(600);
         final M5TargetDeleteAuthorityCoordinatorV1 coordinator;
         final Oxia09ExactMetadataTransactionStoreV1 facts;
@@ -267,7 +311,7 @@ class M5ReadFencedOxiaIntegrationTest {
             nativeFixture = new Fixture(root);
             facts = new Oxia09ExactMetadataTransactionStoreV1(nativeFixture.faults);
             // Deliberately test-only: this admits synthetic owner statements, not native protocol authority.
-            var syntheticOwner = new DeleteObservationAuthorityVerifierV2() {
+            syntheticOwner = new DeleteObservationAuthorityVerifierV2() {
                 public CompletionStage<Void> requireCurrent(
                         PhysicalResourceIdV2 resource, DeleteObservationContextV2 context) {
                     return CompletableFuture.completedFuture(null);

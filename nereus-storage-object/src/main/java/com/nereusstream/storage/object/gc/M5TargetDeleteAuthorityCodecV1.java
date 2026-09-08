@@ -45,7 +45,8 @@ import java.util.Optional;
 public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int MAGIC = 0x4d354441; // M5DA
     private static final int BASE_VERSION = 4;
-    private static final int VERSION = 5;
+    private static final int VETO_VERSION = 5;
+    private static final int VERSION = 6;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -110,7 +111,8 @@ public final class M5TargetDeleteAuthorityCodecV1 {
         TargetDeleteAuthorityV1 value = decode(encoded, input -> {
             int magic = input.readInt();
             int wireVersion = input.readInt();
-            if (magic != MAGIC || (wireVersion != BASE_VERSION && wireVersion != VERSION)) {
+            if (magic != MAGIC
+                    || (wireVersion != BASE_VERSION && wireVersion != VETO_VERSION && wireVersion != VERSION)) {
                 throw new IllegalArgumentException("target delete authority preamble differs");
             }
             String authorityKey = readString(input, ExactMetadataTransactionStoreV1.MAX_KEY_BYTES);
@@ -191,6 +193,19 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                             readDigest(input),
                             readDigest(input)))
                     : Optional.empty();
+            if (wireVersion == VERSION) {
+                TargetDeleteIntentV1 original = deleteIntent.orElseThrow(
+                        () -> new IllegalArgumentException("dispatch refresh requires an intent"));
+                deleteIntent = Optional.of(new TargetDeleteIntentV1(
+                        original.deleteAttemptIdSha256(),
+                        original.intentAuthorityRevision(),
+                        original.dispatchEpoch(),
+                        original.dispatchOwnerFenceSha256(),
+                        original.ownerTakeoverProofSha256(),
+                        original.capabilityDigestSha256(),
+                        original.dispatchTokenSha256(),
+                        Optional.of(readDispatchRefresh(input))));
+            }
             return new TargetDeleteAuthorityV1(
                     authorityKey,
                     target,
@@ -206,7 +221,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                     externalIdentity,
                     deleteIntent,
                     deleteDone,
-                    wireVersion == VERSION
+                    wireVersion == VETO_VERSION
                             ? Optional.of(new DeleteRecoveryVetoV2(
                                     enumValue(
                                             DeleteRecoveryVetoV2.Reason.values(),
@@ -248,7 +263,12 @@ public final class M5TargetDeleteAuthorityCodecV1 {
     private static CanonicalBytes encodeUnchecked(TargetDeleteAuthorityV1 value) {
         return encode(output -> {
             output.writeInt(MAGIC);
-            output.writeInt(value.recoveryVeto().isPresent() ? VERSION : BASE_VERSION);
+            output.writeInt(
+                    value.deleteIntent()
+                                    .flatMap(TargetDeleteIntentV1::dispatchRefresh)
+                                    .isPresent()
+                            ? VERSION
+                            : value.recoveryVeto().isPresent() ? VETO_VERSION : BASE_VERSION);
             writeString(output, value.authorityKey());
             writeBytes(output, value.target().resourceId().canonicalBytes());
             writeDigest(output, value.target().targetIdentitySha256());
@@ -330,8 +350,38 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 writeDigest(output, veto.rejectedContextSha256());
                 writeDigest(output, veto.rejectedAuthoritySha256());
             }
+            if (value.deleteIntent()
+                    .flatMap(TargetDeleteIntentV1::dispatchRefresh)
+                    .isPresent()) {
+                writeDispatchRefresh(
+                        output,
+                        value.deleteIntent().orElseThrow().dispatchRefresh().orElseThrow());
+            }
             writeDigest(output, value.authorityCanonicalSha256());
         });
+    }
+
+    static Sha256Digest dispatchRefreshSha256(DeleteDispatchRefreshV2 refresh) {
+        return Sha256Digest.hash(encode(output -> writeDispatchRefresh(output, refresh)));
+    }
+
+    private static void writeDispatchRefresh(DataOutputStream out, DeleteDispatchRefreshV2 refresh) throws IOException {
+        out.writeLong(refresh.predecessorAuthorityRevision());
+        writeDigest(out, refresh.predecessorAuthoritySha256());
+        out.writeLong(refresh.predecessorDispatchEpoch());
+        writeObservationContext(out, refresh.previous());
+        writeObservationContext(out, refresh.current());
+        out.writeByte(refresh.externalObservation().ordinal());
+    }
+
+    private static DeleteDispatchRefreshV2 readDispatchRefresh(DataInputStream in) throws IOException {
+        return new DeleteDispatchRefreshV2(
+                in.readLong(),
+                readDigest(in),
+                in.readLong(),
+                readObservationContext(in),
+                readObservationContext(in),
+                enumValue(ExternalIdentityObservationV1.values(), in.readUnsignedByte(), "refresh observation"));
     }
 
     static Sha256Digest observationContextSha256(DeleteObservationContextV2 context) {

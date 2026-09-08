@@ -96,6 +96,24 @@ public final class M5TargetDeleteAuthorityKeysV1 {
         });
     }
 
+    public static Sha256Digest refreshedDispatchTokenSha256(
+            Sha256Digest baseToken, Sha256Digest capability, Sha256Digest eligibility, Sha256Digest refresh) {
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(baseToken, "baseToken");
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(capability, "capability");
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(eligibility, "eligibility");
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(refresh, "refresh");
+        return hash(output -> {
+            writeBytes(
+                    output,
+                    CanonicalUtf8.fromString("NEREUS_V2_M5_DELETE_DISPATCH_REFRESH_V2")
+                            .bytes());
+            writeDigest(output, baseToken);
+            writeDigest(output, capability);
+            writeDigest(output, eligibility);
+            writeDigest(output, refresh);
+        });
+    }
+
     private static Sha256Digest hash(Writer writer) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();

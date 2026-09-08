@@ -33,17 +33,18 @@
     "proofCollectionFailureCanRecordVetoWithoutFabricatedSnapshot": true
   },
   "focusedTests": {
-    "coordinatorAndGuardTests": 26,
+    "coordinatorAndGuardTests": 35,
     "newObservationRecoveryTests": 7,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
-    "newRecoveryVetoAndCompatibilityTests": 7
+    "newRecoveryVetoAndCompatibilityTests": 7,
+    "newDispatchRecoveryTests": 9
   },
   "nativeProtocolOwnerAdaptersIntegrated": false,
   "externalFullIdentityReaderIntegrated": false,
   "durableRecoveryVetoRecordImplemented": true,
-  "intentTakeoverCapabilityRefreshIntegrated": false,
+  "intentTakeoverCapabilityRefreshIntegrated": true,
   "realOxiaRecoveryExecutionPresent": true,
   "completePhysicalDeleteComposition": false,
   "sourceBoundReceiptPresent": false,
@@ -53,7 +54,7 @@
     "gate": "v2M5ReadFencedOxiaCheck",
     "runner": "scripts/run-v2-m5-read-fenced-oxia-check.sh",
     "semanticAuthority": "SYNTHETIC_FACTS_WITH_NATIVE_KEYS_VERSIONS_AND_HASHES",
-    "integrationCases": 5,
+    "integrationCases": 6,
     "separateJvmRestartPhases": 2,
     "sameServerContainerRestarted": true,
     "oldCallbackRejectedAfterRefresh": true,
@@ -63,8 +64,30 @@
     "checkpointContainsAuthorityBodies": false,
     "physicalDeletionInvoked": false,
     "durableVetoSurvivedServerRestart": true,
-    "qualifiedRefreshClearsVetoAfterServerRestart": true
+    "qualifiedRefreshClearsVetoAfterServerRestart": true,
+    "typedIntentSurvivedServerRestart": true
   },
   "recoveryVetoAuthorityWireVersion": 5,
-  "ordinaryVersionFourBytesPreserved": true
+  "ordinaryVersionFourBytesPreserved": true,
+  "intentRecovery": {
+    "wireVersion": 6,
+    "lastRefreshContextsOnly": true,
+    "exactNextDispatchAndObservationEpoch": true,
+    "originalReadFenceAndExternalIdentityPreserved": true,
+    "fullFreshEligibilityRequired": true,
+    "nativeOwnerVerifiedBeforeAndAfterExternalRead": true,
+    "nativeExternalIdentityRereadRequired": true,
+    "tokenBindsCapabilityEligibilityAndRefresh": true,
+    "hashOnlyTakeoverRejected": true,
+    "hashOnlyCompletionReadOnly": true,
+    "nativeAbsenceRequiredForNewTerminal": true,
+    "cancelledObserverCannotAbandonAcceptedCas": true,
+    "legacyHashOnlyTakeoverContextRejected": true,
+    "nativeBookKeeperIdentityReaderImplemented": true,
+    "nativeBookKeeperAndOxiaCompositionTest": true,
+    "nativeProtocolOwnerAndSemanticAuthority": false,
+    "physicalDeleteDispatchAdapterIntegrated": false,
+    "allProviderIdentityReadersIntegrated": false,
+    "authoritativeAbsenceCannotReappear": true
+  }
 }

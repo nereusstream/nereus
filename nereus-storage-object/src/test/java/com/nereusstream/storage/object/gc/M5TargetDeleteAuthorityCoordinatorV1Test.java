@@ -54,7 +54,9 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     void persistsEveryLifecycleTransitionAtOneKeyWithSameKeyCasOnly() {
         InMemoryStore store = new InMemoryStore();
         M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
-                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
+                store,
+                M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(),
+                expected -> CompletableFuture.completedFuture(ExternalIdentityObservationV1.ABSENT_EXACT_V1));
         VersionedValue open = create(coordinator, 1);
         VersionedValue fenced = coordinator
                 .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
@@ -68,14 +70,19 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 .join()
                 .observed()
                 .orElseThrow();
+        var successor = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(intent).target().resourceId(), 4);
+        store.seedObservation(successor);
+        store.seedSnapshot(snapshot);
         VersionedValue takeover = coordinator
-                .takeOverDispatch(intent, 2, digest(34), digest(35))
+                .refreshDispatch(intent, successor, snapshot)
                 .toCompletableFuture()
                 .join()
                 .observed()
                 .orElseThrow();
         VersionedValue done = coordinator
-                .completeDelete(takeover, DeleteTerminalOutcomeV1.DELETED_EXACT_V1, digest(36), digest(37))
+                .completeAbsent(takeover)
                 .toCompletableFuture()
                 .join()
                 .observed()
@@ -86,6 +93,18 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         assertThat(decoded.state()).isEqualTo(TargetDeleteAuthorityStateV1.DELETE_DONE_V1);
         assertThat(store.casKeys).containsOnly(decoded.authorityKey());
         assertThat(store.transactionCalls).isZero();
+        assertThat(ByteBuffer.wrap(done.canonicalStoredBytes().toByteArray()).getInt(4))
+                .isEqualTo(6);
+        var compact = coordinator.compactDone(done).toCompletableFuture().join();
+        assertThat(compact.exactTerminalIsAuthoritative()).isTrue();
+        assertThat(coordinator
+                        .completeAbsent(takeover)
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(Outcome.EXISTING_TERMINAL);
+        assertThat(M5TargetDeleteDoneV2.decode(compact.exactCandidate()).finalCapabilitySha256())
+                .isEqualTo(successor.capability().valueSha256());
     }
 
     @Test
@@ -738,6 +757,256 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 harness.fenced,
                 harness.store.readNow(harness.fenced.key()),
                 DeleteRecoveryVetoV2.Reason.CURRENT_OBSERVATION_AUTHORITY_REJECTED);
+    }
+
+    @Test
+    void typedDispatchRefreshPreservesIdentityAndRejectsHashOnlyEntrypoints() {
+        var harness = new DispatchHarness(false);
+        var original = decode(harness.intent);
+        var refreshed = harness.refresh().observed().orElseThrow();
+        var current = decode(refreshed);
+        assertThat(current.target()).isEqualTo(original.target());
+        assertThat(current.readFence()).isEqualTo(original.readFence());
+        assertThat(current.externalIdentity()).isEqualTo(original.externalIdentity());
+        assertThat(current.closedWriterFenceEpoch()).isEqualTo(original.closedWriterFenceEpoch());
+        assertThat(current.deleteIntent().orElseThrow().intentAuthorityRevision())
+                .isEqualTo(original.deleteIntent().orElseThrow().intentAuthorityRevision());
+        assertThat(current.deleteIntent().orElseThrow().ownerTakeoverProofSha256())
+                .isEmpty();
+        assertThat(current.deleteIntent().orElseThrow().capabilityDigestSha256())
+                .isEqualTo(harness.context.capability().valueSha256());
+        assertThat(current.proofSnapshotDigest()).isEqualTo(harness.snapshot.sha256());
+        assertThat(harness.reads.get()).isOne();
+        assertThatThrownBy(() -> harness.coordinator
+                        .takeOverDispatch(refreshed, 3, digest(41), digest(42))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(UnsupportedOperationException.class);
+        assertThat(harness.coordinator
+                        .completeDelete(refreshed, DeleteTerminalOutcomeV1.DELETED_EXACT_V1, digest(43), digest(44))
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(Outcome.PREDECESSOR_UNCHANGED);
+        assertThat(harness.store.readNow(refreshed.key())).isEqualTo(refreshed);
+        assertThatThrownBy(() ->
+                        M5TargetDeleteAuthorityStateMachineV1.takeOverDispatch(current, 3, digest(41), digest(42)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void dispatchTokensBindCompetingCapabilityAndFullEligibility() {
+        var harness = new DispatchHarness(false);
+        var first = M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                decode(harness.intent),
+                harness.context,
+                harness.snapshot,
+                ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        var otherContext = new DeleteObservationContextV2(
+                2,
+                harness.context.coordinatorOwner(),
+                M5DeleteEligibilityTestFixtures.fact("/dispatch/capability/other"),
+                Optional.empty());
+        var second = M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                decode(harness.intent), otherContext, harness.snapshot, ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        assertThat(first.deleteIntent().orElseThrow().dispatchTokenSha256())
+                .isNotEqualTo(second.deleteIntent().orElseThrow().dispatchTokenSha256());
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                        decode(harness.intent),
+                        otherContext,
+                        M5DeleteEligibilityTestFixtures.replacement(harness.snapshot.resource(), 3),
+                        ExternalIdentityObservationV1.PRESENT_EXACT_V1))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void nativeDispatchOwnerRejectionPreventsExternalReadAndCas() {
+        var harness = new DispatchHarness(true);
+        var verifier = new DeleteObservationAuthorityVerifierV2() {
+            public CompletionStage<Void> requireCurrent(PhysicalResourceIdV2 resource, DeleteObservationContextV2 ctx) {
+                return CompletableFuture.failedFuture(new IllegalStateException("owner rejected"));
+            }
+
+            public CompletionStage<Void> requirePredecessorFenced(
+                    PhysicalResourceIdV2 resource,
+                    DeleteObservationContextV2 previous,
+                    DeleteObservationContextV2 successor) {
+                return CompletableFuture.failedFuture(new IllegalStateException("predecessor not fenced"));
+            }
+        };
+        var rejected = new M5TargetDeleteAuthorityCoordinatorV1(harness.store, verifier, harness.reader);
+        assertThatThrownBy(() -> rejected.refreshDispatch(harness.intent, harness.context, harness.snapshot)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("predecessor not fenced");
+        assertThat(harness.reads.get()).isZero();
+        assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(harness.intent);
+    }
+
+    @Test
+    void dispatchRechecksAllFactsAfterNativeReadAndRetainsIntentOnFailure() {
+        var harness = new DispatchHarness(false);
+        var read = new CompletableFuture<ExternalIdentityObservationV1>();
+        var delayed = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(), expected -> read);
+        var pending = delayed.refreshDispatch(harness.intent, harness.context, harness.snapshot);
+        harness.store.seed(harness.context.capability().key(), bytes("revoked"));
+        read.complete(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        assertThatThrownBy(() -> pending.toCompletableFuture().join())
+                .hasRootCauseMessage("eligibility authority changed: "
+                        + harness.context.capability().key());
+        assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(harness.intent);
+    }
+
+    @Test
+    void failedOrMissingNativeIdentityReaderNeverAdvancesIntent() {
+        var harness = new DispatchHarness(false);
+        var missing = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
+        assertThatThrownBy(() -> missing.refreshDispatch(harness.intent, harness.context, harness.snapshot)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(UnsupportedOperationException.class);
+        var failed = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store,
+                M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(),
+                expected -> CompletableFuture.failedFuture(new IllegalStateException("changed native identity")));
+        assertThatThrownBy(() -> failed.refreshDispatch(harness.intent, harness.context, harness.snapshot)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("changed native identity");
+        assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(harness.intent);
+    }
+
+    @Test
+    void cancelledDispatchObserverDoesNotCancelNativeReadOrAcceptedCas() {
+        var harness = new DispatchHarness(false);
+        var read = new CompletableFuture<ExternalIdentityObservationV1>();
+        var delayed = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(), expected -> read);
+        var observer = delayed.refreshDispatch(harness.intent, harness.context, harness.snapshot)
+                .toCompletableFuture();
+        assertThat(observer.cancel(true)).isTrue();
+        assertThat(read.isCancelled()).isFalse();
+        read.complete(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        assertThat(decode(harness.store.readNow(harness.intent.key())).authorityRevision())
+                .isEqualTo(4);
+    }
+
+    @Test
+    void delayedDispatchRefreshCannotOverwriteCompetingExactWinner() {
+        var harness = new DispatchHarness(false);
+        var read = new CompletableFuture<ExternalIdentityObservationV1>();
+        var delayed = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(), expected -> read);
+        var pending = delayed.refreshDispatch(harness.intent, harness.context, harness.snapshot);
+        var winner = harness.refresh().observed().orElseThrow();
+        read.complete(ExternalIdentityObservationV1.ABSENT_EXACT_V1);
+        assertThat(pending.toCompletableFuture().join().outcome()).isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+        assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(winner);
+    }
+
+    @Test
+    void dispatchResponseLossReconcilesExactCandidateAndHistoryStaysBounded() {
+        var harness = new DispatchHarness(false);
+        harness.store.nextCas = NextCas.RESPONSE_UNKNOWN_AFTER_APPLY;
+        var result = harness.refresh();
+        assertThat(result.outcome()).isEqualTo(Outcome.EXISTING_EXACT);
+        var first = result.observed().orElseThrow();
+        var latest = first;
+        for (int epoch = 3; epoch < 30; epoch++) {
+            var context = new DeleteObservationContextV2(
+                    epoch, harness.context.coordinatorOwner(), harness.context.capability(), Optional.empty());
+            var snapshot = M5DeleteEligibilityTestFixtures.replacement(harness.snapshot.resource(), epoch + 2);
+            harness.store.seedSnapshot(snapshot);
+            latest = harness.coordinator
+                    .refreshDispatch(latest, context, snapshot)
+                    .toCompletableFuture()
+                    .join()
+                    .observed()
+                    .orElseThrow();
+            assertThat(latest.canonicalStoredBytes().length())
+                    .isEqualTo(first.canonicalStoredBytes().length());
+        }
+        assertThat(decode(latest).deleteIntent().orElseThrow().dispatchEpoch()).isEqualTo(29);
+        var absent = M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                decode(latest),
+                new DeleteObservationContextV2(
+                        30, harness.context.coordinatorOwner(), harness.context.capability(), Optional.empty()),
+                M5DeleteEligibilityTestFixtures.replacement(harness.snapshot.resource(), 32),
+                ExternalIdentityObservationV1.ABSENT_EXACT_V1);
+        var next = new DeleteObservationContextV2(
+                31, harness.context.coordinatorOwner(), harness.context.capability(), Optional.empty());
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(harness.snapshot.resource(), 33);
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                        absent, next, snapshot, ExternalIdentityObservationV1.PRESENT_EXACT_V1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot reappear");
+        assertThat(M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                                absent, next, snapshot, ExternalIdentityObservationV1.ABSENT_EXACT_V1)
+                        .deleteIntent()
+                        .orElseThrow()
+                        .dispatchEpoch())
+                .isEqualTo(31);
+    }
+
+    @Test
+    void nativeAbsenceCompletionRejectsPresentUnknownAndStaleAuthority() {
+        var harness = new DispatchHarness(false);
+        var refreshed = harness.refresh().observed().orElseThrow();
+        assertThatThrownBy(() -> harness.coordinator
+                        .completeAbsent(refreshed)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("native target absence was not established");
+        assertThatThrownBy(() -> harness.coordinator
+                        .completeAbsent(harness.intent)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("dispatch authority changed before native identity read");
+        assertThat(harness.store.readNow(refreshed.key())).isEqualTo(refreshed);
+    }
+
+    private static final class DispatchHarness {
+        private final InMemoryStore store = new InMemoryStore();
+        private final AtomicInteger reads = new AtomicInteger();
+        private final DeleteExternalIdentityReaderV2 reader = expected -> {
+            reads.incrementAndGet();
+            return CompletableFuture.completedFuture(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        };
+        private final M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(), reader);
+        private final VersionedValue intent;
+        private final DeleteObservationContextV2 context;
+        private final DeleteEligibilitySnapshotV2 snapshot;
+
+        private DispatchHarness(boolean newOwner) {
+            var fenced = coordinator
+                    .prepareIdentityRead(
+                            create(coordinator, 1), digest(140), M5DeleteEligibilityTestFixtures.observation())
+                    .toCompletableFuture()
+                    .join()
+                    .observed()
+                    .orElseThrow();
+            intent = coordinator
+                    .bindDeleteIntent(fenced, exactPresent(fenced, 30), digest(31))
+                    .toCompletableFuture()
+                    .join()
+                    .observed()
+                    .orElseThrow();
+            context = nextObservation(newOwner);
+            snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                    decode(intent).target().resourceId(), 4);
+            store.seedSnapshot(snapshot);
+            store.seedObservation(context);
+        }
+
+        private M5TargetDeleteAuthorityCoordinatorV1.MutationResultV1 refresh() {
+            return coordinator
+                    .refreshDispatch(intent, context, snapshot)
+                    .toCompletableFuture()
+                    .join();
+        }
     }
 
     private static DeleteObservationAuthorityVerifierV2 heldVerifier(CompletionStage<Void> validation) {

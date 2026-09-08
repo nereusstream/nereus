@@ -1868,6 +1868,75 @@ contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-veto-final-check.log`
 OPEN/null; M6 012/013/022 remain PLANNED/null in both registries. The owned native containers were cleaned up; the
 unrelated connector was retained. This implementation creates no M5-E child, aggregate Final or physical-delete authority.
 
+## 2026-09-08 typed INTENT capability refresh and native BK identity reread
+
+Status: implemented bounded recovery/absence reconciliation; NON_PROMOTABLE. Protocol owner/proof production,
+all-provider readers and physical-delete dispatch remain incomplete.
+
+The old coordinator dispatch takeover accepted only owner/fencing digests and retained the original capability.
+`refreshDispatch` now requires a complete next-revision eligibility snapshot and the exact next observation epoch.
+It verifies displaced-owner native fencing when required, current owner/capability and the complete fact vector,
+checks the exact stored predecessor, invokes the installed native identity reader, revalidates owner/facts and
+attempts the same-key CAS. Changed/unknown identity or changed authority cannot advance the intent. Cancellation
+of an exposed observer does not abort accepted native work/CAS reconciliation. Hash-only takeover is unsupported;
+hash-only completion remains solely a read-only exact historical terminal reconciliation, including compact done.
+
+`DeleteDispatchRefreshV2` retains only the previous/current contexts, predecessor revision/hash, previous dispatch
+epoch and latest native observation. M5DA wire 6 stores this bounded extension for refreshed intent/done; ordinary
+wire 4 and READ_FENCED-veto wire 5 remain unchanged. The resource, original closed fence, original CAS-2 revision,
+delete attempt and initial external identity remain fixed. A domain-separated token binds the refreshed capability,
+full eligibility and refresh evidence; same-owner capability rotation needs no invented old-owner fence. Legacy
+hash-only takeover records cannot acquire typed owner context by inference. The 35-case coordinator suite adds nine
+recovery cases and retains the four previously published ordinary wire-4 golden hashes. Repeated typed refreshes
+retain constant value size and cannot restore presence after authoritative absence. Native absence completion also recognizes the exact full/compacted terminal on retry.
+
+`KafkaBookKeeperDeleteIdentityReaderV2` uses the guarded actual-instance BK client. It captures and compares the
+full sealed native identity (namespace/ledger, run/configuration, LAC/length, quorum/digest/credential, native metadata
+version/ctoken and fingerprint of every custom field/ensemble). Only native NoSuchLedger establishes absence.
+`completeAbsent` revalidates current native owner/capability and all eligibility facts around the absence read before
+writing ALREADY_ABSENT and compacting permanent done. Actual delete dispatch is outside this reader/coordinator slice.
+
+Final metadata validation: `v2M5ReadFencedOxiaCheck` completed 56/56 main tasks and 15/15 separate-JVM restart tasks.
+Six archives contain 57 cases/phases (coordinator 35, eligibility 10, route 4, native integration 6, restart 1+1).
+Output: `build/m5-read-fenced-oxia/nereus-m5-read-fenced-oxia-59791`;
+log `/tmp/nereus-m5-dispatch-oxia-final2.log`. All 511 tested inputs and every archived XML were independently rehashed.
+Input-map SHA `982687726ba351e7d1f78783578887ad29fd53d3903cb50d41fdcc279ea4791b`;
+summary SHA `f4cc8cd8f81454e807c683e78c97931357f9bc4768bb0ef61947298a1595c647`.
+The same Oxia container `b9659e56b00a29c582a995e5c7f910f32d0dd0b41670491352e47d2130436111` restarted from
+`2026-09-08T06:59:16.209579305Z` to `2026-09-08T07:00:03.634057591Z`. Each checkpoint contains only
+route/key/hash/version; the new JVM reads both wire-5 veto and wire-6 intent before any mutation. Typed INTENT
+competition and post-external-read native fact-version changes fail closed. Owner, semantic/M4 and external identity
+statements in this metadata-only runner remain synthetic. This creates no child receipt, aggregate Final or authority.
+
+Final BK validation: the independent legacy runner passed 93/93 main tasks and 22/22 restart tasks, including the
+new actual BK/Oxia identity/absence case; 17 archives contain 72 cases/phases. Output:
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-70797`. Its 716-input manifest SHA is
+`2c3b33c42d216b01513a57658f9c6dc8682cc713f3429007b346a437cf7191ad`; summary SHA is
+`6f2e912ae32f016a51279f9d7982c854a4476e15ed39671810605163ca40ab7b`. The native identity case captures an actual
+sealed ledger, rejects changed expected identity and a foreign resource, persists capability refresh with native CAS,
+rejects completion while present, removes the unselected fixture ledger through BK, verifies actual native absence,
+then persists/compacts/retries exact done. It directly verifies that the M4 selector is unchanged. Protocol owner,
+semantic transfer and M4 RELEASED are synthetic; the fixture removal does not certify a production dispatch adapter.
+
+The bound-profile regression passed 89/89 main tasks and 22/22 restart tasks; 18 archives contain 90 cases/phases.
+Output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-76752`;
+log `/tmp/nereus-m5-dispatch-bk-bound-final.log`. Its 731-input manifest SHA is
+`ff85ed46437790e32f4bad6904562b92cf2253f7d9b09be5d0957139c6d900e3`; summary SHA is
+`3f0baa14e00c2617a65ca9b99685fe75c740ba434762a24381ea5593f11341dc`. This runner revalidated the exact independently
+completed 72-case legacy archive, including every XML and captured input; both copied legacy manifests are byte-identical.
+The bound Oxia container `549905c5a04b0889bbafae235c50623f9a50fc38d3b9044d9cb6515d0c8c872f` restarted from
+`2026-09-08T07:05:10.266424344Z` to `2026-09-08T07:08:10.609307886Z`; independent legacy Oxia
+`480b1330c627796cfcacef6e8b567ad6775045b8e0bf47085134a9e3881f376f` restarted from
+`2026-09-08T07:01:22.393819002Z` to `2026-09-08T07:03:10.480578677Z`. Both BK runs retained all four exact
+ZooKeeper/bookie container IDs and image IDs across restart, with changed start times. All three final source maps
+and every archived XML were independently rehashed after completion. Initial fixture key/counter assertion failures
+were corrected before these final runs; no failed run is counted as evidence. The outer legacy count now requires 72.
+
+Supplemental documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-dispatch-final-check.log`). All 17 acceptance obligations
+remain OPEN/null, and M6 012/013/022 remain PLANNED/null in both registries. All owned native test containers were
+cleaned up; the unrelated connector was retained. This slice creates no M5-E child, aggregate Final or production authority.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -1877,9 +1946,10 @@ unrelated connector was retained. This implementation creates no M5-E child, agg
 2. Extend the native BK-to-Oxia namespace assignment to Object and cross-Cell resource ownership; complete Binding
    authority admission, quota/restart accounting and Cell I/O/operator metrics around the native M4/history route. Admit the configured durable GC quota route for every actual writer,
    provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.
-3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, current capability refresh,
-   fenced identity observation, dispatch/done and protocol-proof repair above the same-key coordinator; the bounded
-   READ_FENCED veto is now persisted, while those native integrations remain incomplete.
+3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, all-provider identity observation,
+   physical dispatch and protocol-proof repair above the same-key coordinator. Bounded READ_FENCED veto, typed
+   INTENT capability refresh and native BK identity/absence reconciliation are implemented; complete native owner,
+   proof production and dispatch remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

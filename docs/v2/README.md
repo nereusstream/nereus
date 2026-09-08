@@ -26,7 +26,10 @@ performance-first BookKeeper WAL.
   verifier. Its [native metadata recovery check](detailed_design/m5/m5-read-fenced-recovery-projection.json) now
   verifies real Oxia fact versions, competing refreshes and same-server restart across separate JVMs. A bounded
   same-key recovery veto now survives restart and blocks intent until a freshly qualified observation clears it.
-  The owner and deletion-proof statements remain synthetic, so native owner integration and M5 Final remain incomplete.
+  Typed INTENT refresh now binds fresh capability/eligibility and re-reads external identity, retaining only the latest
+  refresh evidence in wire 6. The actual BK identity reader and native-absence completion are exercised with real
+  BK/Oxia; owner and deletion-proof statements remain synthetic, so native owner integration, physical dispatch and
+  M5 Final remain incomplete.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation

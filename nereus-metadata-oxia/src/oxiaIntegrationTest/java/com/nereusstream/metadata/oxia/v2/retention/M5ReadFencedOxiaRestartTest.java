@@ -22,12 +22,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.metadata.oxia.v2.retention.M5PermanentDoneOxiaIntegrationTest.Fixture;
 import com.nereusstream.metadata.oxia.v2.retention.M5ReadFencedOxiaIntegrationTest.RecoveryFixture;
+import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.DeleteRecoveryVetoV2;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.Outcome;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityStateMachineV1;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -37,6 +42,26 @@ import org.junit.jupiter.api.Timeout;
 class M5ReadFencedOxiaRestartTest {
     @Test
     void writeBeforeServerRestart() throws Exception {
+        try (var fixture = new RecoveryFixture(Fixture.root())) {
+            var fenced = fixture.fence();
+            var intent = await(fixture.coordinator.bindDeleteIntent(fenced, external(fenced), digest("intent")))
+                    .observed()
+                    .orElseThrow();
+            var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                    fixture.nativeFixture.route,
+                    fixture.syntheticOwner,
+                    expected -> CompletableFuture.completedFuture(ExternalIdentityObservationV1.PRESENT_EXACT_V1));
+            var refreshed = await(coordinator.refreshDispatch(intent, fixture.next(fenced, true), fixture.snapshot(4)))
+                    .observed()
+                    .orElseThrow();
+            Files.write(
+                    intentCheckpoint(),
+                    List.of(
+                            fixture.nativeFixture.root,
+                            refreshed.key(),
+                            refreshed.canonicalStoredSha256().toHex(),
+                            refreshed.metadataVersion().value().toHex()));
+        }
         try (var fixture = new RecoveryFixture(Fixture.root())) {
             var old = fixture.fence();
             var context = fixture.next(old, true);
@@ -70,6 +95,30 @@ class M5ReadFencedOxiaRestartTest {
 
     @Test
     void readAfterServerRestart() throws Exception {
+        var intentLines = Files.readAllLines(intentCheckpoint());
+        assertThat(intentLines).hasSize(4);
+        try (var fixture = new RecoveryFixture(intentLines.get(0))) {
+            var stored =
+                    await(fixture.nativeFixture.route.read(intentLines.get(1))).orElseThrow();
+            assertThat(stored.canonicalStoredSha256().toHex()).isEqualTo(intentLines.get(2));
+            assertThat(stored.metadataVersion().value().toHex()).isEqualTo(intentLines.get(3));
+            var previous = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(decode(stored));
+            assertThat(previous.observationEpoch()).isEqualTo(2);
+            assertThat(decode(stored).deleteIntent().orElseThrow().dispatchEpoch())
+                    .isEqualTo(2);
+            var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                    fixture.nativeFixture.route,
+                    fixture.syntheticOwner,
+                    expected -> CompletableFuture.completedFuture(ExternalIdentityObservationV1.ABSENT_EXACT_V1));
+            var successor = new DeleteObservationContextV2(
+                    3, previous.coordinatorOwner(), previous.capability(), Optional.empty());
+            var refreshed = await(coordinator.refreshDispatch(stored, successor, fixture.snapshot(5)))
+                    .observed()
+                    .orElseThrow();
+            var done = await(coordinator.completeAbsent(refreshed)).observed().orElseThrow();
+            assertThat(await(coordinator.compactDone(done)).exactTerminalIsAuthoritative())
+                    .isTrue();
+        }
         var lines = Files.readAllLines(checkpoint());
         assertThat(lines).hasSize(4);
         try (var fixture = new RecoveryFixture(lines.get(0))) {
@@ -103,6 +152,10 @@ class M5ReadFencedOxiaRestartTest {
                             .exactCandidateIsAuthoritative())
                     .isTrue();
         }
+    }
+
+    private static Path intentCheckpoint() {
+        return Path.of(checkpoint().toString() + ".intent");
     }
 
     private static Path checkpoint() {

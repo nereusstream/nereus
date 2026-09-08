@@ -320,7 +320,98 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty());
     }
 
-    /** A takeover keeps the exact target, CAS-2 revision, delete attempt, external identity, and capability. */
+    /** Resolves only persisted typed context; a legacy hash-only takeover cannot establish native ownership. */
+    public static DeleteObservationContextV2 dispatchContext(TargetDeleteAuthorityV1 current) {
+        requireState(current, TargetDeleteAuthorityStateV1.DELETE_INTENT_V1);
+        TargetDeleteIntentV1 intent = current.deleteIntent().orElseThrow();
+        if (intent.dispatchRefresh().isPresent()) {
+            return intent.dispatchRefresh().orElseThrow().current();
+        }
+        DeleteObservationContextV2 original = current.readFence().orElseThrow().observationContext();
+        if (intent.dispatchEpoch() != 1
+                || !intent.dispatchOwnerFenceSha256()
+                        .equals(original.coordinatorOwner().valueSha256())
+                || !intent.capabilityDigestSha256().equals(original.capability().valueSha256())) {
+            throw new IllegalStateException("legacy dispatch takeover has no verifiable typed owner context");
+        }
+        return original;
+    }
+
+    static ExternalIdentityObservationV1 dispatchObservation(TargetDeleteAuthorityV1 current) {
+        return current.deleteIntent()
+                .orElseThrow()
+                .dispatchRefresh()
+                .map(DeleteDispatchRefreshV2::externalObservation)
+                .orElseGet(() -> current.externalIdentity().orElseThrow().observation());
+    }
+
+    /** Pure candidate construction; the coordinator must verify native authorities and re-read the identity. */
+    public static TargetDeleteAuthorityV1 refreshDispatch(
+            TargetDeleteAuthorityV1 current,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot,
+            ExternalIdentityObservationV1 observation) {
+        DeleteObservationContextV2 previousContext = dispatchContext(current);
+        if (dispatchObservation(current) == ExternalIdentityObservationV1.ABSENT_EXACT_V1
+                && observation != ExternalIdentityObservationV1.ABSENT_EXACT_V1) {
+            throw new IllegalStateException("authoritatively absent immutable target cannot reappear during refresh");
+        }
+        Objects.requireNonNull(snapshot, "snapshot");
+        long revision = Math.addExact(current.authorityRevision(), 1);
+        if (snapshot.generation() != revision
+                || !snapshot.resource().equals(current.target().resourceId())) {
+            throw new IllegalArgumentException("dispatch refresh requires complete fresh same-resource eligibility");
+        }
+        TargetDeleteIntentV1 previous = current.deleteIntent().orElseThrow();
+        Sha256Digest predecessor = Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current));
+        var refresh = new DeleteDispatchRefreshV2(
+                current.authorityRevision(),
+                predecessor,
+                previous.dispatchEpoch(),
+                previousContext,
+                successor,
+                observation);
+        long epoch = Math.addExact(previous.dispatchEpoch(), 1);
+        Sha256Digest owner = successor.coordinatorOwner().valueSha256();
+        Sha256Digest capability = successor.capability().valueSha256();
+        Sha256Digest baseToken = M5TargetDeleteAuthorityKeysV1.dispatchTokenSha256(
+                current.authorityKey(),
+                current.target().targetIdentitySha256(),
+                previous.intentAuthorityRevision(),
+                previous.deleteAttemptIdSha256(),
+                epoch,
+                owner,
+                current.externalIdentity().orElseThrow().externalIdentitySha256());
+        var intent = new TargetDeleteIntentV1(
+                previous.deleteAttemptIdSha256(),
+                previous.intentAuthorityRevision(),
+                epoch,
+                owner,
+                successor.predecessorOwnerFenced().map(value -> value.valueSha256()),
+                capability,
+                M5TargetDeleteAuthorityKeysV1.refreshedDispatchTokenSha256(
+                        baseToken, capability, snapshot.sha256(), refresh.sha256()),
+                Optional.of(refresh));
+        return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
+                current.authorityKey(),
+                current.target(),
+                revision,
+                Optional.of(predecessor),
+                TargetDeleteAuthorityStateV1.DELETE_INTENT_V1,
+                current.closedWriterFenceEpoch(),
+                current.writerEnrollment(),
+                snapshot.sha256(),
+                Optional.of(snapshot),
+                List.of(),
+                current.readFence(),
+                current.externalIdentity(),
+                Optional.of(intent),
+                Optional.empty(),
+                Optional.empty(),
+                Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH])));
+    }
+
+    /** Legacy pure wire4 candidate builder; it does not perform native verification or grant dispatch authority. */
     public static TargetDeleteAuthorityV1 takeOverDispatch(
             TargetDeleteAuthorityV1 current,
             long nextDispatchEpoch,
@@ -328,6 +419,9 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             Sha256Digest oldOwnerFencedProofSha256) {
         requireState(current, TargetDeleteAuthorityStateV1.DELETE_INTENT_V1);
         TargetDeleteIntentV1 previous = current.deleteIntent().orElseThrow();
+        if (previous.dispatchRefresh().isPresent()) {
+            throw new IllegalStateException("typed dispatch refresh cannot downgrade to legacy hash-only takeover");
+        }
         if (nextDispatchEpoch <= previous.dispatchEpoch()) {
             throw new IllegalArgumentException("dispatch takeover epoch must strictly increase");
         }

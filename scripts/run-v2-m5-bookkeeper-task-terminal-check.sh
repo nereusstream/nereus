@@ -61,6 +61,7 @@ paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata
 for source in ('test','realBookKeeperTest'):
     paths.extend((root/f'nereus-storage-bookkeeper/src/{source}/java').rglob('*.java'))
 paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention').glob('*.java'))
+paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/gc').glob('*.java'))
 paths.append(root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/materialization/M5MaterializationV1Test.java')
 paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/retention').glob('*.java'))
 paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage-bookkeeper/build.gradle.kts',
@@ -127,7 +128,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartReadTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
     ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',8),
-    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',3),
+    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartWriteTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartReadTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperOxiaControlRealTest','KafkaBookKeeperOxiaControlV2RealTest',5),
@@ -144,7 +145,8 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'schema':'NEREUS_V2_M5_BK_TASK_TERMINAL_RUN_V2','suites':suites,
+summary={'nativeBkIdentityRefreshAndAbsenceCompletion':True,'nativeDeleteProtocolOwnerAuthority':False,
+    'nativeDeleteEligibilityAuthority':False,'physicalDeleteDispatchComposition':False,'schema':'NEREUS_V2_M5_BK_TASK_TERMINAL_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,
     'sameZooKeeperAndBookieContainersRestarted':True,

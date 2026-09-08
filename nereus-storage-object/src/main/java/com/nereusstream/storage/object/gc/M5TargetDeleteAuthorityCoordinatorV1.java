@@ -133,6 +133,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
 
     private final ExactMetadataTransactionStoreV1 metadata;
     private final DeleteObservationAuthorityVerifierV2 observationAuthority;
+    private final DeleteExternalIdentityReaderV2 externalReader;
 
     public M5TargetDeleteAuthorityCoordinatorV1(ExactMetadataTransactionStoreV1 metadata) {
         this(metadata, DeleteObservationAuthorityVerifierV2.unsupported());
@@ -140,6 +141,14 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
 
     public M5TargetDeleteAuthorityCoordinatorV1(
             ExactMetadataTransactionStoreV1 metadata, DeleteObservationAuthorityVerifierV2 observationAuthority) {
+        this(metadata, observationAuthority, DeleteExternalIdentityReaderV2.unsupported());
+    }
+
+    public M5TargetDeleteAuthorityCoordinatorV1(
+            ExactMetadataTransactionStoreV1 metadata,
+            DeleteObservationAuthorityVerifierV2 observationAuthority,
+            DeleteExternalIdentityReaderV2 externalReader) {
+        this.externalReader = Objects.requireNonNull(externalReader, "externalReader");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.observationAuthority = Objects.requireNonNull(observationAuthority, "observationAuthority");
     }
@@ -340,16 +349,58 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             long nextDispatchEpoch,
             Sha256Digest nextDispatchOwnerFenceSha256,
             Sha256Digest oldOwnerFencedProofSha256) {
-        VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
-        TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.takeOverDispatch(
-                exact.authority(), nextDispatchEpoch, nextDispatchOwnerFenceSha256, oldOwnerFencedProofSha256);
-        return mutate(
-                exact.authority().authorityKey(),
-                Optional.of(exact.exactStoredValue()),
-                M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                false);
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(
+                "hash-only dispatch takeover requires typed context, current capability and native identity reread"));
     }
 
+    /** Refreshes an INTENT at the same permanent key after fencing/revalidating all native inputs. */
+    public CompletionStage<MutationResultV1> refreshDispatch(
+            VersionedValue exactIntentAuthority,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot) {
+        VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
+        TargetDeleteAuthorityV1 current = exact.authority();
+        DeleteObservationContextV2 previous = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(current);
+        // Validate the proposed shape before starting native work; no observation is persisted from this candidate.
+        M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                current,
+                successor,
+                snapshot,
+                current.externalIdentity().orElseThrow().observation());
+        CompletionStage<Void> fenced = previous.coordinatorOwner().equals(successor.coordinatorOwner())
+                ? CompletableFuture.completedFuture(null)
+                : checkedAuthority(
+                        () -> observationAuthority.requirePredecessorFenced(
+                                current.target().resourceId(), previous, successor),
+                        DeleteRecoveryVetoV2.Reason.PREDECESSOR_OWNER_AUTHORITY_REJECTED);
+        CompletionStage<MutationResultV1> operation = fenced.thenCompose(
+                        ignored -> requireObservationAuthority(current, successor, snapshot))
+                .thenCompose(ignored -> requireExactCurrent(exact))
+                .thenCompose(ignored ->
+                        externalReader.rereadExact(current.externalIdentity().orElseThrow()))
+                .thenCompose(observation -> {
+                    TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
+                            current, successor, snapshot, Objects.requireNonNull(observation, "native observation"));
+                    return requireObservationAuthority(candidate, successor, snapshot)
+                            .thenCompose(ignored -> mutate(
+                                    current.authorityKey(),
+                                    Optional.of(exactIntentAuthority),
+                                    M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                                    false));
+                });
+        // Cancelling the exposed observer must not abort an accepted native read or its exact CAS reconciliation.
+        return operation.thenApply(result -> result);
+    }
+
+    private CompletionStage<Void> requireExactCurrent(VersionedAuthorityV1 exact) {
+        return metadata.read(exact.authority().authorityKey()).thenAccept(observed -> {
+            if (!observed.equals(Optional.of(exact.exactStoredValue()))) {
+                throw new IllegalStateException("dispatch authority changed before native identity read");
+            }
+        });
+    }
+
+    /** Read-only reconciliation of historical terminal candidates; supplied hashes can never create a terminal. */
     public CompletionStage<MutationResultV1> completeDelete(
             VersionedValue exactIntentAuthority,
             DeleteTerminalOutcomeV1 terminalOutcome,
@@ -358,11 +409,65 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
         TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.completeDelete(
                 exact.authority(), terminalOutcome, absenceInventoryRootSha256, completionProofDigestSha256);
-        return mutate(
-                exact.authority().authorityKey(),
-                Optional.of(exact.exactStoredValue()),
+        return reconcile(
+                candidate.authorityKey(),
+                Optional.of(exactIntentAuthority),
                 M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                false);
+                false,
+                new Attempt(MutationOutcome.RESPONSE_UNKNOWN, null));
+    }
+
+    /** Reconciles native absence without claiming that this coordinator dispatched the physical deletion. */
+    public CompletionStage<MutationResultV1> completeAbsent(VersionedValue exactIntentAuthority) {
+        VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
+        TargetDeleteAuthorityV1 current = exact.authority();
+        DeleteObservationContextV2 context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(current);
+        DeleteEligibilitySnapshotV2 snapshot = current.eligibilitySnapshot().orElseThrow();
+        Sha256Digest absence = Sha256Digest.hash(
+                com.nereusstream.domain.bytes.CanonicalUtf8.fromString("NEREUS_V2_M5_NATIVE_ABSENCE_V2:"
+                                + exactIntentAuthority.canonicalStoredSha256().toHex())
+                        .bytes());
+        Sha256Digest completion = M5TargetDeleteAuthorityKeysV1.refreshedDispatchTokenSha256(
+                current.deleteIntent().orElseThrow().dispatchTokenSha256(),
+                context.capability().valueSha256(),
+                snapshot.sha256(),
+                absence);
+        TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.completeDelete(
+                current, DeleteTerminalOutcomeV1.ALREADY_ABSENT_EXACT_V1, absence, completion);
+        CanonicalBytes candidateBytes = M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate);
+        CompletionStage<MutationResultV1> operation = metadata.read(current.authorityKey())
+                .thenCompose(observed -> {
+                    if (observed.isPresent()) {
+                        VersionedValue value = observed.orElseThrow();
+                        if (isExactCompactedSuccessor(candidateBytes, value)) {
+                            return CompletableFuture.completedFuture(new MutationResultV1(
+                                    Outcome.EXISTING_TERMINAL, current.authorityKey(), candidateBytes, observed));
+                        }
+                        if (value.canonicalStoredBytes().equals(candidateBytes)) {
+                            return CompletableFuture.completedFuture(new MutationResultV1(
+                                    Outcome.EXISTING_EXACT, current.authorityKey(), candidateBytes, observed));
+                        }
+                    }
+                    return requireObservationAuthority(current, context, snapshot)
+                            .thenCompose(ignored -> requireExactCurrent(exact))
+                            .thenCompose(ignored -> externalReader.rereadExact(
+                                    current.externalIdentity().orElseThrow()))
+                            .thenCompose(observation -> {
+                                if (observation
+                                        != M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1
+                                                .ABSENT_EXACT_V1) {
+                                    return CompletableFuture.failedFuture(
+                                            new IllegalStateException("native target absence was not established"));
+                                }
+                                return requireObservationAuthority(current, context, snapshot)
+                                        .thenCompose(ignored -> mutate(
+                                                current.authorityKey(),
+                                                Optional.of(exactIntentAuthority),
+                                                candidateBytes,
+                                                false));
+                            });
+                });
+        return operation.thenApply(result -> result);
     }
 
     private VersionedAuthorityV1 exactAuthority(String authorityKey, VersionedValue exactStoredValue) {
@@ -381,9 +486,16 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
 
     private CompletionStage<Void> requireObservationAuthority(TargetDeleteAuthorityV1 authority) {
         DeleteObservationContextV2 context = authority.readFence().orElseThrow().observationContext();
+        return requireObservationAuthority(
+                authority, context, authority.eligibilitySnapshot().orElseThrow());
+    }
+
+    private CompletionStage<Void> requireObservationAuthority(
+            TargetDeleteAuthorityV1 authority,
+            DeleteObservationContextV2 context,
+            DeleteEligibilitySnapshotV2 snapshot) {
         java.util.Map<String, AuthorityFactV1> facts = new java.util.TreeMap<>();
-        for (AuthorityFactV1 fact :
-                authority.eligibilitySnapshot().orElseThrow().authorityFacts()) {
+        for (AuthorityFactV1 fact : snapshot.authorityFacts()) {
             facts.put(fact.key(), fact);
         }
         for (AuthorityFactV1 fact : context.authorityFacts()) {
