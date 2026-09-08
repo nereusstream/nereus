@@ -979,6 +979,83 @@ Supplemental documentation, frozen design/M4 dependency, lifecycle, coordinator 
 **13/13 tasks** in `/tmp/nereus-m5-run-root-final-check.log`. Both complete source maps and all passing XML archives
 were independently rechecked afterward. All 17 acceptance rows remain OPEN/null.
 
+## 2026-09-08 native NBKE2 compaction inputs
+
+Status: focused native raw-run source and restart verification after `5542f4339782d368e969116cfc5284541dbd5a8d`.
+The [run-source projection](m5-kafka-run-source-projection.json) records this raw-run input path. All 17 obligations
+remain OPEN/null; protocol semantic/owner admission, complete source representations and physical deletion remain required.
+
+`KafkaRunRootCatalogV2` exposes selected native records without changing the frozen four-method lifecycle interface.
+The Oxia adapter rejects foreign and noncanonical keys before native lookup, then uses the existing permanent selection
+rules. `KafkaBookKeeperRunSourceV2` reads a selected SEALED root, admits an OWNER_WORKER_LEASE_HANDLE_PIN physical
+ticket and scans the actual closed ledger through an owned non-recovery session. All native frames and total native
+length must agree with the root/header/footer. Kafka bodies must have exact assigned coverage/leader epoch and valid
+CRC. Complete append groups require adjacent members, exact group/attempt IDs, terminal bounds and aggregate payload
+hash. Every present index locator is matched to actual DATA length/coverage and append-group deltas; checkpoint sections
+are decoded, and footer index/checkpoint references and logical/physical ends must match observed frames.
+
+The scan derives canonical InputBatch bodies and the complete SourceExtent, including record/timestamp summaries,
+ledger resource digest and format/body roots. Its source identity binds the sealed root without its successor link,
+closed physical bounds and native frame/body digests; mutable native replica layout is excluded. A successor selection
+therefore preserves the original source identity. The final selected-root reread must preserve the root and physical
+resource. Membership resolution compares the entire frozen extent and exact Binding/provider identity; unsupported
+source kinds fail rather than receiving guessed members. Raw-run range-index coverage does not imply complete protocol
+indexes: requiredIndexesPresent remains false and the existing semantic compiler rebuilds the output indexes.
+
+A shared per-resolution budget covers all input scans: physical entries, input batches, records, native bytes, retained
+Kafka payload and decompressed record bytes. Before Kafka allocates a compressed record body, the parser preflights
+the decompressed stream with fixed scratch space: declared record count, each length prefix and body, the total decoded
+byte budget and exact end of stream. This rejects oversized length declarations before record allocation and truncated
+or undeclared decoded payload before materialization. Actual empty batches need zero decoded record budget. This byte
+budget does not replace complete Cell memory/I/O admission or account for every codec scratch allocation.
+Scan errors return no partial input. Success and failure release only the current invocation's read
+ticket after the owned session drains/closes. Observer cancellation cannot abandon the read or close. Unknown close
+retains the ticket; old-process read-ticket cleanup still requires native owner/drain proof and is not invented here.
+
+The native fixture uses actual run roots and header/DATA/footer bytes to drive the existing semantic compiler, guarded
+native output writer, physical-ticketed selector publication and M4 output recovery. It exercises orders,
+__consumer_offsets and __transaction_state routes with generic Kafka batches; protocol key/transaction/frontier
+proofs, internal message schema semantics, initial M4 capability admission and resource-birth OPEN facts remain fixtures.
+Negative cases cover altered frozen extents, physical fence-first admission, entry/payload/record exhaustion, wrong
+multi-member group digest, bad index payload locator, and cancellation during the final native root read. An actual
+range-index positive case verifies the same DATA-backed locator path. Retained-data restart checkpoints store only
+configuration and source/root/selected-output identities; the new JVM must rederive native source extents and recover
+selected BK output with all eight indexes and no publication writes.
+
+The first complete native attempt passed four of five source cases, including native input-driven publication on all
+three topic routes. The remaining fixture attempted to install a READ_FENCED value derived from revision-one OPEN
+after several real ticket transitions. The native store correctly rejected its stale predecessor/revision. The corrected
+fixture rereads current authority, qualifies a fresh synthetic eligibility snapshot at the next revision and uses the
+existing state machine to build CAS-1 on that exact successor. No production revision check or eligibility requirement
+was weakened. Reader review also makes unresolved ticket release fail capture and keeps scan planning/finalization on
+the supplied owner executor. The next native run passed all 51 cases/phases, including retained-data restart, before
+parser review identified Kafka's allocation-before-yield behavior. That earlier success does not certify the subsequent
+preflight change. Its regression cases include a valid-CRC compressed batch containing only a length varint declaring
+Integer.MAX_VALUE bytes, truncated record payload and undeclared trailing decoded bytes. The later attempt stopped at
+Spotless on the new fixture's argument layout; after formatting, the 3 budget and 14 semantic compaction tests plus
+Spotless/Checkstyle passed (18 tasks, 6 executed). Final validation below must use this later source.
+
+Final native validation: `scripts/run-v2-m5-kafka-run-source-check.sh` passed with 84 executed main tasks and a
+separate 22-task restart JVM (3 executed). Its 13 archived suites contain 51 cases/phases with zero failures/errors/skips.
+The independent legacy cluster passed 93 executed main tasks, 3 executed restart reads and 71 archived cases/phases.
+Every XML archive and both source maps were independently rechecked after completion. The focused input map contains
+718 files, SHA-256 `e45e51bae5ab7b51650360977224d458e6f3cc53159230a18f0f4567a7f82a10`; the 695-file legacy map is
+`09cba9c2bf23cc1db5a2e356eb7feea3796798ee3fc4cd829c6310d9263fd209`. Both remained unchanged.
+
+Local diagnostic summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-82676/run-summary.json`, SHA-256
+`41eca5477b2df6d1bc93ffea39a7429a3a2565a10b7c8cc20884453cd37b9846`; log `/tmp/nereus-m5-run-source-native-gate4.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-82708`; its summary SHA-256 is
+`2f805186e44d60bd031946d6a24111f35ceb32c65b51fa4c5e11806ef8c1d355`.
+The same Oxia container `4721bfaa93c952fe19c1545ae70fce1747afc6cbfbcfb1e625799fc0cc4c18da` restarted from
+`2026-09-08T02:59:48.679578211Z` to `2026-09-08T03:02:12.954770166Z`; all four BK/ZooKeeper containers also retained
+their IDs/images and changed start times. Cleanup removed only runner-owned containers and volumes; the unrelated
+connector remained. These local diagnostics are not M5-E receipts, aggregate Final or physical-delete authority.
+
+Supplemental validation passed 13 executed tasks: `v2DocumentationCheck`, historical M5 freeze/M4 dependency,
+lifecycle design, target-delete coordinator source and READ_FENCED recovery source checks. Log:
+`/tmp/nereus-m5-run-source-final-check.log`. Frozen historical bytes remain unchanged; all 17 acceptance obligations
+remain OPEN/null and the three M6 activation scenarios remain PLANNED/null. The full lifecycle goal remains active.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1426,9 +1503,9 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Derive complete physical input membership and source-cut content from the persisted native run-root adapter,
-   with full DATA/index verification, and integrate the guarded ticketed
-   publisher with real protocol ownership. Extend create/selection/drain terminal to stale-task and complete writer/adoption
+1. Extend native raw-run input capture to selected compacted generations and all other required source representations;
+   integrate current protocol key/transaction/frontier ownership and birth/read-lifetime admission with the guarded
+   publisher. Extend create/selection/drain terminal to stale-task and complete writer/adoption
    admission, then connect M4-protected BK recovery to ordinary reads, internal topics and grace/rescan cleanup.
 2. Extend the native BK-to-Oxia namespace assignment to Object and cross-Cell resource ownership; complete Binding
    authority admission, quota/restart accounting and Cell I/O/operator metrics around the native M4/history route. Admit the configured durable GC quota route for every actual writer,

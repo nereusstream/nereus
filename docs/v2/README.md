@@ -80,6 +80,13 @@ performance-first BookKeeper WAL.
   root mutations. The native internal-topic run lifecycle still uses synthetic owner/resource admission; native input
   membership, root quota, ordinary reads, complete compaction/delete integration and M5 Final remain outstanding.
 
+  The [raw NBKE2 source reader](detailed_design/m5/m5-kafka-run-source-projection.json) now derives input bodies and
+  stable physical membership from native selected roots and closed ledger bytes. Bounded scans hold read tickets until
+  session drain/close and compare complete source extents before guarded publication. Native protocol-owner/semantic
+  admission, compacted-generation input discovery, read-ticket crash recovery and physical deletion remain required.
+  Focused native/restart validation passed 51 archived cases/phases plus 71 legacy regression cases/phases, with both
+  source maps unchanged; this result closes no aggregate M5 obligation.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived

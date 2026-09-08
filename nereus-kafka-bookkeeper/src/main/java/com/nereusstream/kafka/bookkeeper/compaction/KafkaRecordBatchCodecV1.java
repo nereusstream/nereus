@@ -20,6 +20,8 @@ import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Con
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.HeaderValue;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.ParsedBatch;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.RecordValue;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +39,7 @@ import org.apache.kafka.common.record.MutableRecordBatch;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.utils.BufferSupplier;
+import org.apache.kafka.common.utils.ByteUtils;
 import org.apache.kafka.common.utils.CloseableIterator;
 
 /** Strict one-batch Kafka magic-v2 parser and deterministic sparse-batch rewriter. */
@@ -44,6 +47,20 @@ public final class KafkaRecordBatchCodecV1 {
     private KafkaRecordBatchCodecV1() {}
 
     public static ParsedBatch parse(CanonicalBytes body) {
+        return parse(body, KafkaCompactionRecordsV1.MAX_RECORDS, Long.MAX_VALUE);
+    }
+
+    /** Preflights record framing before Kafka allocates decompressed record bodies. */
+    public static ParsedBatch parse(CanonicalBytes body, int maximumRecords, long maximumDecodedBytes) {
+        return parseBounded(body, maximumRecords, maximumDecodedBytes).batch();
+    }
+
+    public record BoundedBatch(ParsedBatch batch, long decodedBytes) {}
+
+    public static BoundedBatch parseBounded(CanonicalBytes body, int maximumRecords, long maximumDecodedBytes) {
+        if (maximumRecords < 0 || maximumRecords > KafkaCompactionRecordsV1.MAX_RECORDS || maximumDecodedBytes < 0) {
+            throw new IllegalArgumentException("Kafka decoded record budget is outside its bounded domain");
+        }
         Objects.requireNonNull(body, "body");
         if (body.isEmpty() || body.length() > KafkaCompactionRecordsV1.MAX_BATCH_BYTES) {
             throw new IllegalArgumentException("Kafka RecordBatch body length is outside the M5-B cap");
@@ -65,11 +82,17 @@ public final class KafkaRecordBatchCodecV1 {
                 || batch.partitionLeaderEpoch() < 0) {
             throw new IllegalArgumentException("M5-B accepts only assigned magic-v2 RecordBatch input");
         }
+        long framedBytes = preflight((DefaultRecordBatch) batch, maximumRecords, maximumDecodedBytes);
         List<RecordValue> values = new ArrayList<>();
+        long decodedBytes = 0;
         try (CloseableIterator<Record> iterator = batch.streamingIterator(BufferSupplier.NO_CACHING)) {
             while (iterator.hasNext()) {
                 Record record = iterator.next();
                 record.ensureValid();
+                if (values.size() == maximumRecords || record.sizeInBytes() > maximumDecodedBytes - decodedBytes) {
+                    throw new IllegalArgumentException("Kafka decoded record budget exhausted");
+                }
+                decodedBytes += record.sizeInBytes();
                 values.add(new RecordValue(
                         record.offset(),
                         record.sequence(),
@@ -83,22 +106,75 @@ public final class KafkaRecordBatchCodecV1 {
             throw new IllegalArgumentException("Kafka RecordBatch count differs from parsed records");
         }
         ControlKind controlKind = controlKind(batch, values);
-        return new ParsedBatch(
-                body,
-                Sha256Digest.hash(body),
-                batch.baseOffset(),
-                batch.lastOffset(),
-                batch.partitionLeaderEpoch(),
-                batch.magic(),
-                batch.compressionType(),
-                batch.timestampType(),
-                batch.maxTimestamp(),
-                batch.producerId(),
-                batch.producerEpoch(),
-                batch.baseSequence(),
-                batch.isTransactional(),
-                controlKind,
-                values);
+        return new BoundedBatch(
+                new ParsedBatch(
+                        body,
+                        Sha256Digest.hash(body),
+                        batch.baseOffset(),
+                        batch.lastOffset(),
+                        batch.partitionLeaderEpoch(),
+                        batch.magic(),
+                        batch.compressionType(),
+                        batch.timestampType(),
+                        batch.maxTimestamp(),
+                        batch.producerId(),
+                        batch.producerEpoch(),
+                        batch.baseSequence(),
+                        batch.isTransactional(),
+                        controlKind,
+                        values),
+                framedBytes);
+    }
+
+    private static long preflight(DefaultRecordBatch batch, int maximumRecords, long maximumDecodedBytes) {
+        int count = batch.countOrNull();
+        if (count < 0) {
+            throw new IllegalArgumentException("Kafka RecordBatch has a negative record count");
+        }
+        if (count > maximumRecords) {
+            throw new IllegalArgumentException("Kafka decoded record budget exhausted");
+        }
+        // The compressed iterator allocates from each record's length before yielding the record.
+        // Traverse the immutable input first using fixed scratch space and the complete byte budget.
+        byte[] lengthBytes = new byte[5];
+        byte[] scratch = new byte[8192];
+        long decodedBytes = 0;
+        try (InputStream input = batch.recordInputStream(BufferSupplier.NO_CACHING)) {
+            for (int record = 0; record < count; record++) {
+                int prefixBytes = 0;
+                int next;
+                do {
+                    next = input.read();
+                    if (next < 0 || prefixBytes == lengthBytes.length) {
+                        throw new IllegalArgumentException("Kafka record length is truncated or invalid");
+                    }
+                    lengthBytes[prefixBytes++] = (byte) next;
+                } while ((next & 0x80) != 0);
+                int length = ByteUtils.readVarint(ByteBuffer.wrap(lengthBytes, 0, prefixBytes));
+                if (length < 0) {
+                    throw new IllegalArgumentException("Kafka record length is negative");
+                }
+                long framedLength = (long) prefixBytes + length;
+                if (framedLength > maximumDecodedBytes - decodedBytes) {
+                    throw new IllegalArgumentException("Kafka decoded record budget exhausted");
+                }
+                decodedBytes += framedLength;
+                int remaining = length;
+                while (remaining > 0) {
+                    int read = input.read(scratch, 0, Math.min(remaining, scratch.length));
+                    if (read <= 0) {
+                        throw new IllegalArgumentException("Kafka record body is truncated");
+                    }
+                    remaining -= read;
+                }
+            }
+            if (input.read() != -1) {
+                throw new IllegalArgumentException("Kafka RecordBatch has trailing decoded record bytes");
+            }
+            return decodedBytes;
+        } catch (IOException error) {
+            throw new IllegalArgumentException("Kafka record framing cannot be decoded", error);
+        }
     }
 
     public static boolean canRewriteSubset(ParsedBatch batch, List<RecordValue> retained) {

@@ -117,6 +117,10 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
         return spec;
     }
 
+    public BookKeeperCapabilitySnapshotV1 capabilitySnapshot() {
+        return capability;
+    }
+
     public RealBookKeeperCellSessionV1 newSession() {
         return new RealBookKeeperCellSessionV1(client, capability, new byte[0]);
     }

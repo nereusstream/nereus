@@ -91,6 +91,12 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThat(join(f.roots.openRoot(a.runId()))).contains(sealed);
         assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
         assertThat(f.stored(a).successor()).contains(f.record(b).initialLink());
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .contains(f.stored(a));
+        assertThatThrownBy(() -> f.roots.readSelectedRoot(f.roots.nativeGenesisKey()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> f.roots.readSelectedRoot("/foreign/" + f.roots.nativeRootKey(a.runId())))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThat(f.tickets(a)).isZero();
         assertThat(f.tickets(b)).isZero();
         assertThat(f.verifications).isEqualTo(3);
@@ -106,6 +112,8 @@ class OxiaKafkaRunRootAuthorityV2Test {
         f.client.holdKey = f.roots.nativeGenesisKey();
         var held = f.roots.createRoot(a).toCompletableFuture();
         assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .isEmpty();
         assertThat(f.tickets(a)).isEqualTo(1);
         assertThat(join(f.roots.createRoot(b)).exactProof()).contains(b);
         f.client.release.run();

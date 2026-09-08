@@ -21,6 +21,7 @@ import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
 import com.nereusstream.storage.api.kafka.KafkaRunRootAuthority;
+import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Link;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Scope;
@@ -46,7 +47,7 @@ import java.util.function.Supplier;
  * Every resource must already have admitted permanent GC authority; this adapter never initializes absent authority.
  * Protocol-owner admission and native run verification remain separate from metadata transport.
  */
-public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority {
+public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority, KafkaRunRootCatalogV2 {
     private record Stored(AuthorityRecord nativeValue, KafkaRunRootRecordV2 value) {}
 
     private record Terminal(ProviderMutationResultV1<KafkaRunRootSnapshotV1> result, Sha256Digest proof) {}
@@ -84,6 +85,30 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority 
 
     public String nativeGenesisKey() {
         return prefix + "/genesis-v2";
+    }
+
+    @Override
+    public CompletionStage<Optional<KafkaRunRootRecordV2>> readSelectedRoot(String nativeKey) {
+        Objects.requireNonNull(nativeKey, "nativeKey");
+        String start = prefix + "/";
+        if (nativeKey.length() != start.length() + 32 + "/root-v2".length()
+                || !nativeKey.startsWith(start)
+                || !nativeKey.endsWith("/root-v2")) {
+            throw new IllegalArgumentException("run catalog key is outside its native route");
+        }
+        String id = nativeKey.substring(start.length(), nativeKey.length() - "/root-v2".length());
+        if (!id.matches("[0-9a-f]{32}")) {
+            throw new IllegalArgumentException("run catalog key has a noncanonical run ID");
+        }
+        var run = new StorageRunId(com.nereusstream.domain.identity.Id128.fromBytes(
+                java.util.HexFormat.of().parseHex(id)));
+        return read(run).thenCompose(current -> {
+            if (current.isEmpty()) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+            var value = current.orElseThrow().value();
+            return selected(value).thenApply(chosen -> chosen ? Optional.of(value) : Optional.empty());
+        });
     }
 
     @Override

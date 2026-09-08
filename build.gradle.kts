@@ -3098,3 +3098,14 @@ tasks.register("v2M5KafkaRunRootsCheck") {
         ":nereus-metadata-oxia:checkstyleTest",
     )
 }
+
+
+tasks.register("v2M5KafkaRunSourceCheck") {
+    group = "verification"
+    description = "Verify native sealed run source capture, bounded decoding, exact membership and ticketed publication."
+    dependsOn(
+        "v2M5KafkaRunRootsCheck",
+        ":nereus-kafka-bookkeeper:v2M5KafkaRecordBatchBudgetTest",
+        ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest",
+    )
+}

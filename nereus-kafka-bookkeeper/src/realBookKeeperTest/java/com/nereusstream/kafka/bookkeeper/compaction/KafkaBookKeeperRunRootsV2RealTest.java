@@ -317,7 +317,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 root.predecessorRunId());
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         final long attempt;
         final Scope scope;
         final List<CanonicalBytes> bodies;

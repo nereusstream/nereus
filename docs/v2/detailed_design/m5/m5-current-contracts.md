@@ -180,6 +180,36 @@ with zero failures/errors/skips. Both the 713-input root manifest and 691-input 
 legacy regression was rerun on an independent cluster: 93 executed main tasks, three executed post-restart reads and
 71 archived cases/phases. These focused results do not close any aggregate obligation.
 
+The [native run-source projection](m5-kafka-run-source-projection.json) adds actual NBKE2 input capture and physical
+membership. `OxiaKafkaRunRootAuthorityV2.readSelectedRoot` accepts only a canonical key on its assigned route and returns
+only a selected root. `KafkaBookKeeperRunSourceV2` requires a nonempty SEALED run, acquires its physical read ticket,
+opens an owned read-only session and verifies every native entry. It checks full header/binding/configuration, Kafka
+body CRC/offsets/leader epoch, append-group continuity and aggregate digests, index locators against actual DATA,
+checkpoint sections/bounds, terminal footer/directory and total native length. It rereads the selected root afterward.
+The source identity excludes the mutable successor link and replica layout; it binds stable root bytes, closed physical
+bounds and actual frame/body digests. The returned SourceExtent, record/timestamp summaries and InputBatch bodies are
+derived from native bytes. Membership resolution compares the complete frozen extent and exact Binding/provider route;
+it does not accept a caller's physical member map. One budget spans all sources and bounds entries, batches, records,
+native bytes, retained payload and decoded record bytes. A fixed-scratch decompressed-stream preflight checks count,
+lengths, total decoded bytes and exact EOF before Kafka allocates record bodies, including malformed oversized length
+declarations. This does not account for every codec scratch allocation or replace complete Cell memory/I/O admission.
+A failed scan returns no partial input. The owned session must drain and close before this
+invocation's read ticket is released, including on parse failure; cancellation does not abandon admitted work. Unknown
+close retains the ticket; unresolved ticket release also prevents a successful capture result. Old-JVM read-ticket
+recovery and complete Cell admission remain required.
+The raw-run adapter feeds the existing ticketed BK compactor and selected-output recovery. It reports range-index
+coverage separately and never declares all protocol indexes complete; the existing semantic compiler rebuilds output
+indexes. Tests use user and internal-topic routes with actual generic Kafka batches. Complete native internal message
+schemas, protocol key/transaction/frontier proofs and resource-birth admission remain separate. Compacted-generation,
+Object and Pulsar input catalogs, ordinary read-owner integration, source lifetime/read-ticket recovery, root quota,
+READ_FENCED and physical deletion remain OPEN. No aggregate obligation closes from this raw-run source path alone.
+
+The final raw-run source runner passed 84 executed main tasks and a separate 22-task restart JVM (three executed).
+Its 13 archived suites contain 51 cases/phases with no failures/errors/skips. The independent legacy regression passed
+71 archived cases/phases; both the 718-input current map and 695-input legacy map were individually unchanged. The
+allocation preflight also passed the 3 budget and 14 existing semantic compaction tests. Exact local source hashes,
+restart identities and archive locations are recorded in the implementation log.
+
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares
 current frozen bytes; the original current-checkout pre-implementation gate still rejects implementation descendants.

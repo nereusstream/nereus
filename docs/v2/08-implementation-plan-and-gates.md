@@ -83,6 +83,13 @@ root choices, actual native NBKE2 header/footer checks, parent/child tickets and
 JVM. Both internal-topic names exercise the run lifecycle. Synthetic resource admission and owner facts remain explicit;
 the [root projection](detailed_design/m5/m5-kafka-run-roots-projection.json) is not native input-catalog admission,
 complete internal-topic compaction, root metadata quota, all-writer verification or aggregate M5 evidence.
+`v2M5KafkaRunSourceCheck` and `scripts/run-v2-m5-kafka-run-source-check.sh` add actual selected-root/DATA-derived
+source extents, shared read/decoded-record budgets, group/index corruption rejection, physical read-ticket lifetime and
+native input-to-compaction publication. Retained-data restart rederives source identities and recovers selected outputs.
+This [raw-run source path](detailed_design/m5/m5-kafka-run-source-projection.json) still uses synthetic protocol semantic
+and birth admission facts; compacted-generation catalogs, all-writer/read-owner closure, deletion and M5-E remain OPEN.
+The focused run passed 51 archived cases/phases and a separate 71-case/phase legacy regression, including retained-data
+restarts. Both exact source maps remained unchanged. Decoded record framing is preflighted before Kafka allocation.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

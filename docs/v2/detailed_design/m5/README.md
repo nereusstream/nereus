@@ -199,6 +199,14 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   Native internal-topic run bytes and restart recovery are exercised with synthetic resource/owner admission. Complete
   input membership, root metadata quota, ordinary reads, internal-topic compaction and physical deletion remain OPEN.
 
+- The [native run-source projection](m5-kafka-run-source-projection.json) derives raw NBKE2 source extents and input
+  batches from selected roots and actual closed ledgers. Complete group/body/index-reference checks run under physical
+  read tickets and shared byte/count budgets; exact frozen extents determine publication membership. The existing BK
+  compiler/publisher consumes these inputs. Compacted-generation and other source catalogs, protocol-owner/semantic
+  admission, read-ticket crash recovery, root quota and physical deletion remain OPEN.
+  The focused runner passed 51 archived cases/phases and retained-data restart; its independent legacy regression
+  passed 71. Both captured source maps remained unchanged. Decompressed framing is checked before record allocation.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

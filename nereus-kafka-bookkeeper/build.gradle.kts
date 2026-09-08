@@ -487,3 +487,47 @@ listOf("v2M5KafkaRunRootsRealTest", "v2M5KafkaRunRootsRestartWriteTest", "v2M5Ka
         }
     }
 }
+
+
+listOf("v2M5KafkaRunSourceRealTest", "v2M5KafkaRunSourceRestartWriteTest", "v2M5KafkaRunSourceRestartReadTest").forEach { taskName ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter {
+            val base = "com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2RealTest"
+            when (taskName) {
+                "v2M5KafkaRunSourceRestartWriteTest" -> includeTestsMatching("$base.writeBeforeServerRestart")
+                "v2M5KafkaRunSourceRestartReadTest" -> includeTestsMatching("$base.readAfterServerRestart")
+                else -> {
+                    includeTestsMatching(base)
+                    excludeTestsMatching("$base.writeBeforeServerRestart")
+                    excludeTestsMatching("$base.readAfterServerRestart")
+                }
+            }
+        }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri", providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get())
+            systemProperty("nereus.m5.oxia.serviceAddress", providers.gradleProperty("v2M5RetentionOxiaServiceAddress").get())
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.runsource.restartCheckpoint", providers.gradleProperty("v2M5KafkaRunSourceRestartCheckpoint").get())
+            }
+        }
+        if (taskName == "v2M5KafkaRunSourceRestartWriteTest") {
+            mustRunAfter("v2M5KafkaRunSourceRealTest")
+        }
+    }
+}
+
+
+tasks.register<Test>("v2M5KafkaRecordBatchBudgetTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test") }
+    outputs.upToDateWhen { false }
+}
