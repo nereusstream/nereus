@@ -185,6 +185,13 @@ final class M5BookKeeperNativeCreateGuardV2 {
                 Op.check(reservationPath(ledgerId), 0));
     }
 
+    List<Op> deleteChecks(long ledgerId) {
+        return List.of(
+                Op.check(namespaceGatePath, namespaceGateVersion),
+                Op.check(taskPath, 1),
+                Op.check(reservationPath(ledgerId), 0));
+    }
+
     CompletableFuture<Void> fenceCreates() {
         var result = new CompletableFuture<Void>();
         zk.setData(

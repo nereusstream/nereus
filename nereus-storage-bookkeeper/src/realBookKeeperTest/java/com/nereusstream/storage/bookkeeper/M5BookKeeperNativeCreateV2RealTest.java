@@ -398,6 +398,8 @@ class M5BookKeeperNativeCreateV2RealTest {
         volatile boolean holdNextMulti;
         volatile boolean loseNextMulti;
         volatile boolean loseNextSet;
+        final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>
+                lostMultiDelivery = new java.util.concurrent.atomic.AtomicReference<>();
         final java.util.concurrent.atomic.AtomicInteger lost = new java.util.concurrent.atomic.AtomicInteger();
         final java.util.concurrent.atomic.AtomicInteger multis = new java.util.concurrent.atomic.AtomicInteger();
         final java.util.concurrent.CompletableFuture<Void> held = new java.util.concurrent.CompletableFuture<>();
@@ -426,6 +428,10 @@ class M5BookKeeperNativeCreateV2RealTest {
                                     path,
                                     ctx,
                                     null);
+                            var delivered = lostMultiDelivery.getAndSet(null);
+                            if (delivered != null) {
+                                delivered.complete(null);
+                            }
                         } else {
                             callback.processResult(rc, path, ctx, results);
                         }

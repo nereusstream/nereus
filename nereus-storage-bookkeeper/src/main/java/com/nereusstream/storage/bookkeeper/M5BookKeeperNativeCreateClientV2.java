@@ -125,6 +125,33 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
         return new RealBookKeeperCellSessionV1(client, capability, new byte[0]);
     }
 
+    /** Native delete fencing is a low-level primitive; the M5 coordinator must supply current intent/eligibility. */
+    public M5BookKeeperNativeDeleteAuthorityV2 deleteAuthority(RunLedgerHandleV1 handle) {
+        return deleteAuthority(handle, () -> CompletableFuture.completedFuture(null));
+    }
+
+    M5BookKeeperNativeDeleteAuthorityV2 deleteAuthority(
+            RunLedgerHandleV1 handle, java.util.function.Supplier<CompletionStage<Void>> beforeDelete) {
+        var configuration = RunLedgerConfigurationV1.from(capability, handle.runId());
+        if (!spec.configurations().contains(configuration)
+                || !handle.providerScopeId().equals(capability.providerScopeId())
+                || !handle.configurationDigest().equals(capability.configurationDigest())
+                || !(client.getLedgerManager() instanceof org.apache.bookkeeper.meta.CleanupLedgerManager cleanup)
+                || !(cleanup.getUnderlying() instanceof M5BookKeeperNativeLedgerManagerV2 manager)) {
+            throw new IllegalArgumentException("native delete handle/manager differs from the admitted scope");
+        }
+        var driver = driver();
+        return new M5BookKeeperNativeDeleteAuthorityV2(
+                driver.getZk(),
+                manager,
+                driver.guard(),
+                driver.nativeAcls(),
+                handle,
+                spec.namespace(),
+                capability,
+                beforeDelete);
+    }
+
     /** Captures sealed native metadata through this same owned connection and admitted capability. */
     public java.util.concurrent.CompletionStage<M5BookKeeperDeleteAdapterV1.CaptureResult> captureExactTarget(
             com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1 handle) {

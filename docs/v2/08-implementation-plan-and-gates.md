@@ -34,6 +34,12 @@ owner/fact validations. Both veto and typed intent survive the metadata runner's
 also exercises the instance-bound full sealed-identity reader and native absence completion on actual BK/Oxia;
 its protocol owner and semantic/M4 statements remain synthetic. Hash-only completion is now read-only historical
 terminal reconciliation; physical-delete dispatch and full native owner/proof integration remain OPEN.
+The guarded BK native delete primitive now supplies permanent resource-scoped GC epochs and atomic server checks
+for namespace/task/reservation/epoch plus the exact ledger metadata version. The task-terminal runner includes
+`v2M5NativeDeleteRealTest` and separate `v2M5NativeDeleteRestartWriteTest` / `v2M5NativeDeleteRestartReadTest` phases.
+Its 20 archived suites contain 77 cases/phases; the bound run-source runner requires and rehashes this independent
+77-case archive. This validates native fencing and identity-specific deletion only: M5 intent/token admission,
+protocol owner and eligibility proof production, grace and per-Cell budgets remain required composition work.
 
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part

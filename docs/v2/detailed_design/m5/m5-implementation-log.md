@@ -1937,6 +1937,66 @@ contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-dispatch-final-check.
 remain OPEN/null, and M6 012/013/022 remain PLANNED/null in both registries. All owned native test containers were
 cleaned up; the unrelated connector was retained. This slice creates no M5-E child, aggregate Final or production authority.
 
+## 2026-09-08 native BK GC epoch and exact-version deletion
+
+Status: implemented native guarded-ledger fencing primitive; NON_PROMOTABLE. Full M5 intent, eligibility,
+grace and per-Cell dispatch composition remain OPEN.
+
+`M5BookKeeperNativeDeleteAuthorityV2` adds one permanent resource-scoped M5DE epoch in the actual native ZooKeeper
+namespace. Its canonical body binds physical resource, owner UUID, monotonic epoch and the complete admitted BK
+capability fingerprint. Native version is exactly epoch minus one; overflow fails closed and no history list is
+appended. Claim uses exact create/set-data under namespace, closed task-create and permanent reservation checks.
+An actual stored candidate reconciles a lost claim reply. Every current-owner check also verifies the actual
+reservation body against the exact task spec; a different task with identical run configuration is rejected before
+delete. The epoch node is never removed after ledger deletion.
+
+Before deletion the adapter reads the full sealed native identity, then sends namespace/task/reservation/epoch
+checks and an exact-version ledger-metadata delete in a single ZooKeeper multi. A successor may revoke the epoch
+after the old owner reads identity; the native transaction then rejects that old delete. Native BADVERSION also
+rejects a same-byte metadata rewrite; actual NoSuchLedger alone establishes absence. Unknown responses require native reconciliation, and
+current native epoch is revalidated before reporting. Cancelling the exposed observer cannot cancel accepted work.
+The owned client unwraps the locked SDK's actual CleanupLedgerManager to its guarded metadata manager; no external
+BookKeeper checkout or SDK source was changed. Raw legacy-ledger deletion is outside this guarded profile.
+
+The new real-native suite covers a full SDK append/seal followed by competing-client epoch takeover while an old
+delete is paused, same-byte metadata-version invalidation, applied-but-lost claim/delete responses and observer
+cancellation. Independent JVM phases retain the actual native epoch and sealed ledger over the same ZooKeeper and
+three bookie service restarts. The new JVM verifies the exact client JAR, reads the surviving epoch and checks its
+hash/version before mutation, rejects the predecessor and deletes under the current epoch. Checkpoints carry only
+input spec, ledger ID, expected hashes/version and predecessor owner identity; they do not supply epoch state.
+
+Final source-locked verification completed through `scripts/run-v2-m5-kafka-run-source-check.sh`:
+legacy 95/95 main tasks (1m 38s) and 24/24 restart tasks (12s), with 20 archived suites / 77 cases and phases;
+bound-profile 89/89 main tasks (2m 46s) and 22/22 restart tasks (25s), with 18 archives / 90 cases and phases.
+Final log: `/tmp/nereus-m5-native-delete-bk-bound-final2.log`. The actual cross-task rejection runs in the native
+suite; the bound-profile archive preserves existing publication, protected read, run-root/source and restart coverage.
+
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-64911`.
+Its 719-input manifest SHA is `6b3c1a7181f2f79003367311ebeb18cf54ad2a6a7b8b13d2c288be2d25206454`;
+summary SHA `9604a38642e942105ee4032bdb941f6b98dfaf3c20021ef2014e0cce5e6f4eda`. The same Oxia container
+`30e7740e4a64caf44a0af3fe9fcfc8d733d1228a9bc7f35e37b78e7e99fc5cc9` restarted from `2026-09-08T07:51:55.37553292Z`
+to `2026-09-08T07:53:47.389497889Z`. Bound output:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-64900`. Its 734-input manifest SHA is
+`789338d021fe93c3e32e466dcf5e9e0ddfd71d7c7e8ce9b06b163ccdf23b4262`; summary SHA
+`fad5c428f5abe653d2ca04046f99dc914486d4cd32af1341d3adfb7ffbfece68`. Bound Oxia
+`11b1703f0e110326570c5ae249c033c7540be27515227260820f532f06123fde` restarted from `2026-09-08T07:54:23.50293271Z`
+to `2026-09-08T07:57:24.164505336Z`. Both runs retained all four ZooKeeper/bookie container IDs and image IDs,
+with changed start times. Every captured input and every XML was independently rehashed; both copied legacy
+manifest/summary files are byte-identical. The manifests explicitly include the new native primitive, both test
+classes and module build. All final suites have zero failures, errors and skips. The earlier Gradle source-contract
+rejection of execution-phase `.get()` was corrected to the existing `.orNull ?: error(...)` convention before
+these final runs; superseded runs do not supply this final source evidence.
+
+Supplemental documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-native-delete-preflight.log`). The final documentation
+check was rerun after recording these outputs. All owned test containers were cleaned up; the unrelated connector
+was retained.
+
+This native primitive is not an admitted lifecycle dispatcher: it does not collect protocol eligibility, prove
+M4 RELEASED or grace, reserve Cell dispatch/unknown capacity, account durable native epoch capacity, or bind a
+durable M5 intent token. The coordinator and all-writer/provider composition must supply those layers.
+All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final or production authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -1948,8 +2008,9 @@ cleaned up; the unrelated connector was retained. This slice creates no M5-E chi
    provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.
 3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, all-provider identity observation,
    physical dispatch and protocol-proof repair above the same-key coordinator. Bounded READ_FENCED veto, typed
-   INTENT capability refresh and native BK identity/absence reconciliation are implemented; complete native owner,
-   proof production and dispatch remain incomplete.
+   INTENT capability refresh, native BK identity/absence reconciliation and server-fenced guarded BK deletion are
+   implemented; complete native owner/proof production, intent-token/grace/Cell admission and dispatch composition
+   remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

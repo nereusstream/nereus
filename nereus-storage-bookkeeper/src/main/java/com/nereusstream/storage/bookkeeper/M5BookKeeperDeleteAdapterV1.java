@@ -142,6 +142,14 @@ public final class M5BookKeeperDeleteAdapterV1 {
     }
 
     private Optional<BookKeeperDeleteTargetV1> targetFrom(LedgerMetadata metadata, RunLedgerHandleV1 handle) {
+        return exactTarget(metadata, handle, capability, password);
+    }
+
+    static Optional<BookKeeperDeleteTargetV1> exactTarget(
+            LedgerMetadata metadata,
+            RunLedgerHandleV1 handle,
+            BookKeeperCapabilitySnapshotV1 capability,
+            byte[] password) {
         if (!metadata.isClosed()
                 || !RealBookKeeperCellSessionV1.metadataMatches(metadata, handle)
                 || metadata.getEnsembleSize() != capability.ensembleSize()

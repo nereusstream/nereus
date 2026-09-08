@@ -30,6 +30,11 @@ performance-first BookKeeper WAL.
   refresh evidence in wire 6. The actual BK identity reader and native-absence completion are exercised with real
   BK/Oxia; owner and deletion-proof statements remain synthetic, so native owner integration, physical dispatch and
   M5 Final remain incomplete.
+  The guarded BK native delete primitive now stores a permanent per-resource GC epoch and atomically checks that
+  epoch, closed-create fences and the exact ledger metadata version in the native delete transaction. Separate
+  clients and JVMs verify stale-owner/version rejection, lost replies and durable restart recovery. This native
+  primitive still requires M5 intent, protocol eligibility, grace and Cell admission composition before use as an
+  admitted lifecycle dispatcher.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation

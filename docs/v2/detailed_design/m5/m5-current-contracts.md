@@ -74,6 +74,27 @@ entry only rereads an existing exact terminal, including compact historical done
 The production physical-delete dispatch composition, Object/provider-wide readers and native protocol owner/proof
 producers remain OPEN. No child receipt or aggregate obligation closes from these bounded integrations.
 
+`M5BookKeeperNativeDeleteAuthorityV2` now stores one permanent native M5DE epoch per guarded physical BK ledger.
+The record binds stable resource, owner UUID, epoch and the fingerprint of the complete admitted BK capability;
+its epoch equals native znode version plus one, with overflow rejected. Claim advances the exact native version
+under namespace, closed task-create and permanent reservation checks; an exact stored candidate reconciles a
+lost reply. Every current-owner check rereads the reservation body to prove its exact task binding; another task
+with the same run configuration cannot reuse the observed epoch to delete that ledger. Deletion re-reads the full sealed identity and performs all four fence checks plus deletion of the exact
+native ledger version in one ZooKeeper transaction. A paused predecessor cannot delete after a successor claims
+the epoch, even if the predecessor had already read identical sealed metadata. A same-byte metadata rewrite also
+invalidates the captured version. Native NoSuchLedger alone proves absence; unknown replies retain uncertainty
+until actual native rereads resolve it, and current epoch is revalidated before reporting. Observer cancellation
+does not cancel accepted work. The epoch remains after ledger deletion and retains constant-size latest state.
+
+Three real native cases plus two independent-JVM phases verify these boundaries, including full BK append/seal,
+actual server BADVERSION, applied-but-lost epoch/delete replies and retained epoch after the same ZooKeeper/bookie
+services restart. Each JVM verifies the locked BK client artifact. The restart checkpoint carries input spec, ledger
+ID and expected hashes/version/old-owner identifier; the new JVM must read the surviving native epoch itself.
+These are low-level native operations on guarded test ledgers. The adapter does not collect protocol eligibility,
+prove grace, reserve Cell dispatch/unknown capacity or bind a durable M5 intent token. Durable quota accounting
+for the permanent native epoch also remains required; fixed-size per-resource state does not bound lifetime resource
+count. Those admission layers, unguarded legacy ledgers, all-provider dispatch and full writer coverage remain OPEN.
+
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.
 `v2M5KafkaSemanticCoreCheck` passed 42 tasks, including 14 Kafka and 7 Object materialization tests. The added

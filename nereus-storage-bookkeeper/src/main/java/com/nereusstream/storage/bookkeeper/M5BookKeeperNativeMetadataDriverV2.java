@@ -42,6 +42,7 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
     static final String SPEC_PROPERTY = "nereusM5NativeCreateSpecV2";
     static final String NAMESPACE_BINDING_PROPERTY = "nereusM5NamespaceAuthorityBindingV2";
     private M5BookKeeperNativeCreateGuardV2 guard;
+    private java.util.List<org.apache.zookeeper.data.ACL> nativeAcls;
 
     static void register() {
         MetadataDrivers.registerClientDriver(DRIVER_SCHEME, M5BookKeeperNativeMetadataDriverV2.class);
@@ -80,6 +81,7 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
             var namespaceBinding = Optional.ofNullable(configuration.getString(NAMESPACE_BINDING_PROPERTY))
                     .map(value -> com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2.decode(
                             CanonicalBytes.copyOf(Base64.getDecoder().decode(value))));
+            nativeAcls = java.util.List.copyOf(ZkUtils.getACLs(nativeConfiguration));
             guard = new M5BookKeeperNativeCreateGuardV2(
                     zk, ledgersRootPath, spec, ZkUtils.getACLs(nativeConfiguration), namespaceBinding);
             var factory = new FencedFactory(spec);
@@ -110,6 +112,10 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
 
     M5BookKeeperNativeCreateGuardV2 guard() {
         return guard;
+    }
+
+    java.util.List<org.apache.zookeeper.data.ACL> nativeAcls() {
+        return nativeAcls;
     }
 
     private final class FencedFactory extends HierarchicalLedgerManagerFactory {

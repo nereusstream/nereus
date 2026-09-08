@@ -72,13 +72,15 @@ paths.extend([root/'scripts/check-v2-m5-bookkeeper-descriptor.py',
 manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 (out/'tested-inputs.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY
-"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --rerun-tasks \
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 --rerun-tasks \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   "-Pv2M5RetentionOxiaServiceAddress=127.0.0.1:$m5_port" \
   "-Pv2M5BookKeeperOxiaRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
+  "-Pv2M5NativeDeleteRestartCheckpoint=$m5_output/native-delete-checkpoint.txt" \
   v2M5BookKeeperTaskTerminationCheck :nereus-kafka-bookkeeper:v2M5BookKeeperOxiaRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRestartWriteTest \
-  :nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartWriteTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartWriteTest \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteRealTest :nereus-storage-bookkeeper:v2M5NativeDeleteRestartWriteTest --console=plain
 
 docker compose -p "$m5_project" -f "$m5_compose" ps -q > "$m5_output/bookkeeper-container-ids.txt"
 while IFS= read -r m5_id; do
@@ -96,13 +98,15 @@ test "$(docker inspect --format '{{.Image}}' "$m5_oxia_owned_id")" = "$m5_oxia_i
 m5_started_after="$(docker inspect --format '{{.State.StartedAt}}' "$m5_oxia_owned_id")"
 test "$m5_started_before" != "$m5_started_after"
 m5_wait_ready
-"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache \
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   "-Pv2M5RetentionOxiaServiceAddress=127.0.0.1:$m5_port" \
   "-Pv2M5BookKeeperOxiaRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
+  "-Pv2M5NativeDeleteRestartCheckpoint=$m5_output/native-delete-checkpoint.txt" \
   :nereus-kafka-bookkeeper:v2M5BookKeeperOxiaRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRestartReadTest \
-  :nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartReadTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartReadTest \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteRestartReadTest --console=plain
 
 docker logs "$m5_oxia_owned_id" > "$m5_output/oxia-server.log" 2>&1
 docker compose -p "$m5_project" -f "$m5_compose" logs > "$m5_output/bookkeeper.log" 2>&1
@@ -128,6 +132,9 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartReadTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
     ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',8),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteRealTest','M5BookKeeperNativeDeleteV2RealTest',3),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartWriteTest','M5BookKeeperNativeDeleteV2RestartTest',1),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartReadTest','M5BookKeeperNativeDeleteV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartWriteTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartReadTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
@@ -145,7 +152,9 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeBkIdentityRefreshAndAbsenceCompletion':True,'nativeDeleteProtocolOwnerAuthority':False,
+summary={'nativeBkServerFencedDelete':True,'nativeGcEpochAndLedgerVersionCheckedAtomically':True,
+    'nativeGcEpochSurvivedServerRestart':True,'nativeGcEpochHistoryBounded':True,
+    'nativeBkIdentityRefreshAndAbsenceCompletion':True,'nativeDeleteProtocolOwnerAuthority':False,
     'nativeDeleteEligibilityAuthority':False,'physicalDeleteDispatchComposition':False,'schema':'NEREUS_V2_M5_BK_TASK_TERMINAL_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,

@@ -129,6 +129,10 @@ final class M5BookKeeperNativeLedgerManagerV2 implements LedgerManager {
                 });
     }
 
+    String nativeLedgerPath(long ledgerId) {
+        return delegate.getLedgerPath(ledgerId);
+    }
+
     @Override
     public CompletableFuture<Void> removeLedgerMetadata(long ledgerId, Version version) {
         return delegate.removeLedgerMetadata(ledgerId, version);

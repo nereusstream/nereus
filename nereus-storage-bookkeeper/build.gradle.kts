@@ -123,3 +123,39 @@ mapOf(
         }
     }
 }
+
+// Native server-side GC epoch and exact ledger-version fencing. No M5 eligibility/Final authority is implied.
+tasks.register<Test>("v2M5NativeDeleteRealTest") {
+    group = "verification"
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteV2RealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.bookkeeper.metadataServiceUri",
+            providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                ?: error("v2M2BookKeeperMetadataServiceUri is required for native M5 delete fencing"))
+    }
+}
+
+mapOf("Write" to "writeBeforeServerRestart", "Read" to "readAfterServerRestart").forEach { (phase, method) ->
+    tasks.register<Test>("v2M5NativeDeleteRestart${phase}Test") {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteV2RestartTest.$method") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri",
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                    ?: error("native BookKeeper URI is required for delete restart verification"))
+            systemProperty("nereus.m5.nativeDelete.restartCheckpoint",
+                providers.gradleProperty("v2M5NativeDeleteRestartCheckpoint").orNull
+                    ?: error("native delete restart checkpoint is required"))
+        }
+    }
+}
