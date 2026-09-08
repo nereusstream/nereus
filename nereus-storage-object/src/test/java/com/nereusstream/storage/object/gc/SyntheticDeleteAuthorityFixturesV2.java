@@ -14,6 +14,7 @@
 
 package com.nereusstream.storage.object.gc;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
@@ -25,8 +26,11 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Physi
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterEnrollmentV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 
 /** Synthetic deletion proofs for unit/native metadata-storage tests only; no actual Provider/BK delete is certified. */
 public final class SyntheticDeleteAuthorityFixturesV2 {
@@ -75,6 +79,18 @@ public final class SyntheticDeleteAuthorityFixturesV2 {
                     fact.key(), CanonicalUtf8.fromString(fact.key()).bytes(), fact.metadataVersion()));
         }
         return List.copyOf(values);
+    }
+
+    /** Synthetic semantic statements, with each fact stored and version-bound by the supplied test factory. */
+    public static DeleteEligibilitySnapshotV2 replacement(
+            PhysicalResourceIdV2 resource, long generation, BiFunction<String, CanonicalBytes, AuthorityFactV1> facts) {
+        return M5DeleteEligibilityTestFixtures.snapshot(
+                resource,
+                DeleteEligibilitySnapshotV2.ReclamationReason.REPLACED_REPRESENTATION,
+                generation,
+                0,
+                PositionDomain.KAFKA_OFFSET,
+                facts::apply);
     }
 
     public static Sha256Digest digest(String value) {

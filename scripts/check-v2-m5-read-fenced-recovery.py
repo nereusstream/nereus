@@ -43,11 +43,25 @@ EXPECTED = {
   "externalFullIdentityReaderIntegrated": False,
   "durableRecoveryVetoRecordImplemented": False,
   "intentTakeoverCapabilityRefreshIntegrated": False,
-  "realOxiaRecoveryExecutionPresent": False,
+  "realOxiaRecoveryExecutionPresent": True,
   "completePhysicalDeleteComposition": False,
   "sourceBoundReceiptPresent": False,
   "physicalDeleteAuthority": False,
-  "productionAuthority": False
+  "productionAuthority": False,
+  "nativeMetadataExecution": {
+    "gate": "v2M5ReadFencedOxiaCheck",
+    "runner": "scripts/run-v2-m5-read-fenced-oxia-check.sh",
+    "semanticAuthority": "SYNTHETIC_FACTS_WITH_NATIVE_KEYS_VERSIONS_AND_HASHES",
+    "integrationCases": 4,
+    "separateJvmRestartPhases": 2,
+    "sameServerContainerRestarted": True,
+    "oldCallbackRejectedAfterRefresh": True,
+    "heldRefreshCannotOverwriteWinningNativeCas": True,
+    "sameBytesNewFactVersionRejected": True,
+    "missingOwnerVerifierRejectsRecovery": True,
+    "checkpointContainsAuthorityBodies": False,
+    "physicalDeletionInvoked": False
+  }
 }
 
 def validate_projection(value):

@@ -28,6 +28,14 @@ class RecoveryContractTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     module.validate_projection(value)
 
+    def test_rejects_native_metadata_claim_changes(self):
+        for key, expected in module.EXPECTED["nativeMetadataExecution"].items():
+            with self.subTest(key=key):
+                value = copy.deepcopy(module.EXPECTED)
+                value["nativeMetadataExecution"][key] = not expected if isinstance(expected, bool) else None
+                with self.assertRaises(ValueError):
+                    module.validate_projection(value)
+
     def test_rejects_native_integration_and_evidence_overclaims(self):
         for key, expected in module.EXPECTED.items():
             if expected is False:

@@ -1759,9 +1759,54 @@ This is persisted behavior only against the deterministic in-memory port. The ge
 production writer classes are wired. There is still no external identity reader, Provider/BookKeeper dispatch,
 source-locked real Oxia result, source-bound receipt, physical-delete, staging, or production authority.
 
+## 2026-09-08 READ_FENCED native metadata recovery
+
+Status: real source-locked Oxia persistence and recovery with synthetic semantic, M4 release, owner/fence and external
+identity statements. No native protocol owner integration or physical deletion authority is claimed.
+
+`M5ReadFencedOxiaIntegrationTest` uses the existing `OxiaTargetDeleteAuthorityStoreV2` and exact coordinator. A test-only
+fact factory stores every fixture statement at a scoped native key, rereads its actual native version/hash and uses
+those values in the typed eligibility snapshot. The existing in-memory fixture path remains unchanged. Four cases cover:
+
+- refresh applied before native response delivery loss, followed by authoritative native reread, epoch-bound identity
+  rejection and fixed physical resource/read attempt/closed-writer fence;
+- a held old refresh losing to another native client without overwriting the winning context;
+- the default unsupported native owner verifier rejecting takeover and intent even with every fact persisted; and
+- identical fact bytes at a new native version vetoing intent, plus changed recovery semantics vetoing refresh.
+
+`M5ReadFencedOxiaRestartTest` stores only route/key/hash/version in its checkpoint. A fresh JVM, after restart of the
+same native server container, reads and verifies that exact fence before any successor mutation, refreshes to epoch 3,
+rejects the previous observation and persists a new synthetic-identity intent. It does not reconstruct proof bodies
+from the checkpoint, certify an actual displaced owner, or call external deletion.
+
+The first run had one assertion failure: the test expected the coordinator's `EXISTING_EXACT`, but the lower native
+Oxia store had already reconciled the post-CAS delivery failure through authoritative reread and returned
+`APPLIED_EXACT`. The corrected test asserts that exact result and consumption of the delivery-loss injection.
+The next run passed 56/56 main tasks and 15 restart tasks (1 executed), with six archived suites/39 cases or phases.
+The final checked-source run passed the same 56/56 main tasks and 15 restart tasks (1 executed), with six archived
+suites/39 cases or phases and zero failure/error/skip. Output:
+`build/m5-read-fenced-oxia/nereus-m5-read-fenced-oxia-9245`; log `/tmp/nereus-m5-read-fenced-native4.log`.
+All 507 captured inputs (including the recovery projection/check scripts) and every archived XML were independently
+rehash-checked after completion. Input manifest SHA
+`ae131f6a7a0c5a84c9f0f55a669592adc166245f76995c39b227092256d14b57`; summary SHA
+`65f1cedd112a1b1218d0b05ad66dbc7c92e4a88a21b06714c47277be372b97b5`.
+Oxia container `afa5e6c7662cf74e1b8e7c8c1d75f2a4b24bd9a147f5fa9db257766068363883` retained its exact source-locked
+image and identity, with start time changing from `2026-09-08T05:37:10.579345095Z` to
+`2026-09-08T05:37:53.831799254Z`. The runner removed only its own container.
+The supplemental documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-read-fenced-final-check.log`). All 17 acceptance rows remain
+OPEN/null, and M6 scenarios 012/013/022 remain PLANNED/null in both the lifecycle matrix and active scenario registry.
+
+
+Read-only inspection of locked Kafka source `323e035145d203f7e74e969341cb610f33e71b7d` found
+`NereusKafkaNativePartitionOwnerAuthorityBridgeV1`: it serializes a synchronous Object-WAL owner-open callback under
+native leader authority and requires a returned `WalRunObjectSession`. It does not yet supply a generic BK maintenance
+callback or the complete asynchronous read-owner population lifetime. No fake Object-WAL session, fork edit, source
+lock change or native owner-fencing claim was introduced. That adapter/composition remains required.
+
 ## Remaining ordered work
 
-1. Extend native raw-run input capture to selected compacted generations and all other required source representations;
+1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
    integrate current protocol key/transaction/frontier ownership and birth/read-lifetime admission with the guarded
    publisher. Extend create/selection/drain terminal to stale-task and complete writer/adoption
    admission, then connect M4-protected BK recovery to ordinary reads, internal topics and grace/rescan cleanup.

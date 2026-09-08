@@ -21,7 +21,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; native run roots now have an exact-header/seal adapter; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
 | Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction/cache recovery and a configured durable quota route pass; pre-reserved intent writes continue at exhaustion and pending grants/refunds recover after restart; unique namespace/all-writer admission, backend disk provisioning and GC scheduling remain OPEN |
-| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; sorted multi-resource tickets now wrap the guarded native BK publication path; complete native input membership, owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
+| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | READ_FENCED refresh/takeover now passes real Oxia CAS, fact-version invalidation, competing-client and server-restart checks with synthetic owner/eligibility facts; sorted multi-resource tickets now wrap the guarded native BK publication path; complete native input membership, owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
 The [physical identity projection](m5-physical-resource-identity-projection.json) and
@@ -31,6 +31,15 @@ The [physical identity projection](m5-physical-resource-identity-projection.json
 [observation recovery projection](m5-read-fenced-recovery-projection.json) adds 7 coordinator cases and requires a
 native verifier that is unsupported by default. These results remain non-promotable and use synthetic eligibility facts.
 `v2M5ReadFencedRecoveryCheck` passed 44 tasks with the expanded 19-test coordinator suite and 3 recovery contract tests.
+The later `v2M5ReadFencedOxiaCheck` runs the actual configured namespace route and coordinator with all eligibility
+and observation facts stored under scoped native keys and bound to server versions/hashes. Four integration cases
+cover post-CAS delivery loss, competing-client refresh, the default unsupported owner verifier, and changed native
+fact versions (including identical bytes). Two separate JVM phases verify the same server container's persisted fence
+before and after restart; the checkpoint contains only route, key, hash and version. The six archived suites contain
+39 cases/phases. Owner/fencing statements, semantic transfer, M4 RELEASED and external identity remain synthetic;
+no native protocol owner adapter, external identity read, delete call or M5-E receipt is supplied by these tests.
+The recovery projection's four contract tests preserve this distinction.
+
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.
 `v2M5KafkaSemanticCoreCheck` passed 42 tasks, including 14 Kafka and 7 Object materialization tests. The added

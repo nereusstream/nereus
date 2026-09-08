@@ -2528,3 +2528,29 @@ tasks.register<Test>("v2M5KafkaRunRootTest") {
     filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+mapOf(
+    "v2M5ReadFencedRealOxiaTest" to "M5ReadFencedOxiaIntegrationTest",
+    "v2M5ReadFencedOxiaRestartWriteTest" to "M5ReadFencedOxiaRestartTest.writeBeforeServerRestart",
+    "v2M5ReadFencedOxiaRestartReadTest" to "M5ReadFencedOxiaRestartTest.readAfterServerRestart",
+).forEach { (taskName, testName) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = oxiaIntegrationTest.output.classesDirs
+        classpath = oxiaIntegrationTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.$testName") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.m5.retention.oxia.serviceAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("real Oxia address is required"))
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.readFenced.oxia.restartCheckpoint",
+                    providers.gradleProperty("v2M5ReadFencedOxiaRestartCheckpoint").orNull
+                        ?: error("read-fenced restart checkpoint is required"))
+            }
+        }
+    }
+}

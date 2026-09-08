@@ -92,13 +92,33 @@ final class M5DeleteEligibilityTestFixtures {
             long generation,
             long floor,
             PositionDomain domain) {
+        return snapshot(resource, reason, generation, floor, domain, M5DeleteEligibilityTestFixtures::fact);
+    }
+
+    @FunctionalInterface
+    interface FactFactory {
+        AuthorityFactV1 create(String key, CanonicalBytes value);
+
+        default AuthorityFactV1 create(String key) {
+            return create(key, bytes(key));
+        }
+    }
+
+    static DeleteEligibilitySnapshotV2 snapshot(
+            PhysicalResourceIdV2 resource,
+            ReclamationReason reason,
+            long generation,
+            long floor,
+            PositionDomain domain,
+            FactFactory facts) {
         var binding =
                 new BindingIdentity(new TopicBindingId(digest("binding")), digest("incarnation"), digest("epoch"));
         var capability = new CapabilityBinding(1, digest("capability"));
         var identity = new IdentityEnvelope(digest("cell"), digest("scope"), binding, 1, 1, 1, capability);
         var coverage = new ProtocolCoverage(domain, 0, 100);
         var floorRows = Arrays.stream(FloorClassV1.values())
-                .map(kind -> new RetentionFloorObservationV1(kind, fact("/floor/" + kind), domain, floor, true, true))
+                .map(kind -> new RetentionFloorObservationV1(
+                        kind, facts.create("/floor/" + kind), domain, floor, true, true))
                 .toList();
         var floors = M5RetentionCodecV1.finalizeSnapshot(new RetentionFloorSnapshotV1(
                 identity,
@@ -106,8 +126,8 @@ final class M5DeleteEligibilityTestFixtures {
                 1,
                 0,
                 digest("retention-policy"),
-                fact("/owner"),
-                fact("/storage"),
+                facts.create("/owner"),
+                facts.create("/storage"),
                 1,
                 4096,
                 floorRows,
@@ -119,8 +139,8 @@ final class M5DeleteEligibilityTestFixtures {
                 floor,
                 digest("retention-policy"),
                 floors.snapshotRootSha256(),
-                fact("/owner"),
-                fact("/storage"),
+                facts.create("/owner"),
+                facts.create("/storage"),
                 1,
                 capability);
         var trimBytes = M5RetentionCodecV1.encodeTrimFrontier(trim);
@@ -133,14 +153,14 @@ final class M5DeleteEligibilityTestFixtures {
         var release = new M4ReleaseBindingV1(
                 digest("m4-source"),
                 1,
-                fact("/protection", releaseBytes),
+                facts.create("/protection", releaseBytes),
                 releaseBytes,
                 digest("m4-batch"),
                 digest("m4-proof-head"));
         var references = Arrays.stream(ReferenceKindV1.values())
                 .map(kind -> new ReferenceObservationV1(
                         kind,
-                        fact("/reference/" + kind),
+                        facts.create("/reference/" + kind),
                         resource.sha256(),
                         coverage,
                         ReferenceDispositionV1.ABSENT,
@@ -156,16 +176,16 @@ final class M5DeleteEligibilityTestFixtures {
                         : ReferenceTargetKindV1.READABLE_SOURCE,
                 resource.sha256(),
                 coverage,
-                fact("/selector"),
-                fact("/manifest"),
-                fact("/trim", trimBytes),
+                facts.create("/selector"),
+                facts.create("/manifest"),
+                facts.create("/trim", trimBytes),
                 floors.snapshotRootSha256(),
                 M5RetentionCodecV1.calculateObservationsRoot(references),
                 reason == ReclamationReason.UNPUBLISHED_ARTIFACT ? List.of() : List.of(release),
-                fact("/owner"),
-                fact("/worker"),
-                fact("/storage"),
-                fact("/provider"),
+                facts.create("/owner"),
+                facts.create("/worker"),
+                facts.create("/storage"),
+                facts.create("/provider"),
                 1,
                 2,
                 summaries,
@@ -184,7 +204,7 @@ final class M5DeleteEligibilityTestFixtures {
                                 CanonicalUtf8.fromString("ledger-namespace")),
                         900);
                 replacement = Optional.of(new ReplacementEvidence(
-                        fact("/manifest"),
+                        facts.create("/manifest"),
                         List.of(output),
                         DeleteEligibilitySnapshotV2.requiredSemantics(domain).stream()
                                 .map(aspect -> new SemanticTransfer(
@@ -192,7 +212,7 @@ final class M5DeleteEligibilityTestFixtures {
                                         coverage,
                                         digest("semantic-" + aspect),
                                         digest("semantic-" + aspect),
-                                        fact("/semantic/" + aspect)))
+                                        facts.create("/semantic/" + aspect)))
                                 .toList()));
                 disposition = NativeDisposition.REPLACEMENT_ALLOWED;
             }
@@ -203,10 +223,10 @@ final class M5DeleteEligibilityTestFixtures {
             case UNPUBLISHED_ARTIFACT -> {
                 unpublished = Optional.of(new UnpublishedEvidence(
                         digest("task-attempt"),
-                        fact("/task-terminal"),
-                        fact("/task-owner-fenced"),
-                        fact("/adoption-closed"),
-                        Optional.of(fact("/never-admitted"))));
+                        facts.create("/task-terminal"),
+                        facts.create("/task-owner-fenced"),
+                        facts.create("/adoption-closed"),
+                        Optional.of(facts.create("/never-admitted"))));
                 disposition = NativeDisposition.UNPUBLISHED_CLEANUP_ALLOWED;
             }
             default -> throw new IllegalArgumentException("unknown fixture reason");
@@ -215,10 +235,16 @@ final class M5DeleteEligibilityTestFixtures {
                 resource,
                 reason,
                 generation,
-                fact("/physical-namespace"),
-                fact("/complete-member-inventory"),
+                facts.create("/physical-namespace"),
+                facts.create("/complete-member-inventory"),
                 List.of(new MemberSnapshot(
-                        floors, proof, fact("/native/" + reason), disposition, replacement, expiry, unpublished)));
+                        floors,
+                        proof,
+                        facts.create("/native/" + reason),
+                        disposition,
+                        replacement,
+                        expiry,
+                        unpublished)));
     }
 
     static List<VersionedValue> metadataValues(DeleteEligibilitySnapshotV2 snapshot) {

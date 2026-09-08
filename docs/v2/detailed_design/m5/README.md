@@ -129,8 +129,10 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   remain OPEN; these focused results create no source-bound child or physical-delete authority.
 - The [READ_FENCED recovery projection](m5-read-fenced-recovery-projection.json) adds exact observation-epoch binding,
   same-key takeover/refresh without reopening admission, and mandatory native owner verification that is unsupported
-  by default. The expanded coordinator suite uses synthetic facts; real protocol owner adapters, external identity
-  readers, intent capability refresh and durable recovery-veto records remain OPEN.
+  by default. The later `v2M5ReadFencedOxiaCheck` adds native fact versions, actual competing-client CAS and same-server
+  restart recovery: four integration cases plus two separate JVM phases. The owner, semantic/M4 and external identity
+  statements remain synthetic; real protocol owner adapters, external identity readers, intent capability refresh and
+  durable recovery-veto records remain OPEN.
 - The [shared Kafka semantic-core projection](m5-kafka-semantic-core-projection.json) records carrier-independent
   record/disposition/gap/eight-index output. The Object bridge uses the same record compiler and independent validator;
   the [BK carrier projection](m5-bookkeeper-compaction-carrier-projection.json) adds inventoried native ledger

@@ -36,9 +36,23 @@
   "externalFullIdentityReaderIntegrated": false,
   "durableRecoveryVetoRecordImplemented": false,
   "intentTakeoverCapabilityRefreshIntegrated": false,
-  "realOxiaRecoveryExecutionPresent": false,
+  "realOxiaRecoveryExecutionPresent": true,
   "completePhysicalDeleteComposition": false,
   "sourceBoundReceiptPresent": false,
   "physicalDeleteAuthority": false,
-  "productionAuthority": false
+  "productionAuthority": false,
+  "nativeMetadataExecution": {
+    "gate": "v2M5ReadFencedOxiaCheck",
+    "runner": "scripts/run-v2-m5-read-fenced-oxia-check.sh",
+    "semanticAuthority": "SYNTHETIC_FACTS_WITH_NATIVE_KEYS_VERSIONS_AND_HASHES",
+    "integrationCases": 4,
+    "separateJvmRestartPhases": 2,
+    "sameServerContainerRestarted": true,
+    "oldCallbackRejectedAfterRefresh": true,
+    "heldRefreshCannotOverwriteWinningNativeCas": true,
+    "sameBytesNewFactVersionRejected": true,
+    "missingOwnerVerifierRejectsRecovery": true,
+    "checkpointContainsAuthorityBodies": false,
+    "physicalDeletionInvoked": false
+  }
 }

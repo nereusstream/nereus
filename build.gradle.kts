@@ -3114,3 +3114,16 @@ tasks.register("v2M5KafkaRunSourceCheck") {
         ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest",
     )
 }
+
+
+tasks.register("v2M5ReadFencedOxiaCheck") {
+    group = "verification"
+    description = "Exercise READ_FENCED recovery on native Oxia; owner and external proof semantics remain synthetic."
+    dependsOn(
+        "v2M5ReadFencedRecoveryCheck",
+        ":nereus-metadata-oxia:v2M5TargetDeleteRouteTest",
+        ":nereus-metadata-oxia:v2M5ReadFencedRealOxiaTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
+    )
+}
