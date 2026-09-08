@@ -1212,6 +1212,57 @@ Final documentation, historical design/M4 dependency, lifecycle, coordinator and
 13/13 executed tasks in `/tmp/nereus-m5-second-restart-final-check.log`. The active scenario registry independently
 retains V2-KAF-DATA-012/013/022 as PLANNED with null evidence receipts.
 
+## 2026-09-08 fallback introduction epoch correction
+
+Status: shared validation fixed and current-source native/restart verification passed. This follows published
+`1abe65a872ac03032508fde15f27dc3103a43852`, with a clean main checkout verified before this slice.
+
+Tracing the remaining M4 release obligation exposed an incorrect first-fallback epoch in M5 fixtures and a missing
+shared publication validation. From a preferred-only selector at E, M4 introduces fallback at E+1; the fixture used E.
+No fallback closure anchor or terminal exists for the preferred-only epoch. Consequently even a valid proof for E+1
+cannot cover the incorrectly requested interval [E,E+1]. This is a retention/convergence defect, not evidence that old
+data was deleted. The first red regression confirmed the previous validator accepted the wrong epoch.
+
+`M5MaterializationValidatorV1.requireFallbackProtections` now requires exactly E+1 for new fallback identities when
+the predecessor has no fallback set. Both M5-A Object publication and M5-B Kafka publication consume that check.
+Existing fallback sets retain their exact canonical identities, including their earlier first epochs; no reset is
+allowed. Test protection creation and native publication-ticket restart expectations use the introduced epoch, while
+an existing fallback fixture reads its immutable protection rather than recomputing the first epoch.
+
+The deterministic case rejects both E and E+2, accepts inherited earlier-first identity, rejects a reset identity,
+and demonstrates M4 proof coverage/release with only the actual fallback epoch's terminal/proof. That terminal and
+drain are explicitly synthetic unit fixtures and grant no native release or deletion authority. Native run-source
+checks separately inspect the actual protection records and selector fallback-set digest at first/second publication
+and after both generations' retained-data restart. Real old sources remain PROTECTED.
+
+Focused validation passed 8 materialization, 14 Kafka semantic and 10 descriptor cases, with native compilation and
+style checks (28 tasks, 15 executed); the expanded inheritance and native epoch assertions passed a further 25-task
+check (9 executed). The final existing-protection helper change passed 17 tasks (5 executed). The source-bound native
+runner now includes both shared publication suites and archives 16 suites/77 cases/phases; both source manifests
+capture the materialization test input explicitly.
+
+Final native validation passed 87/87 main tasks and a separate 22-task restart JVM (3 executed). All 16 archives/77
+cases and phases passed with zero failures/errors/skips. Independent legacy validation passed 93/93 main tasks and
+17 archives/71 cases and phases, including its three fresh-JVM restart reads. Both source maps and every XML were
+independently rechecked after completion. The 723-input map is SHA-256
+`e69740a64a0778d6f4d0085cad57be8b2c37e9df2b65b297a453dc09b9f5c0af`; the 700-input legacy map is
+`88f867aa4a7a1f2e5de844dbe1a2cda9286a8585e8d977d2a8605ea40597cbc3`.
+
+Local summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-83614/run-summary.json`, SHA-256
+`1f7e1d9a5cddf3be1759c2d0bdca352e95ff9817a3e254d15579f8cfb8a7d319`; log `/tmp/nereus-m5-fallback-epoch-native1.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-83625`, summary SHA-256
+`3c4d44df72b741390a0d3a8622c9b78b2d762f5f8cfa1c340c6d5bc9890b585c`.
+Oxia container `9921ed0cc8ea84f5b64729947f3ae473df65ce3950dc0bb88c1cc07e667cd8b7` retained its ID/image and restarted
+from `2026-09-08T04:43:33.656837842Z` to `2026-09-08T04:46:29.199774965Z`; all four BK/ZooKeeper containers likewise
+retained IDs/images and changed start times. Cleanup removed only runner-owned resources and retained the connector.
+The real source protection remains PROTECTED; only the unit's explicitly synthetic proof fixture reaches RELEASED.
+No native owner/drain, physical-delete, M5-E child or aggregate/source-bound Final authority is gained.
+
+Final documentation, historical design/M4 dependency, lifecycle, coordinator and READ_FENCED checks plus M5-A,
+M5-B and semantic-core source/contract checks passed 19/19 executed tasks in
+`/tmp/nereus-m5-fallback-epoch-final-check.log`. All 17 acceptance obligations remain OPEN/null; both the lifecycle
+deferred list and active registry retain V2-KAF-DATA-012/013/022 as PLANNED with null receipts.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

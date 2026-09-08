@@ -409,6 +409,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
                     assertThat(M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
                                     .toHex())
                             .isEqualTo(lines.get(9));
+                    verifyCurrentFallbackEpoch(
+                            published.context, selected.view().descriptor());
                     assertThat(published.context.faults.recordCreates.get()).isZero();
                     assertThat(published.context.faults.selectorCas.get()).isZero();
                 }
@@ -523,6 +525,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                         context.owner)
                                 .capture());
                         verifySelected(selected, descriptor);
+                        verifyCurrentFallbackEpoch(context, descriptor);
                         assertThat(selected.extent().sourceIdentitySha256().toHex())
                                 .isEqualTo(lines.get(4));
                         assertThat(M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
@@ -871,6 +874,34 @@ class KafkaBookKeeperRunSourceV2RealTest {
     private record SelectedRestart(
             M5BookKeeperNativeCreateSpecV2 spec, KafkaBookKeeperSelectedSourceV2.Snapshot snapshot) {}
 
+    private static void verifyCurrentFallbackEpoch(NativeContext context, KafkaSealedBookKeeperDescriptorV2 descriptor)
+            throws Exception {
+        context.onOwner(() -> {
+            var selector = context.m4.readSelector().orElseThrow();
+            assertThat(selector.mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_WITH_FALLBACK);
+            long introduced =
+                    Math.addExact(descriptor.sourceCut().predecessorSelector().readAdmissionEpoch(), 1);
+            assertThat(selector.readAdmissionEpoch()).isEqualTo(introduced);
+            var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(7, context.binding);
+            var identities = descriptor.sourceCut().sources().stream()
+                    .map(source -> {
+                        var protection = M4ReadControlCodecV1.decodeProtection(context.store
+                                .get(keys.protection(source.sourceIdentitySha256(), 1))
+                                .orElseThrow());
+                        assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
+                        assertThat(protection.identity().firstFallbackCapableReadAdmissionEpoch())
+                                .isEqualTo(introduced);
+                        return protection.identity();
+                    })
+                    .sorted(java.util.Comparator.comparing(
+                            value -> value.sourceIdentitySha256().toHex()))
+                    .toList();
+            assertThat(selector.fallbackSetSha256())
+                    .contains(M4ReadControlCodecV1.calculateFallbackSetSha256(identities));
+            return null;
+        });
+    }
+
     private static void verifySelected(
             KafkaBookKeeperSelectedSourceV2.Snapshot selected, KafkaSealedBookKeeperDescriptorV2 descriptor) {
         assertThat(selected.extent().kind())
@@ -966,6 +997,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             context.protections,
                             () -> new KafkaCompactionPublicationFenceV1().expected(input.plan())))))
                     .isEqualTo(PublicationOutcome.APPLIED_EXACT);
+            verifyCurrentFallbackEpoch(context, descriptor);
             return descriptor;
         }
 

@@ -92,8 +92,10 @@ performance-first BookKeeper WAL.
   The next [selected-generation reader](detailed_design/m5/m5-kafka-selected-source-projection.json) adds the current
   native descriptor's complete data/index membership and typed index-only input. Native validation passed second
   publication after exact M4 fallback closure and new source protection; old inputs remain PROTECTED. The final run
-  passed 55 archived cases/phases and 71 independent legacy cases/phases. Fresh-JVM second-generation recovery
+  passed 77 archived cases/phases and 71 independent legacy cases/phases. Fresh-JVM second-generation recovery
   additionally verifies the user topic, both internal topics and index-only output from native descriptor/task records.
+  Shared publication validation now rejects the preferred-only predecessor's epoch as a new fallback's first epoch;
+  the introducing E+1 and inherited existing fallback identities are verified before and after native restart.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

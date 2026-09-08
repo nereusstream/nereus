@@ -239,9 +239,15 @@ must remain stable across the M4 closure. Old raw protection records and their a
 intact: this closure is not RELEASED or deletion. Complete M4 release, mixed raw/generation catalogs and native
 protocol-owner semantics remain required. No aggregate obligation closes from this path alone.
 
-The final native run passed 85 executed main tasks and a separate 22-task restart JVM (three executed), with 55
+The shared M5 publication validator requires a new fallback protection's first epoch to equal E+1 when introducing
+fallback from a preferred-only selector at E. Epoch E has no fallback closure/proof liability and must not be included.
+Existing fallback identities retain their original first epochs and exact set digest. Native tests reread those
+identities at both publications and after both generations' restart; the unit proof/release case uses synthetic drain
+facts only. Actual M4 RELEASED and admitted native read-owner drain remain OPEN.
+
+The final native run passed 87 executed main tasks and a separate 22-task restart JVM (three executed), with 77
 archived cases/phases and no failures/errors/skips. The independent legacy regression passed 71 cases/phases. Both
-the 722-input map and 699-input legacy map were independently unchanged, including the amended descriptor checker and
+the 723-input map and 700-input legacy map were independently unchanged, including the amended descriptor checker and
 its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
 now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route
 loads the current native descriptor and immutable task; the checkpoint supplies only client configuration and expected

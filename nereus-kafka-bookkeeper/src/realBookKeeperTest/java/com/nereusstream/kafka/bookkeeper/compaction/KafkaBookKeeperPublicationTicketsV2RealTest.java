@@ -394,7 +394,7 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
                                     .SourceProtectionIdentity(
                                     member.sourceIdentitySha256(),
                                     1,
-                                    1,
+                                    Math.addExact(cut.predecessorSelector().readAdmissionEpoch(), 1),
                                     cut.predecessorSelector().sourceGeneration(),
                                     cut.identity().capability());
                             var key = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(

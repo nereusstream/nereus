@@ -131,15 +131,24 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
         var m4 = new com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1(
                 store, 7, cut.identity().binding());
         m4.createCapability(input.capabilityEvidence());
+        var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                7, cut.identity().binding());
         var sources = cut.sources().stream()
-                .map(source ->
-                        new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1
-                                .SourceProtectionIdentity(
-                                source.sourceIdentitySha256(),
-                                1,
-                                cut.predecessorSelector().readAdmissionEpoch(),
-                                cut.predecessorSelector().sourceGeneration(),
-                                cut.identity().capability()))
+                .map(source -> {
+                    if (cut.predecessorSelector().fallbackSetSha256().isPresent()) {
+                        return com.nereusstream.storage.object.read.control.M4ReadControlCodecV1.decodeProtection(
+                                        store.get(keys.protection(source.sourceIdentitySha256(), 1))
+                                                .orElseThrow())
+                                .identity();
+                    }
+                    return new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1
+                            .SourceProtectionIdentity(
+                            source.sourceIdentitySha256(),
+                            1,
+                            Math.addExact(cut.predecessorSelector().readAdmissionEpoch(), 1),
+                            cut.predecessorSelector().sourceGeneration(),
+                            cut.identity().capability());
+                })
                 .sorted(java.util.Comparator.comparing(
                         source -> source.sourceIdentitySha256().toHex()))
                 .toList();

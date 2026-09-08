@@ -270,6 +270,124 @@ class M5MaterializationV1Test {
                 .hasMessageContaining("source identities");
     }
 
+    @Test
+    void newFallbackProtectionStartsInTheIntroducedEpochAndNeedsNoPreferredOnlyProof() {
+        Fixture fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        var introduced =
+                new SourceProtectionIdentity(fixture.source.sourceIdentitySha256(), 1, 2, 7, fixture.capability);
+        assertThat(M5MaterializationValidatorV1.requireFallbackProtections(fixture.cut, List.of(introduced)))
+                .isEqualTo(M4ReadControlCodecV1.calculateFallbackSetSha256(List.of(introduced)));
+        for (long wrongEpoch : new long[] {1, 3}) {
+            var wrong = new SourceProtectionIdentity(
+                    introduced.sourceIdentitySha256(), 1, wrongEpoch, 7, fixture.capability);
+            assertThatThrownBy(
+                            () -> M5MaterializationValidatorV1.requireFallbackProtections(fixture.cut, List.of(wrong)))
+                    .hasMessage("new M5 fallback protection must begin in the introduced read epoch");
+        }
+        // Structural M4 proof fixture: no native owner/drain or physical-delete authority is claimed.
+        var m4 = new M4ReadControlCoordinatorV1(fixture.store, 7, fixture.binding);
+        m4.createCapability(fixture.capabilityEvidence);
+        m4.createSelector(fixture.selector);
+        m4.createProtection(new SourceProtection(
+                fixture.binding, introduced, ProtectionState.PROTECTED, Optional.empty(), Optional.empty()));
+        assertThat(m4.introduceFallback(fixture.selector, digest("selected"), 8, List.of(introduced)))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        var selected = m4.readSelector().orElseThrow();
+        assertThat(selected.readAdmissionEpoch()).isEqualTo(introduced.firstFallbackCapableReadAdmissionEpoch());
+        var inheritedSelector = new BindingReadSelector(
+                selected.binding(),
+                selected.selectedViewSha256(),
+                selected.ownerEpoch(),
+                3,
+                9,
+                selected.mode(),
+                selected.admissionState(),
+                selected.fallbackSetSha256(),
+                selected.capability(),
+                selected.pendingAnchors(),
+                selected.activeBatches());
+        var oldCut = fixture.cut;
+        var inheritedCut = new MaterializationSourceCut(
+                oldCut.identity(),
+                inheritedSelector,
+                Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(inheritedSelector)),
+                inheritedSelector.selectedViewSha256(),
+                oldCut.coverage(),
+                oldCut.durableFrontier(),
+                oldCut.logEndFrontier(),
+                oldCut.highWatermark(),
+                oldCut.lastStableFrontier(),
+                oldCut.trimFrontier(),
+                oldCut.protocolStateRootSha256(),
+                oldCut.recoveryCheckpointRootSha256(),
+                oldCut.materializationPolicySha256(),
+                oldCut.outputFormatPolicySha256(),
+                oldCut.sourceSetSha256(),
+                oldCut.sources());
+        assertThat(M5MaterializationValidatorV1.requireFallbackProtections(inheritedCut, List.of(introduced)))
+                .isEqualTo(selected.fallbackSetSha256().orElseThrow());
+        var reset = new SourceProtectionIdentity(introduced.sourceIdentitySha256(), 1, 3, 7, fixture.capability);
+        assertThatThrownBy(() -> M5MaterializationValidatorV1.requireFallbackProtections(inheritedCut, List.of(reset)))
+                .hasMessage("M5 fallback protection membership differs from the predecessor");
+        assertThat(m4.closeFallback(selected, selected.selectedViewSha256(), 9, List.of(introduced)))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        var closed = m4.readSelector().orElseThrow();
+        var anchor = closed.pendingAnchors().get(0);
+        assertThat(anchor.closedReadAdmissionEpoch()).isEqualTo(2);
+        var terminal =
+                new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadAdmissionEpochTerminalCut(
+                        fixture.binding,
+                        M4ReadControlCodecV1.anchorSha256(anchor),
+                        2,
+                        1,
+                        8,
+                        1000,
+                        fixture.capability,
+                        com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.TerminalKind.PLANNED_DRAIN,
+                        digest("fixture-closed"),
+                        digest("fixture-drained"),
+                        0,
+                        0,
+                        1);
+        assertThat(m4.publishTerminal(terminal)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        var draft = new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadQuiescenceProof(
+                fixture.binding,
+                2,
+                M4ReadControlCodecV1.terminalSha256(terminal),
+                8,
+                1000,
+                fixture.capability,
+                terminal.kind(),
+                digest("fixture-proof"));
+        var proof = new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadQuiescenceProof(
+                draft.binding(),
+                draft.readAdmissionEpoch(),
+                draft.terminalCutSha256(),
+                draft.drainedThroughReadViewGeneration(),
+                draft.safeAfterAuthorityTimeMillis(),
+                draft.capability(),
+                draft.kind(),
+                M4ReadControlCodecV1.calculateProofIdentity(draft));
+        assertThat(m4.publishProof(proof)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(7, fixture.binding);
+        assertThat(fixture.store.get(keys.terminal(1))).isEmpty();
+        assertThat(fixture.store.get(keys.proof(1))).isEmpty();
+        var head = M4ReadControlCodecV1.decodeHead(
+                fixture.store.get(keys.proofHead()).orElseThrow());
+        assertThat(m4.verifyInterval(head, 1, 2)).isFalse();
+        assertThat(m4.verifyInterval(head, 2, 2)).isTrue();
+        assertThat(m4.releaseProtection(
+                        closed.activeBatches().get(0),
+                        introduced,
+                        new com.nereusstream.storage.object.read.BindingReadHazardPoolV1(2, 4)))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        assertThat(M4ReadControlCodecV1.decodeProtection(fixture.store
+                                .get(keys.protection(introduced.sourceIdentitySha256(), 1))
+                                .orElseThrow())
+                        .state())
+                .isEqualTo(ProtectionState.RELEASED);
+    }
+
     private static final class Fixture {
         private final Store store = new Store();
         private final BindingIdentity binding = new BindingIdentity(
@@ -321,7 +439,7 @@ class M5MaterializationV1Test {
                     reusable,
                     indexed,
                     List.of(binding.bindingId().digest()));
-            protection = new SourceProtectionIdentity(sourceIdentity, 1, 1, 7, capability);
+            protection = new SourceProtectionIdentity(sourceIdentity, 1, 2, 7, capability);
             selector = new BindingReadSelector(
                     binding,
                     digest("predecessor-view"),

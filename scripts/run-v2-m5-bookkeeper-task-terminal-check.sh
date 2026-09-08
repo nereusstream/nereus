@@ -61,6 +61,7 @@ paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata
 for source in ('test','realBookKeeperTest'):
     paths.extend((root/f'nereus-storage-bookkeeper/src/{source}/java').rglob('*.java'))
 paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention').glob('*.java'))
+paths.append(root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/materialization/M5MaterializationV1Test.java')
 paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/retention').glob('*.java'))
 paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage-bookkeeper/build.gradle.kts',
               root/'config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml',root/'build.gradle.kts',root/'nereus-kafka-bookkeeper/build.gradle.kts',

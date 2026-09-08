@@ -3105,6 +3105,8 @@ tasks.register("v2M5KafkaRunSourceCheck") {
     description = "Verify native sealed run source capture, bounded decoding, exact membership and ticketed publication."
     dependsOn(
         "v2M5KafkaRunRootsCheck",
+        ":nereus-storage-object:v2M5MaterializationTest",
+        ":nereus-kafka-bookkeeper:v2M5KafkaCompactionTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaRecordBatchBudgetTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaSelectedSourceTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest",

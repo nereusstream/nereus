@@ -644,7 +644,7 @@ class KafkaSemanticCompactorV1Test {
                     false,
                     false,
                     List.of(binding.bindingId().digest()));
-            this.protection = new SourceProtectionIdentity(source.sourceIdentitySha256(), 1, 1, 7, capability);
+            this.protection = new SourceProtectionIdentity(source.sourceIdentitySha256(), 1, 2, 7, capability);
             this.cut = new MaterializationSourceCut(
                     envelope,
                     selector,

@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M5_KAFKA_SELECTED_SOURCE_PROJECTION_V2",
   "status": "NATIVE_SELECTED_GENERATION_INPUT_SECOND_PUBLICATION_AND_RESTART_FOCUSED_NON_PROMOTABLE",
-  "predecessorSource": "c97aefcfb1bd3e1d7c6ef145ba1f610bcf8f5f98",
+  "predecessorSource": "1abe65a872ac03032508fde15f27dc3103a43852",
   "sourceReader": "KafkaBookKeeperSelectedSourceV2",
   "sourceKind": "KAFKA_BK_COMPACTED_GENERATION_V2",
   "sourceKindOrdinal": 4,
@@ -44,23 +44,25 @@
     "nativeSourceRestartPhases": 2,
     "budgetUnitCases": 3,
     "rootAndPublicationRegressionCasesAndPhases": 41,
-    "archivedCasesAndPhases": 55,
+    "archivedCasesAndPhases": 77,
     "failures": 0,
     "errors": 0,
-    "skipped": 0
+    "skipped": 0,
+    "sharedMaterializationCases": 8,
+    "kafkaSemanticCases": 14
   },
   "oldFallbackProtectionsRemainProtected": true,
   "firstSelectedGenerationSourceReverifiedAfterRestart": true,
   "secondGenerationRestartAdmissionVerified": true,
   "verifiedLegacyRegressionCasesAndPhases": 71,
-  "nativeMainExecutedTasks": 85,
+  "nativeMainExecutedTasks": 87,
   "restartJvmTasks": 22,
   "restartJvmExecutedTasks": 3,
   "sameFiveNativeServicesRestarted": true,
-  "testedInputCount": 722,
-  "testedInputManifestSha256": "0705e6493fb203c3cf981eedcadb344fd67cd420e4a19712a6331fbc0a05494b",
-  "legacyTestedInputCount": 699,
-  "legacyTestedInputManifestSha256": "b80ddb7e1e1905201cd9ec6f0e17ff12b221c846b00ea76af9e5edbd626faf4e",
+  "testedInputCount": 723,
+  "testedInputManifestSha256": "e69740a64a0778d6f4d0085cad57be8b2c37e9df2b65b297a453dc09b9f5c0af",
+  "legacyTestedInputCount": 700,
+  "legacyTestedInputManifestSha256": "88f867aa4a7a1f2e5de844dbe1a2cda9286a8585e8d977d2a8605ea40597cbc3",
   "everyCapturedSourceManifestCheckedIndependently": true,
   "secondGenerationRestartRoutes": [
     "orders",
@@ -72,5 +74,10 @@
   "secondGenerationRestartUsesCopiedDescriptorOrTaskBody": false,
   "secondGenerationRestartControlRecordCreates": 0,
   "secondGenerationRestartSelectorCasCalls": 0,
-  "restartPhysicalReadTicketWritesStillRequired": true
+  "restartPhysicalReadTicketWritesStillRequired": true,
+  "newFallbackEpochEqualsPreferredOnlyPredecessorPlusOne": true,
+  "existingFallbackFirstEpochInherited": true,
+  "wrongNewFallbackEpochRejectedBeforePublication": true,
+  "nativeFallbackEpochAndSetVerifiedAfterBothGenerationRestarts": true,
+  "unitProofReleaseUsesSyntheticDrainOnly": true
 }

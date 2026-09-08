@@ -304,6 +304,14 @@ public final class M5MaterializationValidatorV1 {
         if (existing.isPresent() && !existing.orElseThrow().equals(calculated)) {
             throw new IllegalArgumentException("M5 fallback protection membership differs from the predecessor");
         }
+        if (existing.isEmpty()) {
+            long introducedEpoch = Math.addExact(cut.predecessorSelector().readAdmissionEpoch(), 1);
+            if (sources.stream()
+                    .anyMatch(source -> source.firstFallbackCapableReadAdmissionEpoch() != introducedEpoch)) {
+                throw new IllegalArgumentException(
+                        "new M5 fallback protection must begin in the introduced read epoch");
+            }
+        }
         return calculated;
     }
 

@@ -102,6 +102,7 @@ paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata
 for source in ('test','realBookKeeperTest'):
     paths.extend((root/f'nereus-storage-bookkeeper/src/{source}/java').rglob('*.java'))
 paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention').glob('*.java'))
+paths.append(root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/materialization/M5MaterializationV1Test.java')
 paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/retention').glob('*.java'))
 paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage-bookkeeper/build.gradle.kts',
               root/'config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml',root/'build.gradle.kts',root/'nereus-kafka-bookkeeper/build.gradle.kts',
@@ -167,6 +168,8 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
     raise SystemExit('Native BK restart did not retain all four exact containers and change their start times')
 suites=[]
 for module,task,name,count in (
+    ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',8),
+    ('nereus-kafka-bookkeeper','v2M5KafkaCompactionTest','KafkaSemanticCompactorV1Test',14),
     ('nereus-kafka-bookkeeper','v2M5KafkaRecordBatchBudgetTest','KafkaRecordBatchBudgetV2Test',3),
     ('nereus-kafka-bookkeeper','v2M5KafkaSelectedSourceTest','KafkaBookKeeperSelectedSourceV2Test',3),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',6),
@@ -237,6 +240,10 @@ summary={'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'indexOnlyGenerationCanReenterSemanticCompilerWithNoInputBatches':True,
     'selectedGenerationSourceIdentityRederivedAfterRestart':True,
     'secondNativePublicationAfterExactM4FallbackClosure':True,
+    'newFallbackProtectionStartsAtIntroducedEpoch':True,
+    'newFallbackRejectsPreviousPreferredOnlyAndFutureEpochs':True,
+    'existingFallbackFirstEpochInherited':True,
+    'syntheticM4ProofNeedsNoPreferredOnlyEpoch':True,
     'secondSelectedGenerationReverifiedAfterRestart':True,
     'secondGenerationTaskReadFromNativeControlAfterRestart':True,
     'secondGenerationRestartUsesNoCopiedDescriptorOrTaskBody':True,

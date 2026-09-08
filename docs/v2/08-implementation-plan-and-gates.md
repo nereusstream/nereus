@@ -96,10 +96,13 @@ cases/phases and 71 independent legacy cases/phases; omitted input issued no can
 The [selected-generation source slice](detailed_design/m5/m5-kafka-selected-source-projection.json) extends the same
 runner with typed descriptor inputs, all native ledger members, shared decoding bounds, index-only recompilation and
 first- and second-generation restart identity recovery. Validation passed second publication after exact M4 closure:
-55 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
+77 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
 Old source protection and active retirement batches must remain intact; complete M4 release, mixed-source catalogs,
 native owner admission and physical deletion remain required. Fresh-JVM second-generation recovery covers the user
 topic, both internal topics and index-only output without republishing or copying descriptor/task bodies.
+Shared M5-A/M5-B validation now rejects a new fallback's first epoch unless it equals the introducing selector's E+1;
+existing fallback sets inherit their original first epoch. The current 77-case/phase run includes 8 Object
+materialization and 14 Kafka semantic cases plus native epoch/set checks before and after both generation restarts.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.
