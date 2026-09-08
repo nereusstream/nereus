@@ -207,6 +207,11 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   The focused runner passed 51 archived cases/phases and retained-data restart; its independent legacy regression
   passed 71. Both captured source maps remained unchanged. Decompressed framing is checked before record allocation.
 
+- The [complete input-plan check](m5-kafka-input-plan-projection.json) additionally compares every native source batch,
+  ordinal and byte body with the publication plan. Native/restart validation passed 51 archived cases/phases plus
+  71 independent legacy cases/phases; omitted input created no candidate pointer or selector CAS. Compacted-generation
+  input capture remains OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

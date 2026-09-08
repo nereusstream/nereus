@@ -465,9 +465,9 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
         }
 
         CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> membership(
-                com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationSourceCut
-                        cut) {
-            assertThat(cut).isEqualTo(input.plan().sourceCut());
+                KafkaCompactionRecordsV1.CompactionPlan plan) {
+            assertThat(plan).isEqualTo(input.plan());
+            var cut = plan.sourceCut();
             assertThat(cut.sources()).hasSize(1);
             return source.captureExactTarget(sourceHandle)
                     .thenCompose(seal -> {
@@ -491,7 +491,8 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
         }
 
         List<PhysicalResourceIdV2> targets(KafkaSealedBookKeeperDescriptorV2 descriptor) throws Exception {
-            return KafkaBookKeeperPublicationTicketsV2.targets(descriptor, await(membership(descriptor.sourceCut())));
+            assertThat(descriptor.sourceCut()).isEqualTo(input.plan().sourceCut());
+            return KafkaBookKeeperPublicationTicketsV2.targets(descriptor, await(membership(input.plan())));
         }
 
         List<VersionedValue> admit(List<PhysicalResourceIdV2> resources) throws Exception {

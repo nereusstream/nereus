@@ -110,6 +110,7 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             return physicalTickets
                     .orElseThrow()
                     .publish(
+                            plan,
                             descriptor,
                             () -> publishRegistered(plan, semantic, descriptor, sources, currentCompactionState),
                             () -> taskSelections.readDecision(descriptor.task().taskIdSha256()));

@@ -86,6 +86,9 @@ performance-first BookKeeper WAL.
   admission, compacted-generation input discovery, read-ticket crash recovery and physical deletion remain required.
   Focused native/restart validation passed 51 archived cases/phases plus 71 legacy regression cases/phases, with both
   source maps unchanged; this result closes no aggregate M5 obligation.
+  A follow-up [complete native input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) now rejects
+  omissions, reordering, changed ordinals and substituted bodies before publication. Its native/restart validation
+  passed 51 archived cases/phases and 71 independent legacy cases/phases with both source maps unchanged.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

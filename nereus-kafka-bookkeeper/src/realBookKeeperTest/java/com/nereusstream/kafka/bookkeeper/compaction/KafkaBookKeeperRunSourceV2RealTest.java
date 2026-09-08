@@ -90,7 +90,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 await(successor.drain());
                 await(successor.seal(f.footer(f.runBinding(1), 2, 1)));
                 var input = input(f, snapshot, 3300 + i);
-                assertThat(await(source.resolve(input.plan().sourceCut()))
+                assertThat(await(source.resolve(input.plan()))
                                 .get(snapshot.extent().sourceIdentitySha256()))
                         .containsExactly(snapshot.root().resource());
                 try (var published = new Published(f, input, NativeContext.root())) {
@@ -130,6 +130,51 @@ class KafkaBookKeeperRunSourceV2RealTest {
             assertThatThrownBy(
                             () -> await(source.resolve(withExtent(input.plan().sourceCut(), wrong))))
                     .hasRootCauseMessage("native run source differs from the complete frozen source extent");
+            assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            var first = input.plan().inputBatches().get(0);
+            var second = input.plan().inputBatches().get(1);
+            var omitted = withBatches(input.plan(), List.of(second));
+            for (var invalid : List.of(
+                    omitted,
+                    withBatches(input.plan(), List.of(second, first)),
+                    withBatches(
+                            input.plan(),
+                            List.of(
+                                    first,
+                                    new KafkaCompactionRecordsV1.InputBatch(
+                                            second.sourceIdentitySha256(), 2, second.canonicalBody()))),
+                    withBatches(
+                            input.plan(),
+                            List.of(
+                                    new KafkaCompactionRecordsV1.InputBatch(
+                                            first.sourceIdentitySha256(), 0, second.canonicalBody()),
+                                    second)))) {
+                assertThatThrownBy(() -> await(source.resolve(invalid)))
+                        .hasRootCauseMessage("native source input batches differ from compaction plan");
+                assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            }
+            var semantic = new KafkaSemanticCompactorV1().compileSemantic(omitted);
+            var missingBatch = new KafkaBookKeeperCompactionTestSupportV2.Input(
+                    omitted,
+                    semantic,
+                    KafkaBookKeeperCompactionLayoutV2.plan(
+                            omitted,
+                            semantic,
+                            f.binding.physicalNamespace(),
+                            f.source.capabilitySnapshot(),
+                            3340,
+                            512,
+                            1024),
+                    input.capabilityEvidence());
+            try (var published = new Published(f, missingBatch, NativeContext.root())) {
+                assertThatThrownBy(() -> published.writeAndPublish(source))
+                        .hasRootCauseMessage("native source input batches differ from compaction plan");
+                assertThat(published.context.faults.selectorCas.get()).isZero();
+                assertThat(published.context.onOwner(
+                                () -> published.context.store.get(KafkaBookKeeperCompactionPublicationV2.candidateKey(
+                                        missingBatch.layout().task().taskIdSha256()))))
+                        .isEmpty();
+            }
             assertThat(f.tickets(root.ledgerIdentity())).isZero();
             var target = snapshot.root().resource();
             var before = await(f.route.read(target.authorityKey())).orElseThrow();
@@ -512,6 +557,21 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 cut.outputFormatPolicySha256(),
                 M5MaterializationCodecV1.calculateSourceSetSha256(sources),
                 sources);
+    }
+
+    private static KafkaCompactionRecordsV1.CompactionPlan withBatches(
+            KafkaCompactionRecordsV1.CompactionPlan plan, List<KafkaCompactionRecordsV1.InputBatch> batches) {
+        return new KafkaCompactionRecordsV1.CompactionPlan(
+                plan.sourceCut(),
+                plan.policy(),
+                plan.frontiers(),
+                plan.protocolRoots(),
+                batches,
+                plan.keyProofs(),
+                plan.transactions(),
+                plan.leaderEpochs(),
+                plan.undecidableOffsets(),
+                plan.recoveryRequiredOffsets());
     }
 
     private static final class Published implements AutoCloseable {

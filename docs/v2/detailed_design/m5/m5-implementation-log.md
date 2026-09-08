@@ -1056,6 +1056,46 @@ lifecycle design, target-delete coordinator source and READ_FENCED recovery sour
 `/tmp/nereus-m5-run-source-final-check.log`. Frozen historical bytes remain unchanged; all 17 acceptance obligations
 remain OPEN/null and the three M6 activation scenarios remain PLANNED/null. The full lifecycle goal remains active.
 
+## 2026-09-08 complete native input plan admission
+
+Status: focused complete native input-plan verification after `3151d6e5c1e1d3e764fa609651382d9c3b172b8e`.
+
+Preparing compacted-generation input capture exposed a gap in the raw-run publication port: rereading an exact source
+extent and its physical members did not prove that the caller's plan supplied every native batch. The semantic compiler
+could accept an omitted batch within an otherwise matching source cut. The input port now consumes the complete
+CompactionPlan; `KafkaBookKeeperRunSourceV2` checks exact native source IDs, batch ordinals, list order and canonical
+bodies after the same bounded physical-ticketed native reread. A mismatch returns no publication membership. The
+source-cut-only overload cannot be used by the publication constructor. Existing synthetic publication fixtures now
+compare their entire expected plan and retain their native source-body reread; their protocol authority stays synthetic.
+
+The native negative case adds omitted, reordered, relocated and substituted batches under an unchanged source extent.
+It also writes a real candidate output from an omitted-input plan and requires publication to reject it before creating
+the candidate pointer or issuing selector CAS. Read tickets must be released only after the owned session closes.
+The [input-plan projection](m5-kafka-input-plan-projection.json) retains all aggregate, native owner, resource-birth,
+compacted-generation input, read-ticket recovery and physical-delete boundaries. No acceptance row closes here.
+
+Validation: focused compilation, 3 budget and 14 semantic compaction tests, Spotless and Checkstyle passed
+(24 tasks, 8 executed) after formatting the new native fixture. The complete native runner passed 84 executed main
+tasks and a separate 22-task restart JVM (3 executed). Its 13 archived suites contain 51 cases/phases with no
+failures/errors/skips. The independent legacy cluster passed 93 executed main tasks, 3 executed restart reads and
+71 archived cases/phases. Every archived XML and both source maps were independently verified after completion.
+
+The 718-input map is SHA-256 `d272cb352a4b6ef852c8d1f6dc31ae87b8cacd440c54715c4589953c48ec2f54`; the 695-input
+legacy map is `140ddf68fa9622a555a5222a247b222fbcb54c874062615b3601e8ca0dbbc24d`. Both remained unchanged.
+Local summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-23396/run-summary.json`, SHA-256
+`1958002f780f944cd0cd96b900f0dc0ac052b5ca9ee9df7f929cb117bcdbd020`; log `/tmp/nereus-m5-run-plan-native-gate1.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-23408`, with summary SHA-256
+`7567627c7bc9b508d38acd3e965b66cbf080e6fe749f5f2ccf5b620fd9324acb`.
+Oxia container `6786616b9ead4015adc6cfd9af23fb439ce9aa9a5f2f38f2c590ad59c40dc9cd` retained its ID/image and restarted
+from `2026-09-08T03:20:02.811557967Z` to `2026-09-08T03:22:28.246761549Z`; all four BK/ZooKeeper containers likewise
+retained their IDs/images and changed start times. Only runner-owned containers/volumes were cleaned up. The unrelated
+connector remained. These focused diagnostics are not M5-E receipts, aggregate Final or physical-delete authority.
+
+Supplemental validation passed 13 executed tasks: current documentation, historical M5 freeze/M4 dependency,
+lifecycle design, coordinator source and READ_FENCED recovery source checks. Log:
+`/tmp/nereus-m5-run-plan-final-check.log`. All 17 obligations remain OPEN/null, the three M6 activation scenarios remain
+PLANNED/null, and frozen historical bytes remain unchanged. The full lifecycle objective remains active.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

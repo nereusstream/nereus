@@ -90,6 +90,9 @@ This [raw-run source path](detailed_design/m5/m5-kafka-run-source-projection.jso
 and birth admission facts; compacted-generation catalogs, all-writer/read-owner closure, deletion and M5-E remain OPEN.
 The focused run passed 51 archived cases/phases and a separate 71-case/phase legacy regression, including retained-data
 restarts. Both exact source maps remained unchanged. Decoded record framing is preflighted before Kafka allocation.
+The next [complete input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) extends the publication
+input port from source-cut membership to exact native batch-list verification. Its native/restart run passed 51 archived
+cases/phases and 71 independent legacy cases/phases; omitted input issued no candidate-pointer write or selector CAS.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

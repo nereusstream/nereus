@@ -16,13 +16,13 @@ package com.nereusstream.kafka.bookkeeper.compaction;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CompactionPlan;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Completion;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Context;
 import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
-import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationSourceCut;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PublicationOutcome;
 import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.nio.ByteBuffer;
@@ -39,13 +39,14 @@ import java.util.function.Supplier;
 /** Concrete BK publication tickets; input membership must be supplied by the admitted source owner. */
 public final class KafkaBookKeeperPublicationTicketsV2 {
     /**
-     * Resolve every frozen logical source to all native physical members, under its existing source protection.
-     * The protocol owner must derive this mapping from actual immutable source metadata; digests alone are not proof.
+     * Verify the complete plan input list against native source bytes and resolve every frozen logical source to all
+     * physical members, under its existing source protection. The protocol owner must derive this mapping from actual
+     * immutable source metadata; source extents alone do not prove the plan supplied every batch in exact order.
      * Missing native source adapters must fail rather than return an empty or guessed physical membership.
      */
     @FunctionalInterface
     public interface InputMembership {
-        CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(MaterializationSourceCut cut);
+        CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(CompactionPlan plan);
     }
 
     private final M5TargetDeleteMultiWriterGuardV2 guard;
@@ -60,10 +61,14 @@ public final class KafkaBookKeeperPublicationTicketsV2 {
     }
 
     CompletionStage<PublicationOutcome> publish(
+            CompactionPlan plan,
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             Supplier<CompletionStage<PublicationOutcome>> publication,
             Supplier<Optional<M5TaskSelectionDecisionV2>> currentDecision) {
-        return inputMembership.resolve(descriptor.sourceCut()).thenCompose(membership -> {
+        if (!plan.sourceCut().equals(descriptor.sourceCut())) {
+            throw new IllegalArgumentException("publication input plan differs from the descriptor source cut");
+        }
+        return inputMembership.resolve(plan).thenCompose(membership -> {
             var resources = targets(descriptor, membership);
             var context = context(descriptor, resources);
             return CompletableFuture.supplyAsync(() -> terminal(descriptor, currentDecision.get()), owner)

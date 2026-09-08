@@ -20,6 +20,7 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CompactionPlan;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.InputBatch;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1;
@@ -135,10 +136,22 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     }
 
     @Override
+    public CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(CompactionPlan plan) {
+        Objects.requireNonNull(plan, "plan");
+        return resolve(plan.sourceCut(), Optional.of(plan.inputBatches()));
+    }
+
+    /** Physical membership only; publication must use the complete-plan overload. */
     public CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(MaterializationSourceCut cut) {
+        return resolve(cut, Optional.empty());
+    }
+
+    private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
+            MaterializationSourceCut cut, Optional<List<InputBatch>> expectedInputs) {
         Objects.requireNonNull(cut, "cut");
         var budget = new Budget(bounds);
         Map<Sha256Digest, List<PhysicalResourceIdV2>> result = new LinkedHashMap<>();
+        List<InputBatch> nativeInputs = new ArrayList<>();
         CompletionStage<Void> sequence = CompletableFuture.completedFuture(null);
         for (var extent : cut.sources()) {
             if (extent.kind() != SourceKind.BOOKKEEPER_LEDGER) {
@@ -163,10 +176,18 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                 != null) {
                             throw new IllegalArgumentException("duplicate native source identity");
                         }
+                        if (expectedInputs.isPresent()) {
+                            nativeInputs.addAll(snapshot.batches());
+                        }
                     }),
                     owner);
         }
-        return sequence.thenApply(ignored -> Map.copyOf(result));
+        return sequence.thenApply(ignored -> {
+            if (expectedInputs.isPresent() && !nativeInputs.equals(expectedInputs.orElseThrow())) {
+                throw new IllegalArgumentException("native source input batches differ from compaction plan");
+            }
+            return Map.copyOf(result);
+        });
     }
 
     private CompletionStage<Snapshot> capture(String key, Budget budget) {

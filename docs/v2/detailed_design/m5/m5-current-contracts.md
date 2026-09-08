@@ -210,6 +210,16 @@ Its 13 archived suites contain 51 cases/phases with no failures/errors/skips. Th
 allocation preflight also passed the 3 budget and 14 existing semantic compaction tests. Exact local source hashes,
 restart identities and archive locations are recorded in the implementation log.
 
+The next [input-plan verification slice](m5-kafka-input-plan-projection.json) closes a narrower admission gap found
+while preparing compacted-generation inputs. Publication now passes the complete CompactionPlan to the input port.
+The raw-run adapter compares the entire native input list, including source identities, ordinals, order and canonical
+bytes, before returning physical members. Matching the SourceExtent alone cannot justify an omitted or substituted
+batch. The source-cut-only overload remains a physical-membership query and is not the publication entry point.
+The follow-up native run passed 51 archived cases/phases and 71 independent legacy cases/phases, including same-service
+retained-data restarts. The omitted-input output created no candidate pointer or selector CAS. Both independently
+captured source maps remained unchanged; exact hashes and archive identities are in the implementation log. These
+checks do not supply native protocol-owner/semantic admission or complete compacted-generation source capture.
+
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares
 current frozen bytes; the original current-checkout pre-implementation gate still rejects implementation descendants.
