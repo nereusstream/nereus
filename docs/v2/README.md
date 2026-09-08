@@ -89,6 +89,10 @@ performance-first BookKeeper WAL.
   A follow-up [complete native input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) now rejects
   omissions, reordering, changed ordinals and substituted bodies before publication. Its native/restart validation
   passed 51 archived cases/phases and 71 independent legacy cases/phases with both source maps unchanged.
+  The next [selected-generation reader](detailed_design/m5/m5-kafka-selected-source-projection.json) adds the current
+  native descriptor's complete data/index membership and typed index-only input. Native validation passed second
+  publication after exact M4 fallback closure and new source protection; old inputs remain PROTECTED. The final run
+  passed 55 archived cases/phases and 71 independent legacy cases/phases; second-generation restart remains OPEN.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

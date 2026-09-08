@@ -65,6 +65,10 @@ def validate(root):
              "KafkaBookKeeperArtifactAssemblerV2.java", "KafkaBookKeeperReadViewV2.java",
              "KafkaSealedBookKeeperReaderV2.java", "KafkaBookKeeperCompactionPublicationV2.java")
     sources = {name: (base / name).read_text() for name in names}
+    validate_sources(sources)
+    print("PASS_V2_M5_BK_DESCRIPTOR_NON_PROMOTABLE")
+
+def validate_sources(sources):
     for source in sources.values():
         if any(value in source for value in ("new MaterializationPlan", "new ObjectIdentity", "new GenerationObject",
                 "M5MaterializationObjectSessionV1", "new Nms1ObjectV1", "compareAndSet(")):
@@ -81,7 +85,10 @@ def validate(root):
             "!encode(descriptor).equals(bytes)", "input.available() != 0", "input.readInt() != 8"],
         "KafkaBookKeeperArtifactAssemblerV2.java": ["chunk.chunkOrdinal() != nextChunk", "chunk.chunkCount() != first.chunkCount()",
             "!Sha256Digest.hash(value).equals(first.artifactSha256())", "indexes.size() != 8"],
-        "KafkaBookKeeperReadViewV2.java": ["KafkaRecordBatchCodecV1::parse", "requireProof()", "requireIndexes(records)",
+        "KafkaBookKeeperReadViewV2.java": ["KafkaRecordBatchCodecV1.parse(body)",
+            "KafkaRecordBatchCodecV1.parseBounded(body, remainingRecords, remainingBytes)",
+            "remainingRecords -= read.batch().records().size()", "remainingBytes -= read.decodedBytes()",
+            "requireProof()", "requireIndexes(records)",
             "allowsPredecessorOffset", "case ABORTED_TRANSACTION", "!actual.equals(expected)",
             "row.byteOffset() != located.byteOffset()", "artifacts.indexLocators().equals(descriptor.indexes())"],
         "KafkaSealedBookKeeperReaderV2.java": ["required > maximumEncodedRecoveryBytes", "requireMetadata(expected)",
@@ -96,7 +103,6 @@ def validate(root):
         compact = "".join(sources[name].split())
         if any("".join(value.split()) not in compact for value in literals):
             raise ValueError("BK descriptor omits a required identity, recovery or publication predicate")
-    print("PASS_V2_M5_BK_DESCRIPTOR_NON_PROMOTABLE")
 
 if __name__ == "__main__":
     validate(ROOT)

@@ -12,6 +12,22 @@ class DescriptorContractTest(unittest.TestCase):
     def test_current_sources(self):
         module.validate(module.ROOT)
 
+    def test_rejects_removed_decoding_or_shared_budget_accounting(self):
+        base = module.ROOT / "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/compaction"
+        names = ("KafkaSealedBookKeeperDescriptorV2.java", "KafkaSealedBookKeeperDescriptorCodecV2.java",
+                 "KafkaBookKeeperArtifactAssemblerV2.java", "KafkaBookKeeperReadViewV2.java",
+                 "KafkaSealedBookKeeperReaderV2.java", "KafkaBookKeeperCompactionPublicationV2.java")
+        sources = {name: (base / name).read_text() for name in names}
+        for predicate in ("KafkaRecordBatchCodecV1.parse(body)", "KafkaRecordBatchCodecV1.parseBounded",
+                          "remainingRecords -=", "remainingBytes -="):
+            with self.subTest(predicate=predicate):
+                changed = sources.copy()
+                self.assertIn(predicate, changed["KafkaBookKeeperReadViewV2.java"])
+                changed["KafkaBookKeeperReadViewV2.java"] = changed["KafkaBookKeeperReadViewV2.java"].replace(
+                    predicate, "removed_predicate")
+                with self.assertRaises(ValueError):
+                    module.validate_sources(changed)
+
     def test_rejects_changed_descriptor_domain_caps_and_suite_claims(self):
         for field in ("descriptorKind", "descriptorWire", "maximumDescriptorBytes", "physicalIndexLocators", "focusedSuites"):
             value = copy.deepcopy(module.EXPECTED)

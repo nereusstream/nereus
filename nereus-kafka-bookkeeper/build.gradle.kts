@@ -531,3 +531,12 @@ tasks.register<Test>("v2M5KafkaRecordBatchBudgetTest") {
     filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test") }
     outputs.upToDateWhen { false }
 }
+
+tasks.register<Test>("v2M5KafkaSelectedSourceTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test") }
+    outputs.upToDateWhen { false }
+}

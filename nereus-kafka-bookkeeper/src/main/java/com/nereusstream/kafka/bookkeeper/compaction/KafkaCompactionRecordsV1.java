@@ -330,7 +330,12 @@ public final class KafkaCompactionRecordsV1 {
                     || sourceCut.lastStableFrontier() != frontiers.lastStableOffset()) {
                 throw new IllegalArgumentException("M5-B frontiers differ from the M5-A source cut");
             }
-            if (inputBatches.isEmpty()
+            boolean emptyCompactedInput = sourceCut.sources().stream()
+                    .allMatch(source -> source.kind()
+                                    == com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1
+                                            .SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2
+                            && source.recordCount() == 0);
+            if ((inputBatches.isEmpty() && !emptyCompactedInput)
                     || inputBatches.size() > Math.min(policy.caps().maximumInputBatches(), MAX_BATCHES)) {
                 throw new IllegalArgumentException("M5-B input batch count exceeds its cap");
             }

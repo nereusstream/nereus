@@ -77,6 +77,10 @@ public final class M5MaterializationPlannerV1 {
         Objects.requireNonNull(sourceCut, "sourceCut");
         Objects.requireNonNull(policy, "policy");
         M5MaterializationCodecV1.encodeSourceCut(sourceCut);
+        if (sourceCut.sources().stream()
+                .anyMatch(source -> source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2)) {
+            throw new IllegalArgumentException("compacted BK generation input requires the M5-B semantic path");
+        }
         requireProtocolPayloadCompatibility(sourceCut, policy.rewritePayloadKind());
         requireSharedObjectIsolation(sourceCut);
 

@@ -3106,6 +3106,7 @@ tasks.register("v2M5KafkaRunSourceCheck") {
     dependsOn(
         "v2M5KafkaRunRootsCheck",
         ":nereus-kafka-bookkeeper:v2M5KafkaRecordBatchBudgetTest",
+        ":nereus-kafka-bookkeeper:v2M5KafkaSelectedSourceTest",
         ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest",
     )
 }

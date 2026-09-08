@@ -46,7 +46,8 @@ public final class M5MaterializationRecordsV1 {
         OBJECT_WAL_NWG1,
         BOOKKEEPER_LEDGER,
         PULSAR_NPD1_DATA,
-        PULSAR_NPO1_ROOT
+        PULSAR_NPO1_ROOT,
+        KAFKA_BK_COMPACTED_GENERATION_V2
     }
 
     public enum RepresentationMode {
@@ -174,6 +175,14 @@ public final class M5MaterializationRecordsV1 {
             }
             if (kind != SourceKind.BOOKKEEPER_LEDGER && ledgerIdentitySha256.isPresent()) {
                 throw new IllegalArgumentException("non-BookKeeper source carries a ledger identity");
+            }
+            if (kind == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2
+                    && (coverage.domain() != PositionDomain.KAFKA_OFFSET
+                            || immutableProviderVersionToken.isPresent()
+                            || !payloadLongLivedReadable
+                            || !requiredIndexesPresent
+                            || memberBindingIds.size() != 1)) {
+                throw new IllegalArgumentException("compacted BK generation requires complete single-Binding indexes");
             }
         }
 

@@ -103,6 +103,14 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             List<SourceProtectionIdentity> exactFallbackSources,
             CurrentStateReader currentCompactionState) {
+        if (physicalTickets.isEmpty()
+                && plan.sourceCut().sources().stream()
+                        .anyMatch(source -> source.kind()
+                                == com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind
+                                        .KAFKA_BK_COMPACTED_GENERATION_V2)) {
+            throw new IllegalArgumentException(
+                    "compacted generation input requires native physical input verification");
+        }
         requireIdentity(plan, semantic, descriptor);
         if (physicalTickets.isPresent()) {
             List<SourceProtectionIdentity> sources = List.copyOf(exactFallbackSources);

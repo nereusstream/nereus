@@ -212,6 +212,14 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   71 independent legacy cases/phases; omitted input created no candidate pointer or selector CAS. Compacted-generation
   input capture remains OPEN.
 
+- The [selected-generation source reader](m5-kafka-selected-source-projection.json) captures native selected descriptors,
+  all data/index ledger members and actual batches under read tickets and shared decode bounds. A typed index-only
+  generation can enter the semantic compiler with no invented data batch. Native verification passed exact M4
+  fallback closure, new source protection and second publication while retaining old PROTECTED records. Complete M4
+  release, mixed catalogs, native owner admission and deletion remain OPEN.
+  The final run passed 55 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
+  First-generation restart capture is verified; second-generation restart admission remains OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

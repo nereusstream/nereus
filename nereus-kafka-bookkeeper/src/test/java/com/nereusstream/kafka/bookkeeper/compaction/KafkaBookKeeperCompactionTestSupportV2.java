@@ -137,7 +137,7 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                                 .SourceProtectionIdentity(
                                 source.sourceIdentitySha256(),
                                 1,
-                                1,
+                                cut.predecessorSelector().readAdmissionEpoch(),
                                 cut.predecessorSelector().sourceGeneration(),
                                 cut.identity().capability()))
                 .sorted(java.util.Comparator.comparing(

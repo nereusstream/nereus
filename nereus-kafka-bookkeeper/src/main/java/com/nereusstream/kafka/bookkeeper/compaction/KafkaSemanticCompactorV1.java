@@ -138,6 +138,12 @@ public final class KafkaSemanticCompactorV1 {
             List<ParsedBatch> inputs, List<BatchOutput> outputs, List<DispositionRow> dispositions, List<Gap> gaps) {}
 
     public Result compact(CompactionPlan plan) {
+        if (plan.sourceCut().sources().stream()
+                .anyMatch(source -> source.kind()
+                        == com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind
+                                .KAFKA_BK_COMPACTED_GENERATION_V2)) {
+            throw new IllegalArgumentException("compacted BK generation input requires the BookKeeper output path");
+        }
         CompiledRecords records = compileRecords(plan);
         MaterializationPlan materialization = materializationPlan(plan);
         List<KafkaCompactionIndexV1> indexes = indexes(

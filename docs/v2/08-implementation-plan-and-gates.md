@@ -93,6 +93,12 @@ restarts. Both exact source maps remained unchanged. Decoded record framing is p
 The next [complete input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) extends the publication
 input port from source-cut membership to exact native batch-list verification. Its native/restart run passed 51 archived
 cases/phases and 71 independent legacy cases/phases; omitted input issued no candidate-pointer write or selector CAS.
+The [selected-generation source slice](detailed_design/m5/m5-kafka-selected-source-projection.json) extends the same
+runner with typed descriptor inputs, all native ledger members, shared decoding bounds, index-only recompilation and
+first-generation restart identity recovery. Validation passed second publication after exact M4 closure/new protection:
+55 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
+Old source protection and active retirement batches must remain intact; complete M4 release, mixed-source catalogs,
+native owner admission, second-generation restart admission and physical deletion remain required.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

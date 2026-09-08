@@ -25,22 +25,57 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.CaptureOu
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Read-only descriptor recovery. It never allocates, appends, fences, reads old inputs or contacts an Object provider.
  * The caller must hold M4 read/source-plan admission and reserve cache/temporary memory in its Cell budget.
  */
 public final class KafkaSealedBookKeeperReaderV2 {
+    public record DecodingBounds(int records, long bytes) {
+        public DecodingBounds {
+            if (records < 0
+                    || records > KafkaCompactionRecordsV1.MAX_RECORDS
+                    || bytes < 0
+                    || bytes > 256L * 1024 * 1024) {
+                throw new IllegalArgumentException("selected BK decoding budget exceeds its hard bounds");
+            }
+        }
+    }
+
     private final BookKeeperCellSession session;
     private final SealedMetadataReader metadataReader;
     private final int maximumEncodedRecoveryBytes;
+    private final Optional<DecodingBounds> decodingBounds;
+    private final Executor decodingExecutor;
 
     public KafkaSealedBookKeeperReaderV2(
             BookKeeperCellSession session, SealedMetadataReader metadataReader, int maximumEncodedRecoveryBytes) {
+        this(session, metadataReader, maximumEncodedRecoveryBytes, Optional.empty(), Runnable::run);
+    }
+
+    public KafkaSealedBookKeeperReaderV2(
+            BookKeeperCellSession session,
+            SealedMetadataReader metadataReader,
+            int maximumEncodedRecoveryBytes,
+            DecodingBounds decodingBounds,
+            Executor decodingExecutor) {
+        this(session, metadataReader, maximumEncodedRecoveryBytes, Optional.of(decodingBounds), decodingExecutor);
+    }
+
+    private KafkaSealedBookKeeperReaderV2(
+            BookKeeperCellSession session,
+            SealedMetadataReader metadataReader,
+            int maximumEncodedRecoveryBytes,
+            Optional<DecodingBounds> decodingBounds,
+            Executor decodingExecutor) {
         this.session = Objects.requireNonNull(session, "session");
         this.metadataReader = Objects.requireNonNull(metadataReader, "metadataReader");
+        this.decodingBounds = decodingBounds;
+        this.decodingExecutor = Objects.requireNonNull(decodingExecutor, "decodingExecutor");
         if (maximumEncodedRecoveryBytes <= 0) {
             throw new IllegalArgumentException("BK descriptor recovery requires a positive pre-admitted byte bound");
         }
@@ -66,8 +101,12 @@ public final class KafkaSealedBookKeeperReaderV2 {
                 return parts;
             }));
         }
-        return result.thenApply(parts -> new KafkaBookKeeperReadViewV2(
-                descriptor, KafkaBookKeeperArtifactAssemblerV2.assemble(descriptor.task(), parts)));
+        return result.thenApplyAsync(
+                parts -> new KafkaBookKeeperReadViewV2(
+                        descriptor,
+                        KafkaBookKeeperArtifactAssemblerV2.assemble(descriptor.task(), parts),
+                        decodingBounds),
+                decodingExecutor);
     }
 
     private CompletionStage<PartBody> readPart(KafkaSealedBookKeeperDescriptorV2 descriptor, int ordinal) {

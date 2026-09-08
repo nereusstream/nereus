@@ -39,10 +39,33 @@ public final class KafkaBookKeeperReadViewV2 {
 
     KafkaBookKeeperReadViewV2(
             KafkaSealedBookKeeperDescriptorV2 descriptor, KafkaBookKeeperArtifactAssemblerV2.Artifacts artifacts) {
+        this(descriptor, artifacts, Optional.empty());
+    }
+
+    KafkaBookKeeperReadViewV2(
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            KafkaBookKeeperArtifactAssemblerV2.Artifacts artifacts,
+            Optional<KafkaSealedBookKeeperReaderV2.DecodingBounds> decodingBounds) {
         this.descriptor = descriptor;
         this.artifacts = artifacts;
-        this.batches =
-                artifacts.batches().stream().map(KafkaRecordBatchCodecV1::parse).toList();
+        var parsed = new ArrayList<ParsedBatch>();
+        int remainingRecords = decodingBounds
+                .map(KafkaSealedBookKeeperReaderV2.DecodingBounds::records)
+                .orElse(0);
+        long remainingBytes = decodingBounds
+                .map(KafkaSealedBookKeeperReaderV2.DecodingBounds::bytes)
+                .orElse(0L);
+        for (var body : artifacts.batches()) {
+            if (decodingBounds.isEmpty()) {
+                parsed.add(KafkaRecordBatchCodecV1.parse(body));
+            } else {
+                var read = KafkaRecordBatchCodecV1.parseBounded(body, remainingRecords, remainingBytes);
+                parsed.add(read.batch());
+                remainingRecords -= read.batch().records().size();
+                remainingBytes -= read.decodedBytes();
+            }
+        }
+        this.batches = List.copyOf(parsed);
         this.indexes =
                 artifacts.indexes().stream().map(KafkaCompactionIndexV1::decode).toList();
         if (batches.size() != descriptor.batchCount()
@@ -90,6 +113,10 @@ public final class KafkaBookKeeperReadViewV2 {
 
     KafkaBookKeeperArtifactAssemblerV2.Artifacts artifacts() {
         return artifacts;
+    }
+
+    List<ParsedBatch> parsedBatches() {
+        return batches;
     }
 
     private Map<Long, LocatedRecord> expectedRecords() {

@@ -1096,6 +1096,79 @@ lifecycle design, coordinator source and READ_FENCED recovery source checks. Log
 `/tmp/nereus-m5-run-plan-final-check.log`. All 17 obligations remain OPEN/null, the three M6 activation scenarios remain
 PLANNED/null, and frozen historical bytes remain unchanged. The full lifecycle objective remains active.
 
+## 2026-09-08 native selected-generation source capture
+
+Status: focused native selected-source and second-publication verification after
+`99b4b6cb4fcbfdb85c77ffa76a1c1f4b74ea5094`.
+
+`KafkaBookKeeperSelectedSourceV2` reads the admitted native M4 selector and exact descriptor on the owner executor,
+checks Binding/namespace/capability and every native run configuration, and bounds total physical entries/bytes and batch
+count before opening parts. A physical ticket covers every data and index ledger. An owned read-only session verifies
+all parts through the existing descriptor reader, all eight rebuilt indexes and gap/semantic roots. The final selector
+and descriptor reread must be exactly unchanged. Success or parse failure drains/closes the owned session before release
+of only this invocation's tickets; cancellation cannot abandon it, and unknown close/release does not grant a capture.
+
+KAFKA_BK_COMPACTED_GENERATION_V2 appends source-kind ordinal 4. Ordinals 0-3 keep their encodings; older parsers reject
+the extension. The canonical SourceExtent body is the descriptor itself, so an index-only generation has a positive
+canonical length without invented data. Its complete native ledger set is separate from the logical source identity;
+no single-ledger identity is manufactured for the generation. M5-A and the Object-facing compactor reject this type,
+as does BK publication without physical input verification. Compaction can accept an empty batch list only when every
+source is a typed zero-record generation with complete indexes. Native input-plan verification still runs before
+publication; a caller's empty declaration alone grants no authority.
+
+The selected descriptor reader gains an explicit per-generation record/decoded-byte budget and owner decoding executor.
+The old constructor remains a foundation interface; this change does not claim complete Cell memory/I/O admission for
+all readers. Tests exercise normal selected output on all three topic routes, all physical members, decoded-budget
+rejection, complete input membership and repeated semantic compilation. A real raw run containing actual empty Kafka
+batches produces an index-only selected generation, which is captured and recompiled with zero decoded-record budget.
+Fresh-JVM restart rederives selected-generation source identity and extent from retained native data without republishing.
+
+The next plan cannot borrow the original raw sources' M4 fallback protections. Tests preserve that rejection; exact M4
+fallback retirement, new source protection and second publication remain OPEN. Protocol semantic/key/frontier/owner
+facts and resource-birth admission remain synthetic fixtures; mixed raw/generation discovery, native owner closure,
+read-ticket crash recovery, deletion and M5-E/Final remain required. The
+[selected-source projection](m5-kafka-selected-source-projection.json) tracks these limits with all 17 obligations OPEN.
+
+Focused validation passed the 3 selected-source contract/decoding tests and 7 existing M5-A materialization tests,
+plus the existing semantic/M4/descriptor regression suites and affected style checks. The first native attempt stopped
+at the historical descriptor source check, which still required the removed method-reference spelling `::parse`.
+The checker now requires both actual parsing branches and both shared-budget decrements; a new negative test removes
+each predicate in turn. All 4 checker tests pass. The amended checker and its tests are captured independently in both
+native source manifests. No native mutation, complete-body, index or M4 publication predicate was removed.
+
+The next native run passed 55 archived cases/phases and retained-data restart for selected-generation capture. Work
+then continued to actual second publication. The fixture performs the existing exact M4 closeFallback transition,
+recaptures the unchanged generation extent/member set from the preferred-only view, and installs the next source's
+protection at the current read-admission epoch. A new native task writes/publishes the second output on the same native
+control route using the selected-source verifier. All eight indexes and gaps must recover from that output. The old raw
+source protection must still be PROTECTED and its active retirement batch must remain present; no RELEASED proof or
+delete authority is fabricated. The expanded test applies to all three topic routes and index-only output. Compilation,
+3 selected-source tests, 14 semantic tests and style checks pass (24 tasks, 6 executed); the expanded native run is in
+progress at that point; the final result below uses the later source rather than the earlier capture-only result.
+
+Final native validation passed 85 executed main tasks and a separate 22-task restart JVM (3 executed). The 14 archived
+suites contain 55 cases/phases with no failures/errors/skips. The independent legacy cluster passed 93 executed main
+tasks, 3 executed restart reads and 71 archived cases/phases. Every archived XML and both source maps were independently
+verified after completion. The 722-input map is SHA-256
+`0ee2790f619384790d2460fa7a4c9ab4758f3f2a8119b9a7c2a312b9e4e6fb5d`; the 699-input legacy map is
+`4aee7803cb76b5754669fc48bccbcfb4f3c35c05e6daf9ccd77896737c025fb7`. Both remained unchanged, including the amended
+descriptor checker and negative tests. The second native publication/read executes in the main JVM. The retained-data
+restart checkpoints rederive the first selected generation's source identity/extent and read all native parts;
+second-generation restart admission remains OPEN and is not borrowed from those checkpoints.
+
+Local summary: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-16116/run-summary.json`, SHA-256
+`67278c6bef4475505acaf3124a8186037a5063dfedadb54ff403c75686ad0202`; log `/tmp/nereus-m5-selected-source-native-gate3.log`.
+The legacy run is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-16127`, with summary SHA-256
+`a75101a5b629de67e6f50c2a4a6b2b2b81e7413a9a3b8a67b7556c70170c52e3`.
+Oxia container `cc487b755a037bef4a7b47e2febcc82b62a0c72be08ca592dd008137a0e65286` retained its ID/image and restarted
+from `2026-09-08T04:05:53.879479713Z` to `2026-09-08T04:08:31.749038508Z`; all four BK/ZooKeeper containers likewise
+retained their IDs/images and changed start times. Cleanup removed only runner-owned containers/volumes, preserving
+the unrelated connector. These focused diagnostics are not M5-E receipts, aggregate Final or physical-delete authority.
+
+Final documentation, historical design/M4 dependency, lifecycle, coordinator and READ_FENCED source checks passed
+13/13 executed tasks in `/tmp/nereus-m5-selected-source-final-check.log`. All 17 acceptance obligations remain OPEN
+with null receipts; the three deferred M6 Kafka scenarios remain PLANNED with null receipts.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

@@ -220,6 +220,31 @@ retained-data restarts. The omitted-input output created no candidate pointer or
 captured source maps remained unchanged; exact hashes and archive identities are in the implementation log. These
 checks do not supply native protocol-owner/semantic admission or complete compacted-generation source capture.
 
+The [selected-generation input slice](m5-kafka-selected-source-projection.json) adds native capture of the current
+selected BK descriptor and every data/index ledger, including an index-only generation. The new source kind appends
+ordinal 4 without changing older kind encodings; older implementations reject it and no mixed-version migration is
+claimed. Its canonical SourceExtent body/length/hash describe the exact immutable descriptor, while InputBatch bodies
+come from independently verified native parts. A generation carries no fabricated single-ledger identity. All physical
+members receive read tickets before opening; the owned session drains/closes before releasing this invocation's tickets.
+The current admitted M4 selector and descriptor must be unchanged after capture. Record count/decoded bytes share one
+generation budget; decoding runs on the supplied owner executor. Complete Cell cache/codec/I/O accounting remains OPEN.
+
+Only typed zero-record generations can supply an empty compaction input list; all eight indexes and the gap root still
+must verify. M5-A Object materialization, the Object-facing compactor and unguarded BK publication reject this source
+kind. The selected-source resolver compares the full native extent, exact predecessor selector and every input batch.
+The native fixture first preserves M4's rejection of the previous raw fallback set as
+protection for the new generation, then executes exact closeFallback, protects the new generation at its current read
+epoch, and completes a second physical-ticketed native publication and read. The source extent and physical members
+must remain stable across the M4 closure. Old raw protection records and their active retirement batch must remain
+intact: this closure is not RELEASED or deletion. Complete M4 release, mixed raw/generation catalogs and native
+protocol-owner semantics remain required. No aggregate obligation closes from this path alone.
+
+The final native run passed 85 executed main tasks and a separate 22-task restart JVM (three executed), with 55
+archived cases/phases and no failures/errors/skips. The independent legacy regression passed 71 cases/phases. Both
+the 722-input map and 699-input legacy map were independently unchanged, including the amended descriptor checker and
+its negative tests. Restart checkpoints reverify the first selected generation's source identity and complete native
+parts; second publication/read is exercised in the main JVM. Second-generation restart admission remains required.
+
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares
 current frozen bytes; the original current-checkout pre-implementation gate still rejects implementation descendants.

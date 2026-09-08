@@ -65,6 +65,8 @@ paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata
 paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage-bookkeeper/build.gradle.kts',
               root/'config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml',root/'build.gradle.kts',root/'nereus-kafka-bookkeeper/build.gradle.kts',
               root/'nereus-metadata-oxia/build.gradle.kts',root/'scripts/run-v2-m5-bookkeeper-task-terminal-check.sh'])
+paths.extend([root/'scripts/check-v2-m5-bookkeeper-descriptor.py',
+              root/'scripts/check-v2-m5-bookkeeper-descriptor-tests.py'])
 manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 (out/'tested-inputs.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY

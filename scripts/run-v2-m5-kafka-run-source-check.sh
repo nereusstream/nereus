@@ -107,6 +107,7 @@ paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage
               root/'config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml',root/'build.gradle.kts',root/'nereus-kafka-bookkeeper/build.gradle.kts',
               root/'nereus-metadata-oxia/build.gradle.kts',root/'scripts/run-v2-m5-publication-tickets-check.sh',
               root/'scripts/run-v2-m5-kafka-run-roots-check.sh',root/'scripts/run-v2-m5-kafka-run-source-check.sh',
+              root/'scripts/check-v2-m5-bookkeeper-descriptor.py',root/'scripts/check-v2-m5-bookkeeper-descriptor-tests.py',
               root/'scripts/run-v2-m5-bookkeeper-task-terminal-check.sh',root/'nereus-storage-api/build.gradle.kts'])
 paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/gc').glob('*.java'))
 paths.extend((root/'nereus-metadata-oxia/src/oxiaIntegrationTest/java/com/nereusstream/metadata/oxia/v2/retention').glob('*.java'))
@@ -167,7 +168,8 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
 suites=[]
 for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRecordBatchBudgetTest','KafkaRecordBatchBudgetV2Test',3),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',5),
+    ('nereus-kafka-bookkeeper','v2M5KafkaSelectedSourceTest','KafkaBookKeeperSelectedSourceV2Test',3),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',6),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',7),
@@ -231,6 +233,12 @@ summary={'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'sourceBudgetSharedAcrossWholeResolution':True,
     'decodedKafkaRecordCountAndBytesBounded':True,
     'nativeSourceAndSelectedOutputReverifiedAfterRestart':True,
+    'nativeSelectedGenerationSourceAndAllPhysicalMembersVerified':True,
+    'indexOnlyGenerationCanReenterSemanticCompilerWithNoInputBatches':True,
+    'selectedGenerationSourceIdentityRederivedAfterRestart':True,
+    'secondNativePublicationAfterExactM4FallbackClosure':True,
+    'oldFallbackProtectionsRemainProtectedAfterSecondPublication':True,
+    'selectedGenerationRepublicationAndFallbackRetirementComplete':False,
     'realProtocolSemanticAndBirthAdmissionComplete':False,
     'm5EComplete':False,
     'allConcreteWriterRowsComplete':False,'nativeInputCatalogAdmissionComplete':False,

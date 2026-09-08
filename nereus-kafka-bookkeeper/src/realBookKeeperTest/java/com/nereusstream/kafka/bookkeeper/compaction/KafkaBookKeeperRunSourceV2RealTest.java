@@ -35,6 +35,7 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
@@ -96,6 +97,28 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 try (var published = new Published(f, input, NativeContext.root())) {
                     var descriptor = published.writeAndPublish(source);
                     verify(published.context.recover(), input, descriptor.descriptorSha256());
+                    var selectedSource = selectedReader(f, published, 1000, 500000);
+                    var selected = await(selectedSource.capture());
+                    verifySelected(selected, descriptor);
+                    assertThatThrownBy(() -> await(
+                                    selectedReader(f, published, 0, 500000).capture()))
+                            .hasRootCauseMessage("Kafka decoded record budget exhausted");
+                    assertThatThrownBy(() ->
+                                    await(selectedReader(f, published, 1000, 0).capture()))
+                            .hasRootCauseMessage("Kafka decoded record budget exhausted");
+                    var next = selectedPlan(input.plan(), selected);
+                    assertThat(await(selectedSource.resolve(next))
+                                    .get(selected.extent().sourceIdentitySha256()))
+                            .containsExactlyElementsOf(selected.resources());
+                    var repeated = new KafkaSemanticCompactorV1().compileSemantic(next);
+                    assertThat(repeated.outputBatches())
+                            .isEqualTo(input.semantic().outputBatches());
+                    assertThat(repeated.gaps()).isEqualTo(input.semantic().gaps());
+                    assertThatThrownBy(() -> com.nereusstream.storage.object.materialization
+                                    .M5MaterializationValidatorV1.requireFallbackProtections(
+                                    next.sourceCut(), published.context.protections))
+                            .hasMessage("M5 fallback protections differ from the frozen source identities");
+                    recompactSelected(f, published, input, selected, 4300 + i);
                 }
                 assertThat(f.tickets(root.ledgerIdentity())).isZero();
             }
@@ -291,6 +314,35 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void selectedIndexOnlyGenerationCanBeAnEmptyCompactionInput() throws Exception {
+        try (var f = new Fixture(2320, "orders", null)) {
+            var root = admit(f, customSource(f, 3));
+            var source = reader(f, f.roots, BOUNDS);
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var input = input(f, raw, 3320);
+            assertThat(input.semantic().outputBatches()).isEmpty();
+            try (var published = new Published(f, input, NativeContext.root())) {
+                var descriptor = published.writeAndPublish(source);
+                var selectedSource = selectedReader(f, published, 0, 0);
+                var selected = await(selectedSource.capture());
+                verifySelected(selected, descriptor);
+                assertThat(selected.batches()).isEmpty();
+                assertThat(selected.extent().recordCount()).isZero();
+                assertThat(selected.extent().canonicalLength()).isPositive();
+                assertThat(descriptor.task().parts())
+                        .allMatch(part -> part.kind() == KafkaBookKeeperInventoryV2.PartKind.INDEX);
+                var next = selectedPlan(input.plan(), selected);
+                assertThat(await(selectedSource.resolve(next))).hasSize(1);
+                var repeated = new KafkaSemanticCompactorV1().compileSemantic(next);
+                assertThat(repeated.outputBatches()).isEmpty();
+                assertThat(repeated.gaps()).containsExactly(new KafkaCompactionRecordsV1.Gap(0, 2));
+                assertThat(repeated.indexes()).hasSize(8);
+                recompactSelected(f, published, input, selected, 4320);
+            }
+        }
+    }
+
+    @Test
     void writeBeforeServerRestart() throws Exception {
         Files.createDirectories(checkpoint());
         for (int i = 0; i < TOPICS.size(); i++) {
@@ -301,6 +353,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 var input = input(f, snapshot, 3400 + i);
                 try (var published = new Published(f, input, NativeContext.root())) {
                     var descriptor = published.writeAndPublish(source);
+                    var selected =
+                            await(selectedReader(f, published, 1000, 500000).capture());
                     var nativeRoot = await(f.nativeClient.read(snapshot.extent().physicalKey()))
                             .orElseThrow();
                     Files.write(
@@ -314,7 +368,10 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                             .toHex(),
                                     Sha256Digest.hash(nativeRoot.storedBytes()).toHex() + ":" + nativeRoot.versionId(),
                                     published.context.root,
-                                    descriptor.descriptorSha256().toHex()));
+                                    descriptor.descriptorSha256().toHex(),
+                                    selected.extent().sourceIdentitySha256().toHex(),
+                                    M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
+                                            .toHex()));
                 }
             }
         }
@@ -343,6 +400,12 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             published.context.recover(),
                             input,
                             Sha256Digest.copyOf(java.util.HexFormat.of().parseHex(lines.get(7))));
+                    var selected =
+                            await(selectedReader(f, published, 1000, 500000).capture());
+                    assertThat(selected.extent().sourceIdentitySha256().toHex()).isEqualTo(lines.get(8));
+                    assertThat(M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
+                                    .toHex())
+                            .isEqualTo(lines.get(9));
                     assertThat(published.context.faults.recordCreates.get()).isZero();
                     assertThat(published.context.faults.selectorCas.get()).isZero();
                 }
@@ -391,7 +454,12 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 handle,
                 0,
                 Nbke2CodecV1.encode(ledger, 0, new Nbke2RunHeaderV1(binding, 0, 1, f.verifier.capabilitySha256())));
-        if (mode == 0) {
+        if (mode == 3) {
+            for (int i = 0; i < 2; i++) {
+                f.data(handle, binding, i + 1, i, KafkaSemanticCompactorV1Test.emptyBatch(i, 1));
+            }
+            f.append(handle, 3, Nbke2CodecV1.encode(ledger, 3, f.footer(binding, 2, 3)));
+        } else if (mode == 0) {
             var group = new Id128(100, f.attempt);
             var attempt = new Id128(101, f.attempt);
             f.append(
@@ -574,6 +642,138 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 plan.recoveryRequiredOffsets());
     }
 
+    private static KafkaBookKeeperSelectedSourceV2 selectedReader(
+            Fixture f, Published published, int records, long decodedBytes) {
+        return new KafkaBookKeeperSelectedSourceV2(
+                published.context.store,
+                published.context.m4,
+                published.output,
+                new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, records, 1000000, decodedBytes),
+                published.context.owner);
+    }
+
+    private static void recompactSelected(
+            Fixture f,
+            Published first,
+            KafkaBookKeeperCompactionTestSupportV2.Input previous,
+            KafkaBookKeeperSelectedSourceV2.Snapshot captured,
+            long attempt)
+            throws Exception {
+        var descriptor = captured.view().descriptor();
+        assertThat(first.context.onOwner(() -> first.context.m4.closeFallback(
+                        captured.selector(),
+                        descriptor.descriptorSha256(),
+                        captured.selector().sourceGeneration() + 1,
+                        first.context.protections)))
+                .isEqualTo(com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        var source = selectedReader(f, first, 1000, 500000);
+        var preferred = await(source.capture());
+        assertThat(preferred.extent()).isEqualTo(captured.extent());
+        assertThat(preferred.resources()).isEqualTo(captured.resources());
+        assertThat(preferred.selector().mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_ONLY);
+        var plan = selectedPlan(previous.plan(), preferred);
+        var semantic = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        var input = new KafkaBookKeeperCompactionTestSupportV2.Input(
+                plan,
+                semantic,
+                KafkaBookKeeperCompactionLayoutV2.plan(
+                        plan,
+                        semantic,
+                        f.binding.physicalNamespace(),
+                        f.source.capabilitySnapshot(),
+                        attempt,
+                        512,
+                        1024),
+                previous.capabilityEvidence());
+        try (var second = new Published(f, input, first.context.root)) {
+            var next = second.writeAndPublish(source);
+            var view = second.context.recover();
+            assertThat(view.descriptor()).isEqualTo(next);
+            assertThat(view.parsedBatches()).isEqualTo(semantic.outputBatches());
+            assertThat(view.gaps()).isEqualTo(semantic.gaps());
+            assertThat(view.allowsPredecessorOffset(0)).isFalse();
+            for (var kind : M5MaterializationRecordsV1.IndexKind.values()) {
+                assertThat(view.index(kind)).isEqualTo(semantic.indexes().get(kind.ordinal()));
+            }
+            assertThat(second.context.onOwner(
+                            () -> second.context.m4.readSelector().orElseThrow().activeBatches()))
+                    .anyMatch(batch -> batch.sources().equals(first.context.protections));
+            var keys = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(7, second.context.binding);
+            for (var old : first.context.protections) {
+                var protection = second.context.onOwner(() -> M4ReadControlCodecV1.decodeProtection(second.context
+                        .store
+                        .get(keys.protection(old.sourceIdentitySha256(), old.protectionGeneration()))
+                        .orElseThrow()));
+                assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
+            }
+        }
+        for (var resource : captured.resources()) {
+            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(resource.authorityKey()))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .activeWriterTickets())
+                    .isEmpty();
+        }
+    }
+
+    private static void verifySelected(
+            KafkaBookKeeperSelectedSourceV2.Snapshot selected, KafkaSealedBookKeeperDescriptorV2 descriptor) {
+        assertThat(selected.extent().kind())
+                .isEqualTo(M5MaterializationRecordsV1.SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2);
+        assertThat(selected.extent().ledgerIdentitySha256()).isEmpty();
+        assertThat(selected.extent().bodySha256()).isEqualTo(descriptor.descriptorSha256());
+        assertThat(selected.resources()).hasSize(descriptor.sealedParts().size());
+        assertThat(selected.resources())
+                .containsExactlyInAnyOrderElementsOf(descriptor.sealedParts().stream()
+                        .map(part -> new PhysicalResourceIdV2.BookKeeperLedger(
+                                descriptor.task().namespace(),
+                                part.handle().ledgerIdentity().ledgerId()))
+                        .toList());
+        assertThat(selected.batches()).hasSize(descriptor.batchCount());
+        assertThat(selected.view().descriptor()).isEqualTo(descriptor);
+        for (var kind : M5MaterializationRecordsV1.IndexKind.values()) {
+            assertThat(selected.view().index(kind).kind()).isEqualTo(kind);
+        }
+    }
+
+    private static KafkaCompactionRecordsV1.CompactionPlan selectedPlan(
+            KafkaCompactionRecordsV1.CompactionPlan previous, KafkaBookKeeperSelectedSourceV2.Snapshot selected) {
+        var old = previous.sourceCut();
+        var sources = List.of(selected.extent());
+        var selector = selected.selector();
+        var cut = new M5MaterializationRecordsV1.MaterializationSourceCut(
+                old.identity(),
+                selector,
+                Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selector)),
+                selector.selectedViewSha256(),
+                selected.extent().coverage(),
+                old.durableFrontier(),
+                old.logEndFrontier(),
+                old.highWatermark(),
+                old.lastStableFrontier(),
+                old.trimFrontier(),
+                old.protocolStateRootSha256(),
+                old.recoveryCheckpointRootSha256(),
+                old.materializationPolicySha256(),
+                old.outputFormatPolicySha256(),
+                M5MaterializationCodecV1.calculateSourceSetSha256(sources),
+                sources);
+        assertThat(M5MaterializationCodecV1.decodeSourceCut(M5MaterializationCodecV1.encodeSourceCut(cut)))
+                .isEqualTo(cut);
+        return new KafkaCompactionRecordsV1.CompactionPlan(
+                cut,
+                previous.policy(),
+                previous.frontiers(),
+                previous.protocolRoots(),
+                selected.batches(),
+                previous.keyProofs(),
+                previous.transactions(),
+                previous.leaderEpochs(),
+                previous.undecidableOffsets(),
+                previous.recoveryRequiredOffsets());
+    }
+
     private static final class Published implements AutoCloseable {
         final Fixture f;
         final KafkaBookKeeperCompactionTestSupportV2.Input input;
@@ -591,7 +791,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
             context = new NativeContext(input.layout().task(), root, output.newSession());
         }
 
-        KafkaSealedBookKeeperDescriptorV2 writeAndPublish(KafkaBookKeeperRunSourceV2 source) throws Exception {
+        KafkaSealedBookKeeperDescriptorV2 writeAndPublish(KafkaBookKeeperPublicationTicketsV2.InputMembership source)
+                throws Exception {
             var descriptor = context.write(input);
             for (var seal : descriptor.sealedParts()) {
                 await(f.admit(seal.handle()));
