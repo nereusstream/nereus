@@ -241,7 +241,10 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'confirmedNativeReadDrainExposesExactOperationTicketRetry':True,
+summary={'selectedGenerationCaptureUsesScopedM4ReadOwner':True,
+    'selectedCaptureAndScopedReadersShareCellCapacityNativeVerified':True,
+    'selectedCaptureTicketCleanupPreservesLiveSameContextSibling':True,
+    'confirmedNativeReadDrainExposesExactOperationTicketRetry':True,
     'nativeReadTicketRetryPreservesLiveSameContextSibling':True,'unknownNativeCloseExposesTicketRetry':False,
     'nativeBkReadOwnerReservesFixedBindingShares':True,'cancelledNativeReadRetainsBindingShareUntilSessionTermination':True,
     'healthyBindingReadsInSameConfiguredCellWhileSiblingHeld':True,'globalProcessReadBudgetAuthority':False,

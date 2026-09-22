@@ -115,7 +115,7 @@ performance-first BookKeeper WAL.
   The next [selected-generation reader](detailed_design/m5/m5-kafka-selected-source-projection.json) adds the current
   native descriptor's complete data/index membership and typed index-only input. Native validation passed second
   publication after exact M4 fallback closure and new source protection; old inputs remain PROTECTED. The final run
-  passed 90 archived cases/phases and 71 independent legacy cases/phases. Fresh-JVM second-generation recovery
+  passed 102 archived cases/phases and 82 independent legacy cases/phases. Fresh-JVM second-generation recovery
   additionally verifies the user topic, both internal topics and index-only output from native descriptor/task records.
   Shared publication validation now rejects the preferred-only predecessor's epoch as a new fallback's first epoch;
   the introducing E+1 and inherited existing fallback identities are verified before and after native restart.
@@ -126,8 +126,9 @@ performance-first BookKeeper WAL.
   A cancelled slow native read retains its share through confirmed session termination; a healthy Binding in the same
   configured Cell continues. Confirmed session termination with unresolved ticket cleanup now returns a privately constructed
   retry handle for that exact operation; metadata-only retry preserves live readers sharing the same Context.
-  Unknown native close grants no such handle. Global process admission, retained result-cache budgeting and full
-  transport accounting remain required.
+  Unknown native close grants no such handle. Selected-generation compaction capture and membership resolution now
+  require that same shared Cell budget and run through the M4 scoped owner; their former direct-session path is removed.
+  Global process admission, retained result-cache budgeting and full transport accounting remain required.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

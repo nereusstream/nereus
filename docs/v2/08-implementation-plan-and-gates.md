@@ -143,7 +143,7 @@ Old source protection and active retirement batches must remain intact; complete
 native owner admission and physical deletion remain required. Fresh-JVM second-generation recovery covers the user
 topic, both internal topics and index-only output without republishing or copying descriptor/task bodies.
 Shared M5-A/M5-B validation now rejects a new fallback's first epoch unless it equals the introducing selector's E+1;
-existing fallback sets inherit their original first epoch. The current 90-case/phase run includes 8 Object
+existing fallback sets inherit their original first epoch. The current 102-case/phase run includes 8 Object
 materialization and 14 Kafka semantic cases plus native epoch/set checks before and after both generation restarts.
 The [scoped read owner](detailed_design/m5/m5-kafka-read-owner-projection.json) adds physical tickets for its complete
 native-session lifetime and local close-before-CAS/drain. Public entry now also reserves fixed per-Binding owner,
@@ -152,8 +152,10 @@ recovery tests and three native owner cases join the current 25-archive / 102-ca
 share remains charged through actual read/session completion while a healthy same-Cell Binding reads. Confirmed
 termination with unresolved physical ticket cleanup returns an exact-operation retry handle; metadata-only retry
 preserves live same-Context siblings and never recreates a session. Unknown native close returns no retry handle.
-Its result is local only; global process admission, result-cache/transport accounting, crash reconciliation,
-M4 terminal/proof publication and RELEASED remain outstanding.
+Selected-generation `capture`/`resolve` now use this same owner and caller-supplied shared budget, including after
+native restart. A held scoped read prevents same-Binding capture until its native lifetime ends, and capture's exact
+cleanup retry preserves live sibling tickets. Its result is local only; raw-run read admission, global process
+admission, result-cache/transport accounting, crash reconciliation, M4 terminal/proof publication and RELEASED remain outstanding.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

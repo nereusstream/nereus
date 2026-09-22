@@ -2424,6 +2424,61 @@ protocol-owner terminal, M4 RELEASED, physical delete eligibility or M5-E/Final 
 retained buffers/caches, other providers and all 17 amended obligations remain required; M6 process wiring and
 M7/M8 activation/production boundaries are unchanged.
 
+## 2026-09-22 selected-generation capture through the scoped M4 read owner
+
+Parent: `f695ab5549fadfe6c37b686707c983d7362bb3a1`. `KafkaBookKeeperSelectedSourceV2.capture()` previously
+opened its own native session and duplicated read/ticket cleanup, outside the scoped M4 planner/hazard and fixed
+Cell admission. Capture and complete-plan membership resolution now delegate to `KafkaBookKeeperReadOwnerV2.run`.
+The constructor requires the caller's shared `KafkaBookKeeperReadCellBudgetV2`; no budget-free constructor remains.
+One capture reserves one owner/read slot and its configured encoded/decoded allowances before physical admission.
+Initial bounded selector/descriptor discovery identifies the Binding first; metadata discovery is not included in
+this read budget. The exact selector and descriptor are still rechecked after native recovery and before snapshot
+return. Known native termination and exact ticket cleanup govern completion through the existing owner lifecycle.
+
+Native fixture owners retain their budget across capture/resolve calls. Restart clients explicitly admit a fresh
+process-local budget; no occupied predecessor reservation is imported or released. Two existing native tests were
+extended: a held/cancelled scoped read prevents selected-source admission in the same Binding share, and capture
+succeeds after actual read/session completion; a selected capture's failed ticket cleanup exposes the exact-operation
+handle and leaves a live same-Context reader's ticket/share untouched through retry. The current-generation, both
+internal topics, gap/index-only and first-/second-generation restart paths all use the mandatory scoped entry.
+Returned snapshots do not create M4 terminal/proof or RELEASED records, and old source protections remain intact.
+
+Preflight passed 23 tasks (`/tmp/nereus-m5-selected-owner-preflight.log`). The first bound attempt
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-11027` stopped in the lifecycle design check after 29 tasks:
+an added implementation note changed the hash-bound writer matrix. That note was removed, restoring the exact
+original bytes; current implementation notes remain in current contracts/projections/log only. The lifecycle
+preflight then passed all 11 tasks (`/tmp/nereus-m5-selected-owner-lifecycle-preflight.log`). No failed native phase
+is counted as evidence. The already completed legacy run's entire 730-input map was reverified unchanged before
+reuse by the new runner; copied legacy summary/manifest and every archived XML were revalidated again at completion.
+
+Final bound execution passed 93/93 main tasks in 3m9s, 26 first-restart JVM tasks (six executed) in 35s, and 16
+occupied-Cell restart JVM tasks (one executed) in 6s. It archives 25 suites / 102 cases and phases. The independent
+legacy run archives 21 suites / 82 cases and phases, including retained-data restart. All have zero failures, errors
+and skips. Logs: `/tmp/nereus-m5-selected-owner-native.log` (failed bound attempt after successful legacy) and
+`/tmp/nereus-m5-selected-owner-native-final.log` (successful bound run).
+
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-11057`. Its 730-input manifest SHA is
+`ecb3b2a489a359cb1584ec5291a38f6a91e44a36da36fad542c9dbf76a9485aa`; summary SHA
+`f1a6f55e959ab658436822f246c83d2cf2ee809eff2b5a40e0443001ab43737b`. The same Oxia container
+`d8b1c5a903804bc1e41f8d0452f3361acd231526718a97cc9bd19f5badc62e6b` restarted from `2026-09-22T09:53:42.87306068Z`
+to `2026-09-22T09:55:54.613982422Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-34970`. Its 745-input manifest SHA is
+`b863f3549db669d6a42239439758e0a1088369f9b7aaa65aedc65e0ac4f17f81`; summary SHA
+`5336052937fa875e8a554fa8a6e763dc551c2f759e03612bde6a66a8c5229066`. The same Oxia container
+`bb80feb237b7de0d80baca3631f96986f1d107827c6c41492f1b0b5c9973cb2f` restarted from `2026-09-22T09:58:45.340931209Z`
+to `2026-09-22T10:02:08.981240845Z`, then to `2026-09-22T10:02:57.445320548Z` for occupied-Cell recovery.
+Exact ZooKeeper/bookie container and image IDs stayed stable with changed start times. Every input, XML and occupied
+Cell checkpoint hash was independently verified by `/tmp/nereus-m5-selected-owner-verify.py`, producing
+`/tmp/nereus-m5-selected-owner-verified.json`. Both projections now reference this exact source/archive tuple.
+Final documentation, frozen design/M4 dependency, lifecycle, coordinator, materialization and Kafka contract/source
+checks passed 19/19 tasks (`/tmp/nereus-m5-selected-owner-final-check.log`). Owning runners cleaned their containers;
+the unrelated connector remains. All 17 obligations remain OPEN/null, and the three M6-deferred rows remain
+PLANNED/null in both registries.
+
+Raw NBKE2 source capture, complete read-population/native-owner admission, retained result caches, backend buffers,
+metadata-I/O budgeting, crash/drain reconstruction and actual M4 RELEASED remain required. No acceptance obligation,
+M5-E child, Final or production authority is closed by this integration; M6/M7/M8 boundaries remain unchanged.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

@@ -237,7 +237,7 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   generation can enter the semantic compiler with no invented data batch. Native verification passed exact M4
   fallback closure, new source protection and second publication while retaining old PROTECTED records. Complete M4
   release, mixed catalogs, native owner admission and deletion remain OPEN.
-  The final run passed 90 archived cases/phases plus 71 independent legacy cases/phases, with both source maps unchanged.
+  The current run passed 102 archived cases/phases plus 82 independent legacy cases/phases, with both source maps unchanged.
   First-generation checkpoints are retained; four separate second-generation checkpoints now pass fresh-JVM native
   descriptor/task recovery for the user topic, both internal topics and index-only output, without republishing.
   New fallback protection starts at the introduced E+1, while existing fallback identities inherit their earlier first
@@ -250,8 +250,10 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   termination. Six owner tests, seven unchanged M4 recovery tests and three native owner cases pass within the current
   102-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
   termination, an exact-operation retry handle can finish unresolved physical ticket cleanup without clearing a live
-  same-Context reader; unknown close grants no handle. It creates no M4 terminal or RELEASED record; global process
-  admission, full cache/transport budgeting and crash reconciliation remain required.
+  same-Context reader; unknown close grants no handle. Selected-generation compaction capture/resolution now requires
+  the same shared budget and uses the scoped owner's M4 planner/hazard/session lifetime, including native restart.
+  It creates no M4 terminal or RELEASED record; raw-run and global process admission, full cache/transport budgeting
+  and crash reconciliation remain required.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

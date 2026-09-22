@@ -420,7 +420,19 @@ claimed. Its canonical SourceExtent body/length/hash describe the exact immutabl
 come from independently verified native parts. A generation carries no fabricated single-ledger identity. All physical
 members receive read tickets before opening; the owned session drains/closes before releasing this invocation's tickets.
 The current admitted M4 selector and descriptor must be unchanged after capture. Record count/decoded bytes share one
-generation budget; decoding runs on the supplied owner executor. Complete Cell cache/codec/I/O accounting remains OPEN.
+generation budget; decoding runs on the supplied owner executor. `capture()` and complete-plan `resolve()` now use
+`KafkaBookKeeperReadOwnerV2`, rather than a separate direct-session path. The constructor requires the admitted
+owner's shared `KafkaBookKeeperReadCellBudgetV2`; one capture reserves one owner/read slot plus its configured
+encoded/decoded allowances. Initial bounded selector/descriptor discovery identifies the Binding before reservation;
+physical ticket/session/native-read work follows reservation. The same M4 planner/hazard and actual session-drain
+path protects direct scoped reads and compaction input capture. Exact selector/descriptor revalidation still occurs
+before returning a snapshot. Confirmed-drain ticket cleanup failures retain the exact-operation retry handle.
+
+A held ordinary scoped reader can exhaust the same Binding share and prevent a selected-source capture from acquiring
+a second physical ticket; after known native completion the capture succeeds and returns its share. Failed selected
+capture cleanup can be retried without discharging a live same-Context reader. The native generation and index-only
+restart cases use this same mandatory path. Raw NBKE2 run capture, complete read-population admission, retained result
+caches, provider buffers and metadata-I/O budgeting remain separate required work.
 
 Only typed zero-record generations can supply an empty compaction input list; all eight indexes and the gap root still
 must verify. M5-A Object materialization, the Object-facing compactor and unguarded BK publication reject this source
@@ -438,10 +450,10 @@ Existing fallback identities retain their original first epochs and exact set di
 identities at both publications and after both generations' restart; the unit proof/release case uses synthetic drain
 facts only. Actual M4 RELEASED and admitted native read-owner drain remain OPEN.
 
-The final native run passed 89 executed main tasks and a separate 22-task restart JVM (three executed), with 90
-archived cases/phases and no failures/errors/skips. The independent legacy regression passed 71 cases/phases. Both
-the 725-input map and 702-input legacy map were independently unchanged, including the amended descriptor checker and
-its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
+The current native run passed 93 executed main tasks, a separate 26-task restart JVM (six executed) and a second
+16-task occupied-Cell restart JVM (one executed), with 102 archived cases/phases and no failures/errors/skips.
+The independent legacy regression passed 82 cases/phases. Both the 745-input map and 730-input legacy map were
+independently unchanged, including the amended descriptor checker and its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
 now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route
 loads the current native descriptor and immutable task; the checkpoint supplies only client configuration and expected
 hashes. Exact source extent, selector, all data/index parts and old PROTECTED records survive restart. Both control

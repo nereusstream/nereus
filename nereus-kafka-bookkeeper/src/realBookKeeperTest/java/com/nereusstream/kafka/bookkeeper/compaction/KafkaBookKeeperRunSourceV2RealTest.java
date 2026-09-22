@@ -445,6 +445,17 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                 KafkaBookKeeperReadOwnerV2::recover)))
                         .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
                 assertThat(sessionCreations.get()).isEqualTo(1);
+                var selectedCapture = new KafkaBookKeeperSelectedSourceV2(
+                        budget,
+                        first.context.store,
+                        first.context.m4,
+                        first.output,
+                        guard,
+                        bounds,
+                        first.context.owner);
+                assertThatThrownBy(() -> await(selectedCapture.capture()))
+                        .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+                assertNativeReadTickets(slow, firstDescriptor, 1);
                 var recovered = await(KafkaBookKeeperReadOwnerV2.run(
                         budget,
                         secondDescriptor,
@@ -471,6 +482,9 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         .hasRootCauseInstanceOf(java.util.concurrent.CancellationException.class);
                 assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
                 assertNativeReadTickets(slow, firstDescriptor, 0);
+                verifySelected(await(selectedCapture.capture()), firstDescriptor);
+                assertNativeReadTickets(slow, firstDescriptor, 0);
+                assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
             }
         }
     }
@@ -689,6 +703,31 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(sibling.toCompletableFuture()).isNotDone();
                 assertThat(budget.usage()).isEqualTo(charge);
                 assertThat(sessions.get()).isEqualTo(2);
+                dropRelease.set(true);
+                var selectedCapture = new KafkaBookKeeperSelectedSourceV2(
+                        budget,
+                        published.context.store,
+                        published.context.m4,
+                        published.output,
+                        guard,
+                        bounds,
+                        published.context.owner);
+                var captureFailure = await(selectedCapture.capture().handle((value, error) -> error));
+                while (captureFailure instanceof java.util.concurrent.CompletionException) {
+                    captureFailure = captureFailure.getCause();
+                }
+                assertThat(captureFailure).isInstanceOf(KafkaBookKeeperReadOwnerV2.TicketCleanupException.class);
+                var captureCleanup = (KafkaBookKeeperReadOwnerV2.TicketCleanupException) captureFailure;
+                assertThat(captureCleanup.operationId()).isNotEqualTo(cleanup.operationId());
+                assertNativeReadTickets(f, descriptor, 2);
+                assertThat(budget.usage()).isEqualTo(charge);
+                dropRelease.set(false);
+                assertThat(await(captureCleanup.reconcileTickets())).isEmpty();
+                assertNativeReadTickets(f, descriptor, 1);
+                assertThat(sibling.toCompletableFuture()).isNotDone();
+                verifySelected(await(selectedCapture.capture()), descriptor);
+                assertNativeReadTickets(f, descriptor, 1);
+                assertThat(budget.usage()).isEqualTo(charge);
                 lifetime.complete("live sibling terminated");
                 assertThat(await(sibling)).isEqualTo("live sibling terminated");
                 assertNativeReadTickets(f, descriptor, 0);
@@ -882,7 +921,13 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                 .isEqualTo(previous.semantic().outputBatches());
                         assertThat(view.gaps()).isEqualTo(previous.semantic().gaps());
                         assertThat(view.allowsPredecessorOffset(0)).isFalse();
+                        var share = new KafkaBookKeeperReadCellBudgetV2.Usage(1, 1, 1000000, 500000);
+                        var budget = new KafkaBookKeeperReadCellBudgetV2(
+                                descriptor.task().capability().providerScopeId(),
+                                share,
+                                java.util.Map.of(context.binding, share));
                         var selected = await(new KafkaBookKeeperSelectedSourceV2(
+                                        budget,
                                         context.store,
                                         context.m4,
                                         output,
@@ -1161,6 +1206,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
     private static KafkaBookKeeperSelectedSourceV2 selectedReader(
             Fixture f, Published published, int records, long decodedBytes) {
         return new KafkaBookKeeperSelectedSourceV2(
+                published.readBudget,
                 published.context.store,
                 published.context.m4,
                 published.output,
@@ -1331,6 +1377,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
         final KafkaBookKeeperCompactionTestSupportV2.Input input;
         final M5BookKeeperNativeCreateClientV2 output;
         final NativeContext context;
+        final KafkaBookKeeperReadCellBudgetV2 readBudget;
 
         Published(Fixture f, KafkaBookKeeperCompactionTestSupportV2.Input input, String root) throws Exception {
             this.f = f;
@@ -1341,6 +1388,11 @@ class KafkaBookKeeperRunSourceV2RealTest {
                     KafkaBookKeeperNativeCreateV2RealTest.spec(input),
                     f.binding);
             context = new NativeContext(input.layout().task(), root, output.newSession());
+            var share = new KafkaBookKeeperReadCellBudgetV2.Usage(1, 1, 1000000, 500000);
+            readBudget = new KafkaBookKeeperReadCellBudgetV2(
+                    input.layout().task().capability().providerScopeId(),
+                    share,
+                    java.util.Map.of(context.binding, share));
         }
 
         KafkaSealedBookKeeperDescriptorV2 writeAndPublish(KafkaBookKeeperPublicationTicketsV2.InputMembership source)

@@ -22,13 +22,9 @@ import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Inp
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
-import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
-import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Completion;
-import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Context;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
-import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
@@ -46,7 +42,8 @@ import java.util.concurrent.Executor;
  * Captures the current native selected BK generation, including all data/index ledgers and gap-only output.
  * SourceExtent's canonical body is its immutable descriptor; input batches come from independently verified parts.
  * The supplied stores must be the admitted native Binding route. Protocol semantics and M4 fallback retirement
- * remain owner obligations. This reader never changes selection or clears tickets belonging to an older process.
+ * remain owner obligations. Captures use the scoped M4 read owner and its caller-supplied shared Cell budget.
+ * This reader never changes selection or clears tickets belonging to an older process.
  */
 public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPublicationTicketsV2.InputMembership {
     public record Bounds(int entries, int batches, int records, int encodedBytes, long decodedBytes) {
@@ -80,8 +77,7 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
 
     private record Selected(BindingReadSelector selector, KafkaSealedBookKeeperDescriptorV2 descriptor) {}
 
-    private record ReadOutcome(Snapshot snapshot, Throwable failure) {}
-
+    private final KafkaBookKeeperReadCellBudgetV2 budget;
     private final CanonicalControlMetadataStore store;
     private final M4ReadControlCoordinatorV1 m4;
     private final M5BookKeeperNativeCreateClientV2 client;
@@ -90,12 +86,14 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
     private final Executor owner;
 
     public KafkaBookKeeperSelectedSourceV2(
+            KafkaBookKeeperReadCellBudgetV2 budget,
             CanonicalControlMetadataStore store,
             M4ReadControlCoordinatorV1 m4,
             M5BookKeeperNativeCreateClientV2 client,
             M5TargetDeleteMultiWriterGuardV2 guard,
             Bounds bounds,
             Executor owner) {
+        this.budget = Objects.requireNonNull(budget, "budget");
         this.store = Objects.requireNonNull(store, "store");
         this.m4 = Objects.requireNonNull(m4, "m4");
         this.client = Objects.requireNonNull(client, "client");
@@ -112,60 +110,26 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
                             descriptor.task().namespace(),
                             part.handle().ledgerIdentity().ledgerId()))
                     .toList();
-            var context = new Context(
-                    ProofBoundWriterClassV1.OWNER_WORKER_LEASE_HANDLE_PIN_V1,
-                    client.capabilitySnapshot().configurationDigest(),
-                    Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selected.selector())),
-                    descriptor.descriptorSha256());
-            return guard.execute(resources, context, () -> {
-                        var reads = client.newSession();
-                        CompletionStage<Snapshot> scan;
-                        try {
-                            var reader = new KafkaSealedBookKeeperReaderV2(
-                                    reads,
-                                    client::captureExactTarget,
-                                    bounds.encodedBytes(),
-                                    new KafkaSealedBookKeeperReaderV2.DecodingBounds(
-                                            bounds.records(), bounds.decodedBytes()),
-                                    owner);
-                            scan = reader.recover(descriptor)
-                                    .thenApplyAsync(
-                                            view -> {
-                                                if (!selected.equals(selected())) {
-                                                    throw new IllegalStateException(
-                                                            "selected source changed during native capture");
-                                                }
-                                                return snapshot(selected, resources, view);
-                                            },
-                                            owner);
-                        } catch (RuntimeException failure) {
-                            scan = CompletableFuture.failedFuture(failure);
-                        }
-                        return scan.handle(ReadOutcome::new).thenCompose(outcome -> reads.closeAsync()
-                                .thenApply(ignored -> new Completion<>(
-                                        outcome,
-                                        Optional.of(Sha256Digest.hash(CanonicalBytes.copyOf(ByteBuffer.allocate(36)
-                                                .putInt(0x4d355343)
-                                                .put(descriptor
-                                                        .descriptorSha256()
-                                                        .bytes()
-                                                        .toByteArray())
-                                                .array()))))));
-                    })
-                    .thenCompose(result -> {
-                        if (!result.mutationInvoked() || result.value().isEmpty()) {
-                            return CompletableFuture.failedFuture(
-                                    new IllegalStateException("selected source physical admission failed"));
-                        }
-                        if (!result.unresolvedTargets().isEmpty()) {
-                            return CompletableFuture.failedFuture(
-                                    new IllegalStateException("selected source ticket release is unresolved"));
-                        }
-                        var outcome = result.value().orElseThrow();
-                        return outcome.failure() == null
-                                ? CompletableFuture.completedFuture(outcome.snapshot())
-                                : CompletableFuture.failedFuture(outcome.failure());
-                    });
+            return KafkaBookKeeperReadOwnerV2.run(
+                    budget,
+                    descriptor,
+                    m4,
+                    guard,
+                    client::newSession,
+                    client::captureExactTarget,
+                    owner,
+                    bounds,
+                    1,
+                    reader -> reader.recover()
+                            .thenApplyAsync(
+                                    recovered -> {
+                                        if (!selected.equals(selected())) {
+                                            throw new IllegalStateException(
+                                                    "selected source changed during native capture");
+                                        }
+                                        return snapshot(selected, resources, recovered.view());
+                                    },
+                                    owner));
         });
         // Observer cancellation cannot abandon accepted reads, owned session close or this invocation's tickets.
         return work.thenApply(value -> value);
