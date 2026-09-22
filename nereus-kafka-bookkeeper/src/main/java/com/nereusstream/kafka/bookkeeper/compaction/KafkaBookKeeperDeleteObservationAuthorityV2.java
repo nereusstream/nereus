@@ -205,6 +205,7 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
         }
         CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireExactIntent(metadata, exactIntent)
                 .thenCompose(ignored -> requireCurrent(resource, context))
+                .thenCompose(ignored -> requireFreshEligibility(metadata, intent))
                 .thenCompose(
                         ignored -> reader.rereadTarget(intent.externalIdentity().orElseThrow()))
                 .thenCompose(target -> {
@@ -225,9 +226,28 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
                     });
                 })
                 .thenCompose(bound -> requireCurrent(resource, context)
+                        .thenCompose(ignored -> requireFreshEligibility(metadata, intent))
                         .thenCompose(ignored -> requireExactIntent(metadata, exactIntent))
                         .thenApply(ignored -> bound));
         return operation.thenApply(value -> value);
+    }
+
+    private CompletionStage<Void> requireFreshEligibility(
+            ExactMetadataTransactionStoreV1 metadata,
+            com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1 intent) {
+        CompletionStage<Void> checked = CompletableFuture.completedFuture(null);
+        for (var fact : intent.eligibilitySnapshot().orElseThrow().authorityFacts()) {
+            checked = checked.thenCompose(ignored -> metadata.read(fact.key()).thenAccept(observed -> {
+                var actual = observed.orElseThrow(() ->
+                        new IllegalStateException("native intent eligibility authority is absent: " + fact.key()));
+                if (!actual.key().equals(fact.key())
+                        || !actual.metadataVersion().equals(fact.metadataVersion())
+                        || !actual.canonicalStoredSha256().equals(fact.valueSha256())) {
+                    throw new IllegalStateException("native intent eligibility authority changed: " + fact.key());
+                }
+            }));
+        }
+        return checked;
     }
 
     private CompletionStage<Void> requireExactIntent(

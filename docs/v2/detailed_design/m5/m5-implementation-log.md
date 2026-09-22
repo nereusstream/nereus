@@ -2151,6 +2151,54 @@ freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka contract
 All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final
 or production authority is created.
 
+## 2026-09-22 native intent eligibility revalidation
+
+Status: implemented complete pre/post binding eligibility reads; locked native validation passed; NON_PROMOTABLE.
+
+Inspection of the grace path found that native intent binding rechecked exact M5 intent and native owner/identity,
+but did not reread its eligibility fact vector. The Kafka native binding adapter now checks every deduplicated fact's
+key, opaque native version and canonical SHA before native identity/binding and again before returning success.
+Missing or changed facts before binding prevent native intent creation; changes after binding retain the old native
+record while failing the observer. Existing owner/intent/native-ledger validation and bounded recovery remain intact.
+
+The new real BK/Oxia case changes an audit/grace row before binding and an M4 row after binding, with identical
+stored bytes but newer actual Oxia versions. The M5 intent and native GC epoch remain unchanged; the pre-write case
+leaves no native intent, while the post-write case retains the exact old binding and the live fixture ledger.
+The public bound-route case additionally rejects a stale audit fact and requires a complete snapshot refresh before
+binding succeeds. The existing changed-M5-intent test now hooks only reads of the exact intent key, preserving its
+intended post-binding race while allowing the new eligibility reads. Its replacement snapshot is prepared outside
+the asynchronous callback: an initial run exposed a fixture-only synchronous metadata wait on the Oxia event thread
+after the callback moved behind the new fact reads. The fixture was corrected before final native validation.
+
+Final locked native validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`:
+legacy 96/96 main tasks (1m 55s), 24/24 restart tasks (12s), 21 archives / 82 cases and phases;
+bound-profile 93/93 main tasks (3m 10s), 23/23 restart tasks (30s), 22 archives / 95 cases and phases.
+Log: `/tmp/nereus-m5-native-facts-real-final.log`.
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-85776`. Its 726-input manifest SHA is
+`70e5ae349ab528db85ebf7fc6bdac5e1a516f46d686027b6d3959af0cf5906fa`; summary SHA
+`8bdf68c8e8361ffc99bdfef5a6e7527218e2fd2bed02beaca66ea0f3f8e875df`. The same legacy Oxia
+`40709b5f47d20be07b303453f9bf40f83cf1b1cdf2fef9e9ff94c7791fd5c669` restarted from `2026-09-22T07:04:29.818018759Z`
+to `2026-09-22T07:06:38.846036638Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-85764`. Its 741-input manifest SHA is
+`c24ed0641048169f570cea68865ffc2ce6d4936527d86edb7bc5b73d01b7ddeb`; summary SHA
+`a104afe208212bcc329ae45ba0df77915058cbd9a895a1a68baeb2a305f01b09`. The same bound Oxia
+`a46572aa3324dcafc155e89160e2dd5e47c9ff96a297b951191b4574c458cf8b` restarted from `2026-09-22T07:07:15.758439544Z`
+to `2026-09-22T07:10:40.345396166Z`.
+Both runs retained all four exact ZooKeeper/bookie container IDs and image IDs with changed start times. Every
+captured source and archived XML was independently rehashed; all suites have zero failures, errors and skips. The
+copied legacy summary/manifest are byte-identical. Both new phase-sensitive native fact mutations and the public
+bound audit-fact repair passed. All owned containers were cleaned up; unrelated connector retained. Initial compile/
+style checks passed 22 tasks (`/tmp/nereus-m5-native-facts-compile.log`); the fixture correction passed 21 tasks
+(`/tmp/nereus-m5-native-facts-compile-final.log`) before the full locked rerun. Final documentation, historical
+freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka contract/source checks passed 19/19 tasks
+(`/tmp/nereus-m5-native-facts-final-check.log`).
+
+These tests use synthetic protocol/M4/audit statements in actual native stores. No admitted authority-time producer,
+clock-bound evidence, complete native reference scan, Cell dispatch/unknown budget or full dispatcher is supplied.
+Numeric grace fields or local/server wall-clock observations are not promoted into native grace authority. All 17
+acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, Final or production
+authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

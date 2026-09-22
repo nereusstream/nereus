@@ -56,7 +56,7 @@ for path,sha in json.loads(inputs).items():
     candidate=(root/path).resolve()
     if not candidate.is_relative_to(root.resolve()) or hashlib.sha256(candidate.read_bytes()).hexdigest()!=sha:
         raise SystemExit('Legacy tested source changed: '+path)
-if sum(suite['tests'] for suite in summary['suites'])!=81:
+if sum(suite['tests'] for suite in summary['suites'])!=82:
     raise SystemExit('Legacy focused suite count differs')
 for suite in summary['suites']:
     data=(previous/(suite['task']+'.xml')).read_bytes(); actual=ET.fromstring(data)
@@ -204,7 +204,7 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeGcCanonicalCapacityAtomicallyReserved':True,
+summary={'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcCanonicalCapacityAtomicallyReserved':True,
     'nativeGcCapacitySurvivedRestartAndDone':True,'existingNativeIntentContinuesAtCapacity':True,
     'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
     'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,

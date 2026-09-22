@@ -104,13 +104,28 @@ Kafka/Pulsar protocol semantics, replacement coverage or M4 RELEASED.
 epoch, M5 dispatch token, exact M5 authority SHA and full ledger metadata SHA. An identical retry reconciles the same
 record; changing any bound identity under the same native epoch fails closed. A successor epoch replaces only this
 bounded record by exact native CAS. `bindIntent` on the Kafka adapter rereads the exact current M5 intent, validates
-native owner/capability, reads full native identity, binds the native record, then revalidates owner and exact M5
-metadata. If M5 changes during binding, the old binding remains for explicit epoch/observation recovery. Native
+native owner/capability and every bound eligibility fact, reads full native identity, binds the native record, then
+revalidates owner, every eligibility fact and exact M5 metadata. If M5 changes during binding, the old binding remains for explicit epoch/observation recovery. Native
 delete using this binding atomically checks both epoch and intent versions with the ledger metadata version, and
 revalidates current native binding before reporting. Epoch and intent survive ledger absence; neither is recreated
 from a checkpoint or appended as per-attempt history.
 
-Three real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch refresh, forged/shadowed native fact
+Native intent binding rereads the complete deduplicated eligibility vector on both sides of native binding, including
+namespace/member inventory, logical floors, selector/manifest/trim, all M4 RELEASED records, every physical reference
+(including audit/grace), protocol semantic transfers, and task/adoption facts where applicable. Reads must match the
+exact key, native metadata version and canonical SHA; equal bytes at a newer version are stale. A missing/changed
+pre-binding fact prevents native intent creation. A post-binding change fails the caller while retaining the permanent
+native binding, so a successful earlier binding cannot be presented as current eligibility. The bound route uses this
+same validation. Qualified snapshot refresh repairs the stale fact vector; a changed native token still requires a
+new native epoch if an earlier native binding exists.
+
+The native regression changes an audit/grace fact before binding and an M4 fact after binding while preserving their
+bytes and the exact M5 intent. Public bound admission also rejects a stale audit fact and resumes only after a full
+snapshot refresh. These are freshness tests using synthetic protocol/M4/audit statements in real Oxia. They do not
+establish an admitted authority-time service, clock bounds, a complete reference scan or dispatch capacity. Grace's
+numeric deadline/observed-time fields alone are not proof of native time authority; that producer remains OPEN.
+
+Real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch refresh, forged/shadowed native fact
 rejection, exact intent binding and changed-M5-intent recovery. One fixture performs the bound low-level native delete
 and current-owner absence completion/compaction; protocol/M4 eligibility remains synthetic and M4 selection remains
 unchanged. The adapter does not prove grace or reserve Cell dispatch/unknown capacity. Native epoch/intent canonical

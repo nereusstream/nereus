@@ -81,9 +81,41 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThatThrownBy(() -> await(gc.bindIntent(raw, intent)))
                     .hasRootCauseMessage("native physical namespace route admission is not installed");
             assertThat(await(f.source.deleteAuthority(handle).readIntent())).isEmpty();
-            var nativeIntent = await(gc.bindIntent(route, intent));
+            var proof = M5TargetDeleteAuthorityCodecV1.decodeAuthority(intent.canonicalStoredBytes())
+                    .eligibilitySnapshot()
+                    .orElseThrow()
+                    .members()
+                    .get(0)
+                    .physicalReferences();
+            var grace = proof.observations().stream()
+                    .filter(row -> row.kind()
+                            == com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceKindV1
+                                    .AUDIT_GRACE)
+                    .findFirst()
+                    .orElseThrow()
+                    .authority();
+            var semanticFacts = new Oxia09ExactMetadataTransactionStoreV1(f.oxia);
+            var originalGrace = await(semanticFacts.read(grace.key())).orElseThrow();
+            await(semanticFacts.compareAndSet(
+                    Optional.of(originalGrace), grace.key(), originalGrace.canonicalStoredBytes()));
+            assertThatThrownBy(() -> await(gc.bindIntent(route, intent)))
+                    .hasRootCauseMessage("native intent eligibility authority changed: " + grace.key());
+            assertThat(await(f.source.deleteAuthority(handle).readIntent())).isEmpty();
+            var refreshedObservation = await(gc.observe(2, Optional.of(observation)));
+            var refreshed = await(coordinator.refreshDispatch(
+                            intent,
+                            refreshedObservation,
+                            SyntheticDeleteAuthorityFixturesV2.replacement(
+                                    resource,
+                                    M5TargetDeleteAuthorityCodecV1.decodeAuthority(intent.canonicalStoredBytes())
+                                                    .authorityRevision()
+                                            + 1,
+                                    facts)))
+                    .observed()
+                    .orElseThrow();
+            var nativeIntent = await(gc.bindIntent(route, refreshed));
             assertThat(nativeIntent.epoch()).isEqualTo(epoch);
-            assertThat(nativeIntent.intentAuthoritySha256()).isEqualTo(intent.canonicalStoredSha256());
+            assertThat(nativeIntent.intentAuthoritySha256()).isEqualTo(refreshed.canonicalStoredSha256());
             assertThat(await(route.requireActiveResource(resource))).isEqualTo(f.binding);
             assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isPresent();
         }

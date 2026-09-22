@@ -37,10 +37,13 @@ terminal reconciliation; physical-delete dispatch and full native owner/proof in
 The guarded BK native delete primitive now supplies permanent resource-scoped GC epochs and atomic server checks
 for namespace/task/reservation/epoch plus the exact ledger metadata version. The task-terminal runner includes
 `v2M5NativeDeleteRealTest` and separate `v2M5NativeDeleteRestartWriteTest` / `v2M5NativeDeleteRestartReadTest` phases.
-Its 21 archived suites contain 81 cases/phases; the bound run-source runner requires and rehashes this independent
-81-case archive. `v2M5BookKeeperNativeDeleteAuthorityRealTest` supplies actual native GC owner/capability facts to
+Its 21 archived suites contain 82 cases/phases; the bound run-source runner requires and rehashes this independent
+82-case archive. `v2M5BookKeeperNativeDeleteAuthorityRealTest` supplies actual native GC owner/capability facts to
 READ_FENCED/INTENT recovery and binds the exact stored M5 intent/token to a permanent native intent record. Every
 changed token requires a newer GC epoch; actual native deletion checks intent version and ledger version atomically.
+Native binding revalidates every eligibility fact before and after its native write. An additional real case changes
+audit/grace and M4 fact versions without changing their bytes or the M5 intent; the public bound case repairs only
+through full snapshot refresh. This is fact freshness, not native authority-time or protocol proof qualification.
 The bound run-source runner now adds `v2M5BoundDeleteRealTest` and independent bound-delete restart write/read
 phases: 21 archives / 93 cases and phases. Public GC claim/bind require `BoundPhysicalDeleteAuthorityRouteV2`,
 actual native namespace equality and an active quota-reserved M5 authority. Manually constructed routes, missing

@@ -181,15 +181,13 @@ class KafkaBookKeeperNativeDeleteAuthorityV2RealTest {
             var sameNativeEpoch = await(authority.observe(2, Optional.of(observation)));
             var reads = new AtomicInteger();
             var replacement = new CompletableFuture<VersionedValue>();
+            var refreshedEligibility =
+                    SyntheticDeleteAuthorityFixturesV2.replacement(fixture.resource, 4, fixture.fact);
             var delayedMetadata = new ExactMetadataTransactionStoreV1() {
                 public CompletionStage<Optional<VersionedValue>> read(String key) {
-                    if (reads.incrementAndGet() == 2) {
+                    if (key.equals(intent.key()) && reads.incrementAndGet() == 2) {
                         return coordinator
-                                .refreshDispatch(
-                                        intent,
-                                        sameNativeEpoch,
-                                        SyntheticDeleteAuthorityFixturesV2.replacement(
-                                                fixture.resource, 4, fixture.fact))
+                                .refreshDispatch(intent, sameNativeEpoch, refreshedEligibility)
                                 .thenCompose(result -> {
                                     replacement.complete(result.observed().orElseThrow());
                                     return route.read(key);
@@ -232,6 +230,88 @@ class KafkaBookKeeperNativeDeleteAuthorityV2RealTest {
                     .isEqualTo(recovered.canonicalStoredSha256());
             assertThat(await(fixture.client.captureExactTarget(fixture.handle)).exactTarget())
                     .isPresent();
+        }
+    }
+
+    @Test
+    void changedGraceAndM4FactsRejectBindingEvenWhenIntentAndFactBytesAreUnchanged() throws Exception {
+        for (boolean afterBinding : java.util.List.of(false, true)) {
+            try (var fixture = new Fixture(afterBinding ? 1005 : 1004)) {
+                var authority = fixture.authority(fixture.client, UUID.randomUUID());
+                var epoch = await(authority.claim(Optional.empty()));
+                var observation = await(authority.observe(1, Optional.empty()));
+                var route = fixture.route(authority);
+                var coordinator = fixture.coordinator(authority, route);
+                var intent = fixture.intent(coordinator, observation);
+                var member = M5TargetDeleteAuthorityCodecV1.decodeAuthority(intent.canonicalStoredBytes())
+                        .eligibilitySnapshot()
+                        .orElseThrow()
+                        .members()
+                        .get(0);
+                var proof = member.physicalReferences();
+                var fact = afterBinding
+                        ? proof.m4Releases().get(0).protectionAuthority()
+                        : proof.observations().stream()
+                                .filter(row -> row.kind()
+                                        == com.nereusstream.storage.object.retention.M5RetentionRecordsV1
+                                                .ReferenceKindV1.AUDIT_GRACE)
+                                .findFirst()
+                                .orElseThrow()
+                                .authority();
+                var original = await(fixture.facts.read(fact.key())).orElseThrow();
+                var reads = new AtomicInteger();
+                if (!afterBinding) {
+                    await(fixture.facts.compareAndSet(
+                            Optional.of(original), fact.key(), original.canonicalStoredBytes()));
+                }
+                var watched = new ExactMetadataTransactionStoreV1() {
+                    public CompletionStage<Optional<VersionedValue>> read(String key) {
+                        if (afterBinding && key.equals(fact.key()) && reads.incrementAndGet() == 2) {
+                            return fixture.client
+                                    .deleteAuthority(fixture.handle)
+                                    .readIntent()
+                                    .thenCompose(nativeIntent -> {
+                                        assertThat(nativeIntent).isPresent();
+                                        return fixture.facts
+                                                .compareAndSet(
+                                                        Optional.of(original),
+                                                        fact.key(),
+                                                        original.canonicalStoredBytes())
+                                                .thenCompose(ignored -> route.read(key));
+                                    });
+                        }
+                        return route.read(key);
+                    }
+
+                    public CompletionStage<MutationOutcome> compareAndSet(
+                            Optional<VersionedValue> previous, String key, CanonicalBytes candidate) {
+                        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+                    }
+
+                    public CompletionStage<TransactionOutcome> conditionalTransaction(ExactTransaction transaction) {
+                        return CompletableFuture.completedFuture(TransactionOutcome.UNSUPPORTED);
+                    }
+
+                    public boolean supportsAtomicMultiKeyTransactions() {
+                        return false;
+                    }
+                };
+                assertThatThrownBy(() -> await(authority.bindIntent(watched, intent)))
+                        .hasRootCauseMessage("native intent eligibility authority changed: " + fact.key());
+                var changed = await(fixture.facts.read(fact.key())).orElseThrow();
+                assertThat(changed.canonicalStoredSha256()).isEqualTo(original.canonicalStoredSha256());
+                assertThat(changed.metadataVersion()).isNotEqualTo(original.metadataVersion());
+                assertThat(await(route.read(intent.key()))).contains(intent);
+                var nativeAuthority = fixture.client.deleteAuthority(fixture.handle);
+                assertThat(await(nativeAuthority.read())).contains(epoch);
+                var nativeIntent = await(nativeAuthority.readIntent());
+                assertThat(nativeIntent.isPresent()).isEqualTo(afterBinding);
+                nativeIntent.ifPresent(
+                        value -> assertThat(value.intentAuthoritySha256()).isEqualTo(intent.canonicalStoredSha256()));
+                assertThat(await(fixture.client.captureExactTarget(fixture.handle))
+                                .exactTarget())
+                        .isPresent();
+            }
         }
     }
 

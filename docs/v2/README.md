@@ -35,6 +35,8 @@ performance-first BookKeeper WAL.
   clients and JVMs verify stale-owner/version rejection, lost replies and durable restart recovery. This native
   primitive now has a permanent native binding to an exact M5 intent/token and ledger fingerprint. Actual native
   GC owner/capability facts feed the coordinator through a read-only route; changed tokens require a new GC epoch.
+  Native intent binding rereads every eligibility fact before and after the native write, rejecting changed versions
+  even when their stored bytes and the M5 intent are unchanged.
   Public GC claim/bind now require the uniquely bound native authority route, an existing durable quota grant and
   active resource authority; manually configured metadata roots cannot qualify this entry. Restart recovery verifies
   the original M5 authority together with both native GC records. A separate native capacity head atomically charges

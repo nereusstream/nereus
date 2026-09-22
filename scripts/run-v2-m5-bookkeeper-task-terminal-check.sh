@@ -136,7 +136,7 @@ for module,task,name,count in (
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRealTest','M5BookKeeperNativeDeleteV2RealTest',4),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartWriteTest','M5BookKeeperNativeDeleteV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartReadTest','M5BookKeeperNativeDeleteV2RestartTest',1),
-    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeDeleteAuthorityRealTest','KafkaBookKeeperNativeDeleteAuthorityV2RealTest',3),
+    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeDeleteAuthorityRealTest','KafkaBookKeeperNativeDeleteAuthorityV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartWriteTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartReadTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
@@ -154,7 +154,7 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeGcOwnerAndCapabilityFacts':True,'nativeM5IntentTokenBinding':True,
+summary={'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcOwnerAndCapabilityFacts':True,'nativeM5IntentTokenBinding':True,
     'nativeIntentBindingSurvivedServerRestart':True,'nativeBkServerFencedDelete':True,'nativeGcEpochAndLedgerVersionCheckedAtomically':True,
     'nativeGcEpochSurvivedServerRestart':True,'nativeGcEpochHistoryBounded':True,
     'nativeBkIdentityRefreshAndAbsenceCompletion':True,'nativeDeleteProtocolOwnerAuthority':False,
