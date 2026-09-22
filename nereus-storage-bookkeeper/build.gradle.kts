@@ -191,3 +191,23 @@ tasks.register<Test>("v2M5NativeDeleteCellBudgetRealTest") {
                 ?: error("bound native BookKeeper URI is required for Cell delete budget verification"))
     }
 }
+
+mapOf("Write" to "writeBeforeServerRestart", "Read" to "readAfterServerRestart").forEach { (phase, method) ->
+    tasks.register<Test>("v2M5NativeDeleteCellRestart${phase}Test") {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RestartTest.$method") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri",
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                    ?: error("bound native BookKeeper URI is required for retained Cell restart verification"))
+            systemProperty("nereus.m5.nativeCell.restartCheckpoint",
+                providers.gradleProperty("v2M5NativeDeleteCellRestartCheckpoint").orNull
+                    ?: error("retained Cell restart checkpoint is required"))
+        }
+    }
+}

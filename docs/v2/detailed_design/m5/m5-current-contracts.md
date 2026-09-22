@@ -202,11 +202,27 @@ The bound fixture's restart checkpoint includes its empty Cell head hash and rer
 Two additional actual native tests verify cancelled held invocation, occupied-head equality through client reconnect,
 rejection of duplicate/full/foreign-Cell dispatch, independent configured Cells, release after known pre-dispatch
 failure and native completion, and terminal-unknown retention followed by read-only absence release. Intent token and
-M5 authority digests in those low-level fixtures are synthetic. Held calls across a server restart and qualified
-ACTIVE drain are not established by this empty-head restart check. These limits account logical native operations,
+M5 authority digests in those low-level fixtures are synthetic. The additional separate-JVM Cell restart phases
+below establish occupied-head persistence, while qualified ACTIVE drain remains OPEN. These limits account logical native operations,
 not transport buffers, per-Binding fairness/rates or total backend storage. Cell heads are not charged to the separate
 per-resource native quota; explicit per-Cell provisioning does not establish a global Cell-count budget. Protocol
 Cell ownership, grace and complete M5 dispatch composition remain required before whole-M5 acceptance.
+
+`M5BookKeeperDeleteCellBudgetV2RestartTest` begins after the original bound restart checks and lifecycle cases. It
+creates two actual three-byte sealed BK ledgers with native intent bindings. For ACTIVE, the real native delete is
+applied but its successful callback is withheld; cancelling its observer leaves an occupied ACTIVE head even though
+actual ledger metadata is absent. For UNKNOWN, a delete-only CONNECTIONLOSS is injected without forwarding the
+transaction; the exact ledger remains and the callback-terminal hold is retained. A second restart preserves the
+same ZooKeeper, three bookie and Oxia containers, images and data, with changed start times.
+
+The fresh JVM reads the original native head/epoch/intent hashes before any mutation. ACTIVE remains ineligible for
+unknown reconciliation despite native absence; UNKNOWN observes exact presence and remains charged. Both reject
+new deletion attempts without changing their heads. A new healthy configured Cell then creates, seals and deletes
+another real ledger; both occupied heads remain byte-identical afterward. Checkpoints contain fixture inputs and
+identity hashes; actual native records supply recovery observations. The runner archives both phase XMLs, hashes
+the checkpoint files and records both sets of service-restart identities/times. These checks establish conservative
+retention and configured-Cell isolation across service restart. They do not qualify transport-buffer drain or free
+ACTIVE capacity merely because the original JVM ended, nor supply per-Binding fairness or a complete dispatcher.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.

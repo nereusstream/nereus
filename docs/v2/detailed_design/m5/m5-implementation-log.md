@@ -2260,6 +2260,65 @@ server restart checks an empty head, so qualified ACTIVE drain/recovery and reta
 Native intent digests in the new low-level fixtures and protocol/M4/grace facts in the bound fixture remain synthetic.
 No M5-E child, source-bound Final, production deployment or benchmark authority is created.
 
+## 2026-09-22 occupied native Cell recovery across service restart
+
+Status: actual occupied-head recovery verification after `b89a824a535fc482c273e40fb1b6b4450c156913`;
+NON_PROMOTABLE. The runtime reservation protocol is unchanged. All 17 acceptance obligations remain OPEN/null;
+M6 012/013/022 remain PLANNED/null in both registries. Review 7/8 child ownership is unchanged.
+
+`M5BookKeeperDeleteCellBudgetV2RestartTest` adds separate write/read JVMs around a second actual restart of the same
+ZooKeeper, three bookie and Oxia containers. Both fixture resources begin as actual three-byte sealed BK ledgers.
+The ACTIVE case performs the actual native delete, then withholds its successful callback from the accepted
+invocation. Cancelling the observer leaves the head occupied despite native ledger absence. The UNKNOWN case
+injects delete-only CONNECTIONLOSS without forwarding that transaction, leaving exact ledger metadata present and
+the terminal-unknown head occupied. Checkpoints retain fixture inputs and native head/epoch/intent identity hashes;
+they supply no replacement authority and are independently hashed in the run summary.
+
+Fresh-JVM recovery rereads those native records before any mutation. ACTIVE cannot enter terminal-unknown
+reconciliation merely because its ledger is absent or its earlier process ended. UNKNOWN performs read-only native
+identity observation and remains reserved while the exact ledger exists. Both refuse another delete and keep the
+original head bytes. A fresh healthy configured Cell then creates, seals and actually deletes another ledger while
+both unresolved heads remain unchanged. The runner archives both additional phase XMLs and verifies both service
+restart timelines against exact retained container/image identities.
+
+A static `javap -c -p` inspection of the exact locked BK 4.18.0 client JAR (SHA-256
+`8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f`) confirms that `BookKeeper.close()` is not a
+complete transport-drain receipt: its scheduler/worker timeout branches only warn, owned event-loop shutdown does
+not await the returned future, and repeated close can return after the closed flag is set before the first close
+finishes. Inspection output is `/tmp/nereus-m5-cell-close-bytecode.txt`. This is bytecode evidence about the dependency
+contract, not a runtime drain test; no capacity release is authorized from close-return alone.
+
+An initial full run (`/tmp/nereus-m5-cell-restart-real.log`) passed the new phases. Review then tightened both ACTIVE
+absence assertions from an empty exact-target result to the explicit `DEFINITIVELY_ABSENT` outcome, excluding
+unknown/unsealed/changed-metadata reads. Final evidence comes from the subsequent full rerun of the tightened source.
+
+Final locked validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`: legacy 96/96 main tasks
+(1m 55s), 24/24 restart tasks (12s), 21 archives / 82 cases and phases; bound profile 93/93 main tasks (3m 13s),
+26/26 first-restart tasks (35s) and 16/16 occupied-head restart-read tasks (6s), 25 archives / 99 cases and phases.
+Log: `/tmp/nereus-m5-cell-restart-real-final.log`.
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-16408`. Its 729-input manifest SHA is
+`d7f8c4687dfe72c96eed65c8f8c8d0ef105c096c8c16968bdbc6de2d57cac227`; summary SHA
+`48f6939880ebb6f806eb720073f0b8906de15748bc8334c2fa299dcccfd36fe0`. Its same Oxia container
+`7467c2f5556002aac06286440533e0f6be086c3cc500464119419311135df8fa` restarted from `2026-09-22T08:09:56.577810715Z`
+to `2026-09-22T08:12:05.923299845Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-16395`. Its 744-input manifest SHA is
+`17cc74e834094cba825fee07932ba52052724daddf10b6943f53aea5cc5cbb99`; summary SHA
+`45ba0979a0670c3eae6961c67e56017fce34fc892adadd0d0a0b0b4decf2ba10`. Its same Oxia container
+`42940f364e8e7edafabc87f03dca4cc7a1aec690276999ddab989a0fa493bbba` restarted from `2026-09-22T08:12:42.357703792Z`
+to `2026-09-22T08:16:09.642160305Z`, then again to `2026-09-22T08:16:58.875934258Z` for occupied Cell recovery.
+All four ZooKeeper/bookie container IDs and image IDs were retained across both bound restarts and the legacy restart,
+with changed start times. Every captured input, archived XML and both Cell checkpoint hashes were independently
+rechecked; all suites have zero failures, errors and skips. The copied legacy summary/manifest are byte-identical.
+Only the owning runners' containers were removed; the unrelated connector remains. Initial and tightened real-test
+compilation/format/style checks each passed 14 tasks before their corresponding full native runs.
+Final documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-cell-restart-final-check.log`).
+
+This closes the occupied-head service-restart evidence gap for configured native Cell logical reservations. It does
+not prove transport-buffer reclamation, qualified ACTIVE drain/exit, per-Binding fairness/rates, native protocol Cell
+ownership or the complete dispatcher. Low-level intent/authority digests remain synthetic. No M5-E receipt, Final,
+benchmark or production authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

@@ -33,8 +33,10 @@ unchanged M5 intent bytes cannot mask newer audit/grace or M4 facts. Public GC c
 route and an active quota-reserved M5 authority, including after service restart. A separate permanent native quota
 head charges first epochs and future intents atomically, without refund on DONE. Bound native deletion also reserves
 both dispatch and possible-unknown slots in a permanent Cell head. Cancellation retains active reservations;
-callback-terminal unknowns can release only after read-only native absence reconciliation. Protocol eligibility,
-grace, backend provisioning, per-Binding/transport admission, qualified active-call recovery and complete dispatch
+callback-terminal unknowns can release only after read-only native absence reconciliation. Separate JVM phases
+across an additional service restart retain both ACTIVE and UNKNOWN records, while a healthy configured Cell still
+completes actual deletion. Protocol eligibility, grace, backend provisioning, per-Binding/transport admission,
+qualified active-call recovery and complete dispatch
 composition remain OPEN; this result creates no M5-E child or aggregate Final.
 
 ## Historical inputs and implementation predecessors

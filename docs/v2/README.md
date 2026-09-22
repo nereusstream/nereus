@@ -42,8 +42,10 @@ performance-first BookKeeper WAL.
   the original M5 authority together with both native GC records. A separate native capacity head atomically charges
   first epochs and their future intents; takeover and DONE retain that charge. Bound native deletion now also requires
   a permanent Cell head reserving both dispatch and possible-unknown slots before invocation. Observer cancellation
-  retains the reservation; callback-terminal unknowns require read-only native absence before release. Protocol
-  eligibility, grace, backend capacity provisioning, per-Binding/transport admission, qualified in-flight recovery
+  retains the reservation; callback-terminal unknowns require read-only native absence before release. Occupied
+  ACTIVE and UNKNOWN heads survive an additional actual service restart; a fresh JVM retains both and a healthy
+  configured Cell can still delete. Protocol eligibility, grace, backend capacity provisioning, per-Binding/transport
+  admission, qualified in-flight recovery
   and complete lifecycle dispatch composition remain required.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;

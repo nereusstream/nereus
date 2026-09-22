@@ -53,9 +53,12 @@ services restarting; a new GC owner refreshes intent before fixture deletion and
 95 cases and phases. The separate native quota reserves both permanent epoch and intent records at first claim,
 checks exact native head CAS in the same transaction and retains the reservation after DONE. Restart recovery runs
 at full capacity and verifies explicit expansion before new admission. `v2M5NativeDeleteCellBudgetRealTest` adds two
-bound native lifecycle cases, bringing the runner to 23 archives / 97 cases and phases. A permanent Cell head reserves
-dispatch and possible-unknown slots before native deletion; cancellation/reconnect retains active holds, and only
-callback-terminal unknowns admit read-only absence reconciliation. Protocol owner and eligibility proof production,
+bound native lifecycle cases. `v2M5NativeDeleteCellRestartWriteTest` / `v2M5NativeDeleteCellRestartReadTest` add
+occupied-head phases around a second actual service restart, bringing the runner to 25 archives / 99 cases and phases.
+A permanent Cell head reserves dispatch and possible-unknown slots before native deletion; cancellation/reconnect
+retains active holds, and only callback-terminal unknowns admit read-only absence reconciliation. ACTIVE and UNKNOWN
+records survive server restart unchanged; ledger absence alone does not release ACTIVE, while a healthy configured
+Cell completes actual deletion. Protocol owner and eligibility proof production,
 grace, unaccounted-namespace migration, backend provisioning, per-Binding shares/rates, transport accounting,
 qualified active-call recovery and complete dispatch remain required.
 

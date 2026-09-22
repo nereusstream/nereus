@@ -408,6 +408,7 @@ class M5BookKeeperNativeCreateV2RealTest {
         volatile boolean loseNextMulti;
         volatile boolean loseNextIntentMutation;
         volatile boolean dropNextDelete;
+        volatile boolean holdNextDeleteReply;
         volatile boolean loseNextSet;
         final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>
                 lostMultiDelivery = new java.util.concurrent.atomic.AtomicReference<>();
@@ -428,7 +429,12 @@ class M5BookKeeperNativeCreateV2RealTest {
                 Object context) {
             multis.incrementAndGet();
             boolean intentMutation = false;
+            boolean holdReply = false;
             for (var op : ops) {
+                if (holdNextDeleteReply && op.getType() == org.apache.zookeeper.ZooDefs.OpCode.delete) {
+                    holdNextDeleteReply = false;
+                    holdReply = true;
+                }
                 if (dropNextDelete && op.getType() == org.apache.zookeeper.ZooDefs.OpCode.delete) {
                     dropNextDelete = false;
                     callback.processResult(
@@ -446,10 +452,14 @@ class M5BookKeeperNativeCreateV2RealTest {
                 loseNextIntentMutation = false;
             }
             loseNextMulti = false;
+            boolean retainReply = holdReply;
             Runnable dispatch = () -> super.multi(
                     ops,
                     (rc, path, ctx, results) -> {
-                        if (lose && rc == 0) {
+                        if (retainReply && rc == 0) {
+                            release.set(() -> callback.processResult(rc, path, ctx, results));
+                            held.complete(null);
+                        } else if (lose && rc == 0) {
                             lost.incrementAndGet();
                             callback.processResult(
                                     org.apache.zookeeper.KeeperException.Code.CONNECTIONLOSS.intValue(),

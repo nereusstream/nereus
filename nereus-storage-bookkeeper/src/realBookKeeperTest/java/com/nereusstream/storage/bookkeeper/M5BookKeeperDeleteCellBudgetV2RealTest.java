@@ -185,14 +185,14 @@ class M5BookKeeperDeleteCellBudgetV2RealTest {
         }
     }
 
-    private static M5BookKeeperNativeDeleteIntentV2 bind(
+    static M5BookKeeperNativeDeleteIntentV2 bind(
             M5BookKeeperNativeDeleteAuthorityV2 authority, com.nereusstream.domain.bytes.Sha256Digest metadata)
             throws Exception {
         var epoch = await(authority.claim(Optional.empty(), UUID.randomUUID()));
         return await(authority.bindIntent(epoch, digest("fixture-token"), digest("fixture-authority"), metadata));
     }
 
-    private static M5BookKeeperNativeCreateSpecV2 spec(BookKeeperCapabilitySnapshotV1 capability) throws Exception {
+    static M5BookKeeperNativeCreateSpecV2 spec(BookKeeperCapabilitySnapshotV1 capability) throws Exception {
         var id = UUID.randomUUID();
         return M5BookKeeperNativeCreateSpecV2.of(
                 M5BookKeeperNativeCreateClientV2.discoverInstanceId(uri(), capability),
@@ -202,7 +202,7 @@ class M5BookKeeperDeleteCellBudgetV2RealTest {
                         new StorageRunId(new Id128(id.getMostSignificantBits(), id.getLeastSignificantBits())))));
     }
 
-    private static BookKeeperCapabilitySnapshotV1 capability(String scope) {
+    static BookKeeperCapabilitySnapshotV1 capability(String scope) {
         var c = M5BookKeeperNativeDeleteV2RealTest.CAPABILITY;
         return new BookKeeperCapabilitySnapshotV1(
                 new CellProviderScopeId(digest(scope)),

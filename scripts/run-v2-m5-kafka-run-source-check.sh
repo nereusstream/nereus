@@ -123,6 +123,7 @@ PY
   "-Pv2M5KafkaRunRootsRestartCheckpoint=$m5_output/run-root-checkpoint" \
   "-Pv2M5KafkaRunSourceRestartCheckpoint=$m5_output/run-source-checkpoint" \
   "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
+  "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
   :nereus-storage-bookkeeper:v2M5NativeDeleteQuotaRealTest \
   v2M5KafkaRunSourceCheck :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartWriteTest \
@@ -152,15 +153,39 @@ m5_wait_ready
   "-Pv2M5KafkaRunRootsRestartCheckpoint=$m5_output/run-root-checkpoint" \
   "-Pv2M5KafkaRunSourceRestartCheckpoint=$m5_output/run-source-checkpoint" \
   "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
+  "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
   :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartReadTest \
-  :nereus-storage-bookkeeper:v2M5NativeDeleteCellBudgetRealTest --console=plain
+  :nereus-storage-bookkeeper:v2M5NativeDeleteCellBudgetRealTest \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartWriteTest --console=plain
+
+# A second actual service restart begins with both ACTIVE and terminal-UNKNOWN native Cell heads occupied.
+m5_cell_started_before="$(docker inspect --format '{{.State.StartedAt}}' "$m5_oxia_owned_id")"
+while IFS= read -r m5_id; do
+  docker inspect --format '{{.Id}} {{.Image}} {{.State.StartedAt}}' "$m5_id"
+done < "$m5_output/bookkeeper-container-ids.txt" > "$m5_output/bookkeeper-before-cell-restart.txt"
+docker compose -p "$m5_project" -f "$m5_compose" stop bookie-0 bookie-1 bookie-2
+docker compose -p "$m5_project" -f "$m5_compose" restart metadata-service
+docker compose -p "$m5_project" -f "$m5_compose" up -d --wait
+while IFS= read -r m5_id; do
+  docker inspect --format '{{.Id}} {{.Image}} {{.State.StartedAt}}' "$m5_id"
+done < "$m5_output/bookkeeper-container-ids.txt" > "$m5_output/bookkeeper-after-cell-restart.txt"
+docker restart "$m5_oxia_owned_id" >/dev/null
+test "$(docker inspect --format '{{.Id}}' "$m5_container")" = "$m5_oxia_owned_id"
+test "$(docker inspect --format '{{.Image}}' "$m5_oxia_owned_id")" = "$m5_oxia_id"
+m5_cell_started_after="$(docker inspect --format '{{.State.StartedAt}}' "$m5_oxia_owned_id")"
+test "$m5_cell_started_before" != "$m5_cell_started_after"
+m5_wait_ready
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 \
+  "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
+  "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartReadTest --console=plain
 
 docker logs "$m5_oxia_owned_id" > "$m5_output/oxia-server.log" 2>&1
 docker compose -p "$m5_project" -f "$m5_compose" logs > "$m5_output/bookkeeper.log" 2>&1
-python3 - "$m5_repo_root" "$m5_output" "$m5_oxia_owned_id" "$m5_started_before" "$m5_started_after" <<'PY'
+python3 - "$m5_repo_root" "$m5_output" "$m5_oxia_owned_id" "$m5_started_before" "$m5_started_after" "$m5_cell_started_before" "$m5_cell_started_after" <<'PY'
 import hashlib,json,sys,xml.etree.ElementTree as ET
 from pathlib import Path
 root,out=map(Path,sys.argv[1:3]); inputs=(out/'tested-inputs.json').read_bytes()
@@ -172,6 +197,14 @@ before=[line.split() for line in (out/'bookkeeper-before-restart.txt').read_text
 after=[line.split() for line in (out/'bookkeeper-after-restart.txt').read_text().splitlines()]
 if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in zip(before,after)):
     raise SystemExit('Native BK restart did not retain all four exact containers and change their start times')
+cell_before=[line.split() for line in (out/'bookkeeper-before-cell-restart.txt').read_text().splitlines()]
+cell_after=[line.split() for line in (out/'bookkeeper-after-cell-restart.txt').read_text().splitlines()]
+if cell_before!=after or len(cell_after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in zip(cell_before,cell_after)):
+    raise SystemExit('Occupied Cell restart did not preserve all exact native containers with new start times')
+if sys.argv[6]!=sys.argv[5] or sys.argv[6]==sys.argv[7]:
+    raise SystemExit('Occupied Cell restart did not retain the same Oxia service and advance its start time')
+cell_checkpoints={name:hashlib.sha256((out/name).read_bytes()).hexdigest()
+    for name in ('native-cell-checkpoint-active','native-cell-checkpoint-unknown')}
 suites=[]
 for module,task,name,count in (
     ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',8),
@@ -185,6 +218,8 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteCellBudgetRealTest','M5BookKeeperDeleteCellBudgetV2RealTest',2),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellRestartWriteTest','M5BookKeeperDeleteCellBudgetV2RestartTest',1),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellRestartReadTest','M5BookKeeperDeleteCellBudgetV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
@@ -206,7 +241,12 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeCellDispatchAndUnknownSlotsReservedBeforeDelete':True,
+summary={'occupiedNativeCellHeadsSurvivedServiceRestart':True,'freshJvmDidNotRedispatchOrReleaseActiveNativeCell':True,
+    'healthyConfiguredCellDeletesAfterOccupiedHeadsRestart':True,'qualifiedActiveTransportDrain':False,
+    'cellRestartStartedBefore':sys.argv[6],'cellRestartStartedAfter':sys.argv[7],
+    'bookKeeperBeforeCellRestart':cell_before,'bookKeeperAfterCellRestart':cell_after,
+    'nativeCellRestartCheckpointSha256':cell_checkpoints,
+    'nativeCellDispatchAndUnknownSlotsReservedBeforeDelete':True,
     'observerCancellationRetainsNativeCellReservation':True,'distinctNativeCellBudgetHeadsAreIndependent':True,
     'terminalUnknownRequiresReadOnlyNativeAbsenceBeforeRelease':True,'fullCellAndPerBindingDispatchAdmission':False,
     'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcCanonicalCapacityAtomicallyReserved':True,
