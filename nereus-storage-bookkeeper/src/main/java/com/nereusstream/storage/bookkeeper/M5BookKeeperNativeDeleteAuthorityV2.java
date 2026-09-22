@@ -97,6 +97,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
     private final Sha256Digest capabilitySha;
     private final String path;
     private final Supplier<CompletionStage<Void>> beforeDelete;
+    private final M5BookKeeperNativeDeleteQuotaV2 quota;
 
     M5BookKeeperNativeDeleteAuthorityV2(
             ZooKeeper zk,
@@ -117,7 +118,8 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
         this.capability = Objects.requireNonNull(capability, "capability");
         this.capabilitySha = capabilitySha256(capability);
         this.beforeDelete = Objects.requireNonNull(beforeDelete, "beforeDelete");
-        this.path = guard.reservationPath(handle.ledgerIdentity().ledgerId()) + "-delete-epoch";
+        this.quota = guard.deleteQuota();
+        this.path = quota.epochPath(handle.ledgerIdentity().ledgerId());
     }
 
     public PhysicalResourceIdV2.BookKeeperLedger resource() {
@@ -180,25 +182,31 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                         return CompletableFuture.failedFuture(
                                 new IllegalStateException("native delete owner CAS conflict"));
                     }
-                    var ops = new ArrayList<>(guard.deleteChecks(resource.ledgerId()));
-                    byte[] encoded = candidate.encode().toByteArray();
-                    ops.add(
-                            previous.isPresent()
-                                    ? Op.setData(
-                                            path,
-                                            encoded,
-                                            previous.orElseThrow().nativeVersion())
-                                    : Op.create(path, encoded, acls, CreateMode.PERSISTENT));
-                    return multi(ops)
-                            .handle((rc, failure) -> null)
-                            .thenCompose(ignored -> read())
-                            .thenApply(stored -> {
-                                if (!stored.equals(Optional.of(candidate))) {
-                                    throw new IllegalStateException(
-                                            "native delete owner mutation is not exactly reconciled");
-                                }
-                                return candidate;
-                            });
+                    CompletionStage<List<Op>> capacity = previous.isEmpty()
+                            ? quota.firstClaimChecks(guard.requiresDeleteQuota(), candidate)
+                            : quota.requireReserved(guard.requiresDeleteQuota()).thenApply(ignored -> List.of());
+                    return capacity.thenCompose(reservation -> {
+                        var ops = new ArrayList<>(guard.deleteChecks(resource.ledgerId()));
+                        ops.addAll(reservation);
+                        byte[] encoded = candidate.encode().toByteArray();
+                        ops.add(
+                                previous.isPresent()
+                                        ? Op.setData(
+                                                path,
+                                                encoded,
+                                                previous.orElseThrow().nativeVersion())
+                                        : Op.create(path, encoded, acls, CreateMode.PERSISTENT));
+                        return multi(ops)
+                                .handle((rc, failure) -> null)
+                                .thenCompose(ignored -> read())
+                                .thenApply(stored -> {
+                                    if (!stored.equals(Optional.of(candidate))) {
+                                        throw new IllegalStateException(
+                                                "native delete owner mutation is not exactly reconciled");
+                                    }
+                                    return candidate;
+                                });
+                    });
                 });
         return operation
                 .thenCompose(value -> requireCurrent(value).thenApply(ignored -> value))
@@ -211,7 +219,8 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("native delete capability/resource differs"));
         }
-        return guard.requireOwned(resource.ledgerId())
+        return quota.requireReserved(guard.requiresDeleteQuota())
+                .thenCompose(ignored -> guard.requireOwned(resource.ledgerId()))
                 .thenCompose(ignored -> read())
                 .thenCompose(observed -> {
                     if (!observed.equals(Optional.of(expected))) {
@@ -424,6 +433,9 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
     private List<Op> checks(Snapshot expected) {
         var ops = new ArrayList<>(guard.deleteChecks(resource.ledgerId()));
         ops.add(Op.check(path, expected.nativeVersion()));
+        if (guard.requiresDeleteQuota()) {
+            ops.add(Op.check(quota.path(), -1));
+        }
         return List.copyOf(ops);
     }
 

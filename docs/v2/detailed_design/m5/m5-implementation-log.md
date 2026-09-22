@@ -2101,6 +2101,56 @@ per-Cell dispatch/unknown capacity and authority-time grace. Protocol/M4 eligibi
 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final or
 production authority is created.
 
+## 2026-09-22 permanent native GC canonical capacity
+
+Status: implemented atomic native epoch/intent capacity admission; locked native validation passed; NON_PROMOTABLE.
+
+`M5BookKeeperNativeDeleteQuotaV2` introduces a permanent fixed-size M5NQ head at the unique native namespace. The
+first epoch and complete future intent reservation commit together with namespace/task/reservation fences; conflicting
+head versions and duplicate epoch creates cannot partially charge or create authority. Bound native clients require
+an initialized head. Existing native epochs retain their reservation across takeover, intent replacement, absence,
+permanent M5 DONE and Oxia authority-quota settlement. Capacity is explicit and expandable, never implicitly reset.
+
+Bootstrap creates the head and permanent guarded-ledger reservation parent in one transaction before any resource
+reservation. This rejects pre-existing or racing unaccounted resources and prevents recreating a deleted head after
+the permanent parent exists. The existing unbound fixture profile remains non-promotable; migration/admission of
+unaccounted native namespaces is not implemented. Canonical head/epoch/intent paths and values are charged; other
+native creation/task metadata, directories, ACL/stat overhead, replicas, transaction logs and physical disk capacity
+remain outside this quota. It supplies no grace, protocol eligibility or Cell dispatch/unknown budget.
+
+New isolated native ZooKeeper tests cover stale concurrent capacity snapshots, lost applied initialization/claim/
+expansion replies, duplicate creation, exhaustion, unchanged fixed head size and missing/corrupt authority rejection.
+The bound BK/Oxia restart checkpoint now includes only the expected original quota hash in addition to the earlier
+input identities/hashes. Recovery rereads that head before mutation, takes over and completes an existing intent at
+full native capacity, verifies no refund on DONE, rejects a new resource without creating an epoch, then explicitly
+expands and admits it exactly once. The runner archives these tests with captured source and real dependency locks.
+
+Locked native validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`:
+legacy 96/96 main tasks (1m 55s), 24/24 restart tasks (12s), 21 archives / 81 cases and phases;
+bound-profile 93/93 main tasks (3m 14s), 23/23 restart tasks (32s), 22 archives / 95 cases and phases.
+Log: `/tmp/nereus-m5-native-quota-real-0922.log`.
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-27555`. Its 726-input manifest SHA is
+`ec13ca7af7aed3d7d3322842bd8a8a19e822ed0313d198b63aea94c9cec06dd8`; summary SHA
+`89f46c3d306f881be58bbb755c4cde7491ddbb300c328a6820d3708dd5ef44ce`. The same legacy Oxia
+`9564c485c2791fbb51b683101990f5a645ca1f04ff9a5af010755f414d7204d4` restarted from `2026-09-22T06:44:06.017655429Z`
+to `2026-09-22T06:46:15.704444377Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-27535`. Its 741-input manifest SHA is
+`c776db640f14c0f4eba6fbd89ce65978f33190ee3efe9b51dc2b7866064d43b7`; summary SHA
+`7ca74e32a57d612e8925ebc16e953ac6744d59da37feaa3aa0e3b1637689636c`. The same bound Oxia
+`58a008085b5dd1b8756a5a114a15029e23efdb5bc786ef38b8ea03f039defcc9` restarted from `2026-09-22T06:46:52.440598297Z`
+to `2026-09-22T06:50:20.682497713Z`.
+Both runs retained all four exact ZooKeeper/bookie container IDs and image IDs with changed start times. Every
+captured source file and archived XML was independently rehashed; every suite has zero failures, errors and skips.
+The copied legacy summary/manifest are byte-identical. The bound restart rereads the original full native quota head
+hash before mutation and proves existing-intent progress at full capacity, retained native charges after DONE and
+exactly-once new reservation after expansion. All owned containers were cleaned up; unrelated connector retained.
+Compile/style checks passed 26 tasks (`/tmp/nereus-m5-native-quota-compile-0922.log`). Final documentation, historical
+freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka contract/source checks passed 19/19 tasks
+(`/tmp/nereus-m5-native-quota-final-check-0922.log`).
+
+All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, aggregate Final
+or production authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2115,7 +2165,8 @@ production authority is created.
    INTENT capability refresh, native BK identity/absence reconciliation and server-fenced guarded BK deletion are
    implemented. Guarded BK native GC owner/capability facts and permanent M5 intent-token binding now compose with
    the coordinator. Public native GC claim/bind now require the unique bound authority route and active quota;
-   complete protocol proof production, native record capacity, grace/Cell admission and dispatch remain incomplete.
+   native epoch/intent canonical capacity now has atomic permanent reservation. Complete protocol proof production,
+   unaccounted-namespace migration, backend provisioning, grace/Cell admission and dispatch remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

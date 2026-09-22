@@ -46,8 +46,12 @@ phases: 21 archives / 93 cases and phases. Public GC claim/bind require `BoundPh
 actual native namespace equality and an active quota-reserved M5 authority. Manually constructed routes, missing
 active authorities and settled resources are rejected. Native epoch/intent and exact M5 authority survive the same
 services restarting; a new GC owner refreshes intent before fixture deletion and permanent done/quota settlement.
-Protocol owner and eligibility proof production, grace, native record capacity, per-Cell dispatch budgets and complete
-dispatch remain required.
+`v2M5NativeDeleteQuotaRealTest` adds two actual ZooKeeper capacity cases; the bound runner now archives 22 suites /
+95 cases and phases. The separate native quota reserves both permanent epoch and intent records at first claim,
+checks exact native head CAS in the same transaction and retains the reservation after DONE. Restart recovery runs
+at full capacity and verifies explicit expansion before new admission. Protocol owner and eligibility proof production,
+grace, unaccounted-namespace migration, backend provisioning, per-Cell dispatch budgets and complete dispatch remain
+required.
 
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part

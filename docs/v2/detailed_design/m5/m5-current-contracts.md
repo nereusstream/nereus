@@ -113,9 +113,9 @@ from a checkpoint or appended as per-attempt history.
 Three real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch refresh, forged/shadowed native fact
 rejection, exact intent binding and changed-M5-intent recovery. One fixture performs the bound low-level native delete
 and current-owner absence completion/compaction; protocol/M4 eligibility remains synthetic and M4 selection remains
-unchanged. The adapter does not prove grace, reserve Cell dispatch/unknown capacity, or account durable native epoch
-and intent capacity. Fixed-size per-resource state does not bound lifetime resource count. Complete protocol proof
-production, unguarded legacy ledgers, all-provider dispatch and full writer coverage remain OPEN.
+unchanged. The adapter does not prove grace or reserve Cell dispatch/unknown capacity. Native epoch/intent canonical
+capacity now has the separate reservation described below. Complete protocol proof production, unguarded legacy
+ledgers, all-provider dispatch and full writer coverage remain OPEN.
 
 `BoundPhysicalDeleteAuthorityRouteV2` now supplies explicit unique-route and active-resource admission to public GC
 claim/bind. `OxiaPhysicalMetadataNamespaceV2.openAuthorityRoute` installs actual native marker/binding revalidation;
@@ -131,10 +131,38 @@ The bound runner adds one active-route case and two independent-JVM restart phas
 routes, unreserved resources and grants lacking active authorities, then verify persisted native epoch/intent and
 exact M5 value/hash/version before takeover. The new owner advances native epoch, refreshes M5 intent, binds the new
 token, removes the fixture ledger through the native intent path and completes/compacts done. Durable quota settles,
-then rejects another claim without changing the epoch. This reuses the existing authority-byte reservation; it does
-not charge permanent native epoch/intent bytes, reserve Cell dispatch/unknown slots or prove grace. Protocol/M4
-eligibility remains synthetic. The unique guarded BK route is exercised; complete cross-Cell/all-writer admission and
-the full dispatcher still require implementation and source-bound evidence.
+then rejects another claim without changing the epoch. This route uses the existing Oxia authority-byte reservation;
+it supplies neither Cell dispatch/unknown slots nor grace. Protocol/M4 eligibility remains synthetic. Complete
+cross-Cell/all-writer admission and the full dispatcher still require implementation and source-bound evidence.
+
+`M5BookKeeperNativeDeleteQuotaV2` adds one permanent 104-byte M5NQ head at the actual BK namespace's
+`nereus-m5-native-v2/delete-capacity` path. It accounts the canonical head path/value plus both permanent epoch/intent
+paths and their fixed encoded sizes for each resource. Namespace identity, charge, capacity, count, exact native
+version and checksum are read from that head. First claim atomically increments it and creates the epoch in the same
+ZooKeeper multi as namespace/task/reservation checks. A stale capacity CAS or duplicate epoch cannot partially charge
+or create authority; a lost reply is reconciled through actual epoch and quota reads. Bound clients require this head.
+The historical unbound fixture profile remains available without a head; it cannot qualify public bound GC admission.
+
+Bootstrap is explicit through `M5BookKeeperNamespaceAuthorityV2.nativeDeleteQuota()`, before any guarded native ledger
+reservation. Initialization creates the permanent ledger-reservation parent and quota head in one transaction, so a
+concurrent or pre-existing reservation prevents zero-state import. Missing heads cannot be recreated after that
+parent exists; operational connection and restart only reread authority. An already initialized namespace is never
+implicitly expanded or reset. Existing unaccounted native namespaces require a separately qualified migration; this
+slice neither imports them nor claims their writer coverage.
+
+Every first epoch reserves its complete future intent storage. Epoch takeover and intent replacement retain constant
+size and consume no new capacity; DONE and Oxia quota settlement never refund native epoch/intent records. Explicit
+capacity expansion preserves the reservation count and advances the exact head version. Exhaustion blocks a new
+resource's first claim while existing native intent recovery can continue. Native version/counter overflow fails
+before mutation. This canonical-record budget excludes creation/task records, directory/ACL/stat overhead, replicas,
+ZooKeeper transaction logs and filesystem space; it is independent of backend provisioning and per-Cell I/O budgets.
+
+Two native quota cases exercise actual ZooKeeper transactions, stale concurrent reservations, lost applied replies,
+duplicate create, exhaustion, explicit expansion and missing/changed-head rejection in isolated fixture namespaces.
+The bound BK/Oxia restart checkpoint adds the original quota-head hash: the fresh JVM reads it before GC mutation,
+recovers the existing intent at full native capacity, and retains the charge after native deletion and permanent DONE.
+A new bound resource is rejected without an epoch at exhaustion, then admitted exactly once after explicit expansion.
+These are required validations for the native capacity slice; whole-M5 evidence remains separate.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.

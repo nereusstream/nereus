@@ -111,14 +111,18 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
                             intent.canonicalStoredSha256().toHex(),
                             intent.metadataVersion().value().toHex(),
                             Sha256Digest.hash(epoch.encode()).toHex(),
-                            Sha256Digest.hash(nativeIntent.encode()).toHex()));
+                            Sha256Digest.hash(nativeIntent.encode()).toHex(),
+                            Sha256Digest.hash(
+                                            await(f.backend.nativeDeleteQuota().snapshot())
+                                                    .encode())
+                                    .toHex()));
         }
     }
 
     @Test
     void readAfterServerRestart() throws Exception {
         var lines = Files.readAllLines(checkpoint());
-        assertThat(lines).hasSize(7);
+        assertThat(lines).hasSize(8);
         try (var f = new Fixture(8802, "gc-bound-restart", List.of(lines.get(0)))) {
             var config = f.source.spec().configurations().get(0);
             var handle = new RunLedgerHandleV1(
@@ -144,6 +148,11 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThat(priorObservation.coordinatorOwner().valueSha256())
                     .isEqualTo(Sha256Digest.hash(previous.encode()));
             // All three durable records have been read and matched before any GC/M5 mutation.
+            var quota = f.backend.nativeDeleteQuota();
+            var capacity = await(quota.snapshot());
+            assertThat(Sha256Digest.hash(capacity.encode()).toHex()).isEqualTo(lines.get(7));
+            assertThat(capacity.reservedResources()).isEqualTo(2);
+            assertThat(quota.chargedBytes(capacity)).isEqualTo(capacity.capacityBytes());
             var current = await(gc.claim(route, Optional.of(previous)));
             var observation = await(gc.observe(priorObservation.observationEpoch() + 1, Optional.of(priorObservation)));
             var coordinator = coordinator(f, handle, gc, route);
@@ -168,6 +177,29 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThatThrownBy(() -> await(gc.claim(route, Optional.of(current))))
                     .hasRootCauseMessage("native resource quota is settled");
             assertThat(await(nativeAuthority.read())).contains(current);
+            assertThat(await(quota.snapshot())).isEqualTo(capacity);
+            // Native GC records remain charged after native absence, permanent DONE and Oxia quota settlement.
+            try (var fresh = new Fixture(8803, "gc-native-capacity", null)) {
+                var nextHandle = sealed(fresh);
+                var nextResource = resource(fresh, nextHandle);
+                var nextGc =
+                        new KafkaBookKeeperDeleteObservationAuthorityV2(fresh.source, nextHandle, UUID.randomUUID());
+                var nextRoute = route(fresh, nextGc);
+                open(coordinator(fresh, nextHandle, nextGc, nextRoute), nextResource, facts(fresh, nextResource));
+                assertThatThrownBy(() -> await(nextGc.claim(nextRoute, Optional.empty())))
+                        .hasRootCauseMessage("native GC quota exhausted");
+                assertThat(await(fresh.source.deleteAuthority(nextHandle).read()))
+                        .isEmpty();
+                assertThat(await(quota.snapshot())).isEqualTo(capacity);
+                var expanded = await(quota.expand(quota.capacityForResources(3)));
+                assertThat(expanded.reservedResources()).isEqualTo(2);
+                var admitted = await(nextGc.claim(nextRoute, Optional.empty()));
+                var charged = await(quota.snapshot());
+                assertThat(charged.reservedResources()).isEqualTo(3);
+                assertThat(quota.chargedBytes(charged)).isEqualTo(charged.capacityBytes());
+                assertThat(await(nextGc.claim(nextRoute, Optional.empty()))).isEqualTo(admitted);
+                assertThat(await(quota.snapshot())).isEqualTo(charged);
+            }
             assertThat(await(coordinator.completeAbsent(refreshed)).exactTerminalIsAuthoritative())
                     .isTrue();
         }

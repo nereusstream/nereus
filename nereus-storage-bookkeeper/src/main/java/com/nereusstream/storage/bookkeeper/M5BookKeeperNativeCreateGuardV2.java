@@ -116,6 +116,14 @@ final class M5BookKeeperNativeCreateGuardV2 {
                 .toCompletableFuture();
     }
 
+    boolean requiresDeleteQuota() {
+        return admittedBinding.isPresent();
+    }
+
+    M5BookKeeperNativeDeleteQuotaV2 deleteQuota() {
+        return new M5BookKeeperNativeDeleteQuotaV2(zk, namespaceGate, acls);
+    }
+
     String reservationPath(long ledgerId) {
         if (ledgerId < 0) {
             throw new IllegalArgumentException("native ledger ID is negative");

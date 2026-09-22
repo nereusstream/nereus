@@ -382,6 +382,12 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
                     : await(OxiaPhysicalMetadataNamespaceV2.connect(
                             oxia, await(backend.readBinding()).orElseThrow().metadataNamespace()));
             binding = await(namespace.bind(backend));
+            if (restore == null) {
+                await(backend.nativeDeleteQuota()
+                        .initialize(backend.nativeDeleteQuota().capacityForResources(2)));
+            } else {
+                await(backend.nativeDeleteQuota().snapshot());
+            }
             output = M5BookKeeperNativeCreateClientV2.connect(
                     uri, task.capability(), KafkaBookKeeperNativeCreateV2RealTest.spec(input), binding);
             String root = restore == null ? NativeContext.root() : restore.get(0);

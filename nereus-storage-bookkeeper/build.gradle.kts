@@ -159,3 +159,19 @@ mapOf("Write" to "writeBeforeServerRestart", "Read" to "readAfterServerRestart")
         }
     }
 }
+
+// Native permanent epoch/intent capacity transactions; actual bound BK/Oxia restart is exercised by the Kafka runner.
+tasks.register<Test>("v2M5NativeDeleteQuotaRealTest") {
+    group = "verification"
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteQuotaV2RealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.bookkeeper.metadataServiceUri",
+            providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                ?: error("native BookKeeper URI is required for native GC quota verification"))
+    }
+}

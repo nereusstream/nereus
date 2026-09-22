@@ -31,10 +31,14 @@ import org.apache.bookkeeper.util.ZkUtils;
 public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNamespaceAuthorityV2, AutoCloseable {
     private final BookKeeper client;
     private final M5BookKeeperNamespaceGateV2 gate;
+    private final M5BookKeeperNativeDeleteQuotaV2 deleteQuota;
 
-    private M5BookKeeperNamespaceAuthorityV2(BookKeeper client, M5BookKeeperNamespaceGateV2 gate) {
+    private M5BookKeeperNamespaceAuthorityV2(
+            BookKeeper client, M5BookKeeperNamespaceGateV2 gate, java.util.List<org.apache.zookeeper.data.ACL> acls) {
         this.client = client;
         this.gate = gate;
+        this.deleteQuota = new M5BookKeeperNativeDeleteQuotaV2(
+                ((ZKMetadataClientDriver) client.getMetadataClientDriver()).getZk(), gate, acls);
     }
 
     /** May initialize ordinary BK metadata and the permanent unbound creation gate; performs no ledger allocation. */
@@ -50,11 +54,15 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
                     new String(driver.getZk().getData(root + "/INSTANCEID", false, null), StandardCharsets.US_ASCII);
             var gate = new M5BookKeeperNamespaceGateV2(driver.getZk(), root, instance, ZkUtils.getACLs(configuration));
             gate.initializeUnbound().get();
-            return new M5BookKeeperNamespaceAuthorityV2(client, gate);
+            return new M5BookKeeperNamespaceAuthorityV2(client, gate, ZkUtils.getACLs(configuration));
         } catch (Exception failure) {
             client.close();
             throw failure;
         }
+    }
+
+    public M5BookKeeperNativeDeleteQuotaV2 nativeDeleteQuota() {
+        return deleteQuota;
     }
 
     @Override

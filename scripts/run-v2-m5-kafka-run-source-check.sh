@@ -123,6 +123,7 @@ PY
   "-Pv2M5KafkaRunRootsRestartCheckpoint=$m5_output/run-root-checkpoint" \
   "-Pv2M5KafkaRunSourceRestartCheckpoint=$m5_output/run-source-checkpoint" \
   "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteQuotaRealTest \
   v2M5KafkaRunSourceCheck :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartWriteTest \
@@ -181,6 +182,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
@@ -202,7 +204,9 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
+summary={'nativeGcCanonicalCapacityAtomicallyReserved':True,
+    'nativeGcCapacitySurvivedRestartAndDone':True,'existingNativeIntentContinuesAtCapacity':True,
+    'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
     'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,

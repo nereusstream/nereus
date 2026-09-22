@@ -37,8 +37,9 @@ performance-first BookKeeper WAL.
   GC owner/capability facts feed the coordinator through a read-only route; changed tokens require a new GC epoch.
   Public GC claim/bind now require the uniquely bound native authority route, an existing durable quota grant and
   active resource authority; manually configured metadata roots cannot qualify this entry. Restart recovery verifies
-  the original M5 authority together with both native GC records. Protocol eligibility, grace, native record capacity,
-  Cell dispatch admission and complete lifecycle dispatch composition remain required.
+  the original M5 authority together with both native GC records. A separate native capacity head atomically charges
+  first epochs and their future intents; takeover and DONE retain that charge. Protocol eligibility, grace, backend
+  capacity provisioning, Cell dispatch admission and complete lifecycle dispatch composition remain required.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation
