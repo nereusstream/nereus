@@ -385,8 +385,12 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
             if (restore == null) {
                 await(backend.nativeDeleteQuota()
                         .initialize(backend.nativeDeleteQuota().capacityForResources(2)));
+                await(backend.nativeDeleteCellBudget()
+                        .initialize(
+                                new com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2.Limits(2, 2)));
             } else {
                 await(backend.nativeDeleteQuota().snapshot());
+                await(backend.nativeDeleteCellBudget().snapshot());
             }
             output = M5BookKeeperNativeCreateClientV2.connect(
                     uri, task.capability(), KafkaBookKeeperNativeCreateV2RealTest.spec(input), binding);

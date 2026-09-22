@@ -139,8 +139,8 @@ existing permanent quota grant and current nonterminal M5 authority. A grant wit
 full/compact done and settled grants reject new GC work. `M5BookKeeperNativeCreateClientV2.requireNamespaceBinding`
 rereads INSTANCEID and permanent binding through the same owned native connection. The GC adapter compares both
 native assignments before and after claim/bind. Endpoint aliases and caller roots cannot select a second authority.
-The old generic-store binding and route-free claim helpers are package-private; the public native delete method now
-requires a durable native intent. Failure after accepted native work retains the record for reconciliation.
+The old generic-store binding and route-free claim helpers are package-private; the public bound native delete method now
+requires a durable native intent and the Cell budget below. Failure after accepted native work retains the record for reconciliation.
 
 The bound runner adds one active-route case and two independent-JVM restart phases. They reject manually constructed
 routes, unreserved resources and grants lacking active authorities, then verify persisted native epoch/intent and
@@ -178,6 +178,35 @@ The bound BK/Oxia restart checkpoint adds the original quota-head hash: the fres
 recovers the existing intent at full native capacity, and retains the charge after native deletion and permanent DONE.
 A new bound resource is rejected without an epoch at exhaustion, then admitted exactly once after explicit expansion.
 These are required validations for the native capacity slice; whole-M5 evidence remains separate.
+
+`M5BookKeeperDeleteCellBudgetV2` owns one explicitly provisioned permanent M5CB head per physical namespace and
+configured `CellProviderScopeId`, using the actual native namespace connection. Every invocation reserves one
+dispatch slot and one possible-unknown slot, with effective capacity equal to the smaller immutable limit (each
+1..64). The canonical head is 120 bytes plus 84 bytes per retained invocation, in addition to its exact path bytes.
+It records exact native version, namespace/Cell digests, limits and bounded unique resource/operation/intent identities.
+Checksum, canonical ordering, exact length, permanent-node status and actual stat version are checked on every read.
+A permanent Cell parent prevents automatic reconstruction of a missing head. Reconnect and service restart read
+existing state; they do not bootstrap, enlarge limits, expire reservations or redispatch work.
+
+Reservation CAS includes the current native namespace, task, resource reservation, GC epoch and intent checks.
+Duplicate resources, exhausted slots or a different Cell/namespace binding reject before invoking native deletion.
+The actual deletion still atomically checks native intent and exact ledger version. Observer cancellation only
+cancels its detached observation. A definite failure before invocation can release its reservation; an issued call
+keeps it until completion. Terminal unknowns remain charged and may only run read-only identity/absence checks;
+actual native absence permits exact operation-identified release. Exact presence or changed identity during unknown
+reconciliation retains the record. ACTIVE records never become terminal based on age or restart. Head conflicts
+have at most four release/terminal-state attempts; unresolved mutations retain capacity and never trigger deletion.
+An old operation callback cannot remove a newer resource reservation with a different operation identity.
+
+The bound fixture's restart checkpoint includes its empty Cell head hash and rereads it before any GC mutation.
+Two additional actual native tests verify cancelled held invocation, occupied-head equality through client reconnect,
+rejection of duplicate/full/foreign-Cell dispatch, independent configured Cells, release after known pre-dispatch
+failure and native completion, and terminal-unknown retention followed by read-only absence release. Intent token and
+M5 authority digests in those low-level fixtures are synthetic. Held calls across a server restart and qualified
+ACTIVE drain are not established by this empty-head restart check. These limits account logical native operations,
+not transport buffers, per-Binding fairness/rates or total backend storage. Cell heads are not charged to the separate
+per-resource native quota; explicit per-Cell provisioning does not establish a global Cell-count budget. Protocol
+Cell ownership, grace and complete M5 dispatch composition remain required before whole-M5 acceptance.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.

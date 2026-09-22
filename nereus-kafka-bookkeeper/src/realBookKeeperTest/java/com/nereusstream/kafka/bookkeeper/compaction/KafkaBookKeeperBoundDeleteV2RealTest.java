@@ -147,6 +147,11 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
                             Sha256Digest.hash(
                                             await(f.backend.nativeDeleteQuota().snapshot())
                                                     .encode())
+                                    .toHex(),
+                            Sha256Digest.hash(await(f.backend
+                                                    .nativeDeleteCellBudget()
+                                                    .snapshot())
+                                            .encode())
                                     .toHex()));
         }
     }
@@ -154,7 +159,7 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
     @Test
     void readAfterServerRestart() throws Exception {
         var lines = Files.readAllLines(checkpoint());
-        assertThat(lines).hasSize(8);
+        assertThat(lines).hasSize(9);
         try (var f = new Fixture(8802, "gc-bound-restart", List.of(lines.get(0)))) {
             var config = f.source.spec().configurations().get(0);
             var handle = new RunLedgerHandleV1(
@@ -185,6 +190,10 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThat(Sha256Digest.hash(capacity.encode()).toHex()).isEqualTo(lines.get(7));
             assertThat(capacity.reservedResources()).isEqualTo(2);
             assertThat(quota.chargedBytes(capacity)).isEqualTo(capacity.capacityBytes());
+            var cellBudget = f.backend.nativeDeleteCellBudget();
+            var originalBudget = await(cellBudget.snapshot());
+            assertThat(Sha256Digest.hash(originalBudget.encode()).toHex()).isEqualTo(lines.get(8));
+            assertThat(originalBudget.reservations()).isEmpty();
             var current = await(gc.claim(route, Optional.of(previous)));
             var observation = await(gc.observe(priorObservation.observationEpoch() + 1, Optional.of(priorObservation)));
             var coordinator = coordinator(f, handle, gc, route);
@@ -198,11 +207,16 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             var bound = await(gc.bindIntent(route, refreshed));
             var target =
                     await(f.source.captureExactTarget(handle)).exactTarget().orElseThrow();
-            assertThatThrownBy(() -> await(nativeAuthority.deleteExact(previousIntent, target)))
+            assertThatThrownBy(() -> await(nativeAuthority.deleteExact(cellBudget, previousIntent, target)))
                     .hasRootCauseMessage("native delete owner is fenced");
             // Low-level deletion of this test-owned fixture. Full protocol/grace/Cell admission is still separate.
-            assertThat(await(nativeAuthority.deleteExact(bound, target)).outcome())
+            assertThatThrownBy(() -> await(nativeAuthority.deleteExact(bound, target)))
+                    .hasRootCauseMessage("bound native delete requires Cell budget");
+            var deleted = await(nativeAuthority.deleteExact(cellBudget, bound, target));
+            assertThat(deleted.deleteResult().outcome())
                     .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
+            assertThat(deleted.reservationRetained()).isFalse();
+            assertThat(await(cellBudget.snapshot()).reservations()).isEmpty();
             var done = await(coordinator.completeAbsent(refreshed)).observed().orElseThrow();
             await(coordinator.compactDone(done));
             assertThat(await(route.quota().settle(resource))).isEqualTo(M5GcQuotaCoordinatorV2.Result.SETTLED);

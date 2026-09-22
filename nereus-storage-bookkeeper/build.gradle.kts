@@ -175,3 +175,19 @@ tasks.register<Test>("v2M5NativeDeleteQuotaRealTest") {
                 ?: error("native BookKeeper URI is required for native GC quota verification"))
     }
 }
+
+// Runs after bound restart-read assertions, using the established real native/Oxia namespace binding.
+tasks.register<Test>("v2M5NativeDeleteCellBudgetRealTest") {
+    group = "verification"
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.bookkeeper.metadataServiceUri",
+            providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                ?: error("bound native BookKeeper URI is required for Cell delete budget verification"))
+    }
+}

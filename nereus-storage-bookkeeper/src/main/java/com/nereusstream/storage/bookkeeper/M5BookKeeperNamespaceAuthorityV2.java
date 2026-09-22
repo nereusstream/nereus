@@ -32,13 +32,19 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
     private final BookKeeper client;
     private final M5BookKeeperNamespaceGateV2 gate;
     private final M5BookKeeperNativeDeleteQuotaV2 deleteQuota;
+    private final M5BookKeeperDeleteCellBudgetV2 deleteCellBudget;
 
     private M5BookKeeperNamespaceAuthorityV2(
-            BookKeeper client, M5BookKeeperNamespaceGateV2 gate, java.util.List<org.apache.zookeeper.data.ACL> acls) {
+            BookKeeper client,
+            M5BookKeeperNamespaceGateV2 gate,
+            java.util.List<org.apache.zookeeper.data.ACL> acls,
+            com.nereusstream.storage.api.bookkeeper.CellProviderScopeId cell) {
         this.client = client;
         this.gate = gate;
         this.deleteQuota = new M5BookKeeperNativeDeleteQuotaV2(
                 ((ZKMetadataClientDriver) client.getMetadataClientDriver()).getZk(), gate, acls);
+        this.deleteCellBudget = new M5BookKeeperDeleteCellBudgetV2(
+                ((ZKMetadataClientDriver) client.getMetadataClientDriver()).getZk(), gate, acls, cell);
     }
 
     /** May initialize ordinary BK metadata and the permanent unbound creation gate; performs no ledger allocation. */
@@ -54,11 +60,16 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
                     new String(driver.getZk().getData(root + "/INSTANCEID", false, null), StandardCharsets.US_ASCII);
             var gate = new M5BookKeeperNamespaceGateV2(driver.getZk(), root, instance, ZkUtils.getACLs(configuration));
             gate.initializeUnbound().get();
-            return new M5BookKeeperNamespaceAuthorityV2(client, gate, ZkUtils.getACLs(configuration));
+            return new M5BookKeeperNamespaceAuthorityV2(
+                    client, gate, ZkUtils.getACLs(configuration), capability.providerScopeId());
         } catch (Exception failure) {
             client.close();
             throw failure;
         }
+    }
+
+    public M5BookKeeperDeleteCellBudgetV2 nativeDeleteCellBudget() {
+        return deleteCellBudget;
     }
 
     public M5BookKeeperNativeDeleteQuotaV2 nativeDeleteQuota() {

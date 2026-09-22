@@ -52,9 +52,12 @@ services restarting; a new GC owner refreshes intent before fixture deletion and
 `v2M5NativeDeleteQuotaRealTest` adds two actual ZooKeeper capacity cases; the bound runner now archives 22 suites /
 95 cases and phases. The separate native quota reserves both permanent epoch and intent records at first claim,
 checks exact native head CAS in the same transaction and retains the reservation after DONE. Restart recovery runs
-at full capacity and verifies explicit expansion before new admission. Protocol owner and eligibility proof production,
-grace, unaccounted-namespace migration, backend provisioning, per-Cell dispatch budgets and complete dispatch remain
-required.
+at full capacity and verifies explicit expansion before new admission. `v2M5NativeDeleteCellBudgetRealTest` adds two
+bound native lifecycle cases, bringing the runner to 23 archives / 97 cases and phases. A permanent Cell head reserves
+dispatch and possible-unknown slots before native deletion; cancellation/reconnect retains active holds, and only
+callback-terminal unknowns admit read-only absence reconciliation. Protocol owner and eligibility proof production,
+grace, unaccounted-namespace migration, backend provisioning, per-Binding shares/rates, transport accounting,
+qualified active-call recovery and complete dispatch remain required.
 
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part

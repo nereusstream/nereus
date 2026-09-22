@@ -155,7 +155,8 @@ m5_wait_ready
   :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartReadTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartReadTest \
-  :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartReadTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartReadTest \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteCellBudgetRealTest --console=plain
 
 docker logs "$m5_oxia_owned_id" > "$m5_output/oxia-server.log" 2>&1
 docker compose -p "$m5_project" -f "$m5_compose" logs > "$m5_output/bookkeeper.log" 2>&1
@@ -183,6 +184,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellBudgetRealTest','M5BookKeeperDeleteCellBudgetV2RealTest',2),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
@@ -204,7 +206,10 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcCanonicalCapacityAtomicallyReserved':True,
+summary={'nativeCellDispatchAndUnknownSlotsReservedBeforeDelete':True,
+    'observerCancellationRetainsNativeCellReservation':True,'distinctNativeCellBudgetHeadsAreIndependent':True,
+    'terminalUnknownRequiresReadOnlyNativeAbsenceBeforeRelease':True,'fullCellAndPerBindingDispatchAdmission':False,
+    'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcCanonicalCapacityAtomicallyReserved':True,
     'nativeGcCapacitySurvivedRestartAndDone':True,'existingNativeIntentContinuesAtCapacity':True,
     'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
     'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,

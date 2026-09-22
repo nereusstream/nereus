@@ -367,8 +367,12 @@ class KafkaBookKeeperRunRootsV2RealTest {
             if (restore == null) {
                 await(backend.nativeDeleteQuota()
                         .initialize(backend.nativeDeleteQuota().capacityForResources(2)));
+                await(backend.nativeDeleteCellBudget()
+                        .initialize(
+                                new com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2.Limits(2, 2)));
             } else {
                 await(backend.nativeDeleteQuota().snapshot());
+                await(backend.nativeDeleteCellBudget().snapshot());
             }
             var spec = restore == null
                     ? M5BookKeeperNativeCreateSpecV2.of(

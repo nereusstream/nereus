@@ -352,14 +352,66 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("native intent ledger identity differs"));
         }
+        if (guard.requiresDeleteQuota()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("bound native delete requires Cell budget"));
+        }
         return requireIntent(intent)
                 .thenCompose(ignored -> deleteExact(intent.epoch(), Optional.of(intent), target))
                 .thenCompose(result -> requireIntent(intent).thenApply(ignored -> result))
                 .thenApply(result -> result);
     }
 
+    /** Bound native operation: reserves Cell dispatch and potential-unknown capacity before any delete. */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> deleteExact(
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            M5BookKeeperNativeDeleteIntentV2 intent,
+            BookKeeperDeleteTargetV1 target) {
+        if (!intent.ledgerMetadataSha256().equals(target.metadataSha256())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native intent ledger identity differs"));
+        }
+        var issued = new java.util.concurrent.atomic.AtomicBoolean();
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> requireIntent(intent).thenCompose(ignored -> {
+                    var checks = new ArrayList<>(checks(intent.epoch()));
+                    checks.add(Op.check(intentPath(), intent.nativeVersion()));
+                    return budget.execute(
+                            binding, capability.providerScopeId(), intent, checks, issued, () -> deleteExact(
+                                            intent.epoch(), Optional.of(intent), target, issued)
+                                    .thenCompose(result -> requireIntent(intent).thenApply(unused -> result)));
+                }))
+                .thenApply(value -> value);
+    }
+
+    /** Read-only recovery of callback-terminal UNKNOWN; in-flight reservations are never cleared by timeout/restart. */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> reconcileCellDelete(
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            M5BookKeeperNativeDeleteIntentV2 intent,
+            BookKeeperDeleteTargetV1 target) {
+        if (!intent.ledgerMetadataSha256().equals(target.metadataSha256()) || !handle.equals(target.handle())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native intent ledger identity differs"));
+        }
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> requireIntent(intent)
+                        .thenCompose(ignored -> budget.reconcileUnknown(
+                                binding, capability.providerScopeId(), intent, () -> reconcile(target, false)
+                                        .thenCompose(
+                                                result -> requireIntent(intent).thenApply(unused -> result)))))
+                .thenApply(value -> value);
+    }
+
     private CompletionStage<DeleteResult> deleteExact(
             Snapshot expected, Optional<M5BookKeeperNativeDeleteIntentV2> intent, BookKeeperDeleteTargetV1 target) {
+        return deleteExact(expected, intent, target, new java.util.concurrent.atomic.AtomicBoolean());
+    }
+
+    private CompletionStage<DeleteResult> deleteExact(
+            Snapshot expected,
+            Optional<M5BookKeeperNativeDeleteIntentV2> intent,
+            BookKeeperDeleteTargetV1 target,
+            java.util.concurrent.atomic.AtomicBoolean issued) {
         Objects.requireNonNull(target, "target");
         if (!handle.equals(target.handle())) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("native delete target handle differs"));
@@ -401,7 +453,10 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                     intent.ifPresent(value -> ops.add(Op.check(intentPath(), value.nativeVersion())));
                     ops.add(Op.delete(manager.nativeLedgerPath(resource.ledgerId()), (int) version));
                     return Objects.requireNonNull(beforeDelete.get(), "beforeDelete stage")
-                            .thenCompose(ignored -> multi(ops))
+                            .thenCompose(ignored -> {
+                                issued.set(true);
+                                return multi(ops);
+                            })
                             .thenCompose(rc -> {
                                 if (rc == KeeperException.Code.BADVERSION.intValue()
                                         || rc == KeeperException.Code.NOAUTH.intValue()) {

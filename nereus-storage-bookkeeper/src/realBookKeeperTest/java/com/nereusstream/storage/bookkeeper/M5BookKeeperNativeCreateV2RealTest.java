@@ -327,6 +327,15 @@ class M5BookKeeperNativeCreateV2RealTest {
 
         NativeFaults(String uri, BookKeeperCapabilitySnapshotV1 capability, M5BookKeeperNativeCreateSpecV2 spec)
                 throws Exception {
+            this(uri, capability, spec, java.util.Optional.empty());
+        }
+
+        NativeFaults(
+                String uri,
+                BookKeeperCapabilitySnapshotV1 capability,
+                M5BookKeeperNativeCreateSpecV2 spec,
+                java.util.Optional<com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2> binding)
+                throws Exception {
             this.spec = spec;
             var configuration = RealBookKeeperClientConfigurationV1.from(uri, capability);
             client = (BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(configuration)
@@ -340,7 +349,7 @@ class M5BookKeeperNativeCreateV2RealTest {
             assertThat(connected.await(10, TimeUnit.SECONDS)).isTrue();
             var acls = org.apache.bookkeeper.util.ZkUtils.getACLs(configuration);
             guard = new M5BookKeeperNativeCreateGuardV2(
-                    zk, java.net.URI.create(uri).getPath(), spec, acls, java.util.Optional.empty());
+                    zk, java.net.URI.create(uri).getPath(), spec, acls, binding);
             var delegate = (org.apache.bookkeeper.meta.AbstractZkLedgerManager)
                     client.getLedgerManagerFactory().newLedgerManager();
             manager = new M5BookKeeperNativeLedgerManagerV2(delegate, guard, spec, zk, acls);
@@ -398,6 +407,7 @@ class M5BookKeeperNativeCreateV2RealTest {
         volatile boolean holdNextMulti;
         volatile boolean loseNextMulti;
         volatile boolean loseNextIntentMutation;
+        volatile boolean dropNextDelete;
         volatile boolean loseNextSet;
         final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>
                 lostMultiDelivery = new java.util.concurrent.atomic.AtomicReference<>();
@@ -419,6 +429,12 @@ class M5BookKeeperNativeCreateV2RealTest {
             multis.incrementAndGet();
             boolean intentMutation = false;
             for (var op : ops) {
+                if (dropNextDelete && op.getType() == org.apache.zookeeper.ZooDefs.OpCode.delete) {
+                    dropNextDelete = false;
+                    callback.processResult(
+                            org.apache.zookeeper.KeeperException.Code.CONNECTIONLOSS.intValue(), null, context, null);
+                    return;
+                }
                 if (op.getPath().endsWith("-intent")
                         && (op.getType() == org.apache.zookeeper.ZooDefs.OpCode.create
                                 || op.getType() == org.apache.zookeeper.ZooDefs.OpCode.setData)) {

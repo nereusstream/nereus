@@ -31,9 +31,11 @@ facts now feed the coordinator, and one permanent native intent record binds its
 fingerprint. New tokens require a new GC epoch. Complete eligibility facts are reread before and after native binding;
 unchanged M5 intent bytes cannot mask newer audit/grace or M4 facts. Public GC claim/bind also verify the permanent unique metadata
 route and an active quota-reserved M5 authority, including after service restart. A separate permanent native quota
-head charges first epochs and future intents atomically, without refund on DONE. Protocol eligibility, grace, backend
-provisioning, Cell dispatch admission and complete dispatch composition remain OPEN; this result creates no
-M5-E child or aggregate Final.
+head charges first epochs and future intents atomically, without refund on DONE. Bound native deletion also reserves
+both dispatch and possible-unknown slots in a permanent Cell head. Cancellation retains active reservations;
+callback-terminal unknowns can release only after read-only native absence reconciliation. Protocol eligibility,
+grace, backend provisioning, per-Binding/transport admission, qualified active-call recovery and complete dispatch
+composition remain OPEN; this result creates no M5-E child or aggregate Final.
 
 ## Historical inputs and implementation predecessors
 

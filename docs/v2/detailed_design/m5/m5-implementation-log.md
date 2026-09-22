@@ -2199,6 +2199,67 @@ Numeric grace fields or local/server wall-clock observations are not promoted in
 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null. No M5-E child, Final or production
 authority is created.
 
+## 2026-09-22 durable native Cell delete reservations
+
+Status: implemented bounded native dispatch/unknown reservations after `e38ccc9bfe04fea5ab96fedcab754069f85d02b7`;
+NON_PROMOTABLE. All 17 acceptance obligations remain OPEN/null and M6 012/013/022 remain PLANNED/null in both
+registries. Review 7/8 ownership and the five-child/aggregate requirements are unchanged.
+
+`M5BookKeeperDeleteCellBudgetV2` stores one permanent M5CB head for the actual physical namespace and configured
+Cell. Explicit provisioning sets immutable dispatch and possible-unknown limits, each at most 64; every invocation
+reserves both before native deletion, with native namespace/task/reservation/epoch/intent checks in the same head
+CAS. The canonical value is 120 plus 84 bytes per reservation, with exact native version, scope, limits, checksum,
+canonical ordering and unique operation/resource identities. A permanent parent forbids automatic missing-head
+recreation. Bound public deletion requires this budget; the historical unbound fixture primitive remains separate.
+
+Detached observer cancellation leaves accepted work and its reservation running. Confirmed pre-dispatch failure or
+terminal known completion can release; an issued unknown retains its operation identity and slot. Only callback-
+terminal unknowns can use read-only native identity/absence reconciliation. Presence retains the reservation;
+authoritative absence permits exact operation release. ACTIVE holds never expire or become terminal on reconnect.
+Release/mark-unknown CAS attempts are bounded at four; unresolved mutations retain capacity. Old callbacks cannot
+release newer operation identities. No recovery path automatically sends another native delete.
+
+The bound restart fixture includes its empty Cell head hash, reads it before GC mutation and verifies budgeted native
+delete plus release. Two added actual native tests hold/cancel a deletion, verify the occupied head through a new
+connection, reject duplicate/full/foreign-Cell work, allow independent Cell progress, and release after native
+completion or known pre-dispatch rejection. The unknown case injects a delete-only CONNECTIONLOSS without forwarding
+that transaction, observes exact metadata still present, and retains capacity. A package-only fixture primitive then
+simulates the prior request becoming applied; read-only absence reconciliation releases the unknown hold.
+
+The first full attempt (`/tmp/nereus-m5-cell-budget-real.log`) passed the independent legacy run but failed bound
+restart-write because test setup omitted explicit Cell head initialization. It produced no accepted bound evidence.
+The corrected setup initializes only in the new-run branch; restart remains read-only. Compilation and style checks
+passed before the final locked rerun.
+
+Final locked validation passed through `scripts/run-v2-m5-kafka-run-source-check.sh`: legacy 96/96 main tasks
+(1m 52s), 24/24 restart tasks (12s), 21 archives / 82 cases and phases; bound profile 93/93 main tasks (3m 1s),
+25/25 restart tasks (32s), 23 archives / 97 cases and phases. Log: `/tmp/nereus-m5-cell-budget-real-final.log`.
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-64906`. Its 728-input manifest SHA is
+`c17434e0ef2f41dfc7bc4cc97d4e388226f992d0f25f2f201886657f5cdc3e1b`; summary SHA
+`406a52dc244b85336c35bdaa12746d3aa5500668007d6caf90bbe28df97d10b0`. Its same Oxia container
+`02862e518efb1add8c9cade34ee0083185b3cbffea31315106a3277cf0b4dd7f` restarted from `2026-09-22T07:45:30.663664592Z`
+to `2026-09-22T07:47:37.004295762Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-64894`. Its 743-input manifest SHA is
+`4e5ce18f24aadf8e294608c9b20c14a3c1c0a08a133ff60f54901a49a8c7ee88`; summary SHA
+`888a1e416062edd43c6ee89bf7238b4dcd017c53eae37362e390af63f47894e3`. Its same Oxia container
+`e149f76753b9e16a94d6003d34b5991840cfd93053828cbe29353d74564a1bc1` restarted from `2026-09-22T07:48:13.156829876Z`
+to `2026-09-22T07:51:28.706756716Z`.
+All four ZooKeeper/bookie container IDs and image IDs were retained in each run, with changed start times. Every
+captured source and archived XML was independently rehashed; all suites have zero failures, errors and skips. The
+copied legacy summary/manifest are byte-identical to their independent run. The two new Cell lifecycle cases and
+the budgeted bound-delete restart path passed. The owning runners removed their containers, retaining the unrelated
+connector. Initial main/real-test compile and style checks passed 25 tasks; test additions and final fixture fixes
+also passed their focused compilation/style checks before rerunning the full native validation.
+Final documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-cell-budget-final-check.log`).
+
+These are configured native Cell operation slots, not per-Binding fairness/rates, transport-memory quarantine or a
+protocol Cell ownership proof. Per-Cell head bytes are bounded but not charged to the permanent per-resource quota;
+backend space and total Cell-count provisioning remain separate. The occupied-head check uses client reconnect;
+server restart checks an empty head, so qualified ACTIVE drain/recovery and retained transport proofs remain OPEN.
+Native intent digests in the new low-level fixtures and protocol/M4/grace facts in the bound fixture remain synthetic.
+No M5-E child, source-bound Final, production deployment or benchmark authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2213,8 +2274,10 @@ authority is created.
    INTENT capability refresh, native BK identity/absence reconciliation and server-fenced guarded BK deletion are
    implemented. Guarded BK native GC owner/capability facts and permanent M5 intent-token binding now compose with
    the coordinator. Public native GC claim/bind now require the unique bound authority route and active quota;
-   native epoch/intent canonical capacity now has atomic permanent reservation. Complete protocol proof production,
-   unaccounted-namespace migration, backend provisioning, grace/Cell admission and dispatch remain incomplete.
+   native epoch/intent canonical capacity now has atomic permanent reservation. Bound native deletion also reserves
+   logical dispatch/unknown slots per configured Cell. Complete protocol proof production, unaccounted-namespace
+   migration, backend provisioning, grace, per-Binding/transport admission, qualified ACTIVE recovery and dispatch
+   remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 
