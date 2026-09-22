@@ -32,6 +32,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
@@ -587,6 +588,111 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             .orElseThrow()));
                     assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
                 }
+            }
+        }
+    }
+
+    @Test
+    void confirmedNativeDrainReconcilesOnlyItsOperationWhileSameContextReaderRemainsLive() throws Exception {
+        try (var f = new Fixture(2550, "ticket-recovery", null)) {
+            var root = admit(f, f.prepareSealedSource());
+            var source = reader(f, f.roots, BOUNDS);
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            try (var published = new Published(f, input(f, raw, 3550), NativeContext.root())) {
+                var descriptor = published.writeAndPublish(source);
+                var bounds = new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000);
+                var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forOwner(bounds, 1);
+                var share = new KafkaBookKeeperReadCellBudgetV2.Usage(2, 2, 2000000, 1000000);
+                var budget = new KafkaBookKeeperReadCellBudgetV2(
+                        descriptor.task().capability().providerScopeId(),
+                        share,
+                        java.util.Map.of(descriptor.sourceCut().identity().binding(), share));
+                var dropRelease = new java.util.concurrent.atomic.AtomicBoolean(true);
+                var faulty = (ExactMetadataTransactionStoreV1) Proxy.newProxyInstance(
+                        ExactMetadataTransactionStoreV1.class.getClassLoader(),
+                        new Class<?>[] {ExactMetadataTransactionStoreV1.class},
+                        (proxy, method, args) -> {
+                            if (method.getName().equals("compareAndSet") && dropRelease.get()) {
+                                var expected = (Optional<?>) args[0];
+                                if (expected.isPresent()) {
+                                    var before =
+                                            (ExactMetadataTransactionStoreV1.VersionedValue) expected.orElseThrow();
+                                    var oldTickets = M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                                    before.canonicalStoredBytes())
+                                            .activeWriterTickets();
+                                    var newTickets = M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                                    (CanonicalBytes) args[2])
+                                            .activeWriterTickets();
+                                    if (newTickets.size() < oldTickets.size()) {
+                                        return CompletableFuture.completedFuture(
+                                                ExactMetadataTransactionStoreV1.MutationOutcome.RESPONSE_UNKNOWN);
+                                    }
+                                }
+                            }
+                            try {
+                                return method.invoke(f.route, args);
+                            } catch (InvocationTargetException failure) {
+                                throw failure.getCause();
+                            }
+                        });
+                var guard = new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(faulty));
+                var ready = new CompletableFuture<Void>();
+                var lifetime = new CompletableFuture<String>();
+                var sessions = new AtomicInteger();
+                java.util.function.Supplier<BookKeeperCellSession> factory = () -> {
+                    sessions.incrementAndGet();
+                    return published.output.newSession();
+                };
+                var sibling = KafkaBookKeeperReadOwnerV2.run(
+                        budget,
+                        descriptor,
+                        published.context.m4,
+                        guard,
+                        factory,
+                        published.output::captureExactTarget,
+                        published.context.owner,
+                        bounds,
+                        1,
+                        owner -> owner.recover().thenCompose(recovered -> {
+                            assertThat(recovered.view().descriptor()).isEqualTo(descriptor);
+                            ready.complete(null);
+                            return lifetime;
+                        }));
+                await(ready);
+                var completed = KafkaBookKeeperReadOwnerV2.run(
+                        budget,
+                        descriptor,
+                        published.context.m4,
+                        guard,
+                        factory,
+                        published.output::captureExactTarget,
+                        published.context.owner,
+                        bounds,
+                        1,
+                        KafkaBookKeeperReadOwnerV2::recover);
+                var failure = await(completed.handle((value, error) -> error));
+                while (failure instanceof java.util.concurrent.CompletionException) {
+                    failure = failure.getCause();
+                }
+                assertThat(failure).isInstanceOf(KafkaBookKeeperReadOwnerV2.TicketCleanupException.class);
+                var cleanup = (KafkaBookKeeperReadOwnerV2.TicketCleanupException) failure;
+                assertNativeReadTickets(f, descriptor, 2);
+                assertThat(budget.usage()).isEqualTo(charge);
+                assertThat(sibling.toCompletableFuture()).isNotDone();
+                assertThat(await(cleanup.reconcileTickets()))
+                        .hasSize(descriptor.sealedParts().size());
+                dropRelease.set(false);
+                assertThat(await(cleanup.reconcileTickets())).isEmpty();
+                assertNativeReadTickets(f, descriptor, 1);
+                assertThat(await(cleanup.reconcileTickets())).isEmpty();
+                assertNativeReadTickets(f, descriptor, 1);
+                assertThat(sibling.toCompletableFuture()).isNotDone();
+                assertThat(budget.usage()).isEqualTo(charge);
+                assertThat(sessions.get()).isEqualTo(2);
+                lifetime.complete("live sibling terminated");
+                assertThat(await(sibling)).isEqualTo("live sibling terminated");
+                assertNativeReadTickets(f, descriptor, 0);
+                assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
             }
         }
     }

@@ -146,6 +146,24 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
      */
     public CompletionStage<List<PhysicalResourceIdV2>> reconcileTerminal(
             List<? extends PhysicalResourceIdV2> resources, Context context, Sha256Digest exactNativeTerminalProof) {
+        return reconcile(resources, context, Optional.empty(), exactNativeTerminalProof);
+    }
+
+    /** Reconciles only one confirmed terminal invocation; sibling operations sharing its Context remain protected. */
+    public CompletionStage<List<PhysicalResourceIdV2>> reconcileOperation(
+            List<? extends PhysicalResourceIdV2> resources,
+            Context context,
+            Sha256Digest operationId,
+            Sha256Digest exactNativeTerminalProof) {
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(operationId, "operationId");
+        return reconcile(resources, context, Optional.of(operationId), exactNativeTerminalProof);
+    }
+
+    private CompletionStage<List<PhysicalResourceIdV2>> reconcile(
+            List<? extends PhysicalResourceIdV2> resources,
+            Context context,
+            Optional<Sha256Digest> operationId,
+            Sha256Digest exactNativeTerminalProof) {
         var targets = canonicalTargets(resources);
         Objects.requireNonNull(context, "context");
         M5TargetDeleteAuthorityRecordsV1.requireDigest(exactNativeTerminalProof, "exactNativeTerminalProof");
@@ -168,12 +186,19 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
                     var current = value.orElseThrow();
                     if (current.state() == TargetDeleteAuthorityStateV1.OPEN_V1) {
                         for (var ticket : current.fullAuthority().orElseThrow().activeWriterTickets()) {
+                            if (operationId.isPresent()
+                                    && !operationId.orElseThrow().equals(ticket.operationIdSha256())) {
+                                continue;
+                            }
                             if (context.matches(ticket)) {
                                 if (pending.size() < MAX_RECOVERY_TICKETS) {
                                     pending.add(new Attempt(resource, ticket));
                                 } else {
                                     unscanned.add(resource);
                                 }
+                            } else if (operationId.isPresent()) {
+                                // The nonce exists with different authority facts; this proof cannot discharge it.
+                                unscanned.add(resource);
                             }
                         }
                     }

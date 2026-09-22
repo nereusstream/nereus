@@ -195,6 +195,38 @@ class KafkaBookKeeperReadOwnerV2Test {
         assertThat(result).isCancelled();
     }
 
+    @Test
+    void confirmedDrainExposesBoundedMetadataOnlyCleanupEvenWhenItsObserverIsCancelled() {
+        var f = new Fixture();
+        f.store.dropRelease = true;
+        var workFailure = new IllegalArgumentException("work failed before confirmed drain");
+        var result = f.run(owner -> CompletableFuture.failedFuture(workFailure));
+        f.closed.complete(null);
+        var failure =
+                result.handle((value, error) -> error).toCompletableFuture().join();
+        while (failure instanceof java.util.concurrent.CompletionException) {
+            failure = failure.getCause();
+        }
+        assertThat(failure).isInstanceOf(KafkaBookKeeperReadOwnerV2.TicketCleanupException.class);
+        var cleanup = (KafkaBookKeeperReadOwnerV2.TicketCleanupException) failure;
+        assertThat(cleanup.getCause()).isSameAs(workFailure);
+        assertThat(f.budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+        f.assertTickets(1);
+        assertThat(cleanup.reconcileTickets().toCompletableFuture().join()).containsExactlyElementsOf(f.resources);
+        f.store.dropRelease = false;
+        var held = new CompletableFuture<Optional<ExactMetadataTransactionStoreV1.VersionedValue>>();
+        f.store.nextRead = held;
+        var retry = cleanup.reconcileTickets().toCompletableFuture();
+        assertThat(retry.cancel(true)).isTrue();
+        assertThat(held).isNotCancelled();
+        held.complete(Optional.of(f.store.values.get(f.resources.get(0).authorityKey())));
+        f.assertTickets(0);
+        assertThat(cleanup.reconcileTickets().toCompletableFuture().join()).isEmpty();
+        assertThat(f.sessions).isEqualTo(1);
+        assertThat(f.closes).isEqualTo(1);
+        assertThat(f.reads).isZero();
+    }
+
     private static final class Fixture {
         final KafkaSealedBookKeeperDescriptorV2Test.Fixture physical =
                 new KafkaSealedBookKeeperDescriptorV2Test.Fixture(false);
@@ -288,6 +320,8 @@ class KafkaBookKeeperReadOwnerV2Test {
     private static final class Store implements ExactMetadataTransactionStoreV1 {
         final Map<String, VersionedValue> values = new HashMap<>();
         long version;
+        boolean dropRelease;
+        CompletableFuture<Optional<VersionedValue>> nextRead;
 
         void put(String key, CanonicalBytes bytes) {
             values.put(
@@ -300,6 +334,11 @@ class KafkaBookKeeperReadOwnerV2Test {
         }
 
         public CompletionStage<Optional<VersionedValue>> read(String key) {
+            if (nextRead != null) {
+                var held = nextRead;
+                nextRead = null;
+                return held;
+            }
             return CompletableFuture.completedFuture(Optional.ofNullable(values.get(key)));
         }
 
@@ -307,6 +346,17 @@ class KafkaBookKeeperReadOwnerV2Test {
                 Optional<VersionedValue> expected, String key, CanonicalBytes bytes) {
             if (!Optional.ofNullable(values.get(key)).equals(expected)) {
                 return CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT);
+            }
+            if (dropRelease
+                    && expected.isPresent()
+                    && M5TargetDeleteAuthorityCodecV1.decodeAuthority(bytes)
+                                    .activeWriterTickets()
+                                    .size()
+                            < M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                            expected.orElseThrow().canonicalStoredBytes())
+                                    .activeWriterTickets()
+                                    .size()) {
+                return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
             }
             put(key, bytes);
             return CompletableFuture.completedFuture(MutationOutcome.APPLIED_EXACT);

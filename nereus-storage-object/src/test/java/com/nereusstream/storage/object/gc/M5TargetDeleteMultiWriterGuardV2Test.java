@@ -132,6 +132,25 @@ class M5TargetDeleteMultiWriterGuardV2Test {
                         .join())
                 .isEmpty();
         remaining.forEach(resource -> assertThat(fixture.tickets(resource)).isEmpty());
+        var exact = fixture.guard
+                .execute(
+                        resources,
+                        CONTEXT,
+                        () -> CompletableFuture.completedFuture(new Completion<>("unknown exact", Optional.empty())))
+                .toCompletableFuture()
+                .join()
+                .operationId();
+        var exactRemaining = fixture.guard
+                .reconcileOperation(resources, CONTEXT, exact, TERMINAL)
+                .toCompletableFuture()
+                .join();
+        assertThat(exactRemaining).containsExactlyElementsOf(resources.subList(256, 258));
+        assertThat(fixture.guard
+                        .reconcileOperation(exactRemaining, CONTEXT, exact, TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+        resources.forEach(resource -> assertThat(fixture.tickets(resource)).isEmpty());
     }
 
     @Test
@@ -143,11 +162,33 @@ class M5TargetDeleteMultiWriterGuardV2Test {
         var a = fixture.guard.execute(resources, CONTEXT, () -> first).toCompletableFuture();
         var b = fixture.guard.execute(resources, CONTEXT, () -> second).toCompletableFuture();
         assertThat(fixture.tickets(resources.get(0))).hasSize(2);
-        first.complete(new Completion<>("first", Optional.of(TERMINAL)));
-        assertThat(fixture.tickets(resources.get(0))).hasSize(1);
         second.complete(new Completion<>("unknown second", Optional.empty()));
-        assertThat(a.join().operationId()).isNotEqualTo(b.join().operationId());
+        var operation = b.join().operationId();
         assertThat(b.join().unresolvedTargets()).containsExactlyElementsOf(resources);
+        var foreignContext = new Context(
+                CONTEXT.writerClass(), CONTEXT.capabilitySha256(), TERMINAL, CONTEXT.externalFactsRootSha256());
+        assertThat(fixture.guard
+                        .reconcileOperation(resources, foreignContext, operation, TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .containsExactlyElementsOf(resources);
+        assertThat(fixture.tickets(resources.get(0))).hasSize(2);
+        assertThat(fixture.guard
+                        .reconcileOperation(resources, CONTEXT, operation, TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+        assertThat(fixture.tickets(resources.get(0))).hasSize(1);
+        assertThat(a).isNotDone();
+        assertThat(fixture.guard
+                        .reconcileOperation(resources, CONTEXT, operation, TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+        assertThat(fixture.tickets(resources.get(0))).hasSize(1);
+        first.complete(new Completion<>("first", Optional.of(TERMINAL)));
+        assertThat(a.join().operationId()).isNotEqualTo(operation);
+        assertThat(fixture.tickets(resources.get(0))).isEmpty();
     }
 
     @Test

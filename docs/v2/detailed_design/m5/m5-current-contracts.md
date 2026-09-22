@@ -471,9 +471,25 @@ Only the read-owner lifecycle can release a reservation. A failure before sessio
 creation begins, unknown creation/close or pending IO retains it. Actual read completion plus confirmed session
 termination releases the exact reservation once, including when the lifetime or outer observer was cancelled.
 Physical ticket cleanup still follows its existing authority protocol. The old budget-free `run` entry was removed.
-Five owner tests include exhaustion before session creation, identity/profile rejection, unknown-close retention and
+Six owner tests include exhaustion before session creation, identity/profile rejection, unknown-close retention and
 pre-session failure release. Actual BK/Oxia cases verify held native read and held session-close callbacks, fixed
 Binding shares, healthy same-Cell progress, and final share/ticket release after known termination.
+
+When IO and the owned session have definitely terminated but physical ticket cleanup remains unresolved,
+`KafkaBookKeeperReadOwnerV2` returns a privately constructed `TicketCleanupException`. It retains this invocation's
+operation ID, complete physical membership, Context and local terminal proof, while preserving an original work
+failure as its cause. `reconcileTickets()` performs metadata-only cleanup through `reconcileOperation`; it never
+creates another session or reruns work. Every ticket must match both the operation ID and all Context fields.
+A same-operation ticket with different authority facts remains unresolved. A live sibling sharing the Context keeps
+its own distinct ticket. Each pass removes at most 256 tickets across at most 2,048 targets / 1 MiB of canonical
+input; it returns unresolved targets and can be repeated. Cancelling its observer does not stop internal cleanup.
+Known native termination already releases the local Cell share, independently of pending metadata cleanup.
+
+Unknown native creation/close, incomplete IO and pre-dispatch admission failure do not construct this handle. This
+is a local post-drain repair path, not recovery of a crashed owner's drain or proof that a failed close is harmless.
+The existing Context-wide `reconcileTerminal` requires a native terminal covering every matching attempt; a single
+reader's drain cannot authorize it. The real BK/Oxia test retains a live same-Context reader, drops the terminated
+reader's ticket-release CAS, then retries only that exact operation and observes the live reader's tickets and share.
 
 This object belongs to one admitted process-local Cell owner and must live for that owner's entire lifetime. It does
 not establish uniqueness across independently created Cell-owner instances, durable process-restart budgeting,

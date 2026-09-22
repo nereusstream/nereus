@@ -124,7 +124,10 @@ performance-first BookKeeper WAL.
   unknown close do not grant early drain. Its local result grants no global M4 terminal, RELEASED or delete authority.
   Its public entry now reserves fixed per-Binding shares from one process-local Cell budget before physical admission.
   A cancelled slow native read retains its share through confirmed session termination; a healthy Binding in the same
-  configured Cell continues. Global process admission, retained result-cache budgeting and full transport accounting remain required.
+  configured Cell continues. Confirmed session termination with unresolved ticket cleanup now returns a privately constructed
+  retry handle for that exact operation; metadata-only retry preserves live readers sharing the same Context.
+  Unknown native close grants no such handle. Global process admission, retained result-cache budgeting and full
+  transport accounting remain required.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

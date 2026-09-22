@@ -2372,6 +2372,58 @@ all native read entry points. Protocol/source eligibility in these fixtures rema
 quarantine/retained-buffer evidence, per-Binding measurements and other providers remain required. M6 process
 wiring and M8 sizing/production qualification are not promoted. No M5-E child or Final authority is created.
 
+## 2026-09-22 exact-operation ticket cleanup after confirmed BK read termination
+
+On parent `80d767f4b59f957dddc250a1aee66c4bba47c716`, the scoped reader could confirm IO/session termination
+and return its Cell reservation, yet lose its operation ID when physical ticket cleanup failed. Readers of the same
+descriptor/selector share a Context, so a single reader's drain cannot authorize the existing Context-wide recovery.
+
+`M5TargetDeleteMultiWriterGuardV2.reconcileOperation` now matches the exact operation ID and every Context field.
+It uses the existing exact ticket CAS release, retains a same-operation/context-mismatch ticket as unresolved,
+and preserves the 256-removal/pass, 2,048-target and 1 MiB canonical input bounds. Context-wide terminal recovery
+retains its original requirement for an irreversible native decision covering every matching attempt.
+`KafkaBookKeeperReadOwnerV2.TicketCleanupException` has a private constructor and retains only the invocation's
+metadata cleanup identity/proof plus any original work failure. It is created only after confirmed IO and owned
+session termination. Its repeatable metadata-only retry never creates a session or reruns work; cancelling an observer
+does not stop cleanup. Unknown native termination or pre-admission failure produces no such handle.
+
+Six owner unit cases now include cleanup failure after confirmed drain, original failure preservation, unresolved
+retry, detached cancellation, idempotent recovery and no extra session/read. Nine guard cases include exact-operation
+isolation, mismatched Context rejection and two bounded passes over 258 targets. The native same-Context sibling
+case creates two actual BK sessions, retains one reader's lifetime after its native read, and drops the other reader's
+release CAS through the real Oxia route. Only the terminated reader's Cell share returns; exact retry removes only its
+tickets. The live sibling retains tickets and its share until its own known termination. Repeated retry creates no
+additional session. The existing unknown-close and cancelled native read/session tests remain in the run.
+
+Two preflight runs each passed 24 tasks; final preflight log is `/tmp/nereus-m5-read-ticket-preflight-final.log`.
+The locked runner passed 93/93 executed main tasks in 3m18s, 26 first-restart JVM tasks (six executed) in 37s,
+and 16 occupied-Cell restart JVM tasks (one executed) in 7s. It archives 25 suites / 102 cases and phases, including
+all three native read-owner cases. Independent legacy regression passed 96/96 main tasks in 1m59s and 24 restart tasks
+(four executed) in 14s, archiving 21 suites / 82 cases and phases.
+
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-78306`. Its 730-input manifest SHA is
+`7386a8ef4c638566a3606020c06e672a8d4d991609843215c575a7eaa84759b9`; summary SHA
+`34b9be68823d99e026176b884f095715cef1a7235353532bc1febb6d9f3a195e`. The same Oxia container
+`555185316d9216b4d02a6ddba536e37c154e9a11b66e6f5e6ba61b30f566e7a8` restarted from `2026-09-22T09:38:02.590971301Z`
+to `2026-09-22T09:40:15.898462376Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-78294`. Its 745-input manifest SHA is
+`eed6bb05170f2d83ae061de3602e3e5c3c62232d72b9a2d71cb7a2348288bf9b`; summary SHA
+`07be2a2faeeedf40c296fff1fb5c9563581c9b54b38bf194abd4765fec8bdd72`. The same Oxia container
+`5102188b8b0912baf31df7d8cfc5201fab407327635d50c959877373566a0a7e` restarted from `2026-09-22T09:40:54.725150797Z`
+to `2026-09-22T09:44:26.633034381Z`, then to `2026-09-22T09:45:17.892863419Z` for occupied-Cell recovery.
+All exact ZooKeeper/bookie container and image IDs remained stable with changed start times. Every input map entry,
+archived XML and occupied-Cell checkpoint hash was independently rechecked; failures, errors and skips are zero.
+Copied legacy summary/manifest bytes match. The verifier is `/tmp/nereus-m5-read-ticket-verify.py`; its result is
+`/tmp/nereus-m5-read-ticket-verified.json`. Owning runners cleaned their containers, preserving the unrelated connector.
+Final documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-read-ticket-final-check.log`). All 17 obligations remain
+OPEN/null; all three deferred M6 rows remain PLANNED/null in both acceptance and scenario registries.
+
+This adds local post-drain metadata repair, not crash recovery, qualified native process/transport drain, a global
+protocol-owner terminal, M4 RELEASED, physical delete eligibility or M5-E/Final authority. Full population admission,
+retained buffers/caches, other providers and all 17 amended obligations remain required; M6 process wiring and
+M7/M8 activation/production boundaries are unchanged.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

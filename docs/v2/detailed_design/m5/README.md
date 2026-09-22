@@ -247,9 +247,11 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   native session creation through actual read/session termination. It closes local admission before exact M4 closure
   and supports exact retry after unknown response. Its public entry now requires fixed process-local Cell/Binding
   shares for owner count, read slots and configured encoded/decoded bytes, retained through native read/session
-  termination. Five owner tests, seven unchanged M4 recovery tests and two native owner cases pass within the current
-  100-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. It creates no M4 terminal
-  or RELEASED record; global process admission, full cache/transport budgeting and crash reconciliation remain required.
+  termination. Six owner tests, seven unchanged M4 recovery tests and three native owner cases pass within the current
+  102-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
+  termination, an exact-operation retry handle can finish unresolved physical ticket cleanup without clearing a live
+  same-Context reader; unknown close grants no handle. It creates no M4 terminal or RELEASED record; global process
+  admission, full cache/transport budgeting and crash reconciliation remain required.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
