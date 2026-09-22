@@ -122,6 +122,9 @@ performance-first BookKeeper WAL.
   A [scoped read owner](detailed_design/m5/m5-kafka-read-owner-projection.json) now holds native physical tickets through
   accepted reads and actual session termination, closing local admission before exact M4 closure. Cancellation and
   unknown close do not grant early drain. Its local result grants no global M4 terminal, RELEASED or delete authority.
+  Its public entry now reserves fixed per-Binding shares from one process-local Cell budget before physical admission.
+  A cancelled slow native read retains its share through confirmed session termination; a healthy Binding in the same
+  configured Cell continues. Global process admission, retained result-cache budgeting and full transport accounting remain required.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

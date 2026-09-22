@@ -455,8 +455,31 @@ exact M4 closure path closes local admission before CAS; unknown/conflicting clo
 material, and exact retry retains the old read until actual completion. Cancellation of reads, work or an outer
 observer cannot bypass cleanup; an ended owner cannot issue another read or late selector transition. Native delayed
 read/close verification passes. Its privately constructed local evidence is not an M4 terminal/proof or RELEASED
-record. Full protocol-owner population admission, aggregate Cell reservation, crash-ticket reconciliation and actual
-M4 release remain OPEN. Existing service-restart cases do not prove reconstruction of this new owner's local drain.
+record. Public `run` now requires the fixed process-local Cell reservation below. Full protocol-owner population
+admission, retained result-cache/backend transport accounting, crash-ticket reconciliation and actual M4 release remain
+OPEN. Existing service-restart cases do not prove reconstruction of this owner's local drain.
+
+`KafkaBookKeeperReadCellBudgetV2` fixes a Cell's admitted Binding shares before use. Full Binding identity includes
+BindingId, incarnation and storage epoch; a changed epoch or foreign Cell cannot consume another share. At most
+1,024 configured Bindings share at most 65,536 owners/read slots. The sum of reserved shares must fit the Cell hard
+limit. A scope reserves one owner, its configured recovery capacity and capacity multiplied by each encoded/decoded
+byte allowance before any metadata/ticket/session admission. Shares are not borrowed and admission has no waiting
+queue, so an occupied Binding cannot consume its healthy sibling's reserved share. Snapshot methods observe only;
+there is no public reset/release or expiry path.
+
+Only the read-owner lifecycle can release a reservation. A failure before session creation returns it; after session
+creation begins, unknown creation/close or pending IO retains it. Actual read completion plus confirmed session
+termination releases the exact reservation once, including when the lifetime or outer observer was cancelled.
+Physical ticket cleanup still follows its existing authority protocol. The old budget-free `run` entry was removed.
+Five owner tests include exhaustion before session creation, identity/profile rejection, unknown-close retention and
+pre-session failure release. Actual BK/Oxia cases verify held native read and held session-close callbacks, fixed
+Binding shares, healthy same-Cell progress, and final share/ticket release after known termination.
+
+This object belongs to one admitted process-local Cell owner and must live for that owner's entire lifetime. It does
+not establish uniqueness across independently created Cell-owner instances, durable process-restart budgeting,
+provider-internal transport memory, retained result caches, bytes/IO rates or all other native read entry points.
+Review 8.1 still requires the complete M4 quarantine/retained-buffer evidence and Binding metrics; M6 owns native
+process-drain wiring. An unplanned death cannot reconstruct a local drain or clear durable tickets from this object.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

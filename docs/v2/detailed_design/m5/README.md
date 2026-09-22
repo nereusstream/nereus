@@ -245,9 +245,11 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
 
 - The [scoped BK read owner](m5-kafka-read-owner-projection.json) holds every physical member's ticket from before
   native session creation through actual read/session termination. It closes local admission before exact M4 closure
-  and supports exact retry after unknown response. Five owner tests, seven unchanged M4 recovery tests and a new
-  native delayed-read/close case pass within the 90-case/phase source-bound run. It creates no M4 terminal or RELEASED
-  record; full native owner admission and crash reconciliation remain required.
+  and supports exact retry after unknown response. Its public entry now requires fixed process-local Cell/Binding
+  shares for owner count, read slots and configured encoded/decoded bytes, retained through native read/session
+  termination. Five owner tests, seven unchanged M4 recovery tests and two native owner cases pass within the current
+  100-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. It creates no M4 terminal
+  or RELEASED record; global process admission, full cache/transport budgeting and crash reconciliation remain required.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

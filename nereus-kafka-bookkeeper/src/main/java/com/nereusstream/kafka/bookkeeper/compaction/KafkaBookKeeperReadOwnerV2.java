@@ -123,11 +123,12 @@ public final class KafkaBookKeeperReadOwnerV2 {
     }
 
     /**
-     * The scope cannot escape its lifetime: completion/cancellation/failure of work closes admission and waits for
-     * accepted IO and the owned session. Cancelling the returned observer never cancels that internal cleanup.
-     * Bounds are per admitted recovery; the Cell owner must reserve the aggregate capacity before calling run.
+     * Fixed Cell/Binding shares precede all admission work and remain charged through actual IO/session termination.
+     * Completion/cancellation/failure of work closes admission and waits for accepted IO and the owned session.
+     * Cancelling the returned observer never cancels internal cleanup or releases its Cell reservation.
      */
     public static <T> CompletionStage<T> run(
+            KafkaBookKeeperReadCellBudgetV2 budget,
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             M4ReadControlCoordinatorV1 coordinator,
             M5TargetDeleteMultiWriterGuardV2 guard,
@@ -137,6 +138,45 @@ public final class KafkaBookKeeperReadOwnerV2 {
             KafkaBookKeeperSelectedSourceV2.Bounds bounds,
             int capacity,
             Function<KafkaBookKeeperReadOwnerV2, ? extends CompletionStage<T>> work) {
+        final KafkaBookKeeperReadCellBudgetV2.Reservation reservation;
+        try {
+            reservation = Objects.requireNonNull(budget, "budget").reserve(descriptor, bounds, capacity);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletionStage<T> operation;
+        try {
+            operation = runInternal(
+                    descriptor,
+                    coordinator,
+                    guard,
+                    sessions,
+                    metadataReader,
+                    owner,
+                    bounds,
+                    capacity,
+                    work,
+                    reservation);
+        } catch (Throwable failure) {
+            reservation.releaseBeforeSession();
+            return CompletableFuture.failedFuture(failure);
+        }
+        return operation
+                .whenComplete((value, failure) -> reservation.releaseBeforeSession())
+                .thenApply(value -> value);
+    }
+
+    private static <T> CompletionStage<T> runInternal(
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            M4ReadControlCoordinatorV1 coordinator,
+            M5TargetDeleteMultiWriterGuardV2 guard,
+            Supplier<? extends BookKeeperCellSession> sessions,
+            KafkaBookKeeperCompactionWriterV2.SealedMetadataReader metadataReader,
+            Executor owner,
+            KafkaBookKeeperSelectedSourceV2.Bounds bounds,
+            int capacity,
+            Function<KafkaBookKeeperReadOwnerV2, ? extends CompletionStage<T>> work,
+            KafkaBookKeeperReadCellBudgetV2.Reservation reservation) {
         Objects.requireNonNull(descriptor, "descriptor");
         Objects.requireNonNull(coordinator, "coordinator");
         Objects.requireNonNull(guard, "guard");
@@ -185,6 +225,7 @@ public final class KafkaBookKeeperReadOwnerV2 {
                             .array()));
                     return guard.execute(resources, context, () -> CompletableFuture.supplyAsync(
                                     () -> {
+                                        reservation.sessionStarting();
                                         var session = Objects.requireNonNull(sessions.get(), "native session");
                                         KafkaBookKeeperReadOwnerV2 controller;
                                         try {
@@ -208,10 +249,11 @@ public final class KafkaBookKeeperReadOwnerV2 {
                                                     bounds,
                                                     capacity);
                                         } catch (Throwable failure) {
-                                            return session.closeAsync()
-                                                    .thenApply(ignored -> new Completion<>(
-                                                            new WorkResult<T>(null, failure),
-                                                            Optional.of(terminalProof)));
+                                            return session.closeAsync().thenApply(ignored -> {
+                                                reservation.releaseAfterDrain();
+                                                return new Completion<>(
+                                                        new WorkResult<T>(null, failure), Optional.of(terminalProof));
+                                            });
                                         }
                                         CompletionStage<T> lifetime;
                                         try {
@@ -222,8 +264,10 @@ public final class KafkaBookKeeperReadOwnerV2 {
                                         return lifetime.handle(WorkResult<T>::new)
                                                 .thenCompose(result -> controller
                                                         .stopAndDrain()
-                                                        .thenApply(ignored ->
-                                                                new Completion<>(result, Optional.of(terminalProof))));
+                                                        .thenApply(ignored -> {
+                                                            reservation.releaseAfterDrain();
+                                                            return new Completion<>(result, Optional.of(terminalProof));
+                                                        }));
                                     },
                                     owner)
                             .thenCompose(stage -> stage));

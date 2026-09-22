@@ -58,6 +58,11 @@ class KafkaBookKeeperReadOwnerV2Test {
                 .toCompletableFuture();
         assertThat(result).isNotDone();
         f.assertTickets(1);
+        assertThat(f.budget.usage()).isEqualTo(f.charge);
+        assertThatThrownBy(() ->
+                        f.run(value -> value.recover()).toCompletableFuture().join())
+                .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+        assertThat(f.sessions).isEqualTo(1);
         assertThat(read.get().cancel(true)).isTrue();
         assertThat(f.pending).isNotCancelled();
         assertThat(f.closes).isZero();
@@ -66,8 +71,10 @@ class KafkaBookKeeperReadOwnerV2Test {
         assertThat(f.closes).isEqualTo(1);
         assertThat(result).isNotDone();
         f.assertTickets(1);
+        assertThat(f.budget.usage()).isEqualTo(f.charge);
         f.closed.complete(null);
         var evidence = result.join();
+        assertThat(f.budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
         assertThat(evidence.anchor().closedReadAdmissionEpoch())
                 .isEqualTo(evidence.predecessor().readAdmissionEpoch());
         assertThat(evidence.successor().readAdmissionEpoch())
@@ -116,11 +123,34 @@ class KafkaBookKeeperReadOwnerV2Test {
         assertThatThrownBy(result::join).hasRootCauseMessage("BK read owner terminal or tickets unresolved");
         f.assertTickets(1);
         assertThat(f.closes).isEqualTo(1);
+        assertThat(f.budget.usage()).isEqualTo(f.charge);
     }
 
     @Test
     void cancelledLifetimeStillDrainsAndMissingAuthorityNeverCreatesSession() {
         var f = new Fixture();
+        var binding = f.physical.descriptor.sourceCut().identity().binding();
+        var changedBinding = new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity(
+                binding.bindingId(),
+                binding.incarnationSha256(),
+                KafkaBookKeeperCompactionTestSupportV2.digest("other-epoch"));
+        var cell = f.physical.descriptor.task().capability().providerScopeId();
+        assertThatThrownBy(() -> new KafkaBookKeeperReadCellBudgetV2(
+                        cell, f.charge, Map.of(binding, f.charge, changedBinding, f.charge)))
+                .hasMessage("BK read Binding shares exceed the Cell hard limit");
+        var foreignBinding = new KafkaBookKeeperReadCellBudgetV2(cell, f.charge, Map.of(changedBinding, f.charge));
+        assertThatThrownBy(() -> foreignBinding.reserve(f.physical.descriptor, f.bounds, 2))
+                .hasMessage("BK read Binding has no admitted Cell share");
+        var foreignCell = new KafkaBookKeeperReadCellBudgetV2(
+                new com.nereusstream.storage.api.bookkeeper.CellProviderScopeId(
+                        KafkaBookKeeperCompactionTestSupportV2.digest("other-cell")),
+                f.charge,
+                Map.of(binding, f.charge));
+        assertThatThrownBy(() -> foreignCell.reserve(f.physical.descriptor, f.bounds, 2))
+                .hasMessage("BK read budget belongs to another Cell");
+        var released = f.budget.reserve(f.physical.descriptor, f.bounds, 2);
+        released.releaseBeforeSession();
+        assertThatThrownBy(released::sessionStarting).hasMessage("BK read Cell reservation is already released");
         var lifetime = new CompletableFuture<String>();
         var result = f.run(value -> {
                     value.recover();
@@ -143,6 +173,7 @@ class KafkaBookKeeperReadOwnerV2Test {
                         .join())
                 .hasRootCauseMessage("BK read owner physical admission failed");
         assertThat(absent.sessions).isZero();
+        assertThat(absent.budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
     }
 
     @Test
@@ -167,6 +198,13 @@ class KafkaBookKeeperReadOwnerV2Test {
     private static final class Fixture {
         final KafkaSealedBookKeeperDescriptorV2Test.Fixture physical =
                 new KafkaSealedBookKeeperDescriptorV2Test.Fixture(false);
+        final KafkaBookKeeperSelectedSourceV2.Bounds bounds =
+                new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000);
+        final KafkaBookKeeperReadCellBudgetV2.Usage charge = KafkaBookKeeperReadCellBudgetV2.Usage.forOwner(bounds, 2);
+        final KafkaBookKeeperReadCellBudgetV2 budget = new KafkaBookKeeperReadCellBudgetV2(
+                physical.descriptor.task().capability().providerScopeId(),
+                charge,
+                Map.of(physical.descriptor.sourceCut().identity().binding(), charge));
         final Store store = new Store();
         final M5TargetDeleteMultiWriterGuardV2 guard =
                 new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(store));
@@ -196,6 +234,7 @@ class KafkaBookKeeperReadOwnerV2Test {
 
         <T> CompletionStage<T> run(Function<KafkaBookKeeperReadOwnerV2, CompletionStage<T>> work) {
             return KafkaBookKeeperReadOwnerV2.run(
+                    budget,
                     physical.descriptor,
                     physical.m4,
                     guard,

@@ -54,7 +54,7 @@ services restarting; a new GC owner refreshes intent before fixture deletion and
 checks exact native head CAS in the same transaction and retains the reservation after DONE. Restart recovery runs
 at full capacity and verifies explicit expansion before new admission. `v2M5NativeDeleteCellBudgetRealTest` adds two
 bound native lifecycle cases. `v2M5NativeDeleteCellRestartWriteTest` / `v2M5NativeDeleteCellRestartReadTest` add
-occupied-head phases around a second actual service restart, bringing the runner to 25 archives / 99 cases and phases.
+occupied-head phases around a second actual service restart, bringing the runner to 25 archives / 99 cases and phases before the read-share case below.
 A permanent Cell head reserves dispatch and possible-unknown slots before native deletion; cancellation/reconnect
 retains active holds, and only callback-terminal unknowns admit read-only absence reconciliation. ACTIVE and UNKNOWN
 records survive server restart unchanged; ledger absence alone does not release ACTIVE, while a healthy configured
@@ -146,9 +146,12 @@ Shared M5-A/M5-B validation now rejects a new fallback's first epoch unless it e
 existing fallback sets inherit their original first epoch. The current 90-case/phase run includes 8 Object
 materialization and 14 Kafka semantic cases plus native epoch/set checks before and after both generation restarts.
 The [scoped read owner](detailed_design/m5/m5-kafka-read-owner-projection.json) adds physical tickets for its complete
-native-session lifetime and local close-before-CAS/drain. Five owner tests, seven existing M4 recovery tests and one
-native delayed-read/close case join the current run. Its result is local only; global native owner admission, crash
-reconciliation, M4 terminal/proof publication and RELEASED remain outstanding.
+native-session lifetime and local close-before-CAS/drain. Public entry now also reserves fixed per-Binding owner,
+read-slot and configured byte allowances from one process-local Cell budget. Five owner tests, seven existing M4
+recovery tests and two native owner cases join the current 25-archive / 100-case bound run. The new case retains a
+cancelled Binding's share through actual read and session completion while a healthy same-Cell Binding reads. Its
+result is local only; global process admission, result-cache/transport accounting, crash reconciliation, M4 terminal/
+proof publication and RELEASED remain outstanding.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

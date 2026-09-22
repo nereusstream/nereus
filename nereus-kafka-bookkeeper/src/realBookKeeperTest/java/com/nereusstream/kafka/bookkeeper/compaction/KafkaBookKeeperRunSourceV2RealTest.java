@@ -350,6 +350,131 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void nativeReadCellReservesBindingSharesUntilActualReadAndCloseComplete() throws Exception {
+        try (var slow = new Fixture(2540, "slow-cell-member", null);
+                var healthy = new Fixture(2541, "healthy-cell-member", null)) {
+            var slowRoot = admit(slow, slow.prepareSealedSource());
+            var healthyRoot = admit(healthy, healthy.prepareSealedSource());
+            var slowSource = reader(slow, slow.roots, BOUNDS);
+            var healthySource = reader(healthy, healthy.roots, BOUNDS);
+            var slowRaw = await(slowSource.capture(slow.roots.nativeRootKey(slowRoot.runId())));
+            var healthyRaw = await(healthySource.capture(healthy.roots.nativeRootKey(healthyRoot.runId())));
+            try (var first = new Published(slow, input(slow, slowRaw, 3540), NativeContext.root());
+                    var second = new Published(healthy, input(healthy, healthyRaw, 3541), NativeContext.root())) {
+                var firstDescriptor = first.writeAndPublish(slowSource);
+                var secondDescriptor = second.writeAndPublish(healthySource);
+                assertThat(firstDescriptor.task().capability().providerScopeId())
+                        .isEqualTo(secondDescriptor.task().capability().providerScopeId());
+                var bounds = new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000);
+                var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forOwner(bounds, 1);
+                var budget = new KafkaBookKeeperReadCellBudgetV2(
+                        firstDescriptor.task().capability().providerScopeId(),
+                        new KafkaBookKeeperReadCellBudgetV2.Usage(2, 2, 2000000, 1000000),
+                        java.util.Map.of(
+                                firstDescriptor.sourceCut().identity().binding(), charge,
+                                secondDescriptor.sourceCut().identity().binding(), charge));
+                var entered = new CompletableFuture<RunLedgerReadResultV1>();
+                var delivered = new CompletableFuture<RunLedgerReadResultV1>();
+                var closeEntered = new CompletableFuture<Void>();
+                var closeDelivered = new CompletableFuture<Void>();
+                var read = new CompletableFuture<CompletableFuture<KafkaBookKeeperM4RecoveryV2.RecoveryResult>>();
+                var calls = new AtomicInteger();
+                var sessionCreations = new AtomicInteger();
+                java.util.function.Supplier<BookKeeperCellSession> sessions = () -> {
+                    sessionCreations.incrementAndGet();
+                    var nativeSession = first.output.newSession();
+                    return (BookKeeperCellSession) Proxy.newProxyInstance(
+                            BookKeeperCellSession.class.getClassLoader(),
+                            new Class<?>[] {BookKeeperCellSession.class},
+                            (proxy, method, args) -> {
+                                Object result;
+                                try {
+                                    result = method.invoke(nativeSession, args);
+                                } catch (InvocationTargetException failure) {
+                                    throw failure.getCause();
+                                }
+                                if (method.getName().equals("readExactEntry") && calls.incrementAndGet() == 1) {
+                                    ((CompletionStage<?>) result).whenComplete((value, failure) -> {
+                                        if (failure == null) {
+                                            entered.complete((RunLedgerReadResultV1) value);
+                                        } else {
+                                            entered.completeExceptionally(failure);
+                                        }
+                                    });
+                                    return delivered;
+                                }
+                                if (method.getName().equals("closeAsync")) {
+                                    return ((CompletionStage<?>) result).thenCompose(ignored -> {
+                                        closeEntered.complete(null);
+                                        return closeDelivered;
+                                    });
+                                }
+                                return result;
+                            });
+                };
+                var guard = new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(slow.route));
+                var pending = KafkaBookKeeperReadOwnerV2.run(
+                        budget,
+                        firstDescriptor,
+                        first.context.m4,
+                        guard,
+                        sessions,
+                        first.output::captureExactTarget,
+                        first.context.owner,
+                        bounds,
+                        1,
+                        owner -> {
+                            var observer = owner.recover();
+                            read.complete(observer);
+                            return observer;
+                        });
+                var actual = await(entered);
+                assertThat(await(read).cancel(true)).isTrue();
+                assertThat(budget.usage()).isEqualTo(charge);
+                assertThatThrownBy(() -> await(KafkaBookKeeperReadOwnerV2.run(
+                                budget,
+                                firstDescriptor,
+                                first.context.m4,
+                                guard,
+                                sessions,
+                                first.output::captureExactTarget,
+                                first.context.owner,
+                                bounds,
+                                1,
+                                KafkaBookKeeperReadOwnerV2::recover)))
+                        .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+                assertThat(sessionCreations.get()).isEqualTo(1);
+                var recovered = await(KafkaBookKeeperReadOwnerV2.run(
+                        budget,
+                        secondDescriptor,
+                        second.context.m4,
+                        new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(healthy.route)),
+                        second.output::newSession,
+                        second.output::captureExactTarget,
+                        second.context.owner,
+                        bounds,
+                        1,
+                        KafkaBookKeeperReadOwnerV2::recover));
+                assertThat(recovered.view().descriptor()).isEqualTo(secondDescriptor);
+                assertThat(budget.usage()).isEqualTo(charge);
+                assertThat(budget.bindingUsage()
+                                .get(secondDescriptor.sourceCut().identity().binding()))
+                        .isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+                assertNativeReadTickets(slow, firstDescriptor, 1);
+                delivered.complete(actual);
+                await(closeEntered);
+                assertThat(budget.usage()).isEqualTo(charge);
+                assertNativeReadTickets(slow, firstDescriptor, 1);
+                closeDelivered.complete(null);
+                assertThatThrownBy(() -> await(pending))
+                        .hasRootCauseInstanceOf(java.util.concurrent.CancellationException.class);
+                assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+                assertNativeReadTickets(slow, firstDescriptor, 0);
+            }
+        }
+    }
+
+    @Test
     void nativeReadOwnerClosesAdmissionAndRetainsTicketsUntilSessionTermination() throws Exception {
         try (var f = new Fixture(2530, "orders", null)) {
             var root = admit(f, f.prepareSealedSource());
@@ -367,7 +492,14 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 var read = new AtomicReference<CompletableFuture<KafkaBookKeeperM4RecoveryV2.RecoveryResult>>();
                 var calls = new AtomicInteger();
                 var closes = new AtomicInteger();
+                var readBounds = new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000);
+                var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forOwner(readBounds, 2);
+                var budget = new KafkaBookKeeperReadCellBudgetV2(
+                        descriptor.task().capability().providerScopeId(),
+                        charge,
+                        java.util.Map.of(descriptor.sourceCut().identity().binding(), charge));
                 var scope = KafkaBookKeeperReadOwnerV2.run(
+                        budget,
                         descriptor,
                         published.context.m4,
                         new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
@@ -426,6 +558,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThatThrownBy(() -> await(owner.recover()))
                         .hasRootCauseMessage("BK read owner admission is closed");
                 assertThat(closes.get()).isZero();
+                assertThat(budget.usage()).isEqualTo(charge);
                 assertNativeReadTickets(f, descriptor, 1);
                 assertThat(drained.toCompletableFuture()).isNotDone();
                 delivered.complete(actual);
@@ -433,8 +566,10 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(closes.get()).isEqualTo(1);
                 assertThat(drained.toCompletableFuture()).isNotDone();
                 assertNativeReadTickets(f, descriptor, 1);
+                assertThat(budget.usage()).isEqualTo(charge);
                 closeDelivered.complete(null);
                 var evidence = await(scope);
+                assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
                 assertThat(evidence.anchor().closedReadAdmissionEpoch())
                         .isEqualTo(evidence.predecessor().readAdmissionEpoch());
                 assertThat(evidence.successor().mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_ONLY);

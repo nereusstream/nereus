@@ -2319,6 +2319,59 @@ not prove transport-buffer reclamation, qualified ACTIVE drain/exit, per-Binding
 ownership or the complete dispatcher. Low-level intent/authority digests remain synthetic. No M5-E receipt, Final,
 benchmark or production authority is created.
 
+## 2026-09-22 scoped BK read-owner fixed Binding shares
+
+Status: runtime Cell admission implemented after `fe300c302cddf60940abe03cd31a576cc6b459c8`; NON_PROMOTABLE.
+All 17 acceptance obligations remain OPEN/null; M6 012/013/022 remain PLANNED/null in both registries. Review 8.1
+requires actual completion/confirmed close and retained behavior without proof; native process-drain wiring remains M6.
+
+`KafkaBookKeeperReadCellBudgetV2` fixes complete Binding identity shares within one process-local Cell owner. Its
+immutable profile caps configured Bindings, owners and read slots, verifies summed shares against the Cell hard
+limit, and reserves owner/read-slot/encoded-byte/decoded-byte allowances before metadata, physical ticket or session
+admission. A Binding cannot borrow another's reserved share. `KafkaBookKeeperReadOwnerV2.run` now requires this
+budget; the old unbudgeted overload was removed. Reservation release is private to the lifecycle: pre-session failure
+returns it, while accepted/pending reads, unknown session creation/close and cancellation retain it until known
+read/session termination. Each exact reservation releases once. Existing M4 and physical-ticket authority is unchanged.
+
+Five owner tests now use this entry and cover capacity exhaustion before new session creation, oversubscribed Cell
+profiles, changed Binding epoch/foreign Cell rejection, unknown-close retention, cancellation and pre-session failure
+release. Final review also makes profile validation use its immutable copied map and rejects session creation through
+an already released reservation; the latter has a focused regression assertion. The existing native read/close case
+checks reserved usage through both delays. A new actual BK/Oxia case
+holds a cancelled native read from one Binding, rejects another scope for its exhausted share before session creation,
+and completes a healthy Binding's read in the same configured Cell. The first share and all physical tickets remain
+until actual read completion and the held native session-close callback; known completion then releases them.
+
+Final locked validation passed via `scripts/run-v2-m5-kafka-run-source-check.sh`: legacy 96/96 main tasks (1m 57s),
+24/24 restart tasks (13s), 21 archives / 82 cases and phases; bound profile 93/93 main tasks (3m 12s), 26/26 first-
+restart tasks (36s), 16/16 occupied-Cell restart-read tasks (6s), 25 archives / 100 cases and phases.
+Log: `/tmp/nereus-m5-read-cell-real-final.log`.
+Legacy output: `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-25063`. Its 730-input manifest SHA is
+`3f394ce102bd8cb29f463b028ec3f65a6648cee1ea62671930be28765baa48cf`; summary SHA
+`a0fd488a2996320799b1cda6e98b593138aa3382a2bb7e2a6252cd8de84be83c`. Its same Oxia container
+`bb89508b50c4052522191fbdaafc65a364b5fff73f4ba71dd7d49cd649a23dd4` restarted from `2026-09-22T09:10:42.311583541Z`
+to `2026-09-22T09:12:53.564878838Z`.
+Bound output: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-25052`. Its 745-input manifest SHA is
+`bd0973930b6abf73b2ad05f17d3383087fe05b8e356180588dbcc5c4deb6964f`; summary SHA
+`65f417dc3bcb814d7ddde58917c859b6c73cd85e2143d74762a2b26de9ae17ea`. Its same Oxia container
+`9ad69b6e7b1cf0d5924e1eb38649665fd5c676b065c0d1f37f1f9c6807514d35` restarted from `2026-09-22T09:13:30.771189342Z`
+to `2026-09-22T09:16:57.699107798Z`, then again to `2026-09-22T09:17:47.467119585Z` for occupied Cell recovery.
+All exact ZooKeeper/bookie container and image IDs were retained with changed start times. Every captured input,
+archived XML and both occupied-Cell checkpoint hashes was independently rechecked; all suites have zero failures,
+errors and skips. Copied legacy summary/manifest bytes match. Owning runners removed their containers; the unrelated
+connector remains. Initial compile/style checks passed 21 tasks, lifecycle additions 22 tasks, expanded unit checks
+24 tasks and final API/preflight 22 tasks. Initial native validation passed; the final immutable-profile/late-session
+review correction passed 23 focused tasks (`/tmp/nereus-m5-read-cell-race-preflight.log`) before the complete locked
+rerun whose final hashes are recorded above.
+Final documentation, historical freeze/M4 dependency, lifecycle, coordinator, materialization and Kafka
+contract/source checks passed 19/19 tasks (`/tmp/nereus-m5-read-cell-final-check.log`).
+
+This is a fixed budget for one admitted process-local Cell owner, not global uniqueness across arbitrary owner
+instances, durable process-restart capacity, retained result-cache accounting, provider-internal buffers, rates or
+all native read entry points. Protocol/source eligibility in these fixtures remains synthetic. Full Review 8.1
+quarantine/retained-buffer evidence, per-Binding measurements and other providers remain required. M6 process
+wiring and M8 sizing/production qualification are not promoted. No M5-E child or Final authority is created.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
