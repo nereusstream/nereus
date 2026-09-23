@@ -185,6 +185,59 @@ class M5BookKeeperDeleteCellBudgetV2RealTest {
         }
     }
 
+    @Test
+    void successorEpochReleasesFencedActiveWithoutReplayingTheOldDelete() throws Exception {
+        var capability = capability("cell-fenced-active-recovery");
+        var spec = spec(capability);
+        try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability)) {
+            var binding = await(backend.readBinding()).orElseThrow();
+            var quota = backend.nativeDeleteQuota();
+            await(quota.expand(
+                    quota.capacityForResources(await(quota.snapshot()).reservedResources() + 1)));
+            var budget = backend.nativeDeleteCellBudget();
+            await(budget.initialize(new M5BookKeeperDeleteCellBudgetV2.Limits(1, 1)));
+            try (var client = M5BookKeeperNativeCreateClientV2.connect(uri(), capability, spec, binding)) {
+                var handle = sealed(client, spec);
+                await(client.fenceCreates());
+                var target =
+                        await(client.captureExactTarget(handle)).exactTarget().orElseThrow();
+                var gate = new CompletableFuture<Void>();
+                var ready = new CompletableFuture<Void>();
+                var authority = client.deleteAuthority(handle, () -> {
+                    ready.complete(null);
+                    return gate;
+                });
+                var oldIntent = bind(authority, target.metadataSha256());
+                var pending = authority.deleteExact(budget, oldIntent, target);
+                await(ready);
+                assertThat(await(budget.snapshot()).reservations()).hasSize(1);
+                assertThatThrownBy(() -> await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                        .hasRootCauseMessage("native delete predecessor epoch is not fenced");
+                assertThat(await(budget.snapshot()).reservations()).hasSize(1);
+
+                var successor = await(authority.claim(Optional.of(oldIntent.epoch()), UUID.randomUUID()));
+                assertThat(successor.nativeVersion())
+                        .isGreaterThan(oldIntent.epoch().nativeVersion());
+                assertThat(await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                        .isTrue();
+                assertThat(await(budget.snapshot()).reservations()).isEmpty();
+                gate.complete(null);
+                assertThatThrownBy(() -> await(pending))
+                        .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.BadVersionException.class);
+                assertThat(await(client.captureExactTarget(handle)).exactTarget())
+                        .contains(target);
+                assertThat(await(budget.snapshot()).reservations()).isEmpty();
+
+                var currentIntent = await(authority.bindIntent(
+                        successor, digest("successor-token"), digest("successor-authority"), target.metadataSha256()));
+                var deleted = await(authority.deleteExact(budget, currentIntent, target));
+                assertThat(deleted.deleteResult().outcome()).isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
+                assertThat(deleted.reservationRetained()).isFalse();
+                assertThat(await(budget.snapshot()).reservations()).isEmpty();
+            }
+        }
+    }
+
     static M5BookKeeperNativeDeleteIntentV2 bind(
             M5BookKeeperNativeDeleteAuthorityV2 authority, com.nereusstream.domain.bytes.Sha256Digest metadata)
             throws Exception {

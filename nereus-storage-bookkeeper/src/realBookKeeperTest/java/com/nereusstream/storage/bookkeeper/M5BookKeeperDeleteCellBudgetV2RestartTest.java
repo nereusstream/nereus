@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -200,6 +201,47 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                                                 .encode())
                                 .toHex())
                         .isEqualTo(Files.readAllLines(checkpoint(unknown)).get(4));
+            }
+        }
+    }
+
+    @Test
+    void recoverFencedActiveAfterServerRestart() throws Exception {
+        var lines = Files.readAllLines(checkpoint(false));
+        assertThat(lines).hasSize(10);
+        var capability = capability(scope(false));
+        var spec = M5BookKeeperNativeCreateSpecV2.decode(
+                CanonicalBytes.copyOf(HexFormat.of().parseHex(lines.get(0))));
+        var run = spec.configurations().get(0);
+        var handle = new RunLedgerHandleV1(
+                run.providerScopeId(),
+                run.runId(),
+                new BookKeeperLedgerIdentity(Long.parseLong(lines.get(1))),
+                run.configurationDigest());
+        try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability)) {
+            var binding = await(backend.readBinding()).orElseThrow();
+            var budget = backend.nativeDeleteCellBudget();
+            var held = await(budget.snapshot());
+            assertThat(Sha256Digest.hash(held.encode()).toHex()).isEqualTo(lines.get(4));
+            assertThat(held.reservations()).hasSize(1);
+            assertThat(held.reservations().get(0).terminalUnknown()).isFalse();
+            try (var client = M5BookKeeperNativeCreateClientV2.connect(uri(), capability, spec, binding)) {
+                var authority = client.deleteAuthority(handle);
+                var predecessor = await(authority.read()).orElseThrow();
+                var oldIntent = await(authority.readIntent()).orElseThrow();
+                assertThat(Sha256Digest.hash(predecessor.encode()).toHex()).isEqualTo(lines.get(2));
+                assertThat(Sha256Digest.hash(oldIntent.encode()).toHex()).isEqualTo(lines.get(3));
+                assertThatThrownBy(() -> await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                        .hasRootCauseMessage("native delete predecessor epoch is not fenced");
+                var successor = await(authority.claim(Optional.of(predecessor), UUID.randomUUID()));
+                assertThat(successor.nativeVersion()).isGreaterThan(predecessor.nativeVersion());
+                assertThat(await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                        .isTrue();
+                assertThat(await(budget.snapshot()).reservations()).isEmpty();
+                assertThat(await(client.captureExactTarget(handle)).outcome())
+                        .isEqualTo(M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
+                assertThat(await(authority.read())).contains(successor);
+                assertThat(await(authority.readIntent())).contains(oldIntent);
             }
         }
     }

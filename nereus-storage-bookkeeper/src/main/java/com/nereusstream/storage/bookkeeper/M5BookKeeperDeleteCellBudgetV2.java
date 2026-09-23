@@ -289,6 +289,29 @@ public final class M5BookKeeperDeleteCellBudgetV2 {
                 .thenApply(value -> value);
     }
 
+    /** A newer native epoch fences every old delete transaction before its exact ACTIVE hold is removed. */
+    CompletionStage<Boolean> reconcileFencedActive(
+            PhysicalNamespaceAuthorityBindingV2 binding,
+            CellProviderScopeId expectedCell,
+            M5BookKeeperNativeDeleteIntentV2 oldIntent,
+            Supplier<CompletionStage<Void>> requireNativeFence) {
+        return requireScope(binding, expectedCell)
+                .thenCompose(ignored -> snapshot())
+                .thenCompose(current -> {
+                    var hold = current.reservations().stream()
+                            .filter(row -> row.resource()
+                                    .equals(oldIntent.epoch().resource().sha256()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException("native Cell reservation is absent"));
+                    if (hold.terminalUnknown() || !hold.nativeIntent().equals(Sha256Digest.hash(oldIntent.encode()))) {
+                        throw new IllegalStateException(
+                                "native Cell ACTIVE reservation is absent or belongs to another intent");
+                    }
+                    return requireNativeFence.get().thenCompose(ignored -> update(hold, true, MAX_RELEASE_ATTEMPTS));
+                })
+                .thenApply(value -> value);
+    }
+
     private CompletionStage<Boolean> update(Hold original, boolean release, int attempts) {
         return snapshot().thenCompose(current -> {
             var observed = current.reservations().stream()

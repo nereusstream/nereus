@@ -2682,6 +2682,27 @@ All 745 current-source inputs and every XML were independently rehashed; the inp
 `PASS_V2_M5_KAFKA_RUN_SOURCE_NON_PROMOTABLE`. Its native paths do not produce the synthetic competing-descriptor
 proof above. All 17 amended acceptance obligations and the five M5-E children/Final remain OPEN/null.
 
+## Successor native epoch recovers a fenced ACTIVE Cell hold (2026-09-23)
+
+`M5BookKeeperNativeDeleteAuthorityV2.reconcileFencedActiveCellDelete` now releases an exact ACTIVE Cell reservation
+only after reading a strictly newer permanent GC epoch for the same physical BK ledger and verifying that epoch's
+native ownership checks. The retained hold must match the complete old native intent digest, resource and configured
+Cell. Every old delete transaction checks its old epoch in the ZooKeeper multi with ledger deletion: one that ran
+before the successor claim can only be reconciled by actual ledger observation; one that runs afterward cannot
+delete. The recovery call only releases capacity. It neither retries the old delete nor records M5 DONE or ledger
+absence, and a same-epoch or wrong-intent attempt keeps the hold.
+
+The real BK test pauses an old deletion after it has reserved the Cell, advances the native epoch, releases the old
+hold, then delivers the delayed callback. ZooKeeper rejects its old transaction; the ledger remains present until
+a newly bound intent deletes it. Separate-JVM tests first verify the ACTIVE and terminal-UNKNOWN heads survived a
+second restart unchanged, then a fresh JVM claims a successor epoch and clears only the exact ACTIVE hold. The
+source-locked BK/Oxia runner passed 26 XML suites and 107 cases with zero failures/errors/skips. All 745 captured
+inputs and XML files were independently rehashed; the archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-17510`, input-manifest SHA-256
+`966f35bd5e36cdb721932d9892522a56211a8f3a79182d8c3700a39aa67c1d4e`.
+This is native capacity recovery under an epoch fence, not same-epoch transport drain, protocol eligibility,
+grace, full physical dispatch or an M5-E/Final receipt. All 17 amended acceptance obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2698,7 +2719,7 @@ proof above. All 17 amended acceptance obligations and the five M5-E children/Fi
    the coordinator. Public native GC claim/bind now require the unique bound authority route and active quota;
    native epoch/intent canonical capacity now has atomic permanent reservation. Bound native deletion also reserves
    logical dispatch/unknown slots per configured Cell. Complete protocol proof production, unaccounted-namespace
-   migration, backend provisioning, grace, per-Binding/transport admission, qualified ACTIVE recovery and dispatch
+   migration, backend provisioning, grace, per-Binding/transport admission, same-epoch ACTIVE recovery and dispatch
    remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.

@@ -402,6 +402,34 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                 .thenApply(value -> value);
     }
 
+    /**
+     * Recovers only native Cell capacity after a newer permanent epoch has fenced the old delete transaction.
+     * The caller must separately requalify M5 eligibility and reconcile actual ledger presence/absence; this
+     * method neither dispatches deletion nor records a physical terminal.
+     */
+    public CompletionStage<Boolean> reconcileFencedActiveCellDelete(
+            M5BookKeeperDeleteCellBudgetV2 budget, M5BookKeeperNativeDeleteIntentV2 oldIntent) {
+        Objects.requireNonNull(budget, "budget");
+        Objects.requireNonNull(oldIntent, "oldIntent");
+        if (!resource.equals(oldIntent.epoch().resource())
+                || !capabilitySha.equals(oldIntent.epoch().capabilitySha256())) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "native Cell recovery intent belongs to another resource or capability"));
+        }
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> budget.reconcileFencedActive(
+                        binding, capability.providerScopeId(), oldIntent, () -> read().thenCompose(observed -> {
+                            var successor = observed.orElseThrow(
+                                    () -> new IllegalStateException("native delete epoch is absent"));
+                            if (successor.nativeVersion() <= oldIntent.epoch().nativeVersion()) {
+                                return CompletableFuture.failedFuture(
+                                        new IllegalStateException("native delete predecessor epoch is not fenced"));
+                            }
+                            return requireCurrent(successor);
+                        })))
+                .thenApply(value -> value);
+    }
+
     private CompletionStage<DeleteResult> deleteExact(
             Snapshot expected, Optional<M5BookKeeperNativeDeleteIntentV2> intent, BookKeeperDeleteTargetV1 target) {
         return deleteExact(expected, intent, target, new java.util.concurrent.atomic.AtomicBoolean());

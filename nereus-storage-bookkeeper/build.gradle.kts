@@ -140,7 +140,10 @@ tasks.register<Test>("v2M5NativeDeleteRealTest") {
     }
 }
 
-mapOf("Write" to "writeBeforeServerRestart", "Read" to "readAfterServerRestart").forEach { (phase, method) ->
+mapOf(
+    "Write" to "writeBeforeServerRestart",
+    "Read" to "readAfterServerRestart",
+).forEach { (phase, method) ->
     tasks.register<Test>("v2M5NativeDeleteRestart${phase}Test") {
         group = "verification"
         testClassesDirs = realBookKeeperTest.output.classesDirs
@@ -192,7 +195,11 @@ tasks.register<Test>("v2M5NativeDeleteCellBudgetRealTest") {
     }
 }
 
-mapOf("Write" to "writeBeforeServerRestart", "Read" to "readAfterServerRestart").forEach { (phase, method) ->
+mapOf(
+    "Write" to "writeBeforeServerRestart",
+    "Read" to "readAfterServerRestart",
+    "Recover" to "recoverFencedActiveAfterServerRestart",
+).forEach { (phase, method) ->
     tasks.register<Test>("v2M5NativeDeleteCellRestart${phase}Test") {
         group = "verification"
         testClassesDirs = realBookKeeperTest.output.classesDirs

@@ -183,6 +183,11 @@ m5_wait_ready
   "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
   :nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartReadTest --console=plain
 
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 \
+  "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
+  "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
+  :nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartRecoverTest --console=plain
+
 docker logs "$m5_oxia_owned_id" > "$m5_output/oxia-server.log" 2>&1
 docker compose -p "$m5_project" -f "$m5_compose" logs > "$m5_output/bookkeeper.log" 2>&1
 python3 - "$m5_repo_root" "$m5_output" "$m5_oxia_owned_id" "$m5_started_before" "$m5_started_after" "$m5_cell_started_before" "$m5_cell_started_after" <<'PY'
@@ -217,9 +222,10 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
-    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellBudgetRealTest','M5BookKeeperDeleteCellBudgetV2RealTest',2),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellBudgetRealTest','M5BookKeeperDeleteCellBudgetV2RealTest',3),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteCellRestartWriteTest','M5BookKeeperDeleteCellBudgetV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteCellRestartReadTest','M5BookKeeperDeleteCellBudgetV2RestartTest',1),
+    ('nereus-storage-bookkeeper','v2M5NativeDeleteCellRestartRecoverTest','M5BookKeeperDeleteCellBudgetV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
@@ -264,6 +270,7 @@ summary={'rawCaptureRequiresExpectedBinding':True,
     'healthyBindingReadsInSameConfiguredCellWhileSiblingHeld':True,'globalProcessReadBudgetAuthority':False,
     'occupiedNativeCellHeadsSurvivedServiceRestart':True,'freshJvmDidNotRedispatchOrReleaseActiveNativeCell':True,
     'healthyConfiguredCellDeletesAfterOccupiedHeadsRestart':True,'qualifiedActiveTransportDrain':False,
+    'successorNativeEpochReleasesFencedActiveCellCapacity':True,
     'cellRestartStartedBefore':sys.argv[6],'cellRestartStartedAfter':sys.argv[7],
     'bookKeeperBeforeCellRestart':cell_before,'bookKeeperAfterCellRestart':cell_after,
     'nativeCellRestartCheckpointSha256':cell_checkpoints,
