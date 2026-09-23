@@ -33,6 +33,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespaceV2;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
@@ -1115,10 +1116,15 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         released.releaseProofHeadSha256().orElseThrow());
                 var oldLedger = new PhysicalResourceIdV2.BookKeeperLedger(
                         f.binding.physicalNamespace(), root.ledgerIdentity().ledgerId());
+                var currentAuthority =
+                        M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(oldLedger.authorityKey()))
+                                .orElseThrow()
+                                .canonicalStoredBytes());
+                long eligibilityGeneration = Math.addExact(currentAuthority.authorityRevision(), 1);
                 var rawFacts = new Oxia09ExactMetadataTransactionStoreV1(f.oxia);
                 var eligibility = SyntheticDeleteAuthorityFixturesV2.replacement(
                         oldLedger,
-                        1,
+                        eligibilityGeneration,
                         (suffix, bytes) -> {
                             String key = "/m5-native-read-owner-facts/"
                                     + oldLedger.sha256().toHex() + suffix;
@@ -1160,6 +1166,29 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(
                         f.source, f.handles.get(root.runId()), UUID.randomUUID());
                 await(gc.requireFreshEligibility(facts, eligibility));
+                var namespace = await(OxiaPhysicalMetadataNamespaceV2.connect(f.oxia, f.binding.metadataNamespace()));
+                var boundRoute = await(namespace.openAuthorityRoute(f.backend, gc.readOnlyFacts(facts)));
+                var retirement = new M5TargetDeleteAuthorityCoordinatorV1(
+                        boundRoute,
+                        gc,
+                        new KafkaBookKeeperDeleteIdentityReaderV2(f.source, f.handles.get(root.runId())));
+                assertThat(f.tickets(root.ledgerIdentity())).isZero();
+                var open = await(retirement.read(oldLedger.authorityKey()))
+                        .orElseThrow()
+                        .exactStoredValue();
+                var qualified = await(retirement.qualifyEligibility(open, eligibility))
+                        .observed()
+                        .orElseThrow();
+                assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(qualified.canonicalStoredBytes())
+                                .eligibilitySnapshot())
+                        .contains(eligibility);
+                assertThat(await(boundRoute.requireActiveResource(oldLedger))).isEqualTo(f.binding);
+                assertThat(await(f.roots.readSelectedRoot(f.roots.nativeRootKey(root.runId()))))
+                        .isPresent();
+                assertThat(await(f.source
+                                .deleteAuthority(f.handles.get(root.runId()))
+                                .readIntent()))
+                        .isEmpty();
             }
         }
     }

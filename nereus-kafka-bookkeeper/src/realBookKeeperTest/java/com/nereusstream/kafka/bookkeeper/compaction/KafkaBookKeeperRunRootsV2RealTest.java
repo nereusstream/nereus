@@ -58,6 +58,7 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2;
 import com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1;
+import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
@@ -436,12 +437,17 @@ class KafkaBookKeeperRunRootsV2RealTest {
         CompletionStage<Void> admit(RunLedgerHandleV1 handle) {
             var resource = new PhysicalResourceIdV2.BookKeeperLedger(
                     binding.physicalNamespace(), handle.ledgerIdentity().ledgerId());
-            return route.compareAndSet(
-                            Optional.empty(),
-                            resource.authorityKey(),
-                            M5TargetDeleteAuthorityCodecV1.encodeAuthority(
-                                    SyntheticDeleteAuthorityFixturesV2.phases(resource)
-                                            .get(0)))
+            return route.quota()
+                    .reserve(resource)
+                    .thenCompose(reservation -> {
+                        assertThat(reservation).isEqualTo(M5GcQuotaCoordinatorV2.Result.GRANTED);
+                        return route.compareAndSet(
+                                Optional.empty(),
+                                resource.authorityKey(),
+                                M5TargetDeleteAuthorityCodecV1.encodeAuthority(
+                                        SyntheticDeleteAuthorityFixturesV2.phases(resource)
+                                                .get(0)));
+                    })
                     .thenAccept(outcome -> {
                         assertThat(outcome)
                                 .isEqualTo(

@@ -2941,6 +2941,22 @@ legacy cases, with zero failures, errors or skips. Archive:
 `3e2063fdbe59892ce81a8a2eff22e7d4ea76999ab24e22d7c8ab506edf7c0e46`.
 All 17 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Bound M5 qualification after scoped M4 release (2026-09-23)
+
+The existing real BK/Oxia slow-read case now reserves the old ledger's durable GC quota before its fixture creates
+the OPEN M5 authority. After the scoped M4 owner releases the old protection and its native read tickets drain, the
+test reads the current authority revision, qualifies the exact next revision with the actual `RELEASED` fact through
+the bound M5 route, rereads the stored snapshot and checks that the route still recognizes the reservation. Other
+eligibility facts, including absence of source references, remain synthetic. The raw run root is still selected and
+the test asserts that no native delete intent exists. It does not claim a native GC owner or delete the ledger.
+
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 target XML suites / 110 cases or restart phases and 83
+legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-23785`; 747-input manifest SHA-256:
+`1eb3605d251e2f3f5b8f303f961fa8b12f8ef3d89f5c9e144a53d45e878f8fc6`.
+This is fixture qualification, not complete source retirement or physical-delete authority. All 17 acceptance
+obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
