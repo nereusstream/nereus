@@ -229,6 +229,9 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   is cancelled. Confirmed close with unresolved ticket cleanup permits exact-operation metadata retry.
   The native callback-hold case retains the raw ticket/share through an undelivered read and unconfirmed close,
   while a healthy same-Cell Binding reads; delivery permits exact local cleanup. Durable drain/restart proof remains OPEN.
+  Standalone raw capture now requires the expected Binding and reserves before its first root-catalog read. Capacity
+  rejection issues no catalog request, and an admitted but wrong Binding cannot capture another run. Catalog bytes and
+  queue footprint are still outside the configured allowance.
   The focused runner passed 51 archived cases/phases and retained-data restart; its independent legacy regression
   passed 71. Both captured source maps remained unchanged. Decompressed framing is checked before record allocation.
 

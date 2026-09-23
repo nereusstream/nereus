@@ -395,8 +395,10 @@ Raw `capture` and complete-plan `resolve` now require the caller's fixed process
 `KafkaBookKeeperReadCellBudgetV2`. One raw scope charges one owner/read slot, the sum of its configured native-frame
 and retained-payload allowances, and its decoded allowance. A single scope spans all sequential native sessions and
 accumulated inputs in one `resolve`; it does not return the charge between runs. `resolve` checks the frozen Binding
-and Cell before catalog reads. Standalone `capture` first discovers its selected root to identify the Binding, then
-reserves the share before physical admission. Unknown native creation/close retains the charge. Confirmed session
+and Cell before catalog reads. Standalone `capture` now requires the caller's expected Binding and reserves its share
+before the first selected-root catalog read. A wrong or unadmitted Binding cannot borrow another source's identity;
+the actual selected root must still match the reserved Binding before physical admission. Unknown native
+creation/close retains the charge. Confirmed session
 close returns it only after the whole operation finishes, including partial input rejection or observer cancellation.
 The same caller-supplied budget can admit selected-generation capture, so a held raw resolution prevents another
 same-Binding capture at capacity.
@@ -404,7 +406,8 @@ same-Binding capture at capacity.
 When raw native termination is confirmed but its physical ticket cleanup is unresolved, a privately constructed
 `KafkaBookKeeperRunSourceV2.TicketCleanupException` retains the exact operation ID, Context and local terminal proof.
 Its repeatable metadata-only retry never reopens the ledger or session. A failed native close grants no retry handle.
-Neither result-cache ownership nor metadata discovery/queue bytes are included in this configured allowance; full
+Metadata discovery runs under the owner/read-slot reservation, but its bytes and queue footprint are not charged.
+Neither result-cache ownership nor backend-internal buffers are included in this configured allowance; full
 provider memory, native process drain and crash-ticket reconstruction remain required.
 The real BK/Oxia raw-run test withholds delivery of a completed native entry read and then of the confirmed native
 close. The cancelled observer cannot discharge the ticket or Binding share at either point; a second Binding in the

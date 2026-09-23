@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M5_KAFKA_READ_OWNER_PROJECTION_V2",
   "status": "SCOPED_NATIVE_READ_OWNER_WITH_EXACT_TICKET_RETRY_NON_PROMOTABLE",
-  "predecessorSource": "d06a90cb3e61bbf1bbe1461f2958ba351cc5fc9a",
+  "predecessorSource": "7ec826413e63d36fd51b57cc8336f2fcbe8a3843",
   "runtime": "KafkaBookKeeperReadOwnerV2",
   "structuredLifetime": true,
   "allPhysicalTicketsBeforeNativeSessionCreation": true,
@@ -44,9 +44,9 @@
   "restartJvmTasks": 26,
   "restartJvmExecutedTasks": 6,
   "testedInputCount": 745,
-  "testedInputManifestSha256": "f286359e1bf3c88028d1b015ff4c9ed6e6383d3f28a19073204e725c01db4093",
+  "testedInputManifestSha256": "6eefcdd6470e699bb12b7ec5a4220e264caf8836c1a5d0981205d59576c379cd",
   "legacyTestedInputCount": 730,
-  "legacyTestedInputManifestSha256": "07c2012bbcf9075b42a93dc022a635419795c7515c2535d36409762f898d3cad",
+  "legacyTestedInputManifestSha256": "178acfcafd1a59a88f014d3f9b32427eac9026b47bf0423a4a93186de9d3e230",
   "everyCapturedSourceManifestAndXmlCheckedIndependently": true,
   "publicEntryRequiresCellBudget": true,
   "fixedProcessLocalBindingShares": true,
@@ -57,8 +57,8 @@
   "retainedResultCachesAndBackendInternalBuffersAccounted": false,
   "occupiedCellRestartJvmTasks": 16,
   "occupiedCellRestartJvmExecutedTasks": 1,
-  "runSummarySha256": "240b6b7b945d8ca22d72e7ab6c99a725ed9f376c08f5346e11d41531460c999a",
-  "legacyRunSummarySha256": "2caa741bb7cac3fc2bb6ec20024a1589ab4a63c55d26e158738370122015842c",
+  "runSummarySha256": "4ac7a30576c63736f2a35237cdb39a2694b763dafdea98953ce918780d22ec83",
+  "legacyRunSummarySha256": "ddb6948d7080c6da006e229eaf614d701296ed4ae440395184826411a6be2225",
   "releasedReservationRejectsLateSessionStartUnitVerified": true,
   "profileValidationUsesImmutableSnapshot": true,
   "confirmedNativeTerminationExposesExactOperationTicketRetry": true,
@@ -77,5 +77,7 @@
   "selectedCaptureTicketCleanupPreservesLiveSameContextSibling": true,
   "initialMetadataDiscoveryIncludedInReadBudget": false,
   "rawRunCaptureUsesSharedReadCellBudget": true,
-  "rawUnconfirmedReadAndCloseRetainSameBindingShareNativeVerified": true
+  "rawUnconfirmedReadAndCloseRetainSameBindingShareNativeVerified": true,
+  "rawCaptureReservesBeforeRootCatalogRead": true,
+  "wrongAdmittedBindingCannotCaptureAnotherNativeRun": true
 }

@@ -137,6 +137,9 @@ crash drain reconstruction remain OPEN.
 A real BK/Oxia callback-hold case keeps both ticket and Binding share during an undelivered read and unconfirmed
 close after observer cancellation; a healthy same-Cell Binding still reads. This is a local lifetime check, not
 qualified durable process-drain or full Review 8.1 quarantine exit.
+Standalone raw capture now requires an exact expected Binding before root-catalog access. The caller's fixed share
+is reserved first; exhausted or unadmitted requests do not issue the metadata read, and an admitted but mismatched
+Binding cannot reach native session creation. Metadata byte/queue accounting remains OPEN.
 The focused run passed 51 archived cases/phases and a separate 71-case/phase legacy regression, including retained-data
 restarts. Both exact source maps remained unchanged. Decoded record framing is preflighted before Kafka allocation.
 The next [complete input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) extends the publication

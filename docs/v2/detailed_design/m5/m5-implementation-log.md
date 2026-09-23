@@ -2554,6 +2554,43 @@ was independently checked by `/tmp/nereus-m5-raw-quarantine-verify.py`, producin
 All 17 acceptance obligations remain OPEN/null, including `QUARANTINE_EXIT`; the five M5-E children and aggregate
 Final remain outstanding, and the three M6-deferred rows remain PLANNED/null.
 
+## Raw-run Binding admission before native catalog access (2026-09-23)
+
+Standalone `KafkaBookKeeperRunSourceV2.capture` now requires the caller's expected `BindingIdentity`. It reserves
+the caller-supplied Cell/Binding share before the first selected-root catalog read, just as complete-plan `resolve`
+already reserves from its frozen cut. The actual root's Binding and Cell still have to match after the read and before
+physical ticket/native session creation. There is no budget-free or Binding-free public raw capture entry. This closes
+the prior local owner/read-slot bypass during initial root discovery; metadata response bytes, queue occupancy,
+backend buffers and global process admission remain unaccounted.
+
+The real BK/Oxia regression holds a raw capture after native scan and cancels its observer. While the share is full,
+a second capture and an unadmitted Binding issue no catalog read. A different admitted Binding can read the catalog
+but cannot borrow the held run's identity; its reservation returns without creating a native session. The held
+capture completes after its actual callback, and the earlier cross-Binding quarantine case still passes. Preflight
+compile, Checkstyle and Spotless passed 22 tasks in `/tmp/nereus-m5-raw-pre-admit-preflight-complete.log`.
+
+The final native runner passed 93/93 bound main tasks, 26 first-restart JVM tasks (six executed) and 16 occupied-Cell
+restart JVM tasks (one executed). It archived 25 suites / 104 cases and phases; the independent legacy run archived
+21 suites / 82 cases and phases. All had zero failures, errors and skips. Log:
+`/tmp/nereus-m5-raw-pre-admit-native.log`; result `NON_PROMOTABLE`.
+
+Legacy output `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-33332` has 730-input manifest
+SHA-256 `178acfcafd1a59a88f014d3f9b32427eac9026b47bf0423a4a93186de9d3e230` and summary SHA-256
+`ddb6948d7080c6da006e229eaf614d701296ed4ae440395184826411a6be2225`. Bound output
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-33321` has 745-input manifest SHA-256
+`6eefcdd6470e699bb12b7ec5a4220e264caf8836c1a5d0981205d59576c379cd` and summary SHA-256
+`4ac7a30576c63736f2a35237cdb39a2694b763dafdea98953ce918780d22ec83`. The same legacy Oxia container
+`2569f63f63ec29dddd4dcb6852a8ad84884ceb295fbe7d8e03c5741d9cc92a1e` restarted from
+`2026-09-23T02:04:01.309933671Z` to `2026-09-23T02:06:07.046700632Z`. The same bound Oxia container
+`6433a2071d4c040db6b8d86621da728ded810f4db28e890dc5785f90e7653532` restarted from
+`2026-09-23T02:06:43.192442218Z` to `2026-09-23T02:10:15.880131678Z`, then to
+`2026-09-23T02:11:05.20847509Z` for occupied-Cell recovery. Every captured source, XML and native checkpoint hash
+was independently checked by `/tmp/nereus-m5-raw-pre-admit-verify.py` and recorded in
+`/tmp/nereus-m5-raw-pre-admit-verified.json`.
+
+All 17 amended acceptance obligations remain OPEN/null; the five M5-E children and aggregate Final remain
+outstanding, and the three M6-deferred rows remain PLANNED/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

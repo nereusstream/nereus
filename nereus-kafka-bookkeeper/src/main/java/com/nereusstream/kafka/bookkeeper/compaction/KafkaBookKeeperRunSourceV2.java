@@ -186,12 +186,11 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
         this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
-    public CompletionStage<Snapshot> capture(String nativeRootKey) {
-        var work = catalog.readSelectedRoot(nativeRootKey).thenCompose(observed -> {
-            var root = observed.orElseThrow(() -> new IllegalArgumentException("native source root is not selected"));
-            return withinBudget(binding(root), scope -> capture(nativeRootKey, new Budget(bounds), scope));
-        });
-        return work.thenApply(value -> value);
+    /** The caller's exact Binding is admitted before even the selected-root metadata read. */
+    public CompletionStage<Snapshot> capture(String nativeRootKey, BindingIdentity expectedBinding) {
+        Objects.requireNonNull(nativeRootKey, "nativeRootKey");
+        Objects.requireNonNull(expectedBinding, "expectedBinding");
+        return withinBudget(expectedBinding, scope -> capture(nativeRootKey, new Budget(bounds), scope));
     }
 
     @Override

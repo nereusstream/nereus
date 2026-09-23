@@ -241,7 +241,11 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'unconfirmedRawReadRetainsShareAndTicketUntilCallback':True,
+summary={'rawCaptureRequiresExpectedBinding':True,
+    'rawCaptureReservesBeforeRootCatalogRead':True,
+    'rejectedRawCaptureDoesNotReadRootCatalog':True,
+    'wrongAdmittedBindingCannotCaptureAnotherNativeRun':True,
+    'unconfirmedRawReadRetainsShareAndTicketUntilCallback':True,
     'unconfirmedRawCloseRetainsShareAndTicket':True,
     'healthySameCellRawBindingReadsDuringSiblingQuarantine':True,
     'cancelledRawObserverCannotClearQuarantine':True,

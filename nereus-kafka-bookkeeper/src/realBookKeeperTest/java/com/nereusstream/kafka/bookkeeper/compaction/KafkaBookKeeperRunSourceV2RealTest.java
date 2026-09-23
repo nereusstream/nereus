@@ -84,7 +84,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                 f.footer(f.runBinding(0), 2, run.snapshot().nextEntryId())))
                         .root();
                 var source = reader(f, f.roots, BOUNDS);
-                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 assertThat(snapshot.batches())
                         .extracting(KafkaCompactionRecordsV1.InputBatch::canonicalBody)
                         .isEqualTo(f.bodies);
@@ -93,7 +93,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(snapshot.extent().recordCount()).isEqualTo(2);
                 assertThat(snapshot.rangeIndexesCoverAllData()).isFalse();
                 var successor = await(run.createSuccessor(f.runBinding(1)));
-                assertThat(await(source.capture(snapshot.extent().physicalKey()))
+                assertThat(await(source.capture(snapshot.extent().physicalKey(), rawBinding(f)))
                                 .extent())
                         .isEqualTo(snapshot.extent());
                 await(successor.drain());
@@ -138,7 +138,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
         try (var f = new Fixture(2310, "orders", null)) {
             var root = admit(f, f.prepareSealedSource());
             var source = reader(f, f.roots, BOUNDS);
-            var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
             var original = snapshot.extent();
             var wrong = new SourceExtent(
                     original.kind(),
@@ -246,7 +246,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                     .isEqualTo(
                             com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome
                                     .APPLIED_EXACT);
-            assertThatThrownBy(() -> await(source.capture(original.physicalKey())))
+            assertThatThrownBy(() -> await(source.capture(original.physicalKey(), rawBinding(f))))
                     .hasRootCauseMessage("native source physical admission failed");
             assertThat(await(f.roots.openRoot(root.runId()))).contains(root);
         }
@@ -261,11 +261,13 @@ class KafkaBookKeeperRunSourceV2RealTest {
                     new Bounds(3, 32, 1000, 1_000_000, 500_000, 500_000),
                     new Bounds(128, 32, 1000, 1_000_000, 1, 500_000),
                     new Bounds(128, 32, 1, 1_000_000, 500_000, 500_000))) {
-                assertThatThrownBy(() -> await(reader(f, f.roots, limit).capture(key)))
+                assertThatThrownBy(() -> await(reader(f, f.roots, limit).capture(key, rawBinding(f))))
                         .hasRootCauseInstanceOf(IllegalArgumentException.class);
                 assertThat(f.tickets(root.ledgerIdentity())).isZero();
             }
-            assertThat(await(reader(f, f.roots, BOUNDS).capture(key)).batches()).hasSize(2);
+            assertThat(await(reader(f, f.roots, BOUNDS).capture(key, rawBinding(f)))
+                            .batches())
+                    .hasSize(2);
         }
     }
 
@@ -276,13 +278,13 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 var root = admit(f, customSource(f, mode));
                 var source = reader(f, f.roots, BOUNDS);
                 if (mode == 0) {
-                    assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()))))
+                    assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f))))
                             .hasRootCauseMessage("native terminal append-group digest or bounds differ");
                 } else if (mode == 1) {
-                    assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()))))
+                    assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f))))
                             .hasRootCauseMessage("native index locator differs from actual DATA");
                 } else {
-                    var captured = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                    var captured = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                     assertThat(captured.rangeIndexesCoverAllData()).isTrue();
                     assertThat(captured.extent().requiredIndexesPresent()).isFalse();
                 }
@@ -299,7 +301,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
             var entered = new CompletableFuture<Optional<KafkaRunRootRecordV2>>();
             var calls = new AtomicInteger();
             KafkaRunRootCatalogV2 held = key -> f.roots.readSelectedRoot(key).thenCompose(value -> {
-                if (calls.incrementAndGet() == 3) {
+                if (calls.incrementAndGet() == 2) {
                     entered.complete(value);
                     return delivered;
                 }
@@ -308,7 +310,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
             var shared = rawBudget(f, BOUNDS);
             var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
             var observer = rawReader(f, held, BOUNDS, shared)
-                    .capture(f.roots.nativeRootKey(root.runId()))
+                    .capture(f.roots.nativeRootKey(root.runId()), rawBinding(f))
                     .toCompletableFuture();
             var selected = entered.get(30, TimeUnit.SECONDS);
             assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
@@ -316,9 +318,16 @@ class KafkaBookKeeperRunSourceV2RealTest {
             assertThat(observer.cancel(false)).isTrue();
             assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
             assertThat(shared.usage()).isEqualTo(charge);
-            assertThatThrownBy(() ->
-                            await(rawReader(f, f.roots, BOUNDS, shared).capture(f.roots.nativeRootKey(root.runId()))))
+            var source = rawReader(f, held, BOUNDS, shared);
+            assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f))))
                     .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+            var foreign = new M4ReadControlRecordsV1.BindingIdentity(
+                    rawBinding(f).bindingId(),
+                    rawBinding(f).incarnationSha256(),
+                    Sha256Digest.hash(CanonicalBytes.copyOf(new byte[] {7})));
+            assertThatThrownBy(() -> await(source.capture(f.roots.nativeRootKey(root.runId()), foreign)))
+                    .hasRootCauseMessage("BK read Binding has no admitted Cell share");
+            assertThat(calls.get()).isEqualTo(2);
             delivered.complete(selected);
             long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
             var zero = new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0);
@@ -338,8 +347,9 @@ class KafkaBookKeeperRunSourceV2RealTest {
             var healthyRoot = admit(healthy, healthy.prepareSealedSource());
             var slowKey = slow.roots.nativeRootKey(slowRoot.runId());
             var healthyKey = healthy.roots.nativeRootKey(healthyRoot.runId());
-            var slowSnapshot = await(reader(slow, slow.roots, BOUNDS).capture(slowKey));
-            var healthySnapshot = await(reader(healthy, healthy.roots, BOUNDS).capture(healthyKey));
+            var slowSnapshot = await(reader(slow, slow.roots, BOUNDS).capture(slowKey, rawBinding(slow)));
+            var healthySnapshot =
+                    await(reader(healthy, healthy.roots, BOUNDS).capture(healthyKey, rawBinding(healthy)));
             assertThat(slow.scope.providerScope()).isEqualTo(healthy.scope.providerScope());
             var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
             var shared = new KafkaBookKeeperReadCellBudgetV2(
@@ -392,23 +402,29 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                     return result;
                                 });
                     });
-            var observer = quarantined.capture(slowKey).toCompletableFuture();
+            var observer = quarantined.capture(slowKey, rawBinding(slow)).toCompletableFuture();
             var firstRead = await(readEntered);
             assertThat(sessions.get()).isEqualTo(1);
             assertThat(slow.tickets(slowRoot.ledgerIdentity())).isEqualTo(1);
             assertThat(shared.bindingUsage().get(slowSnapshot.binding())).isEqualTo(charge);
             assertThat(observer.cancel(true)).isTrue();
             assertThat(readDelivered).isNotCancelled();
-            assertThatThrownBy(() -> await(quarantined.capture(slowKey)))
+            assertThatThrownBy(() -> await(quarantined.capture(slowKey, rawBinding(slow))))
                     .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
             var healthyReader = rawReader(healthy, healthy.roots, BOUNDS, shared);
-            assertThat(await(healthyReader.capture(healthyKey)).binding()).isEqualTo(healthySnapshot.binding());
+            assertThat(await(healthyReader.capture(healthyKey, rawBinding(healthy)))
+                            .binding())
+                    .isEqualTo(healthySnapshot.binding());
+            assertThat(shared.usage()).isEqualTo(charge);
+            assertThatThrownBy(() -> await(quarantined.capture(slowKey, rawBinding(healthy))))
+                    .hasRootCauseMessage("native source requires a nonempty sealed run in the exact namespace");
+            assertThat(sessions.get()).isEqualTo(1);
             assertThat(shared.usage()).isEqualTo(charge);
             readDelivered.complete(firstRead);
             await(closeEntered);
             assertThat(slow.tickets(slowRoot.ledgerIdentity())).isEqualTo(1);
             assertThat(shared.usage()).isEqualTo(charge);
-            assertThatThrownBy(() -> await(quarantined.capture(slowKey)))
+            assertThatThrownBy(() -> await(quarantined.capture(slowKey, rawBinding(slow))))
                     .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
             closeDelivered.complete(null);
             var zero = new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0);
@@ -421,7 +437,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
             assertThat(slow.tickets(slowRoot.ledgerIdentity())).isZero();
             assertThat(shared.usage()).isEqualTo(zero);
             assertThat(observer).isCancelled();
-            assertThat(await(quarantined.capture(slowKey)).extent()).isEqualTo(slowSnapshot.extent());
+            assertThat(await(quarantined.capture(slowKey, rawBinding(slow))).extent())
+                    .isEqualTo(slowSnapshot.extent());
         }
     }
 
@@ -454,8 +471,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             f.footer(f.runBinding(1), 4, second.snapshot().nextEntryId())))
                     .root();
             var baseline = reader(f, f.roots, BOUNDS);
-            var one = await(baseline.capture(f.roots.nativeRootKey(firstRoot.runId())));
-            var two = await(baseline.capture(f.roots.nativeRootKey(secondRoot.runId())));
+            var one = await(baseline.capture(f.roots.nativeRootKey(firstRoot.runId()), rawBinding(f)));
+            var two = await(baseline.capture(f.roots.nativeRootKey(secondRoot.runId()), rawBinding(f)));
             var input = input(f, one, 3316);
             var old = input.plan().sourceCut();
             var extents = List.of(one.extent(), two.extent());
@@ -567,7 +584,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(faulty)),
                         BOUNDS,
                         java.util.concurrent.ForkJoinPool.commonPool());
-                var failed = await(guarded.capture(f.roots.nativeRootKey(firstRoot.runId()))
+                var failed = await(guarded.capture(f.roots.nativeRootKey(firstRoot.runId()), rawBinding(f))
                         .handle((value, error) -> error));
                 while (failed instanceof java.util.concurrent.CompletionException) {
                     failed = failed.getCause();
@@ -592,7 +609,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
         try (var f = new Fixture(2320, "orders", null)) {
             var root = admit(f, customSource(f, 3));
             var source = reader(f, f.roots, BOUNDS);
-            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
             var input = input(f, raw, 3320);
             assertThat(input.semantic().outputBatches()).isEmpty();
             try (var published = new Published(f, input, NativeContext.root())) {
@@ -624,8 +641,9 @@ class KafkaBookKeeperRunSourceV2RealTest {
             var healthyRoot = admit(healthy, healthy.prepareSealedSource());
             var slowSource = reader(slow, slow.roots, BOUNDS);
             var healthySource = reader(healthy, healthy.roots, BOUNDS);
-            var slowRaw = await(slowSource.capture(slow.roots.nativeRootKey(slowRoot.runId())));
-            var healthyRaw = await(healthySource.capture(healthy.roots.nativeRootKey(healthyRoot.runId())));
+            var slowRaw = await(slowSource.capture(slow.roots.nativeRootKey(slowRoot.runId()), rawBinding(slow)));
+            var healthyRaw =
+                    await(healthySource.capture(healthy.roots.nativeRootKey(healthyRoot.runId()), rawBinding(healthy)));
             try (var first = new Published(slow, input(slow, slowRaw, 3540), NativeContext.root());
                     var second = new Published(healthy, input(healthy, healthyRaw, 3541), NativeContext.root())) {
                 var firstDescriptor = first.writeAndPublish(slowSource);
@@ -760,7 +778,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
         try (var f = new Fixture(2530, "orders", null)) {
             var root = admit(f, f.prepareSealedSource());
             var source = reader(f, f.roots, BOUNDS);
-            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
             var input = input(f, raw, 3530);
             try (var published = new Published(f, input, NativeContext.root())) {
                 var descriptor = published.writeAndPublish(source);
@@ -877,7 +895,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
         try (var f = new Fixture(2550, "ticket-recovery", null)) {
             var root = admit(f, f.prepareSealedSource());
             var source = reader(f, f.roots, BOUNDS);
-            var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+            var raw = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
             try (var published = new Published(f, input(f, raw, 3550), NativeContext.root())) {
                 var descriptor = published.writeAndPublish(source);
                 var bounds = new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000);
@@ -1023,7 +1041,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
             try (var f = new Fixture(2400 + i, TOPICS.get(i), null)) {
                 var root = admit(f, f.prepareSealedSource());
                 var source = reader(f, f.roots, BOUNDS);
-                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 var input = input(f, snapshot, 3400 + i);
                 try (var published = new Published(f, input, NativeContext.root())) {
                     var descriptor = published.writeAndPublish(source);
@@ -1064,7 +1082,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(Sha256Digest.hash(stored.storedBytes()).toHex() + ":" + stored.versionId())
                         .isEqualTo(lines.get(5));
                 var source = reader(f, f.roots, BOUNDS);
-                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 assertThat(snapshot.extent().sourceIdentitySha256().toHex()).isEqualTo(lines.get(3));
                 assertThat(M5MaterializationCodecV1.calculateSourceSetSha256(List.of(snapshot.extent()))
                                 .toHex())
@@ -1098,7 +1116,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
             try (var f = new Fixture(2500 + i, topic, null)) {
                 var root = admit(f, i == TOPICS.size() ? customSource(f, 3) : f.prepareSealedSource());
                 var source = reader(f, f.roots, BOUNDS);
-                var raw = await(source.capture(f.roots.nativeRootKey(root.runId())));
+                var raw = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 var input = input(f, raw, 3500 + i);
                 try (var first = new Published(f, input, NativeContext.root())) {
                     var firstDescriptor = first.writeAndPublish(source);
@@ -1139,7 +1157,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
             assertThat(lines).hasSize(9);
             try (var f = new Fixture(2500 + i, TOPICS.get(i % TOPICS.size()), lines)) {
                 var root = await(f.roots.openRoot(f.runBinding(0).runId())).orElseThrow();
-                var raw = await(reader(f, f.roots, BOUNDS).capture(f.roots.nativeRootKey(root.runId())));
+                var raw = await(reader(f, f.roots, BOUNDS).capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 var previous = input(f, raw, 3500 + i);
                 // The old task supplies only the admitted Binding route; it cannot recover the current task.
                 try (var bootstrap = new Published(f, previous, lines.get(1))) {
@@ -1247,12 +1265,16 @@ class KafkaBookKeeperRunSourceV2RealTest {
 
     private static KafkaBookKeeperReadCellBudgetV2 rawBudget(Fixture f, Bounds bounds) {
         var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(bounds);
-        var binding = new M4ReadControlRecordsV1.BindingIdentity(
+        return new KafkaBookKeeperReadCellBudgetV2(
+                f.scope.providerScope(), charge, java.util.Map.of(rawBinding(f), charge));
+    }
+
+    private static M4ReadControlRecordsV1.BindingIdentity rawBinding(Fixture f) {
+        return new M4ReadControlRecordsV1.BindingIdentity(
                 f.scope.bindingId(),
                 Sha256Digest.hash(
                         com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1.encode(f.scope.topic())),
                 f.scope.storageEpoch().digest());
-        return new KafkaBookKeeperReadCellBudgetV2(f.scope.providerScope(), charge, java.util.Map.of(binding, charge));
     }
 
     private static KafkaBookKeeperRunSourceV2 rawReader(

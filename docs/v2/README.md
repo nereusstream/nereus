@@ -114,6 +114,8 @@ performance-first BookKeeper WAL.
   metadata-only retry. Process-wide reader admission and retained-cache accounting remain required.
   A real BK/Oxia callback-hold test keeps the raw read ticket and Binding share charged through an undelivered read
   and an unconfirmed close after observer cancellation, while another Binding in the same Cell completes a read.
+  Standalone raw capture now takes the expected Binding and reserves before its first root-catalog read. Exhausted or
+  unadmitted Binding requests do not read the catalog; a wrong admitted Binding cannot capture another run.
   A follow-up [complete native input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) now rejects
   omissions, reordering, changed ordinals and substituted bodies before publication. Its native/restart validation
   passed 51 archived cases/phases and 71 independent legacy cases/phases with both source maps unchanged.
