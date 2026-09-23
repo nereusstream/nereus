@@ -3003,6 +3003,23 @@ BK/Oxia suites / 112 cases or restart phases and 83 legacy cases, with zero fail
 suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17 acceptance
 obligations and M5-E/Final remain OPEN/null.
 
+## Durable-marker confirmation for local run retirement (2026-09-23)
+
+The K3 run lifecycle now asks the native root authority whether the exact SEALED root has a stored retired marker
+before it changes local state to RETIRED. A caller's eligible permit alone fails closed; absent or mismatched markers
+and authority read failures leave the run SEALED. The returned observer may be cancelled without cancelling the
+admitted authority check. The real BK/Oxia restart fixture verifies rejection before its test-only retired-record
+CAS, local transition after that CAS, and the persisted read veto after service restart. No production path writes
+the retired marker from complete M5-C reference-free proof, and no physical delete is authorized.
+
+Focused lifecycle and Oxia tests, compilation, Spotless and Checkstyle passed. The source-locked
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 target XML suites / 112 cases or restart phases and 83
+legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-89217`; 747-input manifest SHA-256:
+`27ab60f6039ba5995ccae9295f99d0f2c42fe4954392ed71a4c9ec4670e86ac8`. All 747 target source hashes and
+26 XML suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17
+acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

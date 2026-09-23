@@ -14,7 +14,7 @@
 
 package com.nereusstream.kafka.bookkeeper.run;
 
-/** Exact local proof required before a sealed run stops serving reads. */
+/** Local eligibility assertions; only the root authority can confirm a durable retirement marker. */
 public record KafkaRunRetirementPermitV1(
         boolean manifestNoLongerSelectsRun,
         boolean sourceProtectionDrained,

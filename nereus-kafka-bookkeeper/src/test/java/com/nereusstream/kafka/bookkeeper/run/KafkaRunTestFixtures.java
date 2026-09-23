@@ -286,6 +286,8 @@ public final class KafkaRunTestFixtures {
 
     public static final class FakeRootAuthority implements KafkaRunRootAuthority {
         public final Map<StorageRunId, KafkaRunRootSnapshotV1> roots = new LinkedHashMap<>();
+        public final Set<StorageRunId> retired = new java.util.HashSet<>();
+        public CompletableFuture<Void> retirementReadGate;
         public ProviderMutationResultV1<KafkaRunRootSnapshotV1> nextOverride;
 
         @Override
@@ -297,6 +299,14 @@ public final class KafkaRunTestFixtures {
         @Override
         public CompletionStage<Optional<KafkaRunRootSnapshotV1>> openRoot(StorageRunId runId) {
             return CompletableFuture.completedFuture(Optional.ofNullable(roots.get(runId)));
+        }
+
+        @Override
+        public CompletionStage<Boolean> isDurablyRetired(KafkaRunRootSnapshotV1 exactSealed) {
+            CompletionStage<Void> gate =
+                    retirementReadGate == null ? CompletableFuture.completedFuture(null) : retirementReadGate;
+            return gate.thenApply(ignored ->
+                    retired.contains(exactSealed.runId()) && exactSealed.equals(roots.get(exactSealed.runId())));
         }
 
         @Override

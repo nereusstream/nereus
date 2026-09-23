@@ -47,7 +47,8 @@ import java.util.function.Function;
  * One partition/leader-epoch-bound K3 run lifecycle.
  *
  * <p>Normal DATA submission and ordered protocol publication start in K4/K5. K3 owns only ledger/header/root creation,
- * the single entry-ID sequencer, between-group checkpoints, drain, footer/close/root seal, successor, and local retire.
+ * the single entry-ID sequencer, between-group checkpoints, drain, footer/close/root seal, successor, and
+ * durable-marker-confirmed local retire.
  */
 public final class KafkaBookKeeperRunLifecycleV1 {
     private final BookKeeperCellSession session;
@@ -199,14 +200,34 @@ public final class KafkaBookKeeperRunLifecycleV1 {
         });
     }
 
-    public synchronized KafkaBookKeeperRunSnapshotV1 retire(KafkaRunRetirementPermitV1 permit) {
+    public CompletionStage<KafkaBookKeeperRunSnapshotV1> retire(KafkaRunRetirementPermitV1 permit) {
         Objects.requireNonNull(permit, "permit");
-        requireState(KafkaBookKeeperRunStateV1.SEALED);
-        if (!permit.permitsRetirement()) {
-            throw new IllegalArgumentException("retirement proof has an active authority, protection, pin, or hold");
+        KafkaRunRootSnapshotV1 expectedSealed;
+        synchronized (this) {
+            requireState(KafkaBookKeeperRunStateV1.SEALED);
+            if (!permit.permitsRetirement()) {
+                throw new IllegalArgumentException(
+                        "retirement proof has an active authority, protection, pin, or hold");
+            }
+            expectedSealed = root;
         }
-        state = KafkaBookKeeperRunStateV1.RETIRED;
-        return snapshot();
+        CompletionStage<KafkaBookKeeperRunSnapshotV1> work = rootAuthority
+                .isDurablyRetired(expectedSealed)
+                .thenApply(retired -> {
+                    if (!retired) {
+                        throw new IllegalStateException("run root lacks its exact durable retirement marker");
+                    }
+                    synchronized (KafkaBookKeeperRunLifecycleV1.this) {
+                        requireState(KafkaBookKeeperRunStateV1.SEALED);
+                        if (!root.equals(expectedSealed)) {
+                            throw new IllegalStateException("run root changed during retirement confirmation");
+                        }
+                        state = KafkaBookKeeperRunStateV1.RETIRED;
+                        return snapshot();
+                    }
+                });
+        // Cancelling an observer cannot suppress the already admitted authoritative confirmation.
+        return work.thenApply(value -> value);
     }
 
     public synchronized KafkaBookKeeperRunSnapshotV1 snapshot() {

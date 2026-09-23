@@ -20,6 +20,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 
@@ -148,19 +149,45 @@ class KafkaBookKeeperRunLifecycleV1Test {
 
     @Test
     void retiresOnlyAfterEveryLocalEligibilityConditionIsProven() {
-        KafkaBookKeeperRunLifecycleV1 lifecycle = create(
-                new KafkaRunTestFixtures.FakeSession(),
-                new KafkaRunTestFixtures.FakeRootAuthority(),
-                KafkaRunTestFixtures.binding(6, 11, 5));
+        var roots = new KafkaRunTestFixtures.FakeRootAuthority();
+        KafkaBookKeeperRunLifecycleV1 lifecycle =
+                create(new KafkaRunTestFixtures.FakeSession(), roots, KafkaRunTestFixtures.binding(6, 11, 5));
         seal(lifecycle, 100);
 
         assertThatThrownBy(() -> lifecycle.retire(new KafkaRunRetirementPermitV1(true, true, 1, true)))
                 .isInstanceOf(IllegalArgumentException.class);
-        KafkaBookKeeperRunSnapshotV1 retired = lifecycle.retire(new KafkaRunRetirementPermitV1(true, true, 0, true));
+        var permit = new KafkaRunRetirementPermitV1(true, true, 0, true);
+        assertThatThrownBy(() -> lifecycle.retire(permit).toCompletableFuture().join())
+                .hasRootCauseMessage("run root lacks its exact durable retirement marker");
+        assertThat(lifecycle.snapshot().state()).isEqualTo(KafkaBookKeeperRunStateV1.SEALED);
+        roots.retired.add(lifecycle.snapshot().root().runId());
+        KafkaBookKeeperRunSnapshotV1 retired =
+                lifecycle.retire(permit).toCompletableFuture().join();
 
         assertThat(retired.state()).isEqualTo(KafkaBookKeeperRunStateV1.RETIRED);
         assertThat(retired.root().state()).isEqualTo(KafkaRunRootStateV1.SEALED);
         assertThatThrownBy(lifecycle::drain).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void retirementReadFailureAndObserverCancellationCannotForgeOrSuppressLocalState() {
+        var roots = new KafkaRunTestFixtures.FakeRootAuthority();
+        var lifecycle = create(new KafkaRunTestFixtures.FakeSession(), roots, KafkaRunTestFixtures.binding(6, 11, 5));
+        seal(lifecycle, 100);
+        var permit = new KafkaRunRetirementPermitV1(true, true, 0, true);
+
+        roots.retirementReadGate = new CompletableFuture<>();
+        var failed = lifecycle.retire(permit).toCompletableFuture();
+        roots.retirementReadGate.completeExceptionally(new IllegalStateException("metadata read unknown"));
+        assertThatThrownBy(failed::join).hasRootCauseMessage("metadata read unknown");
+        assertThat(lifecycle.snapshot().state()).isEqualTo(KafkaBookKeeperRunStateV1.SEALED);
+
+        roots.retirementReadGate = new CompletableFuture<>();
+        var observer = lifecycle.retire(permit).toCompletableFuture();
+        assertThat(observer.cancel(true)).isTrue();
+        roots.retired.add(lifecycle.snapshot().root().runId());
+        roots.retirementReadGate.complete(null);
+        assertThat(lifecycle.snapshot().state()).isEqualTo(KafkaBookKeeperRunStateV1.RETIRED);
     }
 
     static KafkaBookKeeperRunLifecycleV1 create(

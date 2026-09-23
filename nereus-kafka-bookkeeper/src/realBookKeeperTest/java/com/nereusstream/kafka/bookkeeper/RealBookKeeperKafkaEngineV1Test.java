@@ -486,6 +486,11 @@ class RealBookKeeperKafkaEngineV1Test {
         }
 
         @Override
+        public CompletionStage<Boolean> isDurablyRetired(KafkaRunRootSnapshotV1 exactSealed) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        @Override
         public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> sealRoot(
                 KafkaRunRootSnapshotV1 expectedActive, KafkaRunRootSnapshotV1 sealedCandidate) {
             if (!expectedActive.equals(roots.get(expectedActive.runId()))) {

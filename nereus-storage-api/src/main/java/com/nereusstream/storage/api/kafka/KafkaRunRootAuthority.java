@@ -30,6 +30,9 @@ public interface KafkaRunRootAuthority {
 
     CompletionStage<Optional<KafkaRunRootSnapshotV1>> openRoot(StorageRunId runId);
 
+    /** Authoritative exact stored-marker check; read admission intentionally hides retired roots. */
+    CompletionStage<Boolean> isDurablyRetired(KafkaRunRootSnapshotV1 exactSealed);
+
     CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> sealRoot(
             KafkaRunRootSnapshotV1 expectedActive, KafkaRunRootSnapshotV1 sealedCandidate);
 

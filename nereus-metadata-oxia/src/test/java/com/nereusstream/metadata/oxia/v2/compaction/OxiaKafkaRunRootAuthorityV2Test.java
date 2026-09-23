@@ -120,9 +120,12 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThat(join(f.roots.createSuccessor(sealed, b)).exactProof()).contains(b);
         var old = f.stored(a);
         var retired = old.retire();
+        assertThat(join(f.roots.isDurablyRetired(sealed))).isFalse();
         f.client.put(f.roots.nativeRootKey(a.runId()), retired.encode());
 
         assertThat(f.stored(a)).isEqualTo(retired);
+        assertThat(join(f.roots.isDurablyRetired(sealed))).isTrue();
+        assertThat(join(f.roots.isDurablyRetired(a))).isFalse();
         assertThat(f.stored(a).successor()).isEqualTo(old.successor());
         assertThat(f.stored(a).initialLink()).isEqualTo(old.initialLink());
         assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();

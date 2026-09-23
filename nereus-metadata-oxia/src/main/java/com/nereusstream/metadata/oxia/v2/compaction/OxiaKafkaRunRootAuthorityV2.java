@@ -123,6 +123,17 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
     }
 
     @Override
+    public CompletionStage<Boolean> isDurablyRetired(KafkaRunRootSnapshotV1 exactSealed) {
+        Objects.requireNonNull(exactSealed, "exactSealed");
+        var expectedResource = resource(exactSealed);
+        return read(exactSealed.runId())
+                .thenApply(observed -> observed.map(value -> value.value().retired()
+                                && value.value().root().equals(exactSealed)
+                                && value.value().resource().equals(expectedResource))
+                        .orElse(false));
+    }
+
+    @Override
     public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(KafkaRunRootSnapshotV1 active) {
         var candidate = candidate(active);
         if (active.predecessorRunId().isPresent()) {

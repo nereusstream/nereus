@@ -32,6 +32,8 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperNativeRootVerifierV2;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunStateV1;
+import com.nereusstream.kafka.bookkeeper.run.KafkaRunRetirementPermitV1;
 import com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
@@ -264,9 +266,14 @@ class KafkaBookKeeperRunRootsV2RealTest {
             var before = await(f.nativeClient.read(key)).orElseThrow();
             var retired = KafkaRunRootRecordV2.decode(before.storedBytes()).retire();
             assertThat(retired.successor()).contains(f.stored(child).initialLink());
+            var permit = new KafkaRunRetirementPermitV1(true, true, 0, true);
+            assertThatThrownBy(() -> await(run.retire(permit)))
+                    .hasRootCauseMessage("run root lacks its exact durable retirement marker");
+            assertThat(run.snapshot().state()).isEqualTo(KafkaBookKeeperRunStateV1.SEALED);
             await(f.nativeClient.compareAndSet(key, retired.encode(), before.versionId()));
             var stored = await(f.nativeClient.read(key)).orElseThrow();
             assertThat(KafkaRunRootRecordV2.decode(stored.storedBytes())).isEqualTo(retired);
+            assertThat(await(run.retire(permit)).state()).isEqualTo(KafkaBookKeeperRunStateV1.RETIRED);
             Files.write(
                     checkpoint().resolve("test-only-retired-root"),
                     List.of(
