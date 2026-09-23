@@ -37,12 +37,54 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /** Synthetic native/physical admission fixtures; the local lifecycle is exercised through actual M4 and guard code. */
 class KafkaBookKeeperReadOwnerV2Test {
+    @Test
+    void failedSessionConstructionReleasesPhysicalTicketsAndCellShareBeforeRead() {
+        var f = new Fixture();
+        var attempts = new AtomicInteger();
+        var workCalls = new AtomicInteger();
+        for (int failure = 0; failure < 2; failure++) {
+            int current = failure;
+            var result = KafkaBookKeeperReadOwnerV2.run(
+                    f.budget,
+                    f.physical.descriptor,
+                    f.physical.m4,
+                    f.guard,
+                    () -> {
+                        if (attempts.incrementAndGet() == 1) {
+                            throw new IllegalStateException("session unavailable");
+                        }
+                        return null;
+                    },
+                    handle -> CompletableFuture.completedFuture(new CaptureResult(
+                            CaptureOutcome.EXACT_TARGET,
+                            Optional.of(
+                                    f.physical.seals.get(handle.ledgerIdentity().ledgerId())))),
+                    Runnable::run,
+                    f.bounds,
+                    2,
+                    owner -> {
+                        workCalls.incrementAndGet();
+                        return CompletableFuture.completedFuture("unexpected read");
+                    });
+            assertThatThrownBy(() -> result.toCompletableFuture().join())
+                    .hasRootCauseMessage(current == 0 ? "session unavailable" : "native session");
+            f.assertTickets(0);
+            assertThat(f.budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+        }
+        assertThat(workCalls).hasValue(0);
+        var recovered = f.run(owner -> CompletableFuture.completedFuture("accepted"));
+        f.closed.complete(null);
+        assertThat(recovered.toCompletableFuture().join()).isEqualTo("accepted");
+        f.assertTickets(0);
+    }
+
     @Test
     void closureKeepsAllTicketsThroughCancelledReadAndActualSessionTermination() {
         var f = new Fixture();

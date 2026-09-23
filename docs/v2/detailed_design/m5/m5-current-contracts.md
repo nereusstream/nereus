@@ -567,6 +567,14 @@ The real BK/Oxia regression verifies both constructor failures leave zero ticket
 same Binding budget for a successful native capture. This does not resolve a session whose creation or close is
 actually uncertain.
 
+The selected-generation `KafkaBookKeeperReadOwnerV2` follows the same pre-session boundary. A synchronous throw or
+null from its session supplier produces an exact no-dispatch ticket terminal before marking the Cell share as
+session-started. Confirmed ticket cleanup returns the original failure and lets a subsequent owner use the same
+Binding share; uncertain cleanup retains the exact-operation retry handle. A focused guard/M4 unit regression
+reproduces the former unresolved-ticket result and verifies the correction. The source-locked BK/Oxia run rechecks
+native selected reads and restarts, but does not inject this construction failure into BookKeeper. Once a session
+is returned, unknown close still retains the share and tickets.
+
 When IO and the owned session have definitely terminated but physical ticket cleanup remains unresolved,
 `KafkaBookKeeperReadOwnerV2` returns a privately constructed `TicketCleanupException`. It retains this invocation's
 operation ID, complete physical membership, Context and local terminal proof, while preserving an original work

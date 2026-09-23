@@ -260,8 +260,16 @@ public final class KafkaBookKeeperReadOwnerV2 {
                             .array()));
                     var guarded = guard.execute(resources, context, () -> CompletableFuture.supplyAsync(
                                     () -> {
+                                        final BookKeeperCellSession session;
+                                        try {
+                                            session = Objects.requireNonNull(sessions.get(), "native session");
+                                        } catch (Throwable failure) {
+                                            // Construction accepted no native work; release the already acquired
+                                            // tickets.
+                                            return CompletableFuture.completedFuture(new Completion<>(
+                                                    new WorkResult<T>(null, failure), Optional.of(terminalProof)));
+                                        }
                                         reservation.sessionStarting();
-                                        var session = Objects.requireNonNull(sessions.get(), "native session");
                                         KafkaBookKeeperReadOwnerV2 controller;
                                         try {
                                             if (!session.capabilitySnapshot()

@@ -2812,6 +2812,26 @@ were rehashed in the runner. Archive:
 This is a pre-session cleanup correction, not an all-writer admission proof or M5-E/Final receipt. All 17 amended
 acceptance obligations remain OPEN/null.
 
+## Selected BK read-owner session-construction failure cleanup (2026-09-23)
+
+`KafkaBookKeeperReadOwnerV2` had the same pre-session ordering gap as raw run capture. It marked its Cell share as
+session-started before calling the session supplier; a synchronous throw or null return left its already acquired
+physical tickets unresolved and suppressed the original failure behind the generic terminal error. A new focused
+guard/M4 regression first observed that error, then passed after the owner began marking the share only once a
+session existed. The no-dispatch path now emits the exact terminal for ticket cleanup and releases the pre-session
+share. Confirmed cleanup returns the original failure; uncertain ticket cleanup retains the exact-operation retry
+handle. Returned sessions still use the existing actual-close rule; uncertain native
+termination remains charged.
+
+The 7-case owner unit suite, Spotless and Checkstyle passed. The source-locked BK/Oxia runner also passed 26 XML
+suites / 109 cases or restart phases with zero failures, errors or skips, including existing native selected-read
+and service-restart regressions. Its archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-61611`; 746 current-source inputs were rehashed with
+manifest SHA-256 `8b91fe36fef28df6ff29401c447bd11d9df8c70b5659c388dbb779a6511cab79`.
+The construction-failure injection is in the focused unit suite, not a native BookKeeper fault. Full protocol
+owner admission, crashed-owner drain and retained-result accounting remain OPEN; all 17 acceptance rows and
+M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
