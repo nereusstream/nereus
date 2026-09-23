@@ -31,6 +31,7 @@ import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityStateMachineV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import java.nio.ByteBuffer;
@@ -104,17 +105,13 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
         Objects.requireNonNull(budget, "budget");
         Objects.requireNonNull(exactIntent, "exactIntent");
         Objects.requireNonNull(bound, "bound");
-        var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());
-        var context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(intent);
-        if (!resource.authorityKey().equals(exactIntent.key())
-                || !resource.equals(intent.target().resourceId())
-                || !resource.equals(bound.epoch().resource())
-                || !bound.intentAuthoritySha256().equals(exactIntent.canonicalStoredSha256())
-                || !bound.dispatchTokenSha256()
-                        .equals(intent.deleteIntent().orElseThrow().dispatchTokenSha256())) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("native binding differs from exact M5 delete intent"));
+        TargetDeleteAuthorityV1 intent;
+        try {
+            intent = requireBoundIntent(exactIntent, bound);
+        } catch (IllegalArgumentException failure) {
+            return CompletableFuture.failedFuture(failure);
         }
+        var context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(intent);
         var eligibility = intent.eligibilitySnapshot().orElseThrow();
         var external = intent.externalIdentity().orElseThrow();
         CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> operation = requireRoute(route)
@@ -138,6 +135,45 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
                 });
         // The exposed observer cannot cancel an admitted native deletion or its Cell cleanup.
         return operation.thenApply(value -> value);
+    }
+
+    /**
+     * Recovers only a callback-terminal native Cell hold for this exact Oxia INTENT. A fresh process may use the
+     * persisted native binding without reconstructing a vanished BK target or claiming the original GC owner UUID.
+     * Native absence can release Cell capacity, but M5 DONE still requires separate eligibility and absence checks.
+     */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> reconcileBoundCellDeleteAbsence(
+            BoundPhysicalDeleteAuthorityRouteV2 route,
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            VersionedValue exactIntent,
+            M5BookKeeperNativeDeleteIntentV2 bound) {
+        Objects.requireNonNull(budget, "budget");
+        try {
+            requireBoundIntent(exactIntent, bound);
+        } catch (IllegalArgumentException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> operation = requireRoute(route)
+                .thenCompose(ignored -> requireExactIntent(route, exactIntent))
+                .thenCompose(ignored -> nativeAuthority.reconcileCellDeleteAbsence(budget, bound));
+        // Cancellation of an observer must not interrupt native Cell reconciliation.
+        return operation.thenApply(value -> value);
+    }
+
+    private TargetDeleteAuthorityV1 requireBoundIntent(
+            VersionedValue exactIntent, M5BookKeeperNativeDeleteIntentV2 bound) {
+        Objects.requireNonNull(exactIntent, "exactIntent");
+        Objects.requireNonNull(bound, "bound");
+        var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());
+        if (!resource.authorityKey().equals(exactIntent.key())
+                || !resource.equals(intent.target().resourceId())
+                || !resource.equals(bound.epoch().resource())
+                || !bound.intentAuthoritySha256().equals(exactIntent.canonicalStoredSha256())
+                || !bound.dispatchTokenSha256()
+                        .equals(intent.deleteIntent().orElseThrow().dispatchTokenSha256())) {
+            throw new IllegalArgumentException("native binding differs from exact M5 delete intent");
+        }
+        return intent;
     }
 
     private CompletionStage<Void> requireRoute(BoundPhysicalDeleteAuthorityRouteV2 route) {

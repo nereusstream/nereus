@@ -2749,6 +2749,26 @@ The archive is `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-24869`, 
 drain, UNKNOWN presence recovery, full M5 dispatch and M5-E/Final remain OPEN. All 17 acceptance obligations retain
 OPEN/null receipts.
 
+## Bound BK/Oxia Cell absence recovery entry (2026-09-23)
+
+`KafkaBookKeeperDeleteObservationAuthorityV2.reconcileBoundCellDeleteAbsence` now connects the prior native
+targetless UNKNOWN recovery to a configured BK/Oxia route. It first checks the exact current Oxia INTENT against the
+permanent native intent's physical resource, dispatch token and full stored-value digest, then delegates to the native
+read-only absence reconciliation. It does not require the previous JVM's GC owner UUID or reconstructed full BK
+target. A changed or foreign INTENT, unbound route and missing callback-terminal Cell hold fail before any capacity
+release. The path does not requalify eligibility, write M5 DONE, settle quota or redispatch deletion; the separate
+`completeAbsent` operation retains those checks.
+
+The actual BK/Oxia bound-route test covers those negative paths before and after a service restart and checks that
+the Cell head stays unchanged. The independently exercised native BK restart fixture proves the positive
+callback-terminal UNKNOWN/authoritative-absence release from the persisted native intent; no single test yet creates
+that UNKNOWN through the bound Oxia dispatch and then recovers it through this new entry. The source-locked runner
+passed 26 XML suites / 107 cases with zero failures, errors or skips; all 745 source inputs and XML files were
+independently rehashed. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-73294`; input-manifest
+SHA-256: `afecea6a505d91ccc657eceb3d5c9abd444896bf06315ce00bb343d353adaab9`. Synthetic protocol/M4/grace
+facts, complete writer admission, same-epoch ACTIVE transport drain, M5-E children and source-bound Final remain
+OPEN. All 17 amended acceptance obligations retain OPEN/null receipts.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

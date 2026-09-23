@@ -124,6 +124,17 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             var nativeIntent = await(gc.bindIntent(route, refreshed));
             assertThat(nativeIntent.epoch()).isEqualTo(epoch);
             assertThat(nativeIntent.intentAuthoritySha256()).isEqualTo(refreshed.canonicalStoredSha256());
+            assertThatThrownBy(() -> await(gc.reconcileBoundCellDeleteAbsence(
+                            raw, f.backend.nativeDeleteCellBudget(), refreshed, nativeIntent)))
+                    .hasRootCauseMessage("native physical namespace route admission is not installed");
+            assertThatThrownBy(() -> await(gc.reconcileBoundCellDeleteAbsence(
+                            route, f.backend.nativeDeleteCellBudget(), intent, nativeIntent)))
+                    .hasRootCauseMessage("native binding differs from exact M5 delete intent");
+            assertThatThrownBy(() -> await(gc.reconcileBoundCellDeleteAbsence(
+                            route, f.backend.nativeDeleteCellBudget(), refreshed, nativeIntent)))
+                    .hasRootCauseMessage("native Cell reservation is absent");
+            assertThat(await(f.backend.nativeDeleteCellBudget().snapshot()).reservations())
+                    .isEmpty();
             assertThat(await(route.requireActiveResource(resource))).isEqualTo(f.binding);
             assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isPresent();
             var refreshedGrace = M5TargetDeleteAuthorityCodecV1.decodeAuthority(refreshed.canonicalStoredBytes())
@@ -245,6 +256,11 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
                     .hasRootCauseMessage("bound native delete requires Cell budget");
             assertThatThrownBy(() -> await(gc.dispatchBoundDelete(route, cellBudget, refreshed, previousIntent)))
                     .hasRootCauseMessage("native binding differs from exact M5 delete intent");
+            assertThatThrownBy(() ->
+                            await(gc.reconcileBoundCellDeleteAbsence(route, cellBudget, refreshed, previousIntent)))
+                    .hasRootCauseMessage("native binding differs from exact M5 delete intent");
+            assertThatThrownBy(() -> await(gc.reconcileBoundCellDeleteAbsence(route, cellBudget, refreshed, bound)))
+                    .hasRootCauseMessage("native Cell reservation is absent");
             assertThat(await(cellBudget.snapshot())).isEqualTo(originalBudget);
             var deleted = await(gc.dispatchBoundDelete(route, cellBudget, refreshed, bound));
             assertThat(deleted.deleteResult().outcome())

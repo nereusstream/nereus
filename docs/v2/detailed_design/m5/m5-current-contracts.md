@@ -233,6 +233,13 @@ hold only on authoritative ledger absence; exact presence, changed metadata or a
 This does not require reconstructing the vanished full delete target from an old JVM's checkpoint, does not dispatch
 another delete and does not write M5 DONE. An unchanged native epoch/intent is verified before and after observation.
 
+`KafkaBookKeeperDeleteObservationAuthorityV2.reconcileBoundCellDeleteAbsence` exposes that native recovery only
+through the configured BK/Oxia route and an exact, still-current M5 INTENT whose resource, dispatch token and full
+stored-value digest match the permanent native intent. It does not require the old JVM's GC owner UUID or a
+reconstructed BK target. The native operation accepts only a matching callback-terminal UNKNOWN Cell hold; a missing
+or ACTIVE hold cannot be released by this path. Changed eligibility facts are not promoted by Cell capacity recovery:
+M5 DONE still requires a separate current-owner, fresh-eligibility and actual-absence reconciliation.
+
 `M5BookKeeperDeleteCellBudgetV2RestartTest` begins after the original bound restart checks and lifecycle cases. It
 creates three actual three-byte sealed BK ledgers with native intent bindings. For ACTIVE, the real native delete is
 applied but its successful callback is withheld; cancelling its observer leaves an occupied ACTIVE head even though
