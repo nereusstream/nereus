@@ -240,6 +240,16 @@ reconstructed BK target. The native operation accepts only a matching callback-t
 or ACTIVE hold cannot be released by this path. Changed eligibility facts are not promoted by Cell capacity recovery:
 M5 DONE still requires a separate current-owner, fresh-eligibility and actual-absence reconciliation.
 
+The bound BK/Oxia test now drives a real routed delete to callback-terminal UNKNOWN by reporting one controlled
+CONNECTIONLOSS before forwarding its original exact ZooKeeper delete transaction. Exact ledger presence retains the
+Cell hold; the fixture then delivers those same native operations and verifies actual ledger absence. The hold
+survives the existing BookKeeper/Oxia service restart while another resource in the same Cell deletes independently.
+A new JVM checks the durable Oxia INTENT, native epoch/intent, and the original hold's operation/resource/intent
+identity before `reconcileBoundCellDeleteAbsence` releases only that hold. This recovery instance has a different GC
+owner UUID; the separate M5 DONE/compaction and Oxia quota settlement use the owner read from the permanent native
+epoch. The delayed delivery is a controlled test transport, not evidence of production callback timing. Eligibility,
+M4 RELEASED and grace/reference facts in this bound fixture remain synthetic.
+
 `M5BookKeeperDeleteCellBudgetV2RestartTest` begins after the original bound restart checks and lifecycle cases. It
 creates three actual three-byte sealed BK ledgers with native intent bindings. For ACTIVE, the real native delete is
 applied but its successful callback is withheld; cancelling its observer leaves an occupied ACTIVE head even though

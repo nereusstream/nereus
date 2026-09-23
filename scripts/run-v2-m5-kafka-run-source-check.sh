@@ -211,6 +211,10 @@ if sys.argv[6]!=sys.argv[5] or sys.argv[6]==sys.argv[7]:
 cell_checkpoints={name:hashlib.sha256((out/name).read_bytes()).hexdigest()
     for name in ('native-cell-checkpoint-active','native-cell-checkpoint-unknown',
                  'native-cell-checkpoint-unknown-absent')}
+bound_unknown=out/'bound-delete-checkpoint-unknown'
+if len(bound_unknown.read_text().splitlines())!=8:
+    raise SystemExit('Bound Oxia/BK UNKNOWN restart checkpoint is incomplete')
+bound_unknown_sha=hashlib.sha256(bound_unknown.read_bytes()).hexdigest()
 suites=[]
 for module,task,name,count in (
     ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',8),
@@ -281,7 +285,10 @@ summary={'rawCaptureRequiresExpectedBinding':True,
     'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcCanonicalCapacityAtomicallyReserved':True,
     'nativeGcCapacitySurvivedRestartAndDone':True,'existingNativeIntentContinuesAtCapacity':True,
     'nativeGcUsesUniqueAuthorityRoute':True,'nativeGcRequiresActiveQuotaAuthority':True,
-    'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
+    'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,
+    'boundCellUnknownAbsenceRecoveredAfterRestart':True,
+    'boundUnknownCheckpointSha256':bound_unknown_sha,
+    'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,
     'sameZooKeeperAndBookieContainersRestarted':True,

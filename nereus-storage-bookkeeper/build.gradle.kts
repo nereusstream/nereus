@@ -61,6 +61,18 @@ tasks.withType<Jar>().configureEach {
     isReproducibleFileOrder = true
 }
 
+val m5NativeDeleteFaultFixtures by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+}
+val m5NativeDeleteFaultFixturesJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("m5-native-delete-fault-test-fixtures")
+    from(sourceSets.test.get().output)
+    include("com/nereusstream/storage/bookkeeper/M5BookKeeperDeleteFaultFixtureV2*.class")
+    dependsOn(tasks.named("testClasses"))
+}
+artifacts { add(m5NativeDeleteFaultFixtures.name, m5NativeDeleteFaultFixturesJar) }
+
 // Opt-in native create profile checks; the historical conformance task is unchanged.
 tasks.register<Test>("v2M5NativeCreateTest") {
     group = "verification"

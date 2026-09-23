@@ -21,6 +21,7 @@ dependencies {
 
     testImplementation(project(":nereus-metadata-spi"))
     testImplementation(project(mapOf("path" to ":nereus-storage-object", "configuration" to "m5DeleteTestFixtures")))
+    testImplementation(project(mapOf("path" to ":nereus-storage-bookkeeper", "configuration" to "m5NativeDeleteFaultFixtures")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -573,7 +574,7 @@ mapOf(
                 providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull ?: error("native BK URI is required"))
             systemProperty("nereus.m5.oxia.serviceAddress",
                 providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("native Oxia address is required"))
-            if (taskName.contains("Restart")) {
+            if (taskName.contains("Restart") || taskName == "v2M5BoundDeleteRealTest") {
                 systemProperty("nereus.m5.boundDelete.restartCheckpoint",
                     providers.gradleProperty("v2M5BoundDeleteRestartCheckpoint").orNull ?: error("bound GC checkpoint is required"))
             }

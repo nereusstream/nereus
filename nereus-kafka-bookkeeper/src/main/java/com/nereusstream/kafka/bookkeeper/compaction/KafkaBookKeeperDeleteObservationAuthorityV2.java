@@ -55,14 +55,26 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
 
     public KafkaBookKeeperDeleteObservationAuthorityV2(
             M5BookKeeperNativeCreateClientV2 client, RunLedgerHandleV1 handle, UUID owner) {
-        this.nativeAuthority = client.deleteAuthority(handle);
+        this(client, handle, owner, client.deleteAuthority(handle));
+    }
+
+    /** Package-scoped native transport seam for real BK fault-delivery tests. */
+    KafkaBookKeeperDeleteObservationAuthorityV2(
+            M5BookKeeperNativeCreateClientV2 client,
+            RunLedgerHandleV1 handle,
+            UUID owner,
+            M5BookKeeperNativeDeleteAuthorityV2 nativeAuthority) {
         this.client = client;
         this.reader = new KafkaBookKeeperDeleteIdentityReaderV2(client, handle);
         this.owner = Objects.requireNonNull(owner, "owner");
         if (owner.equals(new UUID(0, 0))) {
             throw new IllegalArgumentException("native GC owner is empty");
         }
+        this.nativeAuthority = Objects.requireNonNull(nativeAuthority, "nativeAuthority");
         resource = nativeAuthority.resource();
+        if (!resource.equals(client.deleteAuthority(handle).resource())) {
+            throw new IllegalArgumentException("injected native delete authority belongs to another BK resource");
+        }
         resourceSha = Sha256Digest.hash(resource.canonicalBytes());
         key = FACT_PREFIX + resourceSha.toHex() + "/fact-v1";
     }

@@ -2759,15 +2759,39 @@ target. A changed or foreign INTENT, unbound route and missing callback-terminal
 release. The path does not requalify eligibility, write M5 DONE, settle quota or redispatch deletion; the separate
 `completeAbsent` operation retains those checks.
 
-The actual BK/Oxia bound-route test covers those negative paths before and after a service restart and checks that
-the Cell head stays unchanged. The independently exercised native BK restart fixture proves the positive
-callback-terminal UNKNOWN/authoritative-absence release from the persisted native intent; no single test yet creates
-that UNKNOWN through the bound Oxia dispatch and then recovers it through this new entry. The source-locked runner
+The actual BK/Oxia bound-route test at this source covers those negative paths before and after a service restart
+and checks that the Cell head stays unchanged. The independently exercised native BK restart fixture proves the
+positive callback-terminal UNKNOWN/authoritative-absence release from the persisted native intent. The source-locked runner
 passed 26 XML suites / 107 cases with zero failures, errors or skips; all 745 source inputs and XML files were
 independently rehashed. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-73294`; input-manifest
 SHA-256: `afecea6a505d91ccc657eceb3d5c9abd444896bf06315ce00bb343d353adaab9`. Synthetic protocol/M4/grace
 facts, complete writer admission, same-epoch ACTIVE transport drain, M5-E children and source-bound Final remain
 OPEN. All 17 amended acceptance obligations retain OPEN/null receipts.
+
+## Bound UNKNOWN delete and recovery across BK/Oxia restart (2026-09-23)
+
+The BK/Oxia bound-route fixture now dispatches one exact M5 INTENT through the configured Cell budget and a
+test-only native callback transport. The fixture reports CONNECTIONLOSS for the original delete transaction before
+forwarding it, so the real authority returns `OUTCOME_UNKNOWN` and retains a callback-terminal Cell hold. A native
+presence reread cannot release the hold. The fixture then delivers those same version-checked ZooKeeper operations;
+the ledger becomes absent while the hold remains. A second physical resource in that Cell can still dispatch and
+finish independently, changing the shared head version without changing the first operation's identity.
+
+After the actual BookKeeper and Oxia service restart, a fresh JVM rereads the exact Oxia INTENT, native epoch and
+intent, and the original Cell operation/resource/intent identity. An instance with a different GC owner UUID calls
+`reconcileBoundCellDeleteAbsence`; authoritative BK absence releases only the old Cell hold without replaying
+deletion. A separate instance takes the owner identity from the permanent native epoch to run M5 `completeAbsent`,
+compact DONE and settle the Oxia quota. The test checkpoint contains no reconstructed BK delete target or local
+owner UUID. The injected callback/delivery schedule proves the behavior under that deterministic fault, not natural
+transport timing or complete protocol eligibility.
+
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 XML suites / 107 cases with no failures, errors or skips.
+All 746 captured source inputs and XML files were independently rehashed, and the bound UNKNOWN checkpoint hash was
+recorded. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-83803`; input-manifest SHA-256:
+`a06b7b8663d295e613b5d4f80ad4648e3a1be620ab7632e86cc899cd5c2a4bb1`; bound checkpoint SHA-256:
+`63903ee91b6142f0afe377d15da06d1a62758b9a7d69ab909cb1fec2caa15b33`. The test-only fault helper is
+packaged solely on test classpaths. Real protocol/M4/grace proof producers, the full writer matrix, all-provider
+dispatch and M5-E/Final remain OPEN; all 17 amended obligations retain OPEN/null receipts.
 
 ## Remaining ordered work
 

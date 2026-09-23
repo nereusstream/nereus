@@ -29,6 +29,7 @@ import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.ImmutableRetainedStoragePayload;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteFaultFixtureV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2;
@@ -58,7 +59,8 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             var handle = sealed(f);
             var resource = resource(f, handle);
             assertThat(await(f.source.requireNamespaceBinding())).isEqualTo(f.binding);
-            var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, UUID.randomUUID());
+            var owner = UUID.randomUUID();
+            var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, owner);
             var facts = facts(f, resource);
             var route = route(f, gc);
             var misplacedRelease = SyntheticDeleteAuthorityFixturesV2.replacement(
@@ -160,6 +162,60 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
                     .hasRootCauseMessage("native intent eligibility authority changed: " + refreshedGrace.key());
             assertThat(await(f.backend.nativeDeleteCellBudget().snapshot())).isEqualTo(heldBefore);
             assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isPresent();
+
+            var successorEpoch = await(gc.claim(route, Optional.of(epoch)));
+            var successorObservation = await(gc.observe(3, Optional.of(refreshedObservation)));
+            var next = await(coordinator.refreshDispatch(
+                            refreshed,
+                            successorObservation,
+                            SyntheticDeleteAuthorityFixturesV2.replacement(
+                                    resource,
+                                    M5TargetDeleteAuthorityCodecV1.decodeAuthority(refreshed.canonicalStoredBytes())
+                                                    .authorityRevision()
+                                            + 1,
+                                    facts)))
+                    .observed()
+                    .orElseThrow();
+            var nextIntent = await(gc.bindIntent(route, next));
+            assertThat(nextIntent.epoch()).isEqualTo(successorEpoch);
+            try (var faults = new M5BookKeeperDeleteFaultFixtureV2(
+                    System.getProperty("nereus.bookkeeper.metadataServiceUri"),
+                    f.source.capabilitySnapshot(),
+                    f.source.spec(),
+                    f.binding)) {
+                var faulted = new KafkaBookKeeperDeleteObservationAuthorityV2(
+                        f.source, handle, owner, faults.deleteAuthority(handle));
+                faults.dropNextDeleteCallback();
+                var unknown =
+                        await(faulted.dispatchBoundDelete(route, f.backend.nativeDeleteCellBudget(), next, nextIntent));
+                assertThat(unknown.deleteResult().outcome())
+                        .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.OUTCOME_UNKNOWN);
+                assertThat(unknown.reservationRetained()).isTrue();
+                var held = await(f.backend.nativeDeleteCellBudget().snapshot());
+                assertThat(held.reservations()).hasSize(1);
+                assertThat(held.reservations().get(0).terminalUnknown()).isTrue();
+                assertThat(await(faulted.reconcileBoundCellDeleteAbsence(
+                                        route, f.backend.nativeDeleteCellBudget(), next, nextIntent))
+                                .deleteResult()
+                                .outcome())
+                        .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.EXACT_LEDGER_REMAINS);
+                assertThat(await(f.backend.nativeDeleteCellBudget().snapshot())).isEqualTo(held);
+                await(faults.deliverDroppedDelete());
+                assertThat(await(f.source.captureExactTarget(handle)).exactTarget())
+                        .isEmpty();
+                assertThat(await(f.backend.nativeDeleteCellBudget().snapshot())).isEqualTo(held);
+                Files.write(
+                        unknownCheckpoint(),
+                        List.of(
+                                f.source.spec().encode().toHex(),
+                                Long.toString(handle.ledgerIdentity().ledgerId()),
+                                next.key(),
+                                next.canonicalStoredSha256().toHex(),
+                                next.metadataVersion().value().toHex(),
+                                Sha256Digest.hash(successorEpoch.encode()).toHex(),
+                                Sha256Digest.hash(nextIntent.encode()).toHex(),
+                                held.reservations().get(0).operation().toString()));
+            }
         }
     }
 
@@ -235,7 +291,8 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             var cellBudget = f.backend.nativeDeleteCellBudget();
             var originalBudget = await(cellBudget.snapshot());
             assertThat(Sha256Digest.hash(originalBudget.encode()).toHex()).isEqualTo(lines.get(8));
-            assertThat(originalBudget.reservations()).isEmpty();
+            assertThat(originalBudget.reservations()).hasSize(1);
+            assertThat(originalBudget.reservations().get(0).terminalUnknown()).isTrue();
             var current = await(gc.claim(route, Optional.of(previous)));
             var observation = await(gc.observe(priorObservation.observationEpoch() + 1, Optional.of(priorObservation)));
             var coordinator = coordinator(f, handle, gc, route);
@@ -266,7 +323,8 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThat(deleted.deleteResult().outcome())
                     .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
             assertThat(deleted.reservationRetained()).isFalse();
-            assertThat(await(cellBudget.snapshot()).reservations()).isEmpty();
+            assertThat(await(cellBudget.snapshot()).reservations())
+                    .containsExactlyElementsOf(originalBudget.reservations());
             var done = await(coordinator.completeAbsent(refreshed)).observed().orElseThrow();
             await(coordinator.compactDone(done));
             assertThat(await(route.quota().settle(resource))).isEqualTo(M5GcQuotaCoordinatorV2.Result.SETTLED);
@@ -298,6 +356,52 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             }
             assertThat(await(coordinator.completeAbsent(refreshed)).exactTerminalIsAuthoritative())
                     .isTrue();
+        }
+        var unknownLines = Files.readAllLines(unknownCheckpoint());
+        assertThat(unknownLines).hasSize(8);
+        try (var f = new Fixture(8801, "gc-bound-route", List.of(unknownLines.get(0)))) {
+            var config = f.source.spec().configurations().get(0);
+            var handle = new RunLedgerHandleV1(
+                    config.providerScopeId(),
+                    config.runId(),
+                    new BookKeeperLedgerIdentity(Long.parseLong(unknownLines.get(1))),
+                    config.configurationDigest());
+            var resource = resource(f, handle);
+            var nativeAuthority = f.source.deleteAuthority(handle);
+            var epoch = await(nativeAuthority.read()).orElseThrow();
+            var nativeIntent = await(nativeAuthority.readIntent()).orElseThrow();
+            assertThat(Sha256Digest.hash(epoch.encode()).toHex()).isEqualTo(unknownLines.get(5));
+            assertThat(Sha256Digest.hash(nativeIntent.encode()).toHex()).isEqualTo(unknownLines.get(6));
+            var recoveryOwner = UUID.randomUUID();
+            assertThat(recoveryOwner).isNotEqualTo(epoch.owner());
+            var recovery = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, recoveryOwner);
+            var route = route(f, recovery);
+            var stored = await(route.read(unknownLines.get(2))).orElseThrow();
+            assertThat(stored.canonicalStoredSha256().toHex()).isEqualTo(unknownLines.get(3));
+            assertThat(stored.metadataVersion().value().toHex()).isEqualTo(unknownLines.get(4));
+            assertThat(nativeIntent.intentAuthoritySha256()).isEqualTo(stored.canonicalStoredSha256());
+            assertThat(await(route.requireActiveResource(resource))).isEqualTo(f.binding);
+            var budget = f.backend.nativeDeleteCellBudget();
+            var held = await(budget.snapshot());
+            assertThat(held.reservations()).hasSize(1);
+            var retained = held.reservations().get(0);
+            assertThat(retained.operation().toString()).isEqualTo(unknownLines.get(7));
+            assertThat(retained.resource()).isEqualTo(resource.sha256());
+            assertThat(retained.nativeIntent()).isEqualTo(Sha256Digest.hash(nativeIntent.encode()));
+            assertThat(retained.terminalUnknown()).isTrue();
+            assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isEmpty();
+            var absent = await(recovery.reconcileBoundCellDeleteAbsence(route, budget, stored, nativeIntent));
+            assertThat(absent.deleteResult().outcome())
+                    .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
+            assertThat(absent.reservationRetained()).isFalse();
+            assertThat(await(budget.snapshot()).reservations()).isEmpty();
+            var completionOwner = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, epoch.owner());
+            var completionRoute = route(f, completionOwner);
+            var coordinator = coordinator(f, handle, completionOwner, completionRoute);
+            var done = await(coordinator.completeAbsent(stored)).observed().orElseThrow();
+            await(coordinator.compactDone(done));
+            assertThat(await(completionRoute.quota().settle(resource)))
+                    .isEqualTo(M5GcQuotaCoordinatorV2.Result.SETTLED);
         }
     }
 
@@ -387,6 +491,10 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
 
     private static Path checkpoint() {
         return Path.of(System.getProperty("nereus.m5.boundDelete.restartCheckpoint"));
+    }
+
+    private static Path unknownCheckpoint() {
+        return Path.of(checkpoint() + "-unknown");
     }
 
     private static <T> T await(CompletionStage<T> stage) {
