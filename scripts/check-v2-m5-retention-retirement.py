@@ -37,6 +37,7 @@ REAL_OXIA = {
         "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
     ],
     "canonicalM4ReleaseKeyRequired": True,
+    "retirementActionsRequireCanonicalReleaseKeyShape": True,
     "nativeM4ReleaseFixtureTerminalAndDrain": "SYNTHETIC",
     "clientReconnectRequired": True,
     "stalePredecessorRejected": True,
@@ -50,6 +51,7 @@ REQUIRED_SOURCES = (
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5ReferenceMutationGuardV1.java",
     "nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention/M5RetentionRetirementV1Test.java",
     "scripts/run-v2-m5-retention-retirement-check.sh",
+    "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetirementCoordinatorV1.java",
 )
 DOCUMENT_CONTRACTS = (
     (
@@ -185,6 +187,7 @@ def validate_runtime_contract(root: Path) -> None:
     pulsar = (root / REQUIRED_SOURCES[3]).read_text(encoding="utf-8")
     guard = (root / REQUIRED_SOURCES[4]).read_text(encoding="utf-8")
     runner = (root / REQUIRED_SOURCES[6]).read_text(encoding="utf-8")
+    retirement = (root / REQUIRED_SOURCES[7]).read_text(encoding="utf-8")
     require_literals(integration, tuple(REAL_OXIA["tests"]), "real Oxia integration test")
     require_literals(
         integration,
@@ -198,7 +201,16 @@ def validate_runtime_contract(root: Path) -> None:
         ),
         "real Oxia integration test",
     )
-    require_literals(binding, ("metadata.compareAndSet", "REFERENCE_SCAN_FENCED_V1"), "Binding coordinator")
+    require_literals(
+        binding,
+        ("metadata.compareAndSet", "REFERENCE_SCAN_FENCED_V1", "matchesProtectionAuthority"),
+        "Binding coordinator",
+    )
+    require_literals(
+        retirement,
+        ("matchesProtectionAuthority", "outside the selector's canonical Cell/shard"),
+        "externalization coordinator",
+    )
     require_literals(pulsar, ("metadata.compareAndSet", "REFERENCE_SCAN_FENCED_V1"), "Pulsar coordinator")
     require_literals(
         guard,

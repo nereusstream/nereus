@@ -29,6 +29,8 @@ done
 "$m5_repo_root/gradlew" \
   --no-daemon \
   --no-configuration-cache \
+  --no-parallel \
+  --max-workers=2 \
   --rerun-tasks \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   v2M5RetiredHistoryCheck \

@@ -591,19 +591,26 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     }
 
     @Test
-    void vetoExtensionPreservesPreviouslyEncodedVersionFourAuthoritiesByteForByte() {
-        // Captured from the ordinary V4 runtime/fixture JARs built at source 4167886e before this extension.
+    void vetoExtensionPreservesPreviouslyEncodedVersionFourAuthoritiesByteForByte() throws Exception {
+        // Exact bytes from the ordinary V4 runtime/fixture JARs built at source 4167886e.
         var hashes = List.of(
                 "80809392e51d7de465fe7e4b7a6559f77bfebd0a623399507e2011cf786ad348",
                 "3ecb6993aaf160084a52dc7e0d7e86acb2264d735971dfaf6e3b86e67f5b5743",
                 "106ba63af2d8171a6aff3948108c84e20b34e5899534c0e9d4f47bf62d550e21",
                 "8ecc4fc242d03671c031efc3cad789e4ac9459a54c564d9ee98d5eabca48aeea");
-        var phases = SyntheticDeleteAuthorityFixturesV2.phases(SyntheticDeleteAuthorityFixturesV2.resource(600));
-        for (int i = 0; i < phases.size(); i++) {
-            var encoded = M5TargetDeleteAuthorityCodecV1.encodeAuthority(phases.get(i));
+        for (int i = 0; i < hashes.size(); i++) {
+            CanonicalBytes encoded;
+            try (var input = getClass().getResourceAsStream("/m5-wire4-predecessor-4167886e/phase-" + i + ".bin")) {
+                assertThat(input).isNotNull();
+                encoded = CanonicalBytes.copyOf(input.readAllBytes());
+            }
             assertThat(Sha256Digest.hash(encoded).toHex()).isEqualTo(hashes.get(i));
             assertThat(ByteBuffer.wrap(encoded.toByteArray()).getInt(4)).isEqualTo(4);
-            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(encoded)).isEqualTo(phases.get(i));
+            var decoded = M5TargetDeleteAuthorityCodecV1.decodeAuthority(encoded);
+            assertThat(M5TargetDeleteAuthorityCodecV1.encodeAuthority(decoded)).isEqualTo(encoded);
+            assertThatThrownBy(() -> decoded.eligibilitySnapshot().orElseThrow().requireCanonicalM4ReleaseKeys())
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("canonical protection key");
         }
     }
 

@@ -230,7 +230,12 @@ class M5RetentionOxiaIntegrationTest {
                             .join())
                     .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
             open = read(exact, selectorKey);
-            VersionedValue forged = create(exact, root + "/forged-release", released.canonicalStoredBytes());
+            VersionedValue forged = create(
+                    exact,
+                    root + "/"
+                            + new M4ReadControlKeysV1(8, BINDING)
+                                    .protection(source.sourceIdentitySha256(), source.protectionGeneration()),
+                    released.canonicalStoredBytes());
             M4ReleaseBindingV1 wrongKey = new M4ReleaseBindingV1(
                     source.sourceIdentitySha256(),
                     source.protectionGeneration(),
@@ -558,7 +563,12 @@ class M5RetentionOxiaIntegrationTest {
                     ProtectionState.RELEASED,
                     Optional.of(batch.batchIdSha256()),
                     Optional.of(proofHead)));
-            VersionedValue protection = create(store, root + "/protection/" + index, protectionBytes);
+            VersionedValue protection = create(
+                    store,
+                    root + "/"
+                            + new M4ReadControlKeysV1(7, BINDING)
+                                    .protection(source.sourceIdentitySha256(), source.protectionGeneration()),
+                    protectionBytes);
             releases.add(new M4ReleaseBindingV1(
                     source.sourceIdentitySha256(),
                     source.protectionGeneration(),

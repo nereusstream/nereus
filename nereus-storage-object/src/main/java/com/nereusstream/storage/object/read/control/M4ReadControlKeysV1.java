@@ -18,9 +18,14 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Canonical bounded M4 keys below one configured Object-WAL shard authority. */
 public final class M4ReadControlKeysV1 {
+    private static final Pattern QUALIFIED_PROTECTION =
+            Pattern.compile("^(?:(?:/[A-Za-z0-9_-]+)+/)?(v2/object-wal/shards/([0-9]{10})/read-m4/[0-9a-f]{64}"
+                    + "/protections/[0-9a-f]{64}-[0-9]{20})$");
     private final String prefix;
 
     public M4ReadControlKeysV1(int shardId, BindingIdentity binding) {
@@ -58,6 +63,26 @@ public final class M4ReadControlKeysV1 {
     public String protection(Sha256Digest sourceIdentity, long protectionGeneration) {
         Objects.requireNonNull(sourceIdentity, "sourceIdentity");
         return prefix + "/protections/" + sourceIdentity.toHex() + "-" + ordinal(protectionGeneration);
+    }
+
+    /** Accepts only this exact M4 protection key, relative or below a canonical Cell authority root. */
+    public static boolean matchesProtectionAuthority(
+            String key, BindingIdentity binding, Sha256Digest sourceIdentity, long protectionGeneration) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(binding, "binding");
+        Objects.requireNonNull(sourceIdentity, "sourceIdentity");
+        Matcher qualified = QUALIFIED_PROTECTION.matcher(key);
+        if (!qualified.matches()) {
+            return false;
+        }
+        try {
+            int shardId = Integer.parseInt(qualified.group(2));
+            return qualified
+                    .group(1)
+                    .equals(new M4ReadControlKeysV1(shardId, binding).protection(sourceIdentity, protectionGeneration));
+        } catch (IllegalArgumentException invalidKey) {
+            return false;
+        }
     }
 
     private static String ordinal(long value) {

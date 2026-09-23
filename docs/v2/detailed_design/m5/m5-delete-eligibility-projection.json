@@ -39,9 +39,11 @@
     "replacementRequiresCompleteSemanticTransfer": true,
     "expiryRequiresTrimAndEveryFloor": true,
     "publishedRequiresExactM4Released": true,
+    "qualificationRequiresCanonicalM4ReleaseKeyShape": true,
     "unpublishedRequiresTerminalNoAdoptionAndProtectionClosure": true,
     "nativeRetainVetoesReplacement": true
   },
+  "legacyV4AuthorityDecodePreserved": true,
   "nativeProtocolProofProducersIntegrated": false,
   "namespaceRouteAdmissionIntegrated": false,
   "completePhysicalDeleteComposition": false,

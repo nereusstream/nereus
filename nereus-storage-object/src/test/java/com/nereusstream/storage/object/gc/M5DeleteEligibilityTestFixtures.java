@@ -31,6 +31,7 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ProtectionState;
@@ -153,7 +154,9 @@ final class M5DeleteEligibilityTestFixtures {
         var release = new M4ReleaseBindingV1(
                 digest("m4-source"),
                 1,
-                facts.create("/protection", releaseBytes),
+                facts.create(
+                        "/cell/" + new M4ReadControlKeysV1(7, binding).protection(digest("m4-source"), 1),
+                        releaseBytes),
                 releaseBytes,
                 digest("m4-batch"),
                 digest("m4-proof-head"));

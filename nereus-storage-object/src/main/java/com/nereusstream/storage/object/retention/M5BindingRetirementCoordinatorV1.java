@@ -19,7 +19,10 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
+import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BatchAuthoritySlotV1;
@@ -492,6 +495,13 @@ public final class M5BindingRetirementCoordinatorV1 {
         }
         Map<Sha256Digest, M4ReleaseBindingV1> indexed = new HashMap<>();
         for (M4ReleaseBindingV1 release : releases) {
+            if (!M4ReadControlKeysV1.matchesProtectionAuthority(
+                    release.protectionAuthority().key(),
+                    batch.binding(),
+                    release.sourceIdentitySha256(),
+                    release.protectionGeneration())) {
+                throw new IllegalArgumentException("M4 release lacks its canonical source-protection key");
+            }
             if (canonicalSelector.matches()) {
                 String protectionKey = canonicalSelector.group(1) + "/protections/"
                         + release.sourceIdentitySha256().toHex() + "-"
@@ -509,6 +519,11 @@ public final class M5BindingRetirementCoordinatorV1 {
             M4ReleaseBindingV1 release = indexed.get(source.sourceIdentitySha256());
             if (release == null || release.protectionGeneration() != source.protectionGeneration()) {
                 throw new IllegalArgumentException("batch member lacks its exact protection-generation release");
+            }
+            SourceProtection protection = M4ReadControlCodecV1.decodeProtection(release.canonicalProtectionBytes());
+            if (!protection.binding().equals(batch.binding())
+                    || !protection.identity().equals(source)) {
+                throw new IllegalArgumentException("M4 release names a different Binding or source");
             }
         }
     }

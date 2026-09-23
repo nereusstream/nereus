@@ -33,8 +33,10 @@ EXPECTED = {'schema': 'NEREUS_V2_M5_DELETE_ELIGIBILITY_PROJECTION_V2',
            'replacementRequiresCompleteSemanticTransfer': True,
            'expiryRequiresTrimAndEveryFloor': True,
            'publishedRequiresExactM4Released': True,
+           'qualificationRequiresCanonicalM4ReleaseKeyShape': True,
            'unpublishedRequiresTerminalNoAdoptionAndProtectionClosure': True,
            'nativeRetainVetoesReplacement': True},
+ 'legacyV4AuthorityDecodePreserved': True,
  'nativeProtocolProofProducersIntegrated': False,
  'namespaceRouteAdmissionIntegrated': False,
  'completePhysicalDeleteComposition': False,
@@ -56,6 +58,14 @@ def validate(root):
     state = (base / "M5TargetDeleteAuthorityStateMachineV1.java").read_text()
     coordinator = (base / "M5TargetDeleteAuthorityCoordinatorV1.java").read_text()
     codec = (base / "M5TargetDeleteAuthorityCodecV1.java").read_text()
+    m4_keys = (root / "nereus-storage-object/src/main/java/com/nereusstream/storage/object/read/control/M4ReadControlKeysV1.java").read_text()
+    if "matchesProtectionAuthority" not in m4_keys or "M4ReadControlKeysV1.matchesProtectionAuthority" not in records:
+        raise ValueError("eligibility action no longer requires the canonical M4 protection key")
+    if state.count("snapshot.requireCanonicalM4ReleaseKeys()") < 2 or coordinator.count("snapshot.requireCanonicalM4ReleaseKeys()") < 2:
+        raise ValueError("eligibility qualification or observation no longer checks canonical M4 release keys")
+    golden = (root / "nereus-storage-object/src/test/java/com/nereusstream/storage/object/gc/M5TargetDeleteAuthorityCoordinatorV1Test.java").read_text()
+    if "m5-wire4-predecessor-4167886e" not in golden or "encodeAuthority(decoded)" not in golden:
+        raise ValueError("legacy V4 authority byte compatibility regression is absent")
     for source, literals in (
         (records, EXPECTED["reasons"] + EXPECTED["referenceScopes"] + EXPECTED["semanticAspects"] + [
             "MAX_SNAPSHOT_BYTES = 786432", "MAX_MEMBERS = 64", "MAX_REPLACEMENTS = 256",

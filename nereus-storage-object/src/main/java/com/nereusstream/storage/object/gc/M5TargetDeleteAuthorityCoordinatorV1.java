@@ -481,6 +481,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     }
 
     private CompletionStage<Void> requireFreshEligibility(DeleteEligibilitySnapshotV2 snapshot) {
+        snapshot.requireCanonicalM4ReleaseKeys();
         return requireFreshFacts(snapshot.authorityFacts());
     }
 
@@ -494,6 +495,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             TargetDeleteAuthorityV1 authority,
             DeleteObservationContextV2 context,
             DeleteEligibilitySnapshotV2 snapshot) {
+        snapshot.requireCanonicalM4ReleaseKeys();
         java.util.Map<String, AuthorityFactV1> facts = new java.util.TreeMap<>();
         for (AuthorityFactV1 fact : snapshot.authorityFacts()) {
             facts.put(fact.key(), fact);

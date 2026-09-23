@@ -48,6 +48,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             ProofBoundWriterEnrollmentV1 writerEnrollment,
             DeleteEligibilitySnapshotV2 snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
+        snapshot.requireCanonicalM4ReleaseKeys();
         if (snapshot.generation() != 1) {
             throw new IllegalArgumentException("initial eligibility must bind authority revision one");
         }
@@ -86,6 +87,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             TargetDeleteAuthorityV1 current, DeleteEligibilitySnapshotV2 snapshot) {
         requireOpen(current);
         Objects.requireNonNull(snapshot, "snapshot");
+        snapshot.requireCanonicalM4ReleaseKeys();
         if (!current.activeWriterTickets().isEmpty()
                 || snapshot.generation() != Math.addExact(current.authorityRevision(), 1)
                 || !snapshot.resource().equals(current.target().resourceId())) {

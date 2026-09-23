@@ -36,6 +36,7 @@ EXPECTED = json.loads(r'''{
     "historyIntegrationTests": 5,
     "serverRestartPhaseTests": 2,
     "priorBindingAndPulsarIntegrationTests": 2,
+    "priorM4ReleaseIntegrationTests": 1,
     "failures": 0,
     "errors": 0,
     "skipped": 0

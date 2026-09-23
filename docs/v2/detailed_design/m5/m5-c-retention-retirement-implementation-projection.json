@@ -29,6 +29,7 @@
       "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart"
     ],
     "canonicalM4ReleaseKeyRequired": true,
+    "retirementActionsRequireCanonicalReleaseKeyShape": true,
     "nativeM4ReleaseFixtureTerminalAndDrain": "SYNTHETIC",
     "clientReconnectRequired": true,
     "stalePredecessorRejected": true,

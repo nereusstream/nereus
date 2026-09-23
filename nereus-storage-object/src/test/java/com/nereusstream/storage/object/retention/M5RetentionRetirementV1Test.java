@@ -54,6 +54,7 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
@@ -385,6 +386,50 @@ class M5RetentionRetirementV1Test {
                         .join())
                 .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
         VersionedValue reopened = fixture.metadata.readNow(fixture.selectorKey);
+        M4ReleaseBindingV1 release = fixture.releases.get(0);
+        VersionedValue misplaced =
+                fixture.metadata.seed("/binding/misplaced-release", release.canonicalProtectionBytes());
+        M4ReleaseBindingV1 misplacedRelease = new M4ReleaseBindingV1(
+                release.sourceIdentitySha256(),
+                release.protectionGeneration(),
+                fact(misplaced),
+                release.canonicalProtectionBytes(),
+                release.releasedByBatchSha256(),
+                release.releaseProofHeadSha256());
+        assertThatThrownBy(() -> coordinator
+                        .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                fixture.selectorKey,
+                                reopened,
+                                fixture.batch.batchIdSha256(),
+                                digest("misplaced-fence"),
+                                List.of(misplacedRelease)))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("M4 release lacks its canonical source-protection key");
+        assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(reopened);
+        VersionedValue unrootedAbsolute = fixture.metadata.seed(
+                "/"
+                        + new M4ReadControlKeysV1(7, fixture.batch.binding())
+                                .protection(release.sourceIdentitySha256(), release.protectionGeneration()),
+                release.canonicalProtectionBytes());
+        M4ReleaseBindingV1 unrootedAbsoluteRelease = new M4ReleaseBindingV1(
+                release.sourceIdentitySha256(),
+                release.protectionGeneration(),
+                fact(unrootedAbsolute),
+                release.canonicalProtectionBytes(),
+                release.releasedByBatchSha256(),
+                release.releaseProofHeadSha256());
+        assertThatThrownBy(() -> coordinator
+                        .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                fixture.selectorKey,
+                                reopened,
+                                fixture.batch.batchIdSha256(),
+                                digest("unrooted-absolute-fence"),
+                                List.of(unrootedAbsoluteRelease)))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("M4 release lacks its canonical source-protection key");
+        assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(reopened);
         assertThat(coordinator
                         .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
                                 fixture.selectorKey,
@@ -1076,7 +1121,10 @@ class M5RetentionRetirementV1Test {
                 ProtectionState.RELEASED,
                 Optional.of(fixture.batch.batchIdSha256()),
                 Optional.of(release.releaseProofHeadSha256())));
-        VersionedValue wrongProtection = fixture.metadata.seed("/binding/wrong-protection", wrongProtectionBytes);
+        VersionedValue wrongProtection = fixture.metadata.seed(
+                new M4ReadControlKeysV1(7, fixture.batch.binding())
+                        .protection(wrongSource.sourceIdentitySha256(), release.protectionGeneration()),
+                wrongProtectionBytes);
         M4ReleaseBindingV1 wrong = new M4ReleaseBindingV1(
                 wrongSource.sourceIdentitySha256(),
                 release.protectionGeneration(),
@@ -1119,7 +1167,12 @@ class M5RetentionRetirementV1Test {
                 ProtectionState.PROTECTED,
                 Optional.empty(),
                 Optional.empty()));
-        VersionedValue protectedValue = fixture.metadata.seed("/binding/still-protected", protectedBytes);
+        VersionedValue protectedValue = fixture.metadata.seed(
+                new M4ReadControlKeysV1(8, fixture.batch.binding())
+                        .protection(
+                                fixture.batch.sources().get(0).sourceIdentitySha256(),
+                                fixture.batch.sources().get(0).protectionGeneration()),
+                protectedBytes);
         assertThatThrownBy(() -> new M4ReleaseBindingV1(
                         fixture.batch.sources().get(0).sourceIdentitySha256(),
                         fixture.batch.sources().get(0).protectionGeneration(),
@@ -1129,6 +1182,41 @@ class M5RetentionRetirementV1Test {
                         digest("proof-head")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("RELEASED");
+    }
+
+    @Test
+    void canonicalExternalizationRejectsReleaseFromAnotherShard() {
+        RetirementFixture fixture = retirementFixture(true, 1, true);
+        M4ReleaseBindingV1 release = fixture.releases.get(0);
+        VersionedValue wrongShard = fixture.metadata.seed(
+                new M4ReadControlKeysV1(8, fixture.batch.binding())
+                        .protection(release.sourceIdentitySha256(), release.protectionGeneration()),
+                release.canonicalProtectionBytes());
+        M4ReleaseBindingV1 misplaced = new M4ReleaseBindingV1(
+                release.sourceIdentitySha256(),
+                release.protectionGeneration(),
+                fact(wrongShard),
+                release.canonicalProtectionBytes(),
+                release.releasedByBatchSha256(),
+                release.releaseProofHeadSha256());
+        ReferenceFreeProofV1 wrongProof = proof(
+                fixture.metadata,
+                "/wrong-shard-release",
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                fixture.exactSelector,
+                List.of(misplaced));
+        M5RetirementCoordinatorV1 coordinator = new M5RetirementCoordinatorV1(fixture.metadata);
+        assertThatThrownBy(() -> coordinator.externalize(externalizationRequest(fixture, wrongProof)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outside the selector's canonical Cell/shard");
+        assertThat(fixture.metadata.transactionCalls).isZero();
+        assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(fixture.exactSelector);
+        assertThat(coordinator
+                        .externalize(fixture.externalizationRequest())
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.APPLIED_EXACT);
     }
 
     @Test
@@ -1148,8 +1236,10 @@ class M5RetentionRetirementV1Test {
                 .hasMessageContaining("count differs");
 
         M4ReleaseBindingV1 first = fixture.releases.get(0);
-        VersionedValue duplicateAuthority =
-                fixture.metadata.seed("/binding/duplicate-release-authority", first.canonicalProtectionBytes());
+        VersionedValue duplicateAuthority = fixture.metadata.seed(
+                new M4ReadControlKeysV1(8, fixture.batch.binding())
+                        .protection(first.sourceIdentitySha256(), first.protectionGeneration()),
+                first.canonicalProtectionBytes());
         M4ReleaseBindingV1 duplicateFirst = new M4ReleaseBindingV1(
                 first.sourceIdentitySha256(),
                 first.protectionGeneration(),
@@ -1696,6 +1786,11 @@ class M5RetentionRetirementV1Test {
     }
 
     private static RetirementFixture retirementFixture(boolean transactionSupported, int sourceCount) {
+        return retirementFixture(transactionSupported, sourceCount, false);
+    }
+
+    private static RetirementFixture retirementFixture(
+            boolean transactionSupported, int sourceCount, boolean canonicalSelector) {
         if (sourceCount <= 0) {
             throw new IllegalArgumentException("test fixture source count must be positive");
         }
@@ -1731,7 +1826,7 @@ class M5RetentionRetirementV1Test {
                 sources);
         BindingReadSelector selector = selector(List.of(batch));
         BindingReadSelector successor = selector(List.of());
-        String selectorKey = "/binding/selector";
+        String selectorKey = canonicalSelector ? new M4ReadControlKeysV1(7, BINDING).selector() : "/binding/selector";
         String batchKey = "/binding/retirement-batches/" + batch.batchIdSha256().toHex();
         VersionedValue exactSelector = metadata.seed(selectorKey, M4ReadControlCodecV1.encodeSelector(selector));
         List<M4ReleaseBindingV1> releases = new ArrayList<>();
@@ -1744,7 +1839,10 @@ class M5RetentionRetirementV1Test {
                     ProtectionState.RELEASED,
                     Optional.of(batch.batchIdSha256()),
                     Optional.of(proofHead)));
-            VersionedValue protection = metadata.seed("/binding/protection/" + index, protectionBytes);
+            VersionedValue protection = metadata.seed(
+                    new M4ReadControlKeysV1(7, batch.binding())
+                            .protection(source.sourceIdentitySha256(), source.protectionGeneration()),
+                    protectionBytes);
             releases.add(new M4ReleaseBindingV1(
                     source.sourceIdentitySha256(),
                     source.protectionGeneration(),

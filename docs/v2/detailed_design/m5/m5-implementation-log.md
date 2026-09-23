@@ -2610,6 +2610,36 @@ terminal and drain facts are controlled fixtures, not a native read-owner drain 
 The other two M5-C Oxia cases still use synthetic release facts. No M5-E child, Final or scenario promotion is
 claimed; all 17 amended obligations remain OPEN/null.
 
+## Canonical release record at every M5 consumer (2026-09-23)
+
+Historical V4 authority bytes remain decodable and re-encode byte for byte. The four exact pre-extension V4
+phases from source `4167886e` are retained as binary golden fixtures, including their older noncanonical release
+key. New M5-D eligibility qualification and its CAS observation reject that key before it can authorize physical
+deletion. M5-C retirement actions likewise require each versioned `RELEASED` fact to use the M4 protection key
+grammar with the decoded Binding, source identity and protection generation. Relative lifecycle keys and keys
+below a nonempty, syntactically valid Cell root are accepted; `/v2/...` without a Cell root is rejected. The
+record alone cannot establish the *expected* Cell root or shard; Binding fencing and batch externalization with
+a canonical selector also require the release key to share its selector's root and shard. Unit regressions reject
+valid release bytes at arbitrary and unrooted absolute keys, and reject cross-shard batch externalization before
+any transaction. The native M4-to-M5 fence test rejects a release placed in a different canonical shard.
+
+Synthetic deletion and retirement fixtures now use canonical-shaped release keys. The bounded-history Oxia fixture
+routes its synthetic protection value through `OxiaBindingLifecycleMetadataStoreV2`, so the release fact and selector
+use the same relative Binding authority route. This does not turn its synthetic terminal, drain or release value
+into a production M4 writer receipt.
+
+Validation on the final Java inputs: `scripts/run-v2-m5-bookkeeper-delete-check.sh` passed 41/41 tasks, including
+501 object-storage tests and the real BK delete path. `scripts/run-v2-m5-retired-history-oxia-check.sh` passed
+76/76 main tasks and 15 post-restart tasks on the same Oxia container, with four XML suites containing 5, 1, 1 and
+3 tests, zero failures, and 1026 continuous retirements. Its run summary is
+`build/m5-retired-history-oxia/nereus-m5-history-oxia-56903/run-summary.json`; the independently rechecked manifest
+SHA-256 is `26e3a955e1d207ae3dff73f61d7f20ccb4626ef7f438f54d0b55df7c1ce5a9df` for 432 unchanged Java
+inputs. The unchanged M4 control-capacity p99 test stopped the first parallel BK-history run at 18,121,000 ns
+against its strict 10,000,000 ns bound. Its isolated rerun passed, and the complete BK-history runner passed
+97/97 tasks twice with Gradle parallelism disabled and two workers. Those settings are now explicit in
+`scripts/run-v2-m5-retired-history-check.sh`; the assertion and threshold were not changed. All results remain
+implementation-only. M5-E/Final and all 17 acceptance obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

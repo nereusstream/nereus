@@ -19,6 +19,7 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.retention.M5RetentionCodecV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BindingTrimFrontierV1;
@@ -215,6 +216,22 @@ public record DeleteEligibilitySnapshotV2(
 
     public Sha256Digest sha256() {
         return Sha256Digest.hash(DeleteEligibilityCodecV2.encode(this));
+    }
+
+    /** Legacy snapshots remain decodable, but cannot authorize a new operation through an arbitrary release key. */
+    public void requireCanonicalM4ReleaseKeys() {
+        for (MemberSnapshot member : members) {
+            for (var release : member.physicalReferences().m4Releases()) {
+                var protection = M4ReadControlCodecV1.decodeProtection(release.canonicalProtectionBytes());
+                if (!M4ReadControlKeysV1.matchesProtectionAuthority(
+                        release.protectionAuthority().key(),
+                        protection.binding(),
+                        release.sourceIdentitySha256(),
+                        release.protectionGeneration())) {
+                    throw new IllegalArgumentException("eligibility M4 release lacks its canonical protection key");
+                }
+            }
+        }
     }
 
     /** Complete exact vector; caller must reread it under enrolled writer/native fencing before CAS-1 and CAS-2. */

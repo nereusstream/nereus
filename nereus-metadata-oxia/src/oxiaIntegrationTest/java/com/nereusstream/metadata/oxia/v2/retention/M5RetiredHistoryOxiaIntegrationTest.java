@@ -342,7 +342,7 @@ class M5RetiredHistoryOxiaIntegrationTest {
         }
 
         private boolean proofFixtureKey(String key) {
-            return key.startsWith(root + "/proof/") || key.startsWith(root + "/protection/");
+            return key.startsWith(root + "/proof/");
         }
 
         void admit(int id) {
@@ -369,7 +369,10 @@ class M5RetiredHistoryOxiaIntegrationTest {
                     ProtectionState.RELEASED,
                     Optional.of(batch.batchIdSha256()),
                     Optional.of(proofHead)));
-            var protection = create(root + "/protection/" + id, protectionBytes);
+            var protection = create(
+                    new M4ReadControlKeysV1(7, binding)
+                            .protection(source.sourceIdentitySha256(), source.protectionGeneration()),
+                    protectionBytes);
             var releases = List.of(new M4ReleaseBindingV1(
                     source.sourceIdentitySha256(),
                     source.protectionGeneration(),

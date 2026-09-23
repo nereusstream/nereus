@@ -25,6 +25,7 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.E
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.TransactionOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
@@ -282,7 +283,7 @@ public final class M5RetirementCoordinatorV1 {
                         .equals(request.exactSelector().canonicalStoredSha256())) {
             throw new IllegalArgumentException("externalization proof target or selector predecessor differs");
         }
-        validateReleases(exactBatch, request.proof().m4Releases());
+        validateReleases(request.selectorKey(), exactBatch, request.proof().m4Releases());
         request.exactExistingBatch().ifPresent(existing -> {
             if (!existing.canonicalStoredBytes().equals(fullBytes)) {
                 throw new IllegalArgumentException("existing FULL batch differs from the exact candidate");
@@ -464,7 +465,8 @@ public final class M5RetirementCoordinatorV1 {
         }
     }
 
-    private static void validateReleases(SourceRetirementBatch batch, List<M4ReleaseBindingV1> releases) {
+    private static void validateReleases(
+            String selectorKey, SourceRetirementBatch batch, List<M4ReleaseBindingV1> releases) {
         if (releases.size() != batch.sources().size()) {
             throw new IllegalArgumentException("M4 RELEASED binding count differs from the full batch");
         }
@@ -479,8 +481,23 @@ public final class M5RetirementCoordinatorV1 {
                 throw new IllegalArgumentException("M4 RELEASED binding names a different batch");
             }
             SourceProtection exact = M4ReadControlCodecV1.decodeProtection(release.canonicalProtectionBytes());
-            if (!exact.binding().equals(batch.binding()) || !exact.identity().equals(source)) {
+            if (!exact.binding().equals(batch.binding())
+                    || !exact.identity().equals(source)
+                    || !M4ReadControlKeysV1.matchesProtectionAuthority(
+                            release.protectionAuthority().key(),
+                            batch.binding(),
+                            source.sourceIdentitySha256(),
+                            source.protectionGeneration())) {
                 throw new IllegalArgumentException("M4 RELEASED value names a different binding or source");
+            }
+            if (selectorKey.contains("v2/object-wal/shards/")) {
+                String protectionKey = release.protectionAuthority().key();
+                String expectedSelector =
+                        protectionKey.substring(0, protectionKey.lastIndexOf("/protections/")) + "/selector";
+                if (!selectorKey.equals(expectedSelector)) {
+                    throw new IllegalArgumentException(
+                            "M4 RELEASED value is outside the selector's canonical Cell/shard");
+                }
             }
         }
     }

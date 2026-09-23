@@ -110,7 +110,7 @@ for task, name, count in (
     ("v2M5RetiredHistoryRealOxiaTest", "M5RetiredHistoryOxiaIntegrationTest", 5),
     ("v2M5RetiredHistoryOxiaRestartWriteTest", "M5RetiredHistoryOxiaRestartTest", 1),
     ("v2M5RetiredHistoryOxiaRestartReadTest", "M5RetiredHistoryOxiaRestartTest", 1),
-    ("v2M5RetentionRealOxiaTest", "M5RetentionOxiaIntegrationTest", 2),
+    ("v2M5RetentionRealOxiaTest", "M5RetentionOxiaIntegrationTest", 3),
 ):
     path = root / f"nereus-metadata-oxia/build/test-results/{task}/TEST-com.nereusstream.metadata.oxia.v2.retention.{name}.xml"
     data = path.read_bytes()
