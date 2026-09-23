@@ -277,6 +277,9 @@ The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) t
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.
 `v2M5KafkaSemanticCoreCheck` passed 42 tasks, including 14 Kafka and 7 Object materialization tests. The added
 interleaved-transaction case fixed producer-independent aborted marking and uses a V2 plan/output task identity.
+M5-A publication now checks the supplied protected fallback set against the validated generation before writing,
+and treats a selected selector as an exact retry only when its fallback set, owner/read epochs, capability and
+admission state still match. A same-manifest competing fallback selection leaves the task uncommitted.
 The [BK carrier projection](m5-bookkeeper-compaction-carrier-projection.json) adds immutable task/part inventory,
 native ID reservation, bounded retained-batch/index chunks, native fencing and complete entry/metadata verification.
 That writer slice requires expected output bodies for part reconciliation. The subsequent

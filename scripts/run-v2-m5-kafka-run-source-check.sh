@@ -217,7 +217,7 @@ if len(bound_unknown.read_text().splitlines())!=8:
 bound_unknown_sha=hashlib.sha256(bound_unknown.read_bytes()).hexdigest()
 suites=[]
 for module,task,name,count in (
-    ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',8),
+    ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',9),
     ('nereus-kafka-bookkeeper','v2M5KafkaCompactionTest','KafkaSemanticCompactorV1Test',14),
     ('nereus-kafka-bookkeeper','v2M5KafkaRecordBatchBudgetTest','KafkaRecordBatchBudgetV2Test',3),
     ('nereus-kafka-bookkeeper','v2M5KafkaReadOwnerTest','KafkaBookKeeperReadOwnerV2Test',7),

@@ -24,6 +24,7 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.TaskState;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.ValidatedGeneration;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
@@ -78,7 +79,9 @@ public final class M5MaterializationCoordinatorV1 {
         requireBinding(plan);
         Objects.requireNonNull(validated, "validated");
         Objects.requireNonNull(exactFallbackSources, "exactFallbackSources");
-        requireValidatedIdentity(plan, validated);
+        Sha256Digest fallbackSet =
+                M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), exactFallbackSources);
+        requireValidatedIdentity(plan, validated, fallbackSet);
 
         Sha256Digest validationSha = M5MaterializationCodecV1.validationRootSha256(validated.validationRoot());
         Sha256Digest generationSha = M5MaterializationCodecV1.generationSha256(validated.generation());
@@ -135,7 +138,7 @@ public final class M5MaterializationCoordinatorV1 {
             }
         }
 
-        PublicationOutcome selector = publishSelector(plan, manifestSha, exactFallbackSources);
+        PublicationOutcome selector = publishSelector(plan, manifestSha, fallbackSet, exactFallbackSources);
         if (!success(selector)) {
             return selector;
         }
@@ -160,13 +163,22 @@ public final class M5MaterializationCoordinatorV1 {
     }
 
     private PublicationOutcome publishSelector(
-            MaterializationPlan plan, Sha256Digest manifestSha, List<SourceProtectionIdentity> exactFallbackSources) {
+            MaterializationPlan plan,
+            Sha256Digest manifestSha,
+            Sha256Digest fallbackSet,
+            List<SourceProtectionIdentity> exactFallbackSources) {
         BindingReadSelector expected = plan.sourceCut().predecessorSelector();
         Optional<BindingReadSelector> observed = m4.readSelector();
         if (observed.isPresent()
                 && observed.orElseThrow().selectedViewSha256().equals(manifestSha)
                 && observed.orElseThrow().sourceGeneration() == expected.sourceGeneration() + 1
-                && observed.orElseThrow().mode() == SelectorMode.PREFERRED_WITH_FALLBACK) {
+                && observed.orElseThrow().mode() == SelectorMode.PREFERRED_WITH_FALLBACK
+                && observed.orElseThrow().admissionState() == AdmissionState.ADMITTING
+                && observed.orElseThrow().ownerEpoch() == expected.ownerEpoch()
+                && observed.orElseThrow().readAdmissionEpoch()
+                        == expected.readAdmissionEpoch() + (expected.mode() == SelectorMode.PREFERRED_ONLY ? 1 : 0)
+                && observed.orElseThrow().capability().equals(expected.capability())
+                && observed.orElseThrow().fallbackSetSha256().equals(Optional.of(fallbackSet))) {
             return PublicationOutcome.EXISTING_EXACT;
         }
         if (observed.isEmpty() || !observed.orElseThrow().equals(expected)) {
@@ -231,11 +243,19 @@ public final class M5MaterializationCoordinatorV1 {
         }
     }
 
-    private static void requireValidatedIdentity(MaterializationPlan plan, ValidatedGeneration validated) {
+    private static void requireValidatedIdentity(
+            MaterializationPlan plan, ValidatedGeneration validated, Sha256Digest fallbackSet) {
         if (!validated.validationRoot().taskIdSha256().equals(plan.taskIdSha256())
                 || !validated.validationRoot().outputIdentitySha256().equals(plan.outputIdentitySha256())
                 || !validated.generation().taskIdSha256().equals(plan.taskIdSha256())
                 || !validated.generation().outputIdentitySha256().equals(plan.outputIdentitySha256())
+                || validated.generation().sourceGeneration()
+                        != Math.addExact(plan.sourceCut().predecessorSelector().sourceGeneration(), 1)
+                || !validated.generation().fallbackSetSha256().equals(Optional.of(fallbackSet))
+                || !validated
+                        .generation()
+                        .predecessorSelectedViewSha256()
+                        .equals(plan.sourceCut().predecessorViewSha256())
                 || !validated
                         .manifestView()
                         .preferredGenerationSha256()

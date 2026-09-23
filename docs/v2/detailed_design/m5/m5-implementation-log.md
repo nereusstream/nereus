@@ -3020,6 +3020,24 @@ legacy cases, with zero failures, errors or skips. Archive:
 26 XML suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17
 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Exact M5-A selector retry after fallback competition (2026-09-23)
+
+M5-A Object publication no longer treats the same manifest digest and source generation as enough to return
+`EXISTING_EXACT`. It first binds the supplied protected fallback set to the validated generation; a stored selector
+also has to retain that set, the expected owner/read epochs, capability and admitting state. A regression first
+reproduced the prior false success after another protection generation selected the same manifest. It now returns
+`CANCELLED_STALE` with the task still `OUTPUT_VERIFIED`; mismatched supplied fallback input is rejected before
+immutable publication writes. This is a publication/retry correction, not complete M5-C reference enumeration or
+physical-delete authority.
+
+The nine focused materialization cases and `v2M5MaterializationCheck` passed. The source-locked
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 95/95 main tasks, its real BK/Oxia restart phases, 26 target
+XML suites / 113 cases or phases and 83 legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-28158`; 747-input manifest SHA-256:
+`1d6f3eea43f6c90adf3b86d73fbbd089c7a691fb6b3912ca3a1c4eeee8fa533b`. The 747 target source hashes
+and 26 XML suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17
+acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

@@ -218,6 +218,40 @@ class M5MaterializationV1Test {
     }
 
     @Test
+    void retryDoesNotClaimPublicationAgainstDifferentProtectedFallbackSet() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        MaterializationPlan plan = fixture.plan(true, List.of(IndexKind.OFFSET_OR_POSITION));
+        fixture.installM4();
+        Output output = fixture.output(plan);
+        ValidatedGeneration validated = fixture.validate(plan, output);
+        var coordinator = new M5MaterializationCoordinatorV1(fixture.store, 7, fixture.binding);
+        assertThat(coordinator.register(plan)).isEqualTo(PublicationOutcome.APPLIED_EXACT);
+
+        var otherProtection =
+                new SourceProtectionIdentity(fixture.protection.sourceIdentitySha256(), 2, 2, 7, fixture.capability);
+        assertThat(fixture.m4.createProtection(new SourceProtection(
+                        fixture.binding,
+                        otherProtection,
+                        ProtectionState.PROTECTED,
+                        Optional.empty(),
+                        Optional.empty())))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        assertThatThrownBy(() -> coordinator.publish(plan, validated, List.of(otherProtection)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("M5 validated generation differs from its deterministic plan");
+        assertThat(coordinator.readTask(plan.taskIdSha256()).orElseThrow().state())
+                .isEqualTo(TaskState.PLANNED);
+        var manifest = M5MaterializationCodecV1.manifestSha256(validated.manifestView());
+        assertThat(fixture.m4.introduceFallback(fixture.selector, manifest, 8, List.of(otherProtection)))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+
+        assertThat(coordinator.publish(plan, validated, List.of(fixture.protection)))
+                .isEqualTo(PublicationOutcome.CANCELLED_STALE);
+        assertThat(coordinator.readTask(plan.taskIdSha256()).orElseThrow().state())
+                .isEqualTo(TaskState.OUTPUT_VERIFIED);
+    }
+
+    @Test
     void validationRejectsStaleAuthorityCorruptPayloadIndexAndWrongFallbackMembership() throws Exception {
         Fixture fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
         MaterializationPlan plan = fixture.plan(true, List.of(IndexKind.OFFSET_OR_POSITION));
