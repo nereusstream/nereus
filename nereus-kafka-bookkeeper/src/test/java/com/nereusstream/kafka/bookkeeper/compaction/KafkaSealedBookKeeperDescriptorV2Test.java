@@ -40,6 +40,9 @@ import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IndexKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PublicationOutcome;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ProtectionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2;
 import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.lang.reflect.Proxy;
@@ -183,6 +186,67 @@ class KafkaSealedBookKeeperDescriptorV2Test {
                 .join();
         assertThat(recovered.lookup(0).orElseThrow().coverage().inclusiveStart())
                 .isEqualTo(1);
+    }
+
+    @Test
+    void sameDescriptorWithDifferentFallbackSelectionIsNotAnExactRetry() {
+        var fixture = new Fixture(false);
+        List<SourceProtectionIdentity> competing = fixture.sources.stream()
+                .map(source -> new SourceProtectionIdentity(
+                        source.sourceIdentitySha256(),
+                        source.protectionGeneration() + 1,
+                        source.firstFallbackCapableReadAdmissionEpoch(),
+                        source.fallbackSourceGeneration(),
+                        source.capability()))
+                .toList();
+        for (var source : competing) {
+            assertThat(fixture.m4.createProtection(new SourceProtection(
+                            fixture.input.plan().sourceCut().identity().binding(),
+                            source,
+                            ProtectionState.PROTECTED,
+                            Optional.empty(),
+                            Optional.empty())))
+                    .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+        }
+        assertThat(fixture.m4.introduceFallback(
+                        fixture.input.plan().sourceCut().predecessorSelector(),
+                        fixture.descriptor.descriptorSha256(),
+                        fixture.descriptor.sourceGeneration(),
+                        competing))
+                .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+
+        assertThat(fixture.publish()).isEqualTo(PublicationOutcome.CANCELLED_STALE);
+        assertThat(new M5TaskSelectionCoordinatorV2(
+                                fixture.store,
+                                7,
+                                fixture.input.plan().sourceCut().identity().binding())
+                        .readDecision(fixture.descriptor.task().taskIdSha256()))
+                .isEmpty();
+    }
+
+    @Test
+    void selectedTaskDecisionRejectsAReplayWithDifferentFallbackMembership() {
+        var fixture = new Fixture(false);
+        assertThat(fixture.publish()).isEqualTo(PublicationOutcome.APPLIED_EXACT);
+        List<SourceProtectionIdentity> competing = fixture.sources.stream()
+                .map(source -> new SourceProtectionIdentity(
+                        source.sourceIdentitySha256(),
+                        source.protectionGeneration() + 1,
+                        source.firstFallbackCapableReadAdmissionEpoch(),
+                        source.fallbackSourceGeneration(),
+                        source.capability()))
+                .toList();
+        var result = fixture.publication
+                .publish(
+                        fixture.input.plan(),
+                        fixture.input.semantic(),
+                        fixture.descriptor,
+                        competing,
+                        () -> new KafkaCompactionPublicationFenceV1().expected(fixture.input.plan()))
+                .toCompletableFuture()
+                .join();
+        assertThat(result).isEqualTo(PublicationOutcome.CONFLICT);
+        assertThat(fixture.store.selectorCasCount).isEqualTo(1);
     }
 
     @Test

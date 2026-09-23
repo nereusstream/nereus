@@ -287,6 +287,9 @@ That writer slice requires expected output bodies for part reconciliation. The s
 read-only BK recovery without expected output or old-source bodies. That descriptor slice did not supply native
 namespace/task authority, M4 read-source-plan admission, real Oxia control, internal-topic lifecycle or physical deletion;
 the later integration results below identify which of these paths now have focused execution.
+BK descriptor publication now accepts an exact retry only with the durable task selection decision for the exact
+predecessor, successor and validated fallback set. A matching descriptor and source generation in an M4 selector
+without this task decision does not establish that this task selected it.
 The [M4 recovery bridge projection](m5-bookkeeper-m4-recovery-projection.json) adds low-frequency descriptor recovery
 under the existing M4 planner and generation lease. Observer cancellation retains the lease through native termination;
 selector closure can install a successor while the old generation remains pinned. Recovered caches retain their exact

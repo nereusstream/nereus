@@ -3038,6 +3038,28 @@ XML suites / 113 cases or phases and 83 legacy cases, with zero failures, errors
 and 26 XML suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17
 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Exact BK descriptor selection retry after fallback competition (2026-09-23)
+
+BK descriptor publication previously accepted `EXISTING_EXACT` when the M4 selector held the same descriptor digest
+and source generation, even if a different fallback protection generation selected it without this task's durable
+selection decision. A second retry path compared only the selected output digest in an existing task decision, so
+supplying a different fallback set could also report exact success. Both regressions failed against the previous
+implementation and now pass. Publication validates the supplied fallback identities, reconstructs the exact
+predecessor/successor selection decision, and requires that decision for every `EXISTING_EXACT` result. A matching
+selector without this task decision returns `CANCELLED_STALE`; a selected decision with different fallback
+membership returns `CONFLICT` without another selector CAS.
+
+The 13 focused descriptor cases, Spotless, Checkstyle and the real BookKeeper descriptor check passed. The
+source-locked `scripts/run-v2-m5-kafka-run-source-check.sh` passed 95/95 main tasks and its BK/Oxia restart phases.
+Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-85318`; 747-input manifest SHA-256:
+`4b805f8c55601c352a1b9cbc3caf61560d1b162fd5040e83153dc781fb9d3732`; summary SHA-256:
+`1d28ac9896cbcc3ca1fc5a7ecf51dcb380881f2a80c9edd610a2e4ca7c878d8b`. Its 26 XML suites contain 115
+cases or restart phases. The fresh legacy archive contains 732 source hashes and 21 XML suites / 83 cases;
+manifest SHA-256: `2cd03b32a2277d73c91ea476e07f5d71cda886dcfd1022fe5493ed5f72ffca37`; summary SHA-256:
+`fe9a1813550ff5f21ab0a154bbe3dbdcb7f9cd33c35d5407ce8f321678e54d8d`. All captured source hashes and
+XML results were independently checked, with zero failures, errors or skips. This only corrects BK publication
+retry classification. Complete writer admission, M5-E/Final and all 17 acceptance obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

@@ -133,17 +133,20 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             List<SourceProtectionIdentity> exactFallbackSources,
             CurrentStateReader currentCompactionState) {
         var priorDecision = taskSelections.readDecision(descriptor.task().taskIdSha256());
-        if (priorDecision.isPresent()) {
-            var decided = priorDecision.orElseThrow();
-            return java.util.concurrent.CompletableFuture.completedFuture(
-                    decided.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED
-                            ? PublicationOutcome.CANCELLED_STALE
-                            : decided.selectedOutput().equals(Optional.of(descriptor.descriptorSha256()))
-                                    ? PublicationOutcome.EXISTING_EXACT
-                                    : PublicationOutcome.CONFLICT);
+        if (priorDecision
+                .filter(decision -> decision.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED)
+                .isPresent()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(PublicationOutcome.CANCELLED_STALE);
         }
         List<SourceProtectionIdentity> sources = List.copyOf(exactFallbackSources);
-        M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), sources);
+        Sha256Digest fallbackSet = M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), sources);
+        var exactSelection = expectedSelection(plan, descriptor, fallbackSet);
+        if (priorDecision.isPresent()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                    priorDecision.orElseThrow().equals(exactSelection)
+                            ? PublicationOutcome.EXISTING_EXACT
+                            : PublicationOutcome.CONFLICT);
+        }
         return reader.recover(descriptor)
                 .thenApplyAsync(
                         recovered -> {
@@ -164,22 +167,13 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                                 return decision.orElseThrow().outcome()
                                                 == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED
                                         ? PublicationOutcome.CANCELLED_STALE
-                                        : decision.orElseThrow()
-                                                        .selectedOutput()
-                                                        .equals(Optional.of(identity))
+                                        : decision.orElseThrow().equals(exactSelection)
                                                 ? PublicationOutcome.EXISTING_EXACT
                                                 : PublicationOutcome.CONFLICT;
                             }
                             new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
                             BindingReadSelector expected = plan.sourceCut().predecessorSelector();
                             Optional<BindingReadSelector> current = m4.readSelector();
-                            if (current.isPresent()
-                                    && current.orElseThrow()
-                                            .selectedViewSha256()
-                                            .equals(identity)
-                                    && current.orElseThrow().sourceGeneration() == descriptor.sourceGeneration()) {
-                                return PublicationOutcome.EXISTING_EXACT;
-                            }
                             if (!current.equals(Optional.of(expected))) {
                                 return PublicationOutcome.CANCELLED_STALE;
                             }
@@ -202,10 +196,7 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                                         == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED) {
                                     return PublicationOutcome.CANCELLED_STALE;
                                 }
-                                if (!appliedDecision
-                                        .orElseThrow()
-                                        .selectedOutput()
-                                        .equals(Optional.of(identity))) {
+                                if (!appliedDecision.orElseThrow().equals(exactSelection)) {
                                     return PublicationOutcome.CONFLICT;
                                 }
                                 taskSelections.archiveCurrentDecision(
@@ -275,6 +266,27 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                 throw new IllegalStateException("BK descriptor differs from its complete physical inventory");
             }
         }
+    }
+
+    private static M5TaskSelectionDecisionV2 expectedSelection(
+            CompactionPlan plan, KafkaSealedBookKeeperDescriptorV2 descriptor, Sha256Digest fallbackSet) {
+        BindingReadSelector before = plan.sourceCut().predecessorSelector();
+        BindingReadSelector after = new BindingReadSelector(
+                before.binding(),
+                descriptor.descriptorSha256(),
+                before.ownerEpoch(),
+                before.mode() == SelectorMode.PREFERRED_ONLY
+                        ? Math.addExact(before.readAdmissionEpoch(), 1)
+                        : before.readAdmissionEpoch(),
+                descriptor.sourceGeneration(),
+                SelectorMode.PREFERRED_WITH_FALLBACK,
+                AdmissionState.ADMITTING,
+                Optional.of(fallbackSet),
+                before.capability(),
+                before.pendingAnchors(),
+                before.activeBatches());
+        return M5TaskSelectionDecisionV2.of(
+                descriptor.task().taskIdSha256(), M5TaskSelectionDecisionV2.Outcome.SELECTED, before, after);
     }
 
     private PublicationOutcome createExact(String key, CanonicalBytes bytes) {
