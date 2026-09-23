@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * One admitted process-local Cell owner's fixed Binding shares for selected-BK read lifetimes. No borrowing,
+ * One admitted process-local Cell owner's fixed Binding shares for raw/selected BK read lifetimes. No borrowing,
  * waiting queue or timeout release. Counts cover configured live-read allowances, not retained result caches,
  * backend-internal buffers or durable process-drain authority. The Cell owner must retain this instance for its life.
  */
@@ -43,6 +43,12 @@ public final class KafkaBookKeeperReadCellBudgetV2 {
                     capacity,
                     Math.multiplyExact((long) capacity, bounds.encodedBytes()),
                     Math.multiplyExact((long) capacity, bounds.decodedBytes()));
+        }
+
+        /** Native frames and retained canonical payload have separate configured allowances. */
+        public static Usage forRunSource(KafkaBookKeeperRunSourceV2.Bounds bounds) {
+            Objects.requireNonNull(bounds, "bounds");
+            return new Usage(1, 1, Math.addExact(bounds.nativeBytes(), bounds.payloadBytes()), bounds.decodedBytes());
         }
 
         Usage plus(Usage other) {
@@ -114,15 +120,25 @@ public final class KafkaBookKeeperReadCellBudgetV2 {
 
     synchronized Reservation reserve(
             KafkaSealedBookKeeperDescriptorV2 descriptor, KafkaBookKeeperSelectedSourceV2.Bounds bounds, int capacity) {
-        if (!cell.equals(descriptor.task().capability().providerScopeId())) {
+        return reserveRequest(
+                descriptor.task().capability().providerScopeId(),
+                descriptor.sourceCut().identity().binding(),
+                Usage.forOwner(bounds, capacity));
+    }
+
+    synchronized Reservation reserveRaw(
+            CellProviderScopeId expectedCell, BindingIdentity binding, KafkaBookKeeperRunSourceV2.Bounds bounds) {
+        return reserveRequest(expectedCell, binding, Usage.forRunSource(bounds));
+    }
+
+    private Reservation reserveRequest(CellProviderScopeId expectedCell, BindingIdentity binding, Usage request) {
+        if (!cell.equals(expectedCell)) {
             throw new IllegalArgumentException("BK read budget belongs to another Cell");
         }
-        var binding = descriptor.sourceCut().identity().binding();
         var share = shares.get(binding);
         if (share == null) {
             throw new IllegalStateException("BK read Binding has no admitted Cell share");
         }
-        var request = Usage.forOwner(bounds, capacity);
         var nextBinding = used.get(binding).plus(request);
         var nextTotal = total.plus(request);
         if (!nextBinding.within(share) || !nextTotal.within(limit)) {

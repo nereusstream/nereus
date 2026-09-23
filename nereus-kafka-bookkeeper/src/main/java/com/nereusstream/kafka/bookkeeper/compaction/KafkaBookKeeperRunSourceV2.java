@@ -63,13 +63,51 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 
 /**
  * Native sealed NBKE2 source capture and exact physical membership. Reads hold a physical ticket until their owned
  * session drains/closes. Protocol frontiers, semantic key/transaction proofs and M4 source protection remain owner
  * obligations; this adapter cannot manufacture them from a sealed ledger. Unknown close retains its read ticket.
+ * One caller-supplied Cell reservation covers the entire capture or multi-run resolution, including retained inputs
+ * between sequential sessions. Native/payload/decoded allowances are separate; returned caches are not charged.
  */
 public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicationTicketsV2.InputMembership {
+    /** Created only after the exact native read session has confirmed termination. */
+    public static final class TicketCleanupException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+        private final M5TargetDeleteMultiWriterGuardV2 guard;
+        private final List<PhysicalResourceIdV2> resources;
+        private final Context context;
+        private final Sha256Digest operationId;
+        private final Sha256Digest terminalProof;
+
+        private TicketCleanupException(
+                M5TargetDeleteMultiWriterGuardV2 guard,
+                List<PhysicalResourceIdV2> resources,
+                Context context,
+                Sha256Digest operationId,
+                Sha256Digest terminalProof,
+                Throwable readFailure) {
+            super("native source session terminated but physical ticket cleanup is unresolved", readFailure);
+            this.guard = guard;
+            this.resources = List.copyOf(resources);
+            this.context = context;
+            this.operationId = operationId;
+            this.terminalProof = terminalProof;
+        }
+
+        public Sha256Digest operationId() {
+            return operationId;
+        }
+
+        /** One bounded, detached metadata pass. It never reopens the native ledger or session. */
+        public CompletionStage<List<PhysicalResourceIdV2>> reconcileTickets() {
+            return guard.reconcileOperation(resources, context, operationId, terminalProof)
+                    .thenApply(left -> left);
+        }
+    }
+
     public record Bounds(
             int entries, int batches, int records, long nativeBytes, long payloadBytes, long decodedBytes) {
         public Bounds {
@@ -112,6 +150,7 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
 
     private record DataRow(Nbke2DataV1 data, long groupOrdinal) {}
 
+    private final KafkaBookKeeperReadCellBudgetV2 cellBudget;
     private final KafkaRunRootCatalogV2 catalog;
     private final M5BookKeeperNativeCreateClientV2 client;
     private final M5TargetDeleteMultiWriterGuardV2 guard;
@@ -119,11 +158,13 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     private final Executor owner;
 
     public KafkaBookKeeperRunSourceV2(
+            KafkaBookKeeperReadCellBudgetV2 cellBudget,
             KafkaRunRootCatalogV2 catalog,
             M5BookKeeperNativeCreateClientV2 client,
             M5TargetDeleteMultiWriterGuardV2 guard,
             Bounds bounds,
             Executor owner) {
+        this.cellBudget = Objects.requireNonNull(cellBudget, "cellBudget");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.client = Objects.requireNonNull(client, "client");
         this.guard = Objects.requireNonNull(guard, "guard");
@@ -132,7 +173,11 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     }
 
     public CompletionStage<Snapshot> capture(String nativeRootKey) {
-        return capture(nativeRootKey, new Budget(bounds));
+        var work = catalog.readSelectedRoot(nativeRootKey).thenCompose(observed -> {
+            var root = observed.orElseThrow(() -> new IllegalArgumentException("native source root is not selected"));
+            return withinBudget(binding(root), scope -> capture(nativeRootKey, new Budget(bounds), scope));
+        });
+        return work.thenApply(value -> value);
     }
 
     @Override
@@ -149,17 +194,25 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
             MaterializationSourceCut cut, Optional<List<InputBatch>> expectedInputs) {
         Objects.requireNonNull(cut, "cut");
+        if (!cut.identity()
+                        .providerScopeSha256()
+                        .equals(client.capabilitySnapshot().providerScopeId().digest())
+                || cut.sources().stream().anyMatch(extent -> extent.kind() != SourceKind.BOOKKEEPER_LEDGER)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native run catalog requires exact BK Cell sources"));
+        }
+        return withinBudget(cut.identity().binding(), scope -> resolve(cut, expectedInputs, scope));
+    }
+
+    private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
+            MaterializationSourceCut cut, Optional<List<InputBatch>> expectedInputs, ReadScope scope) {
         var budget = new Budget(bounds);
         Map<Sha256Digest, List<PhysicalResourceIdV2>> result = new LinkedHashMap<>();
         List<InputBatch> nativeInputs = new ArrayList<>();
         CompletionStage<Void> sequence = CompletableFuture.completedFuture(null);
         for (var extent : cut.sources()) {
-            if (extent.kind() != SourceKind.BOOKKEEPER_LEDGER) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("native run catalog requires BK sources"));
-            }
             sequence = sequence.thenComposeAsync(
-                    ignored -> capture(extent.physicalKey(), budget).thenAccept(snapshot -> {
+                    ignored -> capture(extent.physicalKey(), budget, scope).thenAccept(snapshot -> {
                         if (!snapshot.extent().equals(extent)
                                 || !snapshot.binding().equals(cut.identity().binding())
                                 || !snapshot.root()
@@ -190,13 +243,17 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
         });
     }
 
-    private CompletionStage<Snapshot> capture(String key, Budget budget) {
+    private CompletionStage<Snapshot> capture(String key, Budget budget, ReadScope scope) {
         var work = catalog.readSelectedRoot(key)
                 .thenComposeAsync(
                         observed -> {
                             var actual = observed.orElseThrow(
                                     () -> new IllegalArgumentException("native source root is not selected"));
-                            if (actual.root().state() != KafkaRunRootStateV1.SEALED
+                            if (!binding(actual).equals(scope.binding)
+                                    || !actual.root()
+                                            .providerScopeId()
+                                            .equals(client.capabilitySnapshot().providerScopeId())
+                                    || actual.root().state() != KafkaRunRootStateV1.SEALED
                                     || !actual.resource()
                                             .namespace()
                                             .equals(client.spec().namespace())
@@ -213,7 +270,12 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                     client.capabilitySnapshot().configurationDigest(),
                                     stable.initialLink().initialRootSha256(),
                                     identity);
+                            var terminalProof = Sha256Digest.hash(CanonicalBytes.copyOf(ByteBuffer.allocate(36)
+                                    .putInt(0x4d355243)
+                                    .put(identity.bytes().toByteArray())
+                                    .array()));
                             return guard.execute(List.of(stable.resource()), context, () -> {
+                                        scope.sessionStarting();
                                         var reads = client.newSession();
                                         CompletionStage<Snapshot> scan;
                                         try {
@@ -222,15 +284,10 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                             scan = CompletableFuture.failedFuture(failure);
                                         }
                                         return scan.handle(ReadOutcome::new).thenCompose(outcome -> reads.closeAsync()
-                                                .thenApply(ignored -> new Completion<>(
-                                                        outcome,
-                                                        Optional.of(Sha256Digest.hash(CanonicalBytes.copyOf(
-                                                                ByteBuffer.allocate(36)
-                                                                        .putInt(0x4d355243)
-                                                                        .put(
-                                                                                identity.bytes()
-                                                                                        .toByteArray())
-                                                                        .array()))))));
+                                                .thenApply(ignored -> {
+                                                    scope.sessionDrained();
+                                                    return new Completion<>(outcome, Optional.of(terminalProof));
+                                                }));
                                     })
                                     .thenCompose(result -> {
                                         if (!result.mutationInvoked()
@@ -238,11 +295,16 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                             return CompletableFuture.failedFuture(new IllegalStateException(
                                                     "native source physical admission failed"));
                                         }
-                                        if (!result.unresolvedTargets().isEmpty()) {
-                                            return CompletableFuture.failedFuture(new IllegalStateException(
-                                                    "native source ticket release is unresolved"));
-                                        }
                                         var outcome = result.value().orElseThrow();
+                                        if (!result.unresolvedTargets().isEmpty()) {
+                                            return CompletableFuture.failedFuture(new TicketCleanupException(
+                                                    guard,
+                                                    List.of(stable.resource()),
+                                                    context,
+                                                    result.operationId(),
+                                                    terminalProof,
+                                                    outcome.failure()));
+                                        }
                                         return outcome.failure() == null
                                                 ? CompletableFuture.completedFuture(outcome.snapshot())
                                                 : CompletableFuture.failedFuture(outcome.failure());
@@ -251,6 +313,61 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                         owner);
         // Cancellation never abandons in-flight reads, session drain or release of this invocation's physical ticket.
         return work.thenApply(value -> value);
+    }
+
+    private <T> CompletionStage<T> withinBudget(BindingIdentity binding, Function<ReadScope, CompletionStage<T>> work) {
+        final ReadScope scope;
+        try {
+            scope = new ReadScope(
+                    binding, cellBudget.reserveRaw(client.capabilitySnapshot().providerScopeId(), binding, bounds));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletionStage<T> operation;
+        try {
+            operation = Objects.requireNonNull(work.apply(scope), "raw read scope returned no stage");
+        } catch (Throwable failure) {
+            scope.releaseIfDrained();
+            return CompletableFuture.failedFuture(failure);
+        }
+        return operation
+                .whenComplete((value, failure) -> scope.releaseIfDrained())
+                .thenApply(value -> value);
+    }
+
+    private static BindingIdentity binding(KafkaRunRootRecordV2 root) {
+        return new BindingIdentity(
+                root.root().bindingId(),
+                Sha256Digest.hash(
+                        TopicIncarnationIdentityCodecV1.encode(root.root().topicIncarnation())),
+                root.root().storageEpochId().digest());
+    }
+
+    /** One sequential capture/resolve lifetime, including accumulated inputs between native sessions. */
+    private static final class ReadScope {
+        final BindingIdentity binding;
+        final KafkaBookKeeperReadCellBudgetV2.Reservation reservation;
+        volatile boolean sessionUnresolved;
+
+        ReadScope(BindingIdentity binding, KafkaBookKeeperReadCellBudgetV2.Reservation reservation) {
+            this.binding = binding;
+            this.reservation = reservation;
+        }
+
+        void sessionStarting() {
+            sessionUnresolved = true;
+            reservation.sessionStarting();
+        }
+
+        void sessionDrained() {
+            sessionUnresolved = false;
+        }
+
+        void releaseIfDrained() {
+            if (!sessionUnresolved) {
+                reservation.releaseAfterDrain();
+            }
+        }
     }
 
     private static final class Budget {

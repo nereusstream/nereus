@@ -2479,6 +2479,43 @@ Raw NBKE2 source capture, complete read-population/native-owner admission, retai
 metadata-I/O budgeting, crash/drain reconstruction and actual M4 RELEASED remain required. No acceptance obligation,
 M5-E child, Final or production authority is closed by this integration; M6/M7/M8 boundaries remain unchanged.
 
+## Raw-run shared Cell admission and exact cleanup retry (2026-09-23)
+
+`KafkaBookKeeperRunSourceV2` now requires the caller's shared `KafkaBookKeeperReadCellBudgetV2` for standalone capture
+and complete-plan resolution. One reservation covers all sequential native sessions and retained inputs of a resolution;
+an observer's cancellation does not release it. Unknown native termination retains the share. After confirmed native
+session close, an unresolved physical ticket exposes privately constructed exact-operation, metadata-only retry.
+Standalone capture discovers its selected Binding before reserving; those discovery bytes, retained result caches,
+backend buffers and process-wide ownership are outside the configured allowance. The raw path uses the same Binding
+share as selected-generation capture, without publishing M4 terminal/proof or RELEASED.
+
+The real BK/Oxia source test constructs two adjacent sealed NBKE2 runs and pauses between their native sessions.
+It checks that cancellation leaves the whole-resolution charge in place, a same-Binding selected capture is denied
+at capacity, completion and partial rejection return the share, and a dropped ticket-release response can be retried
+for the exact operation after known session close. Preflight passed 21 tasks in
+`/tmp/nereus-m5-raw-budget-preflight-complete.log`.
+
+The final native runner passed 93/93 bound main tasks, 26 first-restart JVM tasks (six executed), and 16 occupied-Cell
+restart JVM tasks (one executed). It archived 25 suites / 103 cases and phases. The independent legacy run archived
+21 suites / 82 cases and phases. Both have zero failures, errors and skips. Log:
+`/tmp/nereus-m5-raw-budget-native.log`. The runner's result remains `NON_PROMOTABLE`.
+
+Legacy output is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-47465`: 730-input manifest SHA-256
+`59938685432d73c2ccf9c6104cb56c52e46a41ce7d83c0f2a4dc98ae56c38abe`, summary SHA-256
+`790e9c51de8cc0b643eea62a550c53b27c230b9c189d343e942a61b5c2f79f4b`. Bound output is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-47451`: 745-input manifest SHA-256
+`8a1dfaba05948d6c0409c46e28ee5570bdbf27831588016e5929292cec505489`, summary SHA-256
+`e368a5daf571c3ee98b54772ecacc016f5eeb473e7ab56ba42dfaf2a457259cc`. The same bound Oxia container
+`c5795f742496857105a2540c932bc2e7c1c6d7a960535071e57e6887285f6e24` restarted from
+`2026-09-23T01:32:15.77865797Z` to `2026-09-23T01:35:49.235518888Z`, then to
+`2026-09-23T01:36:38.6083173Z` for occupied-Cell recovery. The same legacy Oxia container
+`d7497ee9b17986cd58994a25c5722efbda2468496e348c0f0c88026c55cfbae3` restarted from
+`2026-09-23T01:29:28.543811712Z` to `2026-09-23T01:31:39.217633592Z`.
+Every captured input, archived XML and native Cell-restart checkpoint was independently checked by
+`/tmp/nereus-m5-raw-budget-verify.py`, producing `/tmp/nereus-m5-raw-budget-verified.json`.
+The current projections reference these exact source/archive hashes. All 17 acceptance obligations, the five M5-E
+children, Final/aggregate and production authority remain OPEN; M6-deferred rows remain PLANNED.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

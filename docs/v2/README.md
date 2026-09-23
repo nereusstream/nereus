@@ -109,13 +109,16 @@ performance-first BookKeeper WAL.
   admission, compacted-generation input discovery, read-ticket crash recovery and physical deletion remain required.
   Focused native/restart validation passed 51 archived cases/phases plus 71 legacy regression cases/phases, with both
   source maps unchanged; this result closes no aggregate M5 obligation.
+  Raw capture and multi-run resolution now require the caller's shared Cell budget. A whole resolution retains its
+  charge across sequential native sessions; confirmed termination with unresolved ticket cleanup exposes exact
+  metadata-only retry. Process-wide reader admission and retained-cache accounting remain required.
   A follow-up [complete native input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) now rejects
   omissions, reordering, changed ordinals and substituted bodies before publication. Its native/restart validation
   passed 51 archived cases/phases and 71 independent legacy cases/phases with both source maps unchanged.
   The next [selected-generation reader](detailed_design/m5/m5-kafka-selected-source-projection.json) adds the current
   native descriptor's complete data/index membership and typed index-only input. Native validation passed second
   publication after exact M4 fallback closure and new source protection; old inputs remain PROTECTED. The final run
-  passed 102 archived cases/phases and 82 independent legacy cases/phases. Fresh-JVM second-generation recovery
+  passed 103 archived cases/phases and 82 independent legacy cases/phases. Fresh-JVM second-generation recovery
   additionally verifies the user topic, both internal topics and index-only output from native descriptor/task records.
   Shared publication validation now rejects the preferred-only predecessor's epoch as a new fallback's first epoch;
   the introducing E+1 and inherited existing fallback identities are verified before and after native restart.

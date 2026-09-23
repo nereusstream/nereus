@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M5_KAFKA_READ_OWNER_PROJECTION_V2",
   "status": "SCOPED_NATIVE_READ_OWNER_WITH_EXACT_TICKET_RETRY_NON_PROMOTABLE",
-  "predecessorSource": "f695ab5549fadfe6c37b686707c983d7362bb3a1",
+  "predecessorSource": "f6a4d27b1058eceee365601af386d2115aba1990",
   "runtime": "KafkaBookKeeperReadOwnerV2",
   "structuredLifetime": true,
   "allPhysicalTicketsBeforeNativeSessionCreation": true,
@@ -35,7 +35,7 @@
   "unchangedM4RecoveryUnitCases": 7,
   "newNativeOwnerCase": 3,
   "archivedSuites": 25,
-  "archivedCasesAndPhases": 102,
+  "archivedCasesAndPhases": 103,
   "legacyCasesAndPhases": 82,
   "failures": 0,
   "errors": 0,
@@ -44,9 +44,9 @@
   "restartJvmTasks": 26,
   "restartJvmExecutedTasks": 6,
   "testedInputCount": 745,
-  "testedInputManifestSha256": "b863f3549db669d6a42239439758e0a1088369f9b7aaa65aedc65e0ac4f17f81",
+  "testedInputManifestSha256": "8a1dfaba05948d6c0409c46e28ee5570bdbf27831588016e5929292cec505489",
   "legacyTestedInputCount": 730,
-  "legacyTestedInputManifestSha256": "ecb3b2a489a359cb1584ec5291a38f6a91e44a36da36fad542c9dbf76a9485aa",
+  "legacyTestedInputManifestSha256": "59938685432d73c2ccf9c6104cb56c52e46a41ce7d83c0f2a4dc98ae56c38abe",
   "everyCapturedSourceManifestAndXmlCheckedIndependently": true,
   "publicEntryRequiresCellBudget": true,
   "fixedProcessLocalBindingShares": true,
@@ -57,8 +57,8 @@
   "retainedResultCachesAndBackendInternalBuffersAccounted": false,
   "occupiedCellRestartJvmTasks": 16,
   "occupiedCellRestartJvmExecutedTasks": 1,
-  "runSummarySha256": "5336052937fa875e8a554fa8a6e763dc551c2f759e03612bde6a66a8c5229066",
-  "legacyRunSummarySha256": "f1a6f55e959ab658436822f246c83d2cf2ee809eff2b5a40e0443001ab43737b",
+  "runSummarySha256": "e368a5daf571c3ee98b54772ecacc016f5eeb473e7ab56ba42dfaf2a457259cc",
+  "legacyRunSummarySha256": "790e9c51de8cc0b643eea62a550c53b27c230b9c189d343e942a61b5c2f79f4b",
   "releasedReservationRejectsLateSessionStartUnitVerified": true,
   "profileValidationUsesImmutableSnapshot": true,
   "confirmedNativeTerminationExposesExactOperationTicketRetry": true,
@@ -76,5 +76,5 @@
   "selectedCaptureAndScopedReadersShareCellCapacityNativeVerified": true,
   "selectedCaptureTicketCleanupPreservesLiveSameContextSibling": true,
   "initialMetadataDiscoveryIncludedInReadBudget": false,
-  "rawRunCaptureUsesSharedReadCellBudget": false
+  "rawRunCaptureUsesSharedReadCellBudget": true
 }

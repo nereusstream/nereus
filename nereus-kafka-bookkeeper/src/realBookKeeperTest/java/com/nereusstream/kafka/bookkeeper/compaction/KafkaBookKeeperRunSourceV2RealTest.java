@@ -299,25 +299,196 @@ class KafkaBookKeeperRunSourceV2RealTest {
             var entered = new CompletableFuture<Optional<KafkaRunRootRecordV2>>();
             var calls = new AtomicInteger();
             KafkaRunRootCatalogV2 held = key -> f.roots.readSelectedRoot(key).thenCompose(value -> {
-                if (calls.incrementAndGet() == 2) {
+                if (calls.incrementAndGet() == 3) {
                     entered.complete(value);
                     return delivered;
                 }
                 return CompletableFuture.completedFuture(value);
             });
-            var observer = reader(f, held, BOUNDS)
+            var shared = rawBudget(f, BOUNDS);
+            var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
+            var observer = rawReader(f, held, BOUNDS, shared)
                     .capture(f.roots.nativeRootKey(root.runId()))
                     .toCompletableFuture();
             var selected = entered.get(30, TimeUnit.SECONDS);
             assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
+            assertThat(shared.usage()).isEqualTo(charge);
             assertThat(observer.cancel(false)).isTrue();
             assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
+            assertThat(shared.usage()).isEqualTo(charge);
+            assertThatThrownBy(() ->
+                            await(rawReader(f, f.roots, BOUNDS, shared).capture(f.roots.nativeRootKey(root.runId()))))
+                    .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
             delivered.complete(selected);
             long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-            while (f.tickets(root.ledgerIdentity()) != 0 && System.nanoTime() < end) {
+            var zero = new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0);
+            while ((f.tickets(root.ledgerIdentity()) != 0 || !shared.usage().equals(zero)) && System.nanoTime() < end) {
                 Thread.sleep(10);
             }
             assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            assertThat(shared.usage()).isEqualTo(zero);
+        }
+    }
+
+    @Test
+    void wholeRawResolutionRetainsSharedCellChargeBetweenRunsAndThroughCancelledObservation() throws Exception {
+        try (var f = new Fixture(2316, "raw-shared-admission", null)) {
+            var first = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            f.writeData(first);
+            await(first.drain());
+            var firstRoot = await(first.seal(
+                            f.footer(f.runBinding(0), 2, first.snapshot().nextEntryId())))
+                    .root();
+            var second = await(first.createSuccessor(f.runBinding(1)));
+            for (int i = 0; i < f.bodies.size(); i++) {
+                var bytes = f.bodies.get(i).toByteArray();
+                java.nio.ByteBuffer.wrap(bytes).putLong(0, i + 2L);
+                var assigned = CanonicalBytes.copyOf(bytes);
+                assertThat(KafkaRecordBatchCodecV1.parse(assigned).baseOffset()).isEqualTo(i + 2L);
+                var entry = second.reserveDataGroup(1);
+                f.data(
+                        second.snapshot().handle(),
+                        second.snapshot().runBinding(),
+                        entry.firstEntryId(),
+                        i + 2L,
+                        assigned);
+                second.completeDataGroup(entry);
+            }
+            await(second.drain());
+            var secondRoot = await(second.seal(
+                            f.footer(f.runBinding(1), 4, second.snapshot().nextEntryId())))
+                    .root();
+            var baseline = reader(f, f.roots, BOUNDS);
+            var one = await(baseline.capture(f.roots.nativeRootKey(firstRoot.runId())));
+            var two = await(baseline.capture(f.roots.nativeRootKey(secondRoot.runId())));
+            var input = input(f, one, 3316);
+            var old = input.plan().sourceCut();
+            var extents = List.of(one.extent(), two.extent());
+            var cut = new M5MaterializationRecordsV1.MaterializationSourceCut(
+                    old.identity(),
+                    old.predecessorSelector(),
+                    old.predecessorSelectorValueSha256(),
+                    old.predecessorViewSha256(),
+                    new M5MaterializationRecordsV1.ProtocolCoverage(
+                            old.coverage().domain(), 0, 4),
+                    4,
+                    4,
+                    4,
+                    4,
+                    old.trimFrontier(),
+                    old.protocolStateRootSha256(),
+                    old.recoveryCheckpointRootSha256(),
+                    old.materializationPolicySha256(),
+                    old.outputFormatPolicySha256(),
+                    M5MaterializationCodecV1.calculateSourceSetSha256(extents),
+                    extents);
+            var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
+            assertThat(charge.encodedBytes()).isEqualTo(BOUNDS.nativeBytes() + BOUNDS.payloadBytes());
+            var shared = new KafkaBookKeeperReadCellBudgetV2(
+                    f.scope.providerScope(), charge, java.util.Map.of(one.binding(), charge));
+            try (var published = new Published(f, input, NativeContext.root())) {
+                var descriptor = published.writeAndPublish(baseline);
+                var delivered = new CompletableFuture<Optional<KafkaRunRootRecordV2>>();
+                var entered = new CompletableFuture<Optional<KafkaRunRootRecordV2>>();
+                var calls = new AtomicInteger();
+                KafkaRunRootCatalogV2 held =
+                        key -> f.roots.readSelectedRoot(key).thenCompose(value -> {
+                            if (calls.incrementAndGet() == 3) {
+                                entered.complete(value);
+                                return delivered;
+                            }
+                            return CompletableFuture.completedFuture(value);
+                        });
+                var source = rawReader(f, held, BOUNDS, shared);
+                var observer = source.resolve(cut).toCompletableFuture();
+                var next = await(entered);
+                assertThat(next.orElseThrow().root()).isEqualTo(secondRoot);
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
+                assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+                assertThat(shared.usage()).isEqualTo(charge);
+                assertThat(observer.cancel(true)).isTrue();
+                assertThat(delivered).isNotCancelled();
+                var selected = new KafkaBookKeeperSelectedSourceV2(
+                        shared,
+                        published.context.store,
+                        published.context.m4,
+                        published.output,
+                        new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                        new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1000000, 500000),
+                        published.context.owner);
+                assertThatThrownBy(() -> await(selected.capture()))
+                        .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+                assertNativeReadTickets(f, descriptor, 0);
+                assertThat(shared.usage()).isEqualTo(charge);
+                delivered.complete(next);
+                long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                var zero = new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0);
+                while (!shared.usage().equals(zero) && System.nanoTime() < end) {
+                    Thread.sleep(10);
+                }
+                assertThat(shared.usage()).isEqualTo(zero);
+                assertThat(observer).isCancelled();
+                assertThat(await(source.resolve(cut))).hasSize(2);
+                verifySelected(await(selected.capture()), descriptor);
+                var partial = rawReader(f, f.roots, new Bounds(128, 2, 1000, 1000000, 500000, 500000), shared);
+                assertThatThrownBy(() -> await(partial.resolve(cut)))
+                        .hasRootCauseMessage("native source DATA coverage or payload budget differs");
+                assertThat(shared.usage()).isEqualTo(zero);
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
+                assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+
+                var dropRelease = new java.util.concurrent.atomic.AtomicBoolean(true);
+                var faulty = (ExactMetadataTransactionStoreV1) Proxy.newProxyInstance(
+                        ExactMetadataTransactionStoreV1.class.getClassLoader(),
+                        new Class<?>[] {ExactMetadataTransactionStoreV1.class},
+                        (proxy, method, args) -> {
+                            if (method.getName().equals("compareAndSet") && dropRelease.get()) {
+                                var expected = (Optional<?>) args[0];
+                                if (expected.isPresent()) {
+                                    var before =
+                                            (ExactMetadataTransactionStoreV1.VersionedValue) expected.orElseThrow();
+                                    var oldTickets = M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                                    before.canonicalStoredBytes())
+                                            .activeWriterTickets();
+                                    var newTickets = M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                                    (CanonicalBytes) args[2])
+                                            .activeWriterTickets();
+                                    if (newTickets.size() < oldTickets.size()) {
+                                        return CompletableFuture.completedFuture(
+                                                ExactMetadataTransactionStoreV1.MutationOutcome.RESPONSE_UNKNOWN);
+                                    }
+                                }
+                            }
+                            try {
+                                return method.invoke(f.route, args);
+                            } catch (InvocationTargetException failure) {
+                                throw failure.getCause();
+                            }
+                        });
+                var guarded = new KafkaBookKeeperRunSourceV2(
+                        shared,
+                        f.roots,
+                        f.source,
+                        new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(faulty)),
+                        BOUNDS,
+                        java.util.concurrent.ForkJoinPool.commonPool());
+                var failed = await(guarded.capture(f.roots.nativeRootKey(firstRoot.runId()))
+                        .handle((value, error) -> error));
+                while (failed instanceof java.util.concurrent.CompletionException) {
+                    failed = failed.getCause();
+                }
+                assertThat(failed).isInstanceOf(KafkaBookKeeperRunSourceV2.TicketCleanupException.class);
+                var cleanup = (KafkaBookKeeperRunSourceV2.TicketCleanupException) failed;
+                assertThat(shared.usage()).isEqualTo(zero);
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isEqualTo(1);
+                assertThat(await(cleanup.reconcileTickets()))
+                        .containsExactly(f.record(firstRoot).resource());
+                dropRelease.set(false);
+                assertThat(await(cleanup.reconcileTickets())).isEmpty();
+                assertThat(await(cleanup.reconcileTickets())).isEmpty();
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
+                assertThat(shared.usage()).isEqualTo(zero);
+            }
         }
     }
 
@@ -976,7 +1147,23 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     private static KafkaBookKeeperRunSourceV2 reader(Fixture f, KafkaRunRootCatalogV2 catalog, Bounds bounds) {
+        return rawReader(f, catalog, bounds, rawBudget(f, bounds));
+    }
+
+    private static KafkaBookKeeperReadCellBudgetV2 rawBudget(Fixture f, Bounds bounds) {
+        var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(bounds);
+        var binding = new M4ReadControlRecordsV1.BindingIdentity(
+                f.scope.bindingId(),
+                Sha256Digest.hash(
+                        com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1.encode(f.scope.topic())),
+                f.scope.storageEpoch().digest());
+        return new KafkaBookKeeperReadCellBudgetV2(f.scope.providerScope(), charge, java.util.Map.of(binding, charge));
+    }
+
+    private static KafkaBookKeeperRunSourceV2 rawReader(
+            Fixture f, KafkaRunRootCatalogV2 catalog, Bounds bounds, KafkaBookKeeperReadCellBudgetV2 budget) {
         return new KafkaBookKeeperRunSourceV2(
+                budget,
                 catalog,
                 f.source,
                 new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),

@@ -390,6 +390,23 @@ A failed scan returns no partial input. The owned session must drain and close b
 invocation's read ticket is released, including on parse failure; cancellation does not abandon admitted work. Unknown
 close retains the ticket; unresolved ticket release also prevents a successful capture result. Old-JVM read-ticket
 recovery and complete Cell admission remain required.
+
+Raw `capture` and complete-plan `resolve` now require the caller's fixed process-local
+`KafkaBookKeeperReadCellBudgetV2`. One raw scope charges one owner/read slot, the sum of its configured native-frame
+and retained-payload allowances, and its decoded allowance. A single scope spans all sequential native sessions and
+accumulated inputs in one `resolve`; it does not return the charge between runs. `resolve` checks the frozen Binding
+and Cell before catalog reads. Standalone `capture` first discovers its selected root to identify the Binding, then
+reserves the share before physical admission. Unknown native creation/close retains the charge. Confirmed session
+close returns it only after the whole operation finishes, including partial input rejection or observer cancellation.
+The same caller-supplied budget can admit selected-generation capture, so a held raw resolution prevents another
+same-Binding capture at capacity.
+
+When raw native termination is confirmed but its physical ticket cleanup is unresolved, a privately constructed
+`KafkaBookKeeperRunSourceV2.TicketCleanupException` retains the exact operation ID, Context and local terminal proof.
+Its repeatable metadata-only retry never reopens the ledger or session. A failed native close grants no retry handle.
+Neither result-cache ownership nor metadata discovery/queue bytes are included in this configured allowance; full
+provider memory, native process drain and crash-ticket reconstruction remain required.
+
 The raw-run adapter feeds the existing ticketed BK compactor and selected-output recovery. It reports range-index
 coverage separately and never declares all protocol indexes complete; the existing semantic compiler rebuilds output
 indexes. Tests use user and internal-topic routes with actual generic Kafka batches. Complete native internal message
@@ -451,7 +468,7 @@ identities at both publications and after both generations' restart; the unit pr
 facts only. Actual M4 RELEASED and admitted native read-owner drain remain OPEN.
 
 The current native run passed 93 executed main tasks, a separate 26-task restart JVM (six executed) and a second
-16-task occupied-Cell restart JVM (one executed), with 102 archived cases/phases and no failures/errors/skips.
+16-task occupied-Cell restart JVM (one executed), with 103 archived cases/phases and no failures/errors/skips.
 The independent legacy regression passed 82 cases/phases. Both the 745-input map and 730-input legacy map were
 independently unchanged, including the amended descriptor checker and its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
 now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route

@@ -130,6 +130,10 @@ source extents, shared read/decoded-record budgets, group/index corruption rejec
 native input-to-compaction publication. Retained-data restart rederives source identities and recovers selected outputs.
 This [raw-run source path](detailed_design/m5/m5-kafka-run-source-projection.json) still uses synthetic protocol semantic
 and birth admission facts; compacted-generation catalogs, all-writer/read-owner closure, deletion and M5-E remain OPEN.
+Raw capture and multi-run resolution now require caller-shared Cell/Binding read capacity. The reservation spans all
+sequential native sessions and accumulated inputs; unknown native termination retains it, and known termination with
+unresolved ticket cleanup yields exact-operation metadata retry. Returned cache bytes, process-wide ownership and
+crash drain reconstruction remain OPEN.
 The focused run passed 51 archived cases/phases and a separate 71-case/phase legacy regression, including retained-data
 restarts. Both exact source maps remained unchanged. Decoded record framing is preflighted before Kafka allocation.
 The next [complete input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) extends the publication
@@ -143,19 +147,18 @@ Old source protection and active retirement batches must remain intact; complete
 native owner admission and physical deletion remain required. Fresh-JVM second-generation recovery covers the user
 topic, both internal topics and index-only output without republishing or copying descriptor/task bodies.
 Shared M5-A/M5-B validation now rejects a new fallback's first epoch unless it equals the introducing selector's E+1;
-existing fallback sets inherit their original first epoch. The current 102-case/phase run includes 8 Object
+existing fallback sets inherit their original first epoch. The current 103-case/phase run includes 8 Object
 materialization and 14 Kafka semantic cases plus native epoch/set checks before and after both generation restarts.
 The [scoped read owner](detailed_design/m5/m5-kafka-read-owner-projection.json) adds physical tickets for its complete
 native-session lifetime and local close-before-CAS/drain. Public entry now also reserves fixed per-Binding owner,
 read-slot and configured byte allowances from one process-local Cell budget. Six owner tests, seven existing M4
-recovery tests and three native owner cases join the current 25-archive / 102-case bound run. A cancelled Binding's
+recovery tests and three native owner cases join the current 25-archive / 103-case bound run. A cancelled Binding's
 share remains charged through actual read/session completion while a healthy same-Cell Binding reads. Confirmed
 termination with unresolved physical ticket cleanup returns an exact-operation retry handle; metadata-only retry
 preserves live same-Context siblings and never recreates a session. Unknown native close returns no retry handle.
 Selected-generation `capture`/`resolve` now use this same owner and caller-supplied shared budget, including after
 native restart. A held scoped read prevents same-Binding capture until its native lifetime ends, and capture's exact
-cleanup retry preserves live sibling tickets. Its result is local only; raw-run read admission, global process
-admission, result-cache/transport accounting, crash reconciliation, M4 terminal/proof publication and RELEASED remain outstanding.
+cleanup retry preserves live sibling tickets. Its result is local only; global process admission, result-cache/transport accounting, crash reconciliation, M4 terminal/proof publication and RELEASED remain outstanding.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.
