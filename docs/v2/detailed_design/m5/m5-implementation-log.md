@@ -2660,6 +2660,28 @@ The independently checked legacy archive contains 730 inputs and 21 XML suites /
 Native owner, quota and ledger identity are real; source/protocol eligibility, M4 release production, grace and
 complete physical dispatch remain OPEN. This is not an M5-E child or Final receipt.
 
+## Competing BK task selection reconciles publication tickets (2026-09-23)
+
+The guarded BK publisher previously treated a durable task decision selecting a different descriptor as if the
+task were still undecided. An earlier response-unknown attempt for the losing descriptor could therefore leave
+publication writer tickets on its input and output resources indefinitely; retry could also invoke the losing
+publication callback again. `KafkaBookKeeperPublicationTicketsV2` now treats either selected descriptor as the
+task's irreversible terminal: the matching descriptor returns `EXISTING_EXACT`, while a different descriptor
+returns `CONFLICT` and uses the exact native decision bytes to reconcile tickets for the losing candidate.
+
+The regression drives the M4 selector and native task-selection coordinator, retains a synthetic publication
+ticket after an unknown response, selects a competing descriptor, then verifies that retry performs no mutation
+and clears every matching physical ticket. This is a focused synthetic metadata/physical-authority test, not a
+native BK or source/protocol proof. The full Kafka BK module test suite, Spotless and main/test Checkstyle passed.
+The six exact-count native runners now expect the descriptor suite's 11 tests; the first native run's final verifier
+correctly rejected its old count of 10 despite zero JUnit failures/skips. The source-locked rerun passed legacy
+verification and the BK/Oxia bound profile across two server restarts. Its archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-74849`: 25 XML suites, 105 cases, zero failures/errors/skips.
+All 745 current-source inputs and every XML were independently rehashed; the input-manifest SHA-256 is
+`15f03542997073814747cdb6460651ecfad60a670bfc4335b904152bf40308e6`. The runner reports
+`PASS_V2_M5_KAFKA_RUN_SOURCE_NON_PROMOTABLE`. Its native paths do not produce the synthetic competing-descriptor
+proof above. All 17 amended acceptance obligations and the five M5-E children/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

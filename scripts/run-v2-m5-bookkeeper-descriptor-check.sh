@@ -50,7 +50,7 @@ names = {case.attrib.get("name") for case in suite.findall("testcase")}
 if "m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence()" not in names:
     raise SystemExit("real BookKeeper M5 deletion testcase is absent")
 for task, class_name, expected in (
-    ("v2M5BookKeeperDescriptorTest", "KafkaSealedBookKeeperDescriptorV2Test", 10),
+    ("v2M5BookKeeperDescriptorTest", "KafkaSealedBookKeeperDescriptorV2Test", 11),
     ("v2M5BookKeeperDescriptorRealTest", "KafkaSealedBookKeeperDescriptorV2RealTest", 4),
     ("v2M5BookKeeperCompactionInventoryTest", "KafkaBookKeeperInventoryV2Test", 8),
     ("v2M5BookKeeperCompactionRealTest", "KafkaBookKeeperCompactionWriterV2RealTest", 7),

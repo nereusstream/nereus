@@ -184,15 +184,20 @@ public final class KafkaBookKeeperPublicationTicketsV2 {
             return Optional.empty();
         }
         var exact = decision.orElseThrow();
-        if (!exact.taskId().equals(descriptor.task().taskIdSha256())) {
-            throw new IllegalArgumentException("publication native terminal has another task");
+        if (!exact.taskId().equals(descriptor.task().taskIdSha256())
+                || !exact.binding().equals(descriptor.sourceCut().identity().binding())) {
+            throw new IllegalArgumentException("publication native terminal has another Binding or task");
         }
         if (exact.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED) {
             return Optional.of(new Terminal(PublicationOutcome.CANCELLED_STALE, Sha256Digest.hash(exact.encode())));
         }
-        return exact.selectedOutput().equals(Optional.of(descriptor.descriptorSha256()))
-                ? Optional.of(new Terminal(PublicationOutcome.EXISTING_EXACT, Sha256Digest.hash(exact.encode())))
-                : Optional.empty();
+        // The decision is unique for this task. A different output can no longer win, so it also
+        // terminates tickets left by this candidate's earlier response-unknown publication.
+        return Optional.of(new Terminal(
+                exact.selectedOutput().equals(Optional.of(descriptor.descriptorSha256()))
+                        ? PublicationOutcome.EXISTING_EXACT
+                        : PublicationOutcome.CONFLICT,
+                Sha256Digest.hash(exact.encode())));
     }
 
     private record Terminal(PublicationOutcome outcome, Sha256Digest proof) {}

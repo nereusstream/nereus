@@ -20,6 +20,8 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperCompactionTestSupportV2.Store;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperCompactionWriterV2.VerifiedPart;
+import com.nereusstream.metadata.spi.model.MetadataVersion;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
 import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
@@ -27,20 +29,32 @@ import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerOpenResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.CaptureOutcome;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.CaptureResult;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
+import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IndexKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PublicationOutcome;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
+import com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2;
+import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class KafkaSealedBookKeeperDescriptorV2Test {
@@ -251,6 +265,131 @@ class KafkaSealedBookKeeperDescriptorV2Test {
                 .hasRootCauseMessage("selected BK native sealed metadata is missing, changed or unknown");
         assertThat(fixture.reads).isZero();
         assertThat(fixture.store.selectorCasCount).isZero();
+    }
+
+    @Test
+    void competingNativeSelectionReconcilesUnknownPublicationTickets() {
+        var fixture = new Fixture(false);
+        var selected = fixture.descriptor;
+        var seals = new ArrayList<>(selected.sealedParts());
+        var first = seals.get(0);
+        seals.set(
+                0,
+                new BookKeeperDeleteTargetV1(
+                        first.handle(),
+                        first.sealedLastEntryId(),
+                        first.sealedLength(),
+                        first.ensembleSize(),
+                        first.writeQuorumSize(),
+                        first.ackQuorumSize(),
+                        first.digestType(),
+                        first.passwordCredentialIdentityVersion(),
+                        first.passwordSha256(),
+                        first.metadataFormatVersion(),
+                        first.metadataCToken(),
+                        KafkaBookKeeperCompactionTestSupportV2.digest("losing-native-metadata")));
+        var losing = new KafkaSealedBookKeeperDescriptorV2(
+                selected.task(),
+                selected.sourceGeneration(),
+                selected.batchCount(),
+                selected.dispositionRootSha256(),
+                selected.gapRootSha256(),
+                selected.semanticProof(),
+                seals,
+                selected.indexes());
+        assertThat(losing.descriptorSha256()).isNotEqualTo(selected.descriptorSha256());
+
+        var sourceResource = SyntheticDeleteAuthorityFixturesV2.resource(801);
+        Map<Sha256Digest, List<PhysicalResourceIdV2>> membership = fixture.input.plan().sourceCut().sources().stream()
+                .collect(Collectors.toMap(source -> source.sourceIdentitySha256(), source -> List.of(sourceResource)));
+        var targets = KafkaBookKeeperPublicationTicketsV2.targets(losing, membership);
+        var ticketsStore = new TicketStore();
+        targets.forEach(resource -> ticketsStore.put(
+                resource.authorityKey(),
+                M5TargetDeleteAuthorityCodecV1.encodeAuthority(
+                        SyntheticDeleteAuthorityFixturesV2.phases(resource).get(0))));
+        var tickets = new KafkaBookKeeperPublicationTicketsV2(
+                new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(ticketsStore)),
+                ignored -> CompletableFuture.completedFuture(membership),
+                Runnable::run);
+        var decisions = new M5TaskSelectionCoordinatorV2(
+                fixture.store, 7, fixture.input.plan().sourceCut().identity().binding());
+        java.util.function.Supplier<Optional<M5TaskSelectionDecisionV2>> currentDecision =
+                () -> decisions.readDecision(losing.task().taskIdSha256());
+        assertThat(tickets.publish(
+                                fixture.input.plan(),
+                                losing,
+                                () -> CompletableFuture.completedFuture(PublicationOutcome.OUTCOME_UNKNOWN),
+                                currentDecision)
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
+        targets.forEach(resource -> assertThat(ticketsStore.tickets(resource)).isEqualTo(1));
+
+        assertThat(fixture.publish()).isEqualTo(PublicationOutcome.APPLIED_EXACT);
+        assertThat(decisions
+                        .readDecision(losing.task().taskIdSha256())
+                        .orElseThrow()
+                        .selectedOutput())
+                .contains(selected.descriptorSha256());
+        var retriedMutation = new AtomicInteger();
+        assertThat(tickets.publish(
+                                fixture.input.plan(),
+                                losing,
+                                () -> {
+                                    retriedMutation.incrementAndGet();
+                                    return CompletableFuture.completedFuture(PublicationOutcome.CONFLICT);
+                                },
+                                currentDecision)
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(PublicationOutcome.CONFLICT);
+        assertThat(retriedMutation).hasValue(0);
+        targets.forEach(resource -> assertThat(ticketsStore.tickets(resource)).isZero());
+    }
+
+    private static final class TicketStore implements ExactMetadataTransactionStoreV1 {
+        private final Map<String, VersionedValue> values = new HashMap<>();
+        private long version;
+
+        void put(String key, CanonicalBytes bytes) {
+            values.put(
+                    key,
+                    VersionedValue.of(
+                            key,
+                            bytes,
+                            new MetadataVersion(CanonicalBytes.copyOf(ByteBuffer.allocate(Long.BYTES)
+                                    .putLong(++version)
+                                    .array()))));
+        }
+
+        int tickets(PhysicalResourceIdV2 resource) {
+            return M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                            values.get(resource.authorityKey()).canonicalStoredBytes())
+                    .activeWriterTickets()
+                    .size();
+        }
+
+        public CompletionStage<Optional<VersionedValue>> read(String key) {
+            return CompletableFuture.completedFuture(Optional.ofNullable(values.get(key)));
+        }
+
+        public CompletionStage<MutationOutcome> compareAndSet(
+                Optional<VersionedValue> expected, String key, CanonicalBytes bytes) {
+            if (!Optional.ofNullable(values.get(key)).equals(expected)) {
+                return CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT);
+            }
+            put(key, bytes);
+            return CompletableFuture.completedFuture(MutationOutcome.APPLIED_EXACT);
+        }
+
+        public CompletionStage<TransactionOutcome> conditionalTransaction(ExactTransaction ignored) {
+            throw new AssertionError("publication ticket test has no multi-key transaction");
+        }
+
+        public boolean supportsAtomicMultiKeyTransactions() {
+            return false;
+        }
     }
 
     static final class Fixture {

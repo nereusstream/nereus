@@ -54,7 +54,7 @@ if "m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence()" not in
 for task, class_name, expected in (
     ("v2M5BookKeeperM4RecoveryTest", "KafkaBookKeeperM4RecoveryV2Test", 7),
     ("v2M5BookKeeperM4RecoveryRealTest", "KafkaBookKeeperM4RecoveryV2RealTest", 2),
-    ("v2M5BookKeeperDescriptorTest", "KafkaSealedBookKeeperDescriptorV2Test", 10),
+    ("v2M5BookKeeperDescriptorTest", "KafkaSealedBookKeeperDescriptorV2Test", 11),
     ("v2M5BookKeeperDescriptorRealTest", "KafkaSealedBookKeeperDescriptorV2RealTest", 4),
     ("v2M5BookKeeperCompactionInventoryTest", "KafkaBookKeeperInventoryV2Test", 8),
     ("v2M5BookKeeperCompactionRealTest", "KafkaBookKeeperCompactionWriterV2RealTest", 7),
