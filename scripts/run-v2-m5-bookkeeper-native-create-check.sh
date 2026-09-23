@@ -112,7 +112,7 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
 suites=[]
 for module,task,name,count in (
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
-    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',8),
+    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',9),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',3),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartWriteTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartReadTest','KafkaBookKeeperNativeCreateV2RestartTest',1),

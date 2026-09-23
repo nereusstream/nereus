@@ -162,8 +162,9 @@ final class M5BookKeeperNativeCreateGuardV2 {
                                     path,
                                     false,
                                     (readRc, readPath, ignoredContext, data, stat) -> {
-                                        if (readRc == KeeperException.Code.OK.intValue()
-                                                && stat.getVersion() == 0
+                                        if (readRc != KeeperException.Code.OK.intValue()) {
+                                            result.completeExceptionally(failure(readRc, path));
+                                        } else if (stat.getVersion() == 0
                                                 && stat.getEphemeralOwner() == 0
                                                 && Arrays.equals(data, candidate)) {
                                             result.complete(null);

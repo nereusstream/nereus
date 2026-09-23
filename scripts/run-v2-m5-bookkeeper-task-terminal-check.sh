@@ -132,7 +132,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartWriteTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartReadTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
-    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',8),
+    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',9),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRealTest','M5BookKeeperNativeDeleteV2RealTest',4),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartWriteTest','M5BookKeeperNativeDeleteV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartReadTest','M5BookKeeperNativeDeleteV2RestartTest',1),

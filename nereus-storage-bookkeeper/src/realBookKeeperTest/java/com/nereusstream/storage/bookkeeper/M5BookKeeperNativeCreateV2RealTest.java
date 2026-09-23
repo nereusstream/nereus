@@ -313,6 +313,19 @@ class M5BookKeeperNativeCreateV2RealTest {
         }
     }
 
+    @Test
+    void failedReservationRereadKeepsLostCreateResponseUncertain() throws Exception {
+        try (var fault = new NativeFaults(spec())) {
+            long id = fault.allocate();
+            fault.zk.loseNextMulti = true;
+            fault.zk.failNextGetData = true;
+            assertThatThrownBy(() -> fault.guard.reserve(id).get(10, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(org.apache.bookkeeper.client.BKException.ZKException.class)
+                    .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.ConnectionLossException.class);
+            fault.guard.requireOwned(id).get(10, TimeUnit.SECONDS);
+        }
+    }
+
     /** Only callback delivery is controlled; every reservation, fence and ledger transaction reaches real ZooKeeper. */
     static final class NativeFaults implements AutoCloseable {
         final BookKeeper client;
@@ -410,6 +423,7 @@ class M5BookKeeperNativeCreateV2RealTest {
         volatile boolean dropNextDelete;
         volatile boolean holdNextDeleteReply;
         volatile boolean loseNextSet;
+        volatile boolean failNextGetData;
         final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<Void>>
                 lostMultiDelivery = new java.util.concurrent.atomic.AtomicReference<>();
         final java.util.concurrent.atomic.AtomicInteger lost = new java.util.concurrent.atomic.AtomicInteger();
@@ -510,6 +524,18 @@ class M5BookKeeperNativeCreateV2RealTest {
                         }
                     },
                     context);
+        }
+
+        @Override
+        public void getData(
+                String path, boolean watch, org.apache.zookeeper.AsyncCallback.DataCallback callback, Object context) {
+            if (failNextGetData) {
+                failNextGetData = false;
+                callback.processResult(
+                        org.apache.zookeeper.KeeperException.Code.CONNECTIONLOSS.intValue(), path, context, null, null);
+            } else {
+                super.getData(path, watch, callback, context);
+            }
         }
     }
 
