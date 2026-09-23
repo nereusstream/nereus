@@ -216,6 +216,48 @@ class M5RetentionRetirementV1Test {
     }
 
     @Test
+    void unchangedTrimPositionStillPersistsANewAuthoritativeFloorSnapshot() {
+        InMemoryStore metadata = new InMemoryStore(true);
+        M5LogicalTrimCoordinatorV1 coordinator = new M5LogicalTrimCoordinatorV1(metadata);
+        RetentionFloorSnapshotV1 first = snapshot(metadata, 0, 100);
+        assertThat(coordinator
+                        .advance("/trim-frontier", first)
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(Outcome.APPLIED_EXACT);
+
+        RetentionFloorSnapshotV1 successor = snapshot(metadata, 100, 100);
+        M5LogicalTrimCoordinatorV1.Result advanced = coordinator
+                .advance("/trim-frontier", successor)
+                .toCompletableFuture()
+                .join();
+        assertThat(advanced.outcome()).isEqualTo(Outcome.APPLIED_EXACT);
+        assertThat(advanced.exactFrontier().orElseThrow().priorFrontier()).isEqualTo(100);
+        assertThat(advanced.exactFrontier().orElseThrow().newFrontier()).isEqualTo(100);
+        assertThat(advanced.exactFrontier().orElseThrow().generation()).isEqualTo(2);
+        assertThat(advanced.exactFrontier().orElseThrow().floorSnapshotRootSha256())
+                .isEqualTo(successor.snapshotRootSha256());
+        assertThat(M5RetentionCodecV1.decodeTrimFrontier(
+                        metadata.readNow("/trim-frontier").canonicalStoredBytes()))
+                .isEqualTo(advanced.exactFrontier().orElseThrow());
+
+        int casCalls = metadata.casCalls;
+        assertThat(coordinator
+                        .advance("/trim-frontier", successor)
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(Outcome.EXISTING_EXACT);
+        assertThat(metadata.casCalls).isEqualTo(casCalls);
+        assertThatThrownBy(() -> coordinator
+                        .advance("/trim-frontier", first)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("floor snapshot trim predecessor differs from current authority");
+    }
+
+    @Test
     void singleBindingAuthorityMigrationPreservesExactM4Projection() {
         RetirementFixture fixture = retirementFixture(false);
         M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);

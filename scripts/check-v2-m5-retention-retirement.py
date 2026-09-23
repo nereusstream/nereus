@@ -35,6 +35,7 @@ REAL_OXIA = {
         "nativeM4ReleaseIsConsumedByM5BindingFence",
         "bindingAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
         "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
+        "unchangedLogicalTrimPositionPersistsNewFloorSnapshotAcrossReconnect",
     ],
     "canonicalM4ReleaseKeyRequired": True,
     "retirementActionsRequireCanonicalReleaseKeyShape": True,

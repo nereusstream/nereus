@@ -72,6 +72,7 @@ import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.Bin
 import com.nereusstream.storage.object.retention.M5BindingRetirementCoordinatorV1;
 import com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1;
 import com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1.WriterDeclarationV1;
+import com.nereusstream.storage.object.retention.M5LogicalTrimCoordinatorV1;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateRetirementCoordinatorV1;
 import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1;
@@ -91,6 +92,8 @@ import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceK
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceObservationV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceScanSummaryV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceTargetKindV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionFloorObservationV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionFloorSnapshotV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetiredTopicIncarnationTombstoneV1;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
@@ -366,6 +369,57 @@ class M5RetentionOxiaIntegrationTest {
     }
 
     @Test
+    void unchangedLogicalTrimPositionPersistsNewFloorSnapshotAcrossReconnect() throws Exception {
+        String root = "/nereus/v2/m5/retention/trim-" + UUID.randomUUID();
+        String frontierKey = root + "/frontier";
+        CanonicalBytes persisted;
+        RetentionFloorSnapshotV1 oldSnapshot;
+
+        try (AsyncOxiaClient client = connect()) {
+            Oxia09ExactMetadataTransactionStoreV1 store = new Oxia09ExactMetadataTransactionStoreV1(client);
+            M5LogicalTrimCoordinatorV1 coordinator = new M5LogicalTrimCoordinatorV1(store);
+            oldSnapshot = floorSnapshot(store, root + "/first", 0, 100);
+            assertThat(coordinator
+                            .advance(frontierKey, oldSnapshot)
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
+
+            RetentionFloorSnapshotV1 successor = floorSnapshot(store, root + "/successor", 100, 100);
+            var advanced = coordinator
+                    .advance(frontierKey, successor)
+                    .toCompletableFuture()
+                    .join();
+            assertThat(advanced.outcome()).isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
+            assertThat(advanced.exactFrontier().orElseThrow().generation()).isEqualTo(2);
+            assertThat(advanced.exactFrontier().orElseThrow().floorSnapshotRootSha256())
+                    .isEqualTo(successor.snapshotRootSha256());
+            VersionedValue current = read(store, frontierKey);
+            persisted = current.canonicalStoredBytes();
+            assertThat(M5RetentionCodecV1.decodeTrimFrontier(persisted))
+                    .isEqualTo(advanced.exactFrontier().orElseThrow());
+            assertThat(coordinator
+                            .advance(frontierKey, successor)
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.EXISTING_EXACT);
+            assertThat(read(store, frontierKey)).isEqualTo(current);
+        }
+
+        try (AsyncOxiaClient restarted = connect()) {
+            Oxia09ExactMetadataTransactionStoreV1 store = new Oxia09ExactMetadataTransactionStoreV1(restarted);
+            assertThat(read(store, frontierKey).canonicalStoredBytes()).isEqualTo(persisted);
+            assertThatThrownBy(() -> new M5LogicalTrimCoordinatorV1(store)
+                            .advance(frontierKey, oldSnapshot)
+                            .toCompletableFuture()
+                            .join())
+                    .hasRootCauseMessage("floor snapshot trim predecessor differs from current authority");
+        }
+    }
+
+    @Test
     void pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart() throws Exception {
         String root = "/nereus/v2/m5/retention/pulsar-" + UUID.randomUUID();
         String aggregateKey = root + "/aggregate";
@@ -591,6 +645,30 @@ class M5RetentionOxiaIntegrationTest {
                 List.of(FloorClassV1.values()),
                 List.of(ReferenceKindV1.values()),
                 digest("m5-real-oxia-writer-source"))));
+    }
+
+    private static RetentionFloorSnapshotV1 floorSnapshot(
+            ExactMetadataTransactionStoreV1 store, String prefix, long priorFrontier, long floor) {
+        AuthorityFactV1 owner = fact(create(store, prefix + "/owner", bytes("owner")));
+        AuthorityFactV1 storage = fact(create(store, prefix + "/storage", bytes("storage")));
+        List<RetentionFloorObservationV1> rows = new ArrayList<>();
+        for (FloorClassV1 kind : FloorClassV1.values()) {
+            AuthorityFactV1 authority = fact(create(store, prefix + "/" + kind.name(), bytes(kind.name())));
+            rows.add(new RetentionFloorObservationV1(
+                    kind, authority, PositionDomain.KAFKA_OFFSET, floor + kind.ordinal(), true, true));
+        }
+        return M5RetentionCodecV1.finalizeSnapshot(new RetentionFloorSnapshotV1(
+                IDENTITY,
+                PositionDomain.KAFKA_OFFSET,
+                priorFrontier + 1,
+                priorFrontier,
+                digest("m5-retention-policy"),
+                owner,
+                storage,
+                1,
+                4_096,
+                rows,
+                PLACEHOLDER));
     }
 
     static ReferenceFreeProofV1 proof(

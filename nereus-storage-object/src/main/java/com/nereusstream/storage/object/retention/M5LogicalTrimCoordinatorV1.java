@@ -59,8 +59,7 @@ public final class M5LogicalTrimCoordinatorV1 {
         return freshness.requireFresh(snapshot).thenCompose(ignored -> metadata.read(frontierKey)
                 .thenCompose(current -> {
                     Optional<BindingTrimFrontierV1> predecessor = current.map(value -> decode(frontierKey, value));
-                    if (predecessor.isPresent()
-                            && predecessor.orElseThrow().newFrontier() == snapshot.minimumSafeFloor()) {
+                    if (predecessor.filter(value -> exactRetry(value, snapshot)).isPresent()) {
                         return java.util.concurrent.CompletableFuture.completedFuture(
                                 new Result(Outcome.EXISTING_EXACT, predecessor));
                     }
@@ -105,5 +104,17 @@ public final class M5LogicalTrimCoordinatorV1 {
             throw new IllegalArgumentException("trim reread returned a different authority key");
         }
         return M5RetentionCodecV1.decodeTrimFrontier(stored.canonicalStoredBytes());
+    }
+
+    private static boolean exactRetry(BindingTrimFrontierV1 stored, RetentionFloorSnapshotV1 snapshot) {
+        return stored.identity().equals(snapshot.identity())
+                && stored.domain() == snapshot.domain()
+                && stored.priorFrontier() == snapshot.priorTrimFrontier()
+                && stored.newFrontier() == snapshot.minimumSafeFloor()
+                && stored.retentionPolicyRootSha256().equals(snapshot.retentionPolicyRootSha256())
+                && stored.floorSnapshotRootSha256().equals(snapshot.snapshotRootSha256())
+                && stored.ownerFence().equals(snapshot.ownerFence())
+                && stored.storageFence().equals(snapshot.storageFence())
+                && stored.capability().equals(snapshot.identity().capability());
     }
 }

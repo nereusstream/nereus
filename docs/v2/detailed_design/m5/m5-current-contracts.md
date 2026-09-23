@@ -24,6 +24,11 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | READ_FENCED refresh/takeover now passes real Oxia CAS, fact-version invalidation, competing-client and server-restart checks with synthetic owner/eligibility facts; sorted multi-resource tickets now wrap the guarded native BK publication path; automatic same-key recovery veto now survives restart and requires qualified refresh before intent; complete mixed native catalog admission, owner adapters, physical dispatch and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
+M5-C logical trim treats a retry as exact only when the stored frontier binds the same identity, predecessor,
+floor snapshot root, policy and owner/storage fences. An authoritative new snapshot at the same numeric floor
+persists a successor generation; unchanged position alone cannot stand in for that snapshot. Focused unit and real
+Oxia reconnection tests cover this distinction. Physical writer tickets and complete floor producers remain OPEN.
+
 The [physical identity projection](m5-physical-resource-identity-projection.json) and
 [eligibility projection](m5-delete-eligibility-projection.json) record the current focused results:
 `v2M5DeleteEligibilityCheck` passed 42 tasks at the typed-eligibility slice, including 7 identity, 13 authority,

@@ -3060,6 +3060,29 @@ manifest SHA-256: `2cd03b32a2277d73c91ea476e07f5d71cda886dcfd1022fe5493ed5f72ffc
 XML results were independently checked, with zero failures, errors or skips. This only corrects BK publication
 retry classification. Complete writer admission, M5-E/Final and all 17 acceptance obligations remain OPEN/null.
 
+## Exact M5-C logical-trim retry at an unchanged frontier (2026-09-23)
+
+`M5LogicalTrimCoordinatorV1.advance` previously returned `EXISTING_EXACT` whenever a fresh floor snapshot had the
+same numeric minimum as the stored frontier. That skipped the successor CAS even when the snapshot named the current
+frontier as its predecessor and carried a new floor root or owner/storage facts. The new regression reproduced this
+false success. Exact retry now compares the complete persisted snapshot identity, predecessor, policy and fences;
+a genuinely new snapshot at the same position persists the next frontier generation. Replay of that exact snapshot
+does no additional CAS, while replay of its superseded predecessor fails closed. The wire format and delete
+eligibility protocol are unchanged.
+
+The 119-case retention-core suite, Spotless and Checkstyle passed. The M5-C source-checked real Oxia gate passed
+63/63 tasks, including four Oxia cases; the new case verified the successor CAS, exact replay and retained bytes
+after client reconnect. The shared `scripts/run-v2-m5-kafka-run-source-check.sh` passed 95/95 main tasks and its real
+BK/Oxia restart phases. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-31838`; target 747-input
+manifest SHA-256: `b2ce065b729263b2db8bdaaeb071aaf556f5e05db5b3726739d511168bc6c5c0`; summary SHA-256:
+`c31b8a0cb5fcd794038c85f74fd33a3614422e717621972ac189fb138c3e01e5`. Its 26 archived XML suites contain
+115 cases or restart phases. The fresh 732-input legacy manifest SHA-256 is
+`85844d9c77dfc2c15249860a44e362a0df5233719e0b643b2b038f1c940b1328`; summary SHA-256:
+`4de5d06cccdedc1903afc36cb270c13aac4e65a5b51397970f16b73b745adac6`; its 21 XML suites contain 83 cases.
+All captured sources and archived XML were independently checked with zero failures, errors or skips. This is an
+M5-C logical authority correction, not proof of complete real floor adapters, writer admission or physical GC.
+All 17 amended obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

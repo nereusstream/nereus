@@ -26,7 +26,8 @@
     "tests": [
       "nativeM4ReleaseIsConsumedByM5BindingFence",
       "bindingAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
-      "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart"
+      "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
+      "unchangedLogicalTrimPositionPersistsNewFloorSnapshotAcrossReconnect"
     ],
     "canonicalM4ReleaseKeyRequired": true,
     "retirementActionsRequireCanonicalReleaseKeyShape": true,
