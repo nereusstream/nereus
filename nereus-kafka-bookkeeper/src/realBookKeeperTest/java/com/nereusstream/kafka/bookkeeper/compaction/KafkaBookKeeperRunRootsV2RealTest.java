@@ -247,6 +247,37 @@ class KafkaBookKeeperRunRootsV2RealTest {
                                         + authority.metadataVersion().value().toHex()));
             }
         }
+        // Test-only native CAS: production still lacks a complete reference-free retirement producer.
+        try (var f = new Fixture(1512, "retired-restart", null)) {
+            var run = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            f.writeData(run);
+            await(run.drain());
+            var sealed = await(run.seal(f.footer(
+                            run.snapshot().runBinding(), 2, run.snapshot().nextEntryId())))
+                    .root();
+            var next = await(run.createSuccessor(f.runBinding(1)));
+            await(next.drain());
+            var child = await(next.seal(f.footer(
+                            next.snapshot().runBinding(), 2, next.snapshot().nextEntryId())))
+                    .root();
+            var key = f.roots.nativeRootKey(sealed.runId());
+            var before = await(f.nativeClient.read(key)).orElseThrow();
+            var retired = KafkaRunRootRecordV2.decode(before.storedBytes()).retire();
+            assertThat(retired.successor()).contains(f.stored(child).initialLink());
+            await(f.nativeClient.compareAndSet(key, retired.encode(), before.versionId()));
+            var stored = await(f.nativeClient.read(key)).orElseThrow();
+            assertThat(KafkaRunRootRecordV2.decode(stored.storedBytes())).isEqualTo(retired);
+            Files.write(
+                    checkpoint().resolve("test-only-retired-root"),
+                    List.of(
+                            f.source.spec().encode().toHex(),
+                            sealed.runId().value().toHex(),
+                            child.runId().value().toHex(),
+                            identity(stored),
+                            identity(await(f.nativeClient.read(f.roots.nativeRootKey(child.runId())))
+                                    .orElseThrow()),
+                            Long.toString(sealed.ledgerIdentity().ledgerId())));
+        }
     }
 
     @Test
@@ -286,6 +317,34 @@ class KafkaBookKeeperRunRootsV2RealTest {
                         f.verifier.capabilitySha256());
                 f.verifyData(handle);
             }
+        }
+        var lines = Files.readAllLines(checkpoint().resolve("test-only-retired-root"));
+        try (var f = new Fixture(1512, "retired-restart", lines)) {
+            var parent =
+                    new StorageRunId(Id128.fromBytes(java.util.HexFormat.of().parseHex(lines.get(1))));
+            var child =
+                    new StorageRunId(Id128.fromBytes(java.util.HexFormat.of().parseHex(lines.get(2))));
+            var storedParent =
+                    await(f.nativeClient.read(f.roots.nativeRootKey(parent))).orElseThrow();
+            var storedChild =
+                    await(f.nativeClient.read(f.roots.nativeRootKey(child))).orElseThrow();
+            assertThat(identity(storedParent)).isEqualTo(lines.get(3));
+            assertThat(identity(storedChild)).isEqualTo(lines.get(4));
+            var retired = KafkaRunRootRecordV2.decode(storedParent.storedBytes());
+            var selectedChild = KafkaRunRootRecordV2.decode(storedChild.storedBytes());
+            assertThat(retired.retired()).isTrue();
+            assertThat(retired.successor()).contains(selectedChild.initialLink());
+            assertThat(await(f.roots.openRoot(parent))).isEmpty();
+            assertThat(await(f.roots.readSelectedRoot(f.roots.nativeRootKey(parent))))
+                    .isEmpty();
+            assertThat(await(f.roots.openRoot(child))).contains(selectedChild.root());
+            assertThat(retired.resource().ledgerId()).isEqualTo(Long.parseLong(lines.get(5)));
+            assertThat(f.tickets(retired.root().ledgerIdentity())).isZero();
+            f.verifyData(new RunLedgerHandleV1(
+                    retired.root().providerScopeId(),
+                    parent,
+                    retired.root().ledgerIdentity(),
+                    f.verifier.capabilitySha256()));
         }
     }
 

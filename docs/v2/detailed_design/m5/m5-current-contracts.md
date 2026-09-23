@@ -405,6 +405,9 @@ closing this catalog's read admission; retries cannot reopen it, and a retired p
 successors. No proof-bound native retirement mutation writes that form yet. Existing selected roots therefore remain
 readable, and this representation is not a reference-free proof or physical-delete authority. These permanent records
 are not a bounded lifetime history or quota solution.
+A real BK/Oxia restart fixture writes that form through a test-only native CAS. After restart, it verifies the old
+root's read veto, the selected successor's continued readability, and the old ledger's still-readable physical bytes.
+This verifies persistence of the representation, not production retirement admission or deletion.
 Every root mutation acquires its ledger ticket; successor selection acquires both parent and child tickets before
 native verification or prewrites. The exact root and optional parent enter the context. Only irreversible native root
 or selection facts reconcile prior invocations; unknown results retain tickets and observer cancellation does not stop

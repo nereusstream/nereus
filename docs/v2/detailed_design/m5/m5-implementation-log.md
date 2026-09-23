@@ -2988,6 +2988,21 @@ BK/Oxia suites / 112 cases or restart phases and 83 legacy cases, with zero fail
 suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17 acceptance
 obligations and M5-E/Final remain OPEN/null.
 
+## Test-only native restart of a retired run root (2026-09-23)
+
+The existing BK/Oxia root restart phases now write a sealed parent's wire-3 retirement marker through a test-only
+native CAS after selecting and sealing its child. Following actual service restart, the old root remains unreadable
+through both catalog entries, the child remains selected, the exact retired record survives, and the old ledger's
+physical DATA remains readable by its handle. This is a persistence and read-admission test; it does not provide a
+production reference-free producer, a proof-bound retirement mutation or physical deletion.
+
+Compilation, Spotless and Checkstyle passed. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 source-locked
+BK/Oxia suites / 112 cases or restart phases and 83 legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-50601`; 747-input manifest SHA-256:
+`988c0388b358a5ff2005834caee464a4f67b02269aea1cf59a7c17ab54e72f52`. The 747 source hashes and 26 XML
+suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17 acceptance
+obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
