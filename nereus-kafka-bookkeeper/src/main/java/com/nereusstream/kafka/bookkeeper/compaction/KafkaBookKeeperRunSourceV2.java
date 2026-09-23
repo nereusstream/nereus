@@ -288,8 +288,15 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                     .put(identity.bytes().toByteArray())
                                     .array()));
                             return guard.execute(List.of(stable.resource()), context, () -> {
+                                        final BookKeeperCellSession reads;
+                                        try {
+                                            reads = Objects.requireNonNull(sessions.get(), "native source session");
+                                        } catch (Throwable failure) {
+                                            // No native operation was accepted, so this ticket has an exact terminal.
+                                            return CompletableFuture.completedFuture(new Completion<>(
+                                                    new ReadOutcome(null, failure), Optional.of(terminalProof)));
+                                        }
                                         scope.sessionStarting();
-                                        var reads = Objects.requireNonNull(sessions.get(), "native source session");
                                         CompletionStage<Snapshot> scan;
                                         try {
                                             scan = new Scan(key, stable, reads, budget).start();

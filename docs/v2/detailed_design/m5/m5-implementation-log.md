@@ -2793,6 +2793,25 @@ recorded. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-8380
 packaged solely on test classpaths. Real protocol/M4/grace proof producers, the full writer matrix, all-provider
 dispatch and M5-E/Final remain OPEN; all 17 amended obligations retain OPEN/null receipts.
 
+## Raw BK source session-construction failure cleanup (2026-09-23)
+
+`KafkaBookKeeperRunSourceV2` acquired its physical read ticket, marked the Cell reservation as session-started,
+and only then constructed the native session. If construction threw or returned null, no read had started, but
+the generic writer guard retained the ticket as unresolved and the Cell share could not return. The raw source
+now constructs the session first. A synchronous construction failure produces an exact no-dispatch terminal under
+the already acquired ticket; the guard releases that ticket, and the pre-session reservation returns. Once a
+session is returned, the existing unknown-read/close rule still retains both until actual termination.
+
+The real BK/Oxia regression exercises both throwing and null session suppliers against an admitted sealed run,
+checks zero remaining physical tickets and Cell usage after each failure, then captures the same run with the same
+Binding share. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 XML suites / 108 cases or restart phases,
+with zero failures, errors or skips; the run-source real suite has 12 cases. All 746 current-source inputs and XML
+were rehashed in the runner. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-26286`; input-manifest SHA-256:
+`3bb2155ad2a9b4c98fbf1c84b49bd330a5877c194b0adc450f6a1cac63e95756`.
+This is a pre-session cleanup correction, not an all-writer admission proof or M5-E/Final receipt. All 17 amended
+acceptance obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

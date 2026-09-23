@@ -272,6 +272,40 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void failedSessionCreationReleasesNativeTicketAndCellShareBeforeAnyRead() throws Exception {
+        try (var f = new Fixture(2319, "raw-session-start-failure", null)) {
+            var root = admit(f, f.prepareSealedSource());
+            var key = f.roots.nativeRootKey(root.runId());
+            var budget = rawBudget(f, BOUNDS);
+            var attempts = new AtomicInteger();
+            var failed = new KafkaBookKeeperRunSourceV2(
+                    budget,
+                    f.roots,
+                    f.source,
+                    new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                    BOUNDS,
+                    java.util.concurrent.ForkJoinPool.commonPool(),
+                    () -> {
+                        if (attempts.incrementAndGet() == 1) {
+                            throw new IllegalStateException("session unavailable");
+                        }
+                        return null;
+                    });
+            assertThatThrownBy(() -> await(failed.capture(key, rawBinding(f))))
+                    .hasRootCauseMessage("session unavailable");
+            assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+            assertThatThrownBy(() -> await(failed.capture(key, rawBinding(f))))
+                    .hasRootCauseMessage("native source session");
+            assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+            assertThat(await(rawReader(f, f.roots, BOUNDS, budget).capture(key, rawBinding(f)))
+                            .batches())
+                    .hasSize(2);
+        }
+    }
+
+    @Test
     void nativeGroupDigestAndIndexLocatorsAreCheckedAgainstActualData() throws Exception {
         for (int mode = 0; mode < 3; mode++) {
             try (var f = new Fixture(2312 + mode, "orders", null)) {
