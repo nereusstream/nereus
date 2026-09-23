@@ -50,7 +50,7 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
     private final M5TaskSelectionCoordinatorV2 taskSelections;
     private final Optional<KafkaBookKeeperPublicationTicketsV2> physicalTickets;
 
-    public KafkaBookKeeperCompactionPublicationV2(
+    KafkaBookKeeperCompactionPublicationV2(
             CanonicalControlMetadataStore metadata,
             int shardId,
             BindingIdentity binding,
@@ -59,7 +59,7 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
     }
 
     /** Native immutable publication and selector CAS run on the owner's bounded control executor. */
-    public KafkaBookKeeperCompactionPublicationV2(
+    KafkaBookKeeperCompactionPublicationV2(
             CanonicalControlMetadataStore metadata,
             int shardId,
             BindingIdentity binding,

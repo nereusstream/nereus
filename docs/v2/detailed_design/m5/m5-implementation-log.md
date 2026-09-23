@@ -2897,6 +2897,18 @@ This closes the ordinary-delete bypass only for the guarded BK client. Protocol 
 resource-birth facts and the M5 dispatcher remain incomplete; all 17 acceptance obligations stay OPEN/null, with
 no M5-E receipt, aggregate/source-bound Final or production authority.
 
+## Public BK compaction publication requires physical tickets (2026-09-23)
+
+The two ticketless `KafkaBookKeeperCompactionPublicationV2` constructors are now package-scoped for existing
+same-package fixtures. External callers can construct the publisher only with
+`KafkaBookKeeperPublicationTicketsV2`, which resolves native input membership and acquires input/output physical
+tickets before selector publication. This closes the public raw-BK publication route that omitted those tickets;
+it does not prove the remaining protocol-owner, source-birth or complete writer-matrix admission.
+
+The main, unit-test and real-BK test sources compiled; Spotless and main Checkstyle passed. No runtime behavior
+changed in existing fixture paths, so no native service run was repeated for this visibility-only slice. All 17
+acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
