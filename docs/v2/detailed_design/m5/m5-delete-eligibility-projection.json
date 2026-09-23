@@ -40,6 +40,7 @@
     "expiryRequiresTrimAndEveryFloor": true,
     "publishedRequiresExactM4Released": true,
     "qualificationRequiresCanonicalM4ReleaseKeyShape": true,
+    "nativeBookKeeperIntentBindingRequiresCanonicalM4ReleaseKeyShape": true,
     "unpublishedRequiresTerminalNoAdoptionAndProtectionClosure": true,
     "nativeRetainVetoesReplacement": true
   },

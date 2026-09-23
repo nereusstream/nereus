@@ -26,6 +26,7 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2.Snapshot;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteIntentV2;
 import com.nereusstream.storage.object.gc.BoundPhysicalDeleteAuthorityRouteV2;
+import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
@@ -205,7 +206,8 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
         }
         CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireExactIntent(metadata, exactIntent)
                 .thenCompose(ignored -> requireCurrent(resource, context))
-                .thenCompose(ignored -> requireFreshEligibility(metadata, intent))
+                .thenCompose(ignored -> requireFreshEligibility(
+                        metadata, intent.eligibilitySnapshot().orElseThrow()))
                 .thenCompose(
                         ignored -> reader.rereadTarget(intent.externalIdentity().orElseThrow()))
                 .thenCompose(target -> {
@@ -226,17 +228,18 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
                     });
                 })
                 .thenCompose(bound -> requireCurrent(resource, context)
-                        .thenCompose(ignored -> requireFreshEligibility(metadata, intent))
+                        .thenCompose(ignored -> requireFreshEligibility(
+                                metadata, intent.eligibilitySnapshot().orElseThrow()))
                         .thenCompose(ignored -> requireExactIntent(metadata, exactIntent))
                         .thenApply(ignored -> bound));
         return operation.thenApply(value -> value);
     }
 
-    private CompletionStage<Void> requireFreshEligibility(
-            ExactMetadataTransactionStoreV1 metadata,
-            com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1 intent) {
+    CompletionStage<Void> requireFreshEligibility(
+            ExactMetadataTransactionStoreV1 metadata, DeleteEligibilitySnapshotV2 snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot").requireCanonicalM4ReleaseKeys();
         CompletionStage<Void> checked = CompletableFuture.completedFuture(null);
-        for (var fact : intent.eligibilitySnapshot().orElseThrow().authorityFacts()) {
+        for (var fact : snapshot.authorityFacts()) {
             checked = checked.thenCompose(ignored -> metadata.read(fact.key()).thenAccept(observed -> {
                 var actual = observed.orElseThrow(() ->
                         new IllegalStateException("native intent eligibility authority is absent: " + fact.key()));

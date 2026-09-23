@@ -2640,6 +2640,26 @@ against its strict 10,000,000 ns bound. Its isolated rerun passed, and the compl
 `scripts/run-v2-m5-retired-history-check.sh`; the assertion and threshold were not changed. All results remain
 implementation-only. M5-E/Final and all 17 acceptance obligations remain OPEN/null.
 
+## Canonical M4 release at native BK intent admission (2026-09-23)
+
+The native BK GC binder is another consumer of a persisted M5 INTENT. It previously reread the complete eligibility
+fact vector but did not reject a version/hash-fresh M4 `RELEASED` value stored at a noncanonical protection key.
+`KafkaBookKeeperDeleteObservationAuthorityV2` now checks the snapshot's canonical M4 release keys in both native
+binding freshness passes. The existing real BK/Oxia bound-route test places otherwise valid release bytes at an
+arbitrary Oxia fact key and verifies rejection before the native intent is written. It then exercises the normal
+quota, owner, binding and refresh paths. This closes the native binder's action boundary without changing V4 wire
+decode or claiming that synthetic M4 terminal/protocol facts have production provenance.
+
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed on the current source: legacy 96/96 main and 24 restart tasks,
+then bound-profile 93/93 main, 26 first-restart and 16 second-restart tasks. The bound archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-19962`: 25 XML suites, 104 cases/phases, zero failures,
+errors or skips. Its 745 captured inputs were independently rehashed against the current checkout, with manifest
+SHA-256 `707b6912af832c50770b7c1fe54e2e04111bf58a2f11abce436c5ec0e8630fab`.
+The independently checked legacy archive contains 730 inputs and 21 XML suites / 82 cases, with manifest SHA-256
+`8610a30642c8a62c92a93c4936392f8e06c320eba3a69c3390d4f328d5a99395`.
+Native owner, quota and ledger identity are real; source/protocol eligibility, M4 release production, grace and
+complete physical dispatch remain OPEN. This is not an M5-E child or Final receipt.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

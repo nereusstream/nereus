@@ -34,6 +34,7 @@ EXPECTED = {'schema': 'NEREUS_V2_M5_DELETE_ELIGIBILITY_PROJECTION_V2',
            'expiryRequiresTrimAndEveryFloor': True,
            'publishedRequiresExactM4Released': True,
            'qualificationRequiresCanonicalM4ReleaseKeyShape': True,
+           'nativeBookKeeperIntentBindingRequiresCanonicalM4ReleaseKeyShape': True,
            'unpublishedRequiresTerminalNoAdoptionAndProtectionClosure': True,
            'nativeRetainVetoesReplacement': True},
  'legacyV4AuthorityDecodePreserved': True,
@@ -63,6 +64,9 @@ def validate(root):
         raise ValueError("eligibility action no longer requires the canonical M4 protection key")
     if state.count("snapshot.requireCanonicalM4ReleaseKeys()") < 2 or coordinator.count("snapshot.requireCanonicalM4ReleaseKeys()") < 2:
         raise ValueError("eligibility qualification or observation no longer checks canonical M4 release keys")
+    native_binding = (root / "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/compaction/KafkaBookKeeperDeleteObservationAuthorityV2.java").read_text()
+    if ".requireCanonicalM4ReleaseKeys()" not in native_binding or native_binding.count("requireFreshEligibility(") < 3:
+        raise ValueError("native BookKeeper intent binding no longer checks canonical M4 release keys")
     golden = (root / "nereus-storage-object/src/test/java/com/nereusstream/storage/object/gc/M5TargetDeleteAuthorityCoordinatorV1Test.java").read_text()
     if "m5-wire4-predecessor-4167886e" not in golden or "encodeAuthority(decoded)" not in golden:
         raise ValueError("legacy V4 authority byte compatibility regression is absent")

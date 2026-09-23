@@ -68,7 +68,9 @@ takeovers cannot be upgraded by inventing typed context.
 physical namespace/ledger, run/configuration, sealed LAC/length, quorums/digest/credential and complete native metadata
 fingerprint. Native NoSuchLedger is required for absence. The source-locked BK/Oxia integration uses actual sealed
 metadata, exact authority CAS and actual fixture-ledger removal before absence completion; its owner and semantic/M4
-proofs remain synthetic. `completeAbsent` revalidates native owner/capability and all facts around an actual absence
+proofs remain synthetic. Native BK intent binding also rejects a persisted eligibility snapshot whose M4 RELEASED
+fact is outside the canonical protection key grammar, even if that fact remains version/hash-fresh. `completeAbsent`
+revalidates native owner/capability and all facts around an actual absence
 read, then persists ALREADY_ABSENT and supports permanent compact done. The legacy hash-supplied `completeDelete`
 entry only rereads an existing exact terminal, including compact historical done; it cannot mutate metadata.
 The production physical-delete dispatch composition, Object/provider-wide readers and native protocol owner/proof

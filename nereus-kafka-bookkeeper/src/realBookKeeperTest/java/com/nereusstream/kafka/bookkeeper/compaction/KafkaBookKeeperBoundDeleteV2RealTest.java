@@ -61,6 +61,14 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, UUID.randomUUID());
             var facts = facts(f, resource);
             var route = route(f, gc);
+            var misplacedRelease = SyntheticDeleteAuthorityFixturesV2.replacement(
+                    resource,
+                    1,
+                    (key, value) -> facts.apply(key.contains("/protections/") ? "/misplaced-m4-release" : key, value));
+            assertThatThrownBy(() -> await(gc.requireFreshEligibility(route, misplacedRelease)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("canonical protection key");
+            assertThat(await(f.source.deleteAuthority(handle).readIntent())).isEmpty();
             var raw = new OxiaQuotaTargetDeleteStoreV2(
                     f.oxia,
                     new M5GcQuotaRecordsV2.Layout(f.binding.authorityRoot(), f.binding.physicalNamespace()),
