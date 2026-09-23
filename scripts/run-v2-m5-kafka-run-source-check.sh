@@ -213,7 +213,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaReadOwnerTest','KafkaBookKeeperReadOwnerV2Test',6),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperM4RecoveryTest','KafkaBookKeeperM4RecoveryV2Test',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaSelectedSourceTest','KafkaBookKeeperSelectedSourceV2Test',3),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',10),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',11),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
@@ -241,7 +241,11 @@ for module,task,name,count in (
         raise SystemExit('Native suite did not pass without skips: '+task)
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
-summary={'confirmedRawSessionExposesExactTicketCleanupRetry':True,
+summary={'unconfirmedRawReadRetainsShareAndTicketUntilCallback':True,
+    'unconfirmedRawCloseRetainsShareAndTicket':True,
+    'healthySameCellRawBindingReadsDuringSiblingQuarantine':True,
+    'cancelledRawObserverCannotClearQuarantine':True,
+    'confirmedRawSessionExposesExactTicketCleanupRetry':True,
     'rawTicketCleanupRetryIsMetadataOnly':True,
     'rawSourceRequiresSharedCellReadBudget':True,
     'wholeRawResolutionRetainsChargeBetweenNativeSessions':True,

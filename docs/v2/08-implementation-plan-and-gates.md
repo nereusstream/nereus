@@ -134,6 +134,9 @@ Raw capture and multi-run resolution now require caller-shared Cell/Binding read
 sequential native sessions and accumulated inputs; unknown native termination retains it, and known termination with
 unresolved ticket cleanup yields exact-operation metadata retry. Returned cache bytes, process-wide ownership and
 crash drain reconstruction remain OPEN.
+A real BK/Oxia callback-hold case keeps both ticket and Binding share during an undelivered read and unconfirmed
+close after observer cancellation; a healthy same-Cell Binding still reads. This is a local lifetime check, not
+qualified durable process-drain or full Review 8.1 quarantine exit.
 The focused run passed 51 archived cases/phases and a separate 71-case/phase legacy regression, including retained-data
 restarts. Both exact source maps remained unchanged. Decoded record framing is preflighted before Kafka allocation.
 The next [complete input-plan check](detailed_design/m5/m5-kafka-input-plan-projection.json) extends the publication
@@ -147,12 +150,12 @@ Old source protection and active retirement batches must remain intact; complete
 native owner admission and physical deletion remain required. Fresh-JVM second-generation recovery covers the user
 topic, both internal topics and index-only output without republishing or copying descriptor/task bodies.
 Shared M5-A/M5-B validation now rejects a new fallback's first epoch unless it equals the introducing selector's E+1;
-existing fallback sets inherit their original first epoch. The current 103-case/phase run includes 8 Object
+existing fallback sets inherit their original first epoch. The current 104-case/phase run includes 8 Object
 materialization and 14 Kafka semantic cases plus native epoch/set checks before and after both generation restarts.
 The [scoped read owner](detailed_design/m5/m5-kafka-read-owner-projection.json) adds physical tickets for its complete
 native-session lifetime and local close-before-CAS/drain. Public entry now also reserves fixed per-Binding owner,
 read-slot and configured byte allowances from one process-local Cell budget. Six owner tests, seven existing M4
-recovery tests and three native owner cases join the current 25-archive / 103-case bound run. A cancelled Binding's
+recovery tests and three native owner cases join the current 25-archive / 104-case bound run. A cancelled Binding's
 share remains charged through actual read/session completion while a healthy same-Cell Binding reads. Confirmed
 termination with unresolved physical ticket cleanup returns an exact-operation retry handle; metadata-only retry
 preserves live same-Context siblings and never recreates a session. Unknown native close returns no retry handle.

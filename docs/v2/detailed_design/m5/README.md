@@ -227,6 +227,8 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   Raw capture/resolve now use the same caller-supplied Cell/Binding budget as selected-generation capture. One raw
   resolution keeps its reservation across all sequential native sessions and accumulated input, even if the observer
   is cancelled. Confirmed close with unresolved ticket cleanup permits exact-operation metadata retry.
+  The native callback-hold case retains the raw ticket/share through an undelivered read and unconfirmed close,
+  while a healthy same-Cell Binding reads; delivery permits exact local cleanup. Durable drain/restart proof remains OPEN.
   The focused runner passed 51 archived cases/phases and retained-data restart; its independent legacy regression
   passed 71. Both captured source maps remained unchanged. Decompressed framing is checked before record allocation.
 
@@ -240,7 +242,7 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   generation can enter the semantic compiler with no invented data batch. Native verification passed exact M4
   fallback closure, new source protection and second publication while retaining old PROTECTED records. Complete M4
   release, mixed catalogs, native owner admission and deletion remain OPEN.
-  The current run passed 103 archived cases/phases plus 82 independent legacy cases/phases, with both source maps unchanged.
+  The current run passed 104 archived cases/phases plus 82 independent legacy cases/phases, with both source maps unchanged.
   First-generation checkpoints are retained; four separate second-generation checkpoints now pass fresh-JVM native
   descriptor/task recovery for the user topic, both internal topics and index-only output, without republishing.
   New fallback protection starts at the introduced E+1, while existing fallback identities inherit their earlier first
@@ -251,7 +253,7 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   and supports exact retry after unknown response. Its public entry now requires fixed process-local Cell/Binding
   shares for owner count, read slots and configured encoded/decoded bytes, retained through native read/session
   termination. Six owner tests, seven unchanged M4 recovery tests and three native owner cases pass within the current
-  103-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
+  104-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
   termination, an exact-operation retry handle can finish unresolved physical ticket cleanup without clearing a live
   same-Context reader; unknown close grants no handle. Selected-generation compaction capture/resolution now requires
   the same shared budget and uses the scoped owner's M4 planner/hazard/session lifetime, including native restart.

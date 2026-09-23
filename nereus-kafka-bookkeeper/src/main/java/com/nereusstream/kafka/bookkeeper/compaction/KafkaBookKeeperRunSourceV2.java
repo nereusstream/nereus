@@ -31,6 +31,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
+import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
@@ -38,7 +39,6 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
-import com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Completion;
@@ -64,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Native sealed NBKE2 source capture and exact physical membership. Reads hold a physical ticket until their owned
@@ -156,6 +157,7 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     private final M5TargetDeleteMultiWriterGuardV2 guard;
     private final Bounds bounds;
     private final Executor owner;
+    private final Supplier<? extends BookKeeperCellSession> sessions;
 
     public KafkaBookKeeperRunSourceV2(
             KafkaBookKeeperReadCellBudgetV2 cellBudget,
@@ -164,12 +166,24 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
             M5TargetDeleteMultiWriterGuardV2 guard,
             Bounds bounds,
             Executor owner) {
+        this(cellBudget, catalog, client, guard, bounds, owner, client::newSession);
+    }
+
+    KafkaBookKeeperRunSourceV2(
+            KafkaBookKeeperReadCellBudgetV2 cellBudget,
+            KafkaRunRootCatalogV2 catalog,
+            M5BookKeeperNativeCreateClientV2 client,
+            M5TargetDeleteMultiWriterGuardV2 guard,
+            Bounds bounds,
+            Executor owner,
+            Supplier<? extends BookKeeperCellSession> sessions) {
         this.cellBudget = Objects.requireNonNull(cellBudget, "cellBudget");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.client = Objects.requireNonNull(client, "client");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.bounds = Objects.requireNonNull(bounds, "bounds");
         this.owner = Objects.requireNonNull(owner, "owner");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
     public CompletionStage<Snapshot> capture(String nativeRootKey) {
@@ -276,7 +290,7 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
                                     .array()));
                             return guard.execute(List.of(stable.resource()), context, () -> {
                                         scope.sessionStarting();
-                                        var reads = client.newSession();
+                                        var reads = Objects.requireNonNull(sessions.get(), "native source session");
                                         CompletionStage<Snapshot> scan;
                                         try {
                                             scan = new Scan(key, stable, reads, budget).start();
@@ -387,7 +401,7 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
     private final class Scan {
         final String key;
         final KafkaRunRootRecordV2 root;
-        final RealBookKeeperCellSessionV1 reads;
+        final BookKeeperCellSession reads;
         final Budget budget;
         final RunLedgerHandleV1 handle;
         final Nbke2RunBindingV1 run;
@@ -412,7 +426,7 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
         BookKeeperDeleteTargetV1 seal;
         Nbke2RunFooterV1 footer;
 
-        Scan(String key, KafkaRunRootRecordV2 root, RealBookKeeperCellSessionV1 reads, Budget budget) {
+        Scan(String key, KafkaRunRootRecordV2 root, BookKeeperCellSession reads, Budget budget) {
             this.key = key;
             this.root = root;
             this.reads = reads;

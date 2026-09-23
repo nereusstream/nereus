@@ -406,6 +406,10 @@ When raw native termination is confirmed but its physical ticket cleanup is unre
 Its repeatable metadata-only retry never reopens the ledger or session. A failed native close grants no retry handle.
 Neither result-cache ownership nor metadata discovery/queue bytes are included in this configured allowance; full
 provider memory, native process drain and crash-ticket reconstruction remain required.
+The real BK/Oxia raw-run test withholds delivery of a completed native entry read and then of the confirmed native
+close. The cancelled observer cannot discharge the ticket or Binding share at either point; a second Binding in the
+same configured Cell can still read, and actual callback delivery permits exact local cleanup. No durable ACTIVE
+process-drain proof, retained-result ownership or restart reconstruction is established by this fault injection.
 
 The raw-run adapter feeds the existing ticketed BK compactor and selected-output recovery. It reports range-index
 coverage separately and never declares all protocol indexes complete; the existing semantic compiler rebuilds output
@@ -468,7 +472,7 @@ identities at both publications and after both generations' restart; the unit pr
 facts only. Actual M4 RELEASED and admitted native read-owner drain remain OPEN.
 
 The current native run passed 93 executed main tasks, a separate 26-task restart JVM (six executed) and a second
-16-task occupied-Cell restart JVM (one executed), with 103 archived cases/phases and no failures/errors/skips.
+16-task occupied-Cell restart JVM (one executed), with 104 archived cases/phases and no failures/errors/skips.
 The independent legacy regression passed 82 cases/phases. Both the 745-input map and 730-input legacy map were
 independently unchanged, including the amended descriptor checker and its negative tests. The original first-generation checkpoints remain; four separate second-generation checkpoints
 now reverify the user topic, both internal topics and index-only output in a fresh JVM. The admitted Binding route

@@ -2516,6 +2516,44 @@ Every captured input, archived XML and native Cell-restart checkpoint was indepe
 The current projections reference these exact source/archive hashes. All 17 acceptance obligations, the five M5-E
 children, Final/aggregate and production authority remain OPEN; M6-deferred rows remain PLANNED.
 
+## Raw-run callback quarantine on real BK/Oxia (2026-09-23)
+
+The raw-run source now admits a package-local session supplier for fault injection while its public constructor
+continues to use the guarded native BK client. Its scan depends on the `BookKeeperCellSession` contract. A new real
+BK/Oxia case holds delivery of one completed entry read, cancels the observer, and verifies that both physical ticket
+and Cell/Binding share remain charged. A separate Binding in the same configured Cell completes a native read. After
+the first callback is delivered, the test holds the completed native close response and again proves that neither
+ticket nor share releases. Confirmed delivery then permits cleanup and repeat capture. This tests a local
+never-callback/unconfirmed-close path; it does not prove durable process-drain, retained-result ownership, qualified
+expiry or restart reconstruction required by Review 8.1.
+
+Preflight compile/owner tests passed 19 tasks (`/tmp/nereus-m5-raw-quarantine-preflight.log`). The first full runner
+stopped during Checkstyle before native testing because of import order; its log is
+`/tmp/nereus-m5-raw-quarantine-native.log`. After correcting import order and test formatting, Checkstyle/Spotless
+passed 22 tasks (`/tmp/nereus-m5-raw-quarantine-style-final.log`). The failed attempt contributes no evidence.
+
+The final runner passed 93/93 bound main tasks, 26 first-restart JVM tasks (six executed) and 16 occupied-Cell
+restart JVM tasks (one executed). It archived 25 suites / 104 cases and phases; independent legacy regression
+archived 21 suites / 82 cases and phases. All have zero failures, errors and skips. Log:
+`/tmp/nereus-m5-raw-quarantine-native-final.log`. Its result is `NON_PROMOTABLE`.
+
+Legacy output `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-90339` has 730-input manifest
+SHA-256 `07c2012bbcf9075b42a93dc022a635419795c7515c2535d36409762f898d3cad` and summary SHA-256
+`2caa741bb7cac3fc2bb6ec20024a1589ab4a63c55d26e158738370122015842c`. Bound output
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-90311` has 745-input manifest SHA-256
+`f286359e1bf3c88028d1b015ff4c9ed6e6383d3f28a19073204e725c01db4093` and summary SHA-256
+`240b6b7b945d8ca22d72e7ab6c99a725ed9f376c08f5346e11d41531460c999a`. The same legacy Oxia container
+`888dec244d8aa8e7b539cc76bf5b0692c257574c0e02b4da9995ec6cfd68d7f2` restarted from
+`2026-09-23T01:47:57.734622169Z` to `2026-09-23T01:50:05.488133173Z`. The same bound Oxia container
+`6b21ba34dfe51d3c96fd5517c33bf00f42c18d9a6269d6df8180d7ebcf4d67c4` restarted from
+`2026-09-23T01:50:41.651003676Z` to `2026-09-23T01:54:16.880187595Z`, then to
+`2026-09-23T01:55:06.294426215Z` for occupied-Cell recovery. Every captured input, XML and native checkpoint hash
+was independently checked by `/tmp/nereus-m5-raw-quarantine-verify.py`, producing
+`/tmp/nereus-m5-raw-quarantine-verified.json`.
+
+All 17 acceptance obligations remain OPEN/null, including `QUARANTINE_EXIT`; the five M5-E children and aggregate
+Final remain outstanding, and the three M6-deferred rows remain PLANNED/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

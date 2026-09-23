@@ -331,6 +331,101 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void unconfirmedRawReadAndCloseKeepOneBindingChargedWhileHealthySiblingReads() throws Exception {
+        try (var slow = new Fixture(2317, "raw-quarantined-binding", null);
+                var healthy = new Fixture(2318, "raw-healthy-binding", null)) {
+            var slowRoot = admit(slow, slow.prepareSealedSource());
+            var healthyRoot = admit(healthy, healthy.prepareSealedSource());
+            var slowKey = slow.roots.nativeRootKey(slowRoot.runId());
+            var healthyKey = healthy.roots.nativeRootKey(healthyRoot.runId());
+            var slowSnapshot = await(reader(slow, slow.roots, BOUNDS).capture(slowKey));
+            var healthySnapshot = await(reader(healthy, healthy.roots, BOUNDS).capture(healthyKey));
+            assertThat(slow.scope.providerScope()).isEqualTo(healthy.scope.providerScope());
+            var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
+            var shared = new KafkaBookKeeperReadCellBudgetV2(
+                    slow.scope.providerScope(),
+                    new KafkaBookKeeperReadCellBudgetV2.Usage(
+                            2, 2, charge.encodedBytes() * 2, charge.decodedBytes() * 2),
+                    java.util.Map.of(slowSnapshot.binding(), charge, healthySnapshot.binding(), charge));
+            var readEntered = new CompletableFuture<RunLedgerReadResultV1>();
+            var readDelivered = new CompletableFuture<RunLedgerReadResultV1>();
+            var closeEntered = new CompletableFuture<Void>();
+            var closeDelivered = new CompletableFuture<Void>();
+            var reads = new AtomicInteger();
+            var sessions = new AtomicInteger();
+            var quarantined = new KafkaBookKeeperRunSourceV2(
+                    shared,
+                    slow.roots,
+                    slow.source,
+                    new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(slow.route)),
+                    BOUNDS,
+                    java.util.concurrent.ForkJoinPool.commonPool(),
+                    () -> {
+                        sessions.incrementAndGet();
+                        var nativeSession = slow.source.newSession();
+                        return (BookKeeperCellSession) Proxy.newProxyInstance(
+                                BookKeeperCellSession.class.getClassLoader(),
+                                new Class<?>[] {BookKeeperCellSession.class},
+                                (proxy, method, args) -> {
+                                    Object result;
+                                    try {
+                                        result = method.invoke(nativeSession, args);
+                                    } catch (InvocationTargetException failure) {
+                                        throw failure.getCause();
+                                    }
+                                    if (method.getName().equals("readExactEntry") && reads.incrementAndGet() == 1) {
+                                        ((CompletionStage<?>) result).whenComplete((value, failure) -> {
+                                            if (failure == null) {
+                                                readEntered.complete((RunLedgerReadResultV1) value);
+                                            } else {
+                                                readEntered.completeExceptionally(failure);
+                                            }
+                                        });
+                                        return readDelivered;
+                                    }
+                                    if (method.getName().equals("closeAsync")) {
+                                        return ((CompletionStage<?>) result).thenCompose(ignored -> {
+                                            closeEntered.complete(null);
+                                            return closeDelivered;
+                                        });
+                                    }
+                                    return result;
+                                });
+                    });
+            var observer = quarantined.capture(slowKey).toCompletableFuture();
+            var firstRead = await(readEntered);
+            assertThat(sessions.get()).isEqualTo(1);
+            assertThat(slow.tickets(slowRoot.ledgerIdentity())).isEqualTo(1);
+            assertThat(shared.bindingUsage().get(slowSnapshot.binding())).isEqualTo(charge);
+            assertThat(observer.cancel(true)).isTrue();
+            assertThat(readDelivered).isNotCancelled();
+            assertThatThrownBy(() -> await(quarantined.capture(slowKey)))
+                    .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+            var healthyReader = rawReader(healthy, healthy.roots, BOUNDS, shared);
+            assertThat(await(healthyReader.capture(healthyKey)).binding()).isEqualTo(healthySnapshot.binding());
+            assertThat(shared.usage()).isEqualTo(charge);
+            readDelivered.complete(firstRead);
+            await(closeEntered);
+            assertThat(slow.tickets(slowRoot.ledgerIdentity())).isEqualTo(1);
+            assertThat(shared.usage()).isEqualTo(charge);
+            assertThatThrownBy(() -> await(quarantined.capture(slowKey)))
+                    .hasRootCauseMessage("BK read Binding or Cell capacity exhausted");
+            closeDelivered.complete(null);
+            var zero = new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while ((slow.tickets(slowRoot.ledgerIdentity()) != 0
+                            || !shared.usage().equals(zero))
+                    && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertThat(slow.tickets(slowRoot.ledgerIdentity())).isZero();
+            assertThat(shared.usage()).isEqualTo(zero);
+            assertThat(observer).isCancelled();
+            assertThat(await(quarantined.capture(slowKey)).extent()).isEqualTo(slowSnapshot.extent());
+        }
+    }
+
+    @Test
     void wholeRawResolutionRetainsSharedCellChargeBetweenRunsAndThroughCancelledObservation() throws Exception {
         try (var f = new Fixture(2316, "raw-shared-admission", null)) {
             var first = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
