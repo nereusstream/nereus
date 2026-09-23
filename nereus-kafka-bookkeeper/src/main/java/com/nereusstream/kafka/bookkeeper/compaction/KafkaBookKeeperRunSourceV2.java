@@ -206,24 +206,49 @@ public final class KafkaBookKeeperRunSourceV2 implements KafkaBookKeeperPublicat
 
     private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
             MaterializationSourceCut cut, Optional<List<InputBatch>> expectedInputs) {
-        Objects.requireNonNull(cut, "cut");
-        if (!cut.identity()
-                        .providerScopeSha256()
-                        .equals(client.capabilitySnapshot().providerScopeId().digest())
-                || cut.sources().stream().anyMatch(extent -> extent.kind() != SourceKind.BOOKKEEPER_LEDGER)) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("native run catalog requires exact BK Cell sources"));
-        }
-        return withinBudget(cut.identity().binding(), scope -> resolve(cut, expectedInputs, scope));
+        return resolve(cut, cut.sources(), expectedInputs);
+    }
+
+    /** The mixed catalog owns the complete plan; this reader verifies every raw source under one native budget. */
+    CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolveRawSubset(
+            MaterializationSourceCut cut, List<SourceExtent> rawSources, List<InputBatch> expectedInputs) {
+        return resolve(cut, rawSources, Optional.of(List.copyOf(expectedInputs)));
+    }
+
+    boolean usesBudget(KafkaBookKeeperReadCellBudgetV2 expected) {
+        return cellBudget == expected;
     }
 
     private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
-            MaterializationSourceCut cut, Optional<List<InputBatch>> expectedInputs, ReadScope scope) {
+            MaterializationSourceCut cut, List<SourceExtent> rawSources, Optional<List<InputBatch>> expectedInputs) {
+        Objects.requireNonNull(cut, "cut");
+        rawSources = List.copyOf(rawSources);
+        var admitted = cut.sources().stream()
+                .filter(source -> source.kind() == SourceKind.BOOKKEEPER_LEDGER)
+                .toList();
+        if (!cut.identity()
+                        .providerScopeSha256()
+                        .equals(client.capabilitySnapshot().providerScopeId().digest())
+                || rawSources.isEmpty()
+                || !rawSources.equals(admitted)
+                || (rawSources.size() != cut.sources().size() && expectedInputs.isEmpty())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native run catalog requires exact BK Cell sources"));
+        }
+        var sources = rawSources;
+        return withinBudget(cut.identity().binding(), scope -> resolve(cut, sources, expectedInputs, scope));
+    }
+
+    private CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(
+            MaterializationSourceCut cut,
+            List<SourceExtent> rawSources,
+            Optional<List<InputBatch>> expectedInputs,
+            ReadScope scope) {
         var budget = new Budget(bounds);
         Map<Sha256Digest, List<PhysicalResourceIdV2>> result = new LinkedHashMap<>();
         List<InputBatch> nativeInputs = new ArrayList<>();
         CompletionStage<Void> sequence = CompletableFuture.completedFuture(null);
-        for (var extent : cut.sources()) {
+        for (var extent : rawSources) {
             sequence = sequence.thenComposeAsync(
                     ignored -> capture(extent.physicalKey(), budget, scope).thenAccept(snapshot -> {
                         if (!snapshot.extent().equals(extent)

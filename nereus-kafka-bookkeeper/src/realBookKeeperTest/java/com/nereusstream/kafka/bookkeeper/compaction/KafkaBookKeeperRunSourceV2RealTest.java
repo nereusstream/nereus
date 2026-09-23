@@ -134,6 +134,76 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void selectedGenerationAndSuccessorRawRunResolveCompleteNativeMembership() throws Exception {
+        try (var f = new Fixture(2303, "mixed-source", null)) {
+            var first = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            f.writeData(first);
+            await(first.drain());
+            var firstRoot = await(first.seal(
+                            f.footer(f.runBinding(0), 2, first.snapshot().nextEntryId())))
+                    .root();
+            var second = await(first.createSuccessor(f.runBinding(1)));
+            for (int i = 0; i < f.bodies.size(); i++) {
+                var bytes = f.bodies.get(i).toByteArray();
+                java.nio.ByteBuffer.wrap(bytes).putLong(0, i + 2L);
+                var reservation = second.reserveDataGroup(1);
+                f.data(
+                        second.snapshot().handle(),
+                        second.snapshot().runBinding(),
+                        reservation.firstEntryId(),
+                        i + 2L,
+                        CanonicalBytes.copyOf(bytes));
+                second.completeDataGroup(reservation);
+            }
+            await(second.drain());
+            var secondRoot = await(second.seal(
+                            f.footer(f.runBinding(1), 4, second.snapshot().nextEntryId())))
+                    .root();
+            var baseline = reader(f, f.roots, BOUNDS);
+            var firstSnapshot = await(baseline.capture(f.roots.nativeRootKey(firstRoot.runId()), rawBinding(f)));
+            var secondSnapshot = await(baseline.capture(f.roots.nativeRootKey(secondRoot.runId()), rawBinding(f)));
+            var input = input(f, firstSnapshot, 3303);
+            try (var published = new Published(f, input, NativeContext.root())) {
+                var descriptor = published.writeAndPublish(baseline);
+                var share = new KafkaBookKeeperReadCellBudgetV2.Usage(1, 1, 3_000_000, 1_500_000);
+                var shared = new KafkaBookKeeperReadCellBudgetV2(
+                        f.scope.providerScope(), share, java.util.Map.of(firstSnapshot.binding(), share));
+                var selected = new KafkaBookKeeperSelectedSourceV2(
+                        shared,
+                        published.context.store,
+                        published.context.m4,
+                        published.output,
+                        new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(f.route)),
+                        new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1_000_000, 500_000),
+                        published.context.owner);
+                var raw = rawReader(f, f.roots, BOUNDS, shared);
+                var captured = await(selected.capture());
+                var plan = mixedPlan(input.plan(), captured, secondSnapshot);
+                var mixed = new KafkaBookKeeperMixedSourceV2(shared, selected, raw);
+                var members = await(mixed.resolve(plan));
+                assertThat(members)
+                        .containsEntry(captured.extent().sourceIdentitySha256(), captured.resources())
+                        .containsEntry(
+                                secondSnapshot.extent().sourceIdentitySha256(),
+                                List.of(secondSnapshot.root().resource()))
+                        .hasSize(2);
+                assertThat(shared.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+                assertNativeReadTickets(f, descriptor, 0);
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
+                assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+
+                var incomplete = withBatches(
+                        plan, plan.inputBatches().subList(0, plan.inputBatches().size() - 1));
+                assertThatThrownBy(() -> await(mixed.resolve(incomplete)))
+                        .hasRootCauseMessage("native source input batches differ from compaction plan");
+                assertThat(shared.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+                assertNativeReadTickets(f, descriptor, 0);
+                assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+            }
+        }
+    }
+
+    @Test
     void fullNativeExtentMustMatchAndPhysicalFenceRejectsNewCapture() throws Exception {
         try (var f = new Fixture(2310, "orders", null)) {
             var root = admit(f, f.prepareSealedSource());
@@ -1703,6 +1773,47 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 previous.frontiers(),
                 previous.protocolRoots(),
                 selected.batches(),
+                previous.keyProofs(),
+                previous.transactions(),
+                previous.leaderEpochs(),
+                previous.undecidableOffsets(),
+                previous.recoveryRequiredOffsets());
+    }
+
+    private static KafkaCompactionRecordsV1.CompactionPlan mixedPlan(
+            KafkaCompactionRecordsV1.CompactionPlan previous,
+            KafkaBookKeeperSelectedSourceV2.Snapshot selected,
+            Snapshot raw) {
+        var old = previous.sourceCut();
+        var selector = selected.selector();
+        var sources = List.of(selected.extent(), raw.extent());
+        var coverage =
+                new M5MaterializationRecordsV1.ProtocolCoverage(old.coverage().domain(), 0, 4);
+        var cut = new M5MaterializationRecordsV1.MaterializationSourceCut(
+                old.identity(),
+                selector,
+                Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selector)),
+                selector.selectedViewSha256(),
+                coverage,
+                4,
+                4,
+                4,
+                4,
+                old.trimFrontier(),
+                old.protocolStateRootSha256(),
+                old.recoveryCheckpointRootSha256(),
+                old.materializationPolicySha256(),
+                old.outputFormatPolicySha256(),
+                M5MaterializationCodecV1.calculateSourceSetSha256(sources),
+                sources);
+        var batches = new java.util.ArrayList<>(selected.batches());
+        batches.addAll(raw.batches());
+        return new KafkaCompactionRecordsV1.CompactionPlan(
+                cut,
+                previous.policy(),
+                new KafkaCompactionRecordsV1.Frontiers(0, 4, 4, 4, 4, 0, 4),
+                previous.protocolRoots(),
+                batches,
                 previous.keyProofs(),
                 previous.transactions(),
                 previous.leaderEpochs(),

@@ -131,6 +131,15 @@ public final class KafkaBookKeeperReadCellBudgetV2 {
         return reserveRequest(expectedCell, binding, Usage.forRunSource(bounds));
     }
 
+    /** Keeps one selected result charged while the same plan verifies subsequent raw sources. */
+    synchronized Reservation reserveRetained(
+            CellProviderScopeId expectedCell, BindingIdentity binding, Usage retained) {
+        if (retained.owners() != 0 || retained.readSlots() != 0 || retained.encodedBytes() < 1) {
+            throw new IllegalArgumentException("retained BK read result requires a bounded byte allowance");
+        }
+        return reserveRequest(expectedCell, binding, retained);
+    }
+
     private Reservation reserveRequest(CellProviderScopeId expectedCell, BindingIdentity binding, Usage request) {
         if (!cell.equals(expectedCell)) {
             throw new IllegalArgumentException("BK read budget belongs to another Cell");

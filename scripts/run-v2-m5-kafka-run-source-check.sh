@@ -223,7 +223,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5KafkaReadOwnerTest','KafkaBookKeeperReadOwnerV2Test',7),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperM4RecoveryTest','KafkaBookKeeperM4RecoveryV2Test',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaSelectedSourceTest','KafkaBookKeeperSelectedSourceV2Test',3),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',12),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',13),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),

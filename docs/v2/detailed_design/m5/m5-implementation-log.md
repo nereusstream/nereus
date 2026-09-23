@@ -2832,6 +2832,24 @@ The construction-failure injection is in the focused unit suite, not a native Bo
 owner admission, crashed-owner drain and retained-result accounting remain OPEN; all 17 acceptance rows and
 M5-E/Final remain OPEN/null.
 
+## Mixed selected-generation and raw-run BK input membership (2026-09-23)
+
+`KafkaBookKeeperMixedSourceV2` now resolves a source cut containing one current selected BK generation and sealed
+NBKE2 runs. It reuses the selected and raw native readers, compares each complete extent and every input batch in
+source-cut order, requires one physical namespace, and rereads the selected selector and descriptor after raw
+verification. The shared Cell budget retains a bounded selected-result byte allowance until the full resolution
+ends; existing readers still own their native sessions and physical tickets. This is an input-membership adapter,
+not complete protocol-owner or resource-birth admission.
+
+The real BK/Oxia regression published the first generation from a raw run, then resolved that generation with a
+successor raw run. It verified both native physical member sets, rejected an omitted raw batch, and checked ticket
+and Cell-share release. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 XML suites / 110 cases or restart
+phases with zero failures, errors or skips. The archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-14640`; 747 current-source inputs were rehashed with
+manifest SHA-256 `64687ad04fb4e67e93bb7182ac01c8e7e91fc99bf8da837e8bc9b08973971aca`.
+Full mixed catalog admission, protocol ownership, M4 RELEASED and retained-result/backend buffer accounting remain
+OPEN. All 17 acceptance rows and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

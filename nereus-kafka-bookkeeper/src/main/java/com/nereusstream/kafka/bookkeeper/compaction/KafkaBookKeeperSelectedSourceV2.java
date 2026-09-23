@@ -135,6 +135,26 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
         return work.thenApply(value -> value);
     }
 
+    boolean usesBudget(KafkaBookKeeperReadCellBudgetV2 expected) {
+        return budget == expected;
+    }
+
+    KafkaBookKeeperReadCellBudgetV2.Usage retainedResultAllowance() {
+        return new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, bounds.encodedBytes(), bounds.decodedBytes());
+    }
+
+    CompletionStage<Void> verifyCurrent(Snapshot snapshot) {
+        return CompletableFuture.runAsync(
+                () -> {
+                    var current = selected();
+                    if (!current.selector().equals(snapshot.selector())
+                            || !current.descriptor().equals(snapshot.view().descriptor())) {
+                        throw new IllegalStateException("selected source changed during mixed native capture");
+                    }
+                },
+                owner);
+    }
+
     @Override
     public CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> resolve(CompactionPlan plan) {
         Objects.requireNonNull(plan, "plan");
