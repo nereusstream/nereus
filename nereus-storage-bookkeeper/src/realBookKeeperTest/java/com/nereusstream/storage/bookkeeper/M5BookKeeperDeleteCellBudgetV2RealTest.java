@@ -177,7 +177,7 @@ class M5BookKeeperDeleteCellBudgetV2RealTest {
                 // Package-only primitive simulates the prior request becoming applied; reconciliation never dispatches.
                 assertThat(await(authority.deleteExact(intent.epoch(), target)).outcome())
                         .isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
-                var reconciled = await(authority.reconcileCellDelete(budget, intent, target));
+                var reconciled = await(authority.reconcileCellDeleteAbsence(budget, intent));
                 assertThat(reconciled.deleteResult().outcome()).isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
                 assertThat(reconciled.reservationRetained()).isFalse();
                 assertThat(await(budget.snapshot()).reservations()).isEmpty();

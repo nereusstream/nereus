@@ -43,8 +43,8 @@ import org.junit.jupiter.api.Timeout;
 class M5BookKeeperDeleteCellBudgetV2RestartTest {
     @Test
     void writeBeforeServerRestart() throws Exception {
-        for (boolean unknown : List.of(false, true)) {
-            var capability = capability(scope(unknown));
+        for (var scenario : Scenario.values()) {
+            var capability = capability(scenario.scope);
             var spec = spec(capability);
             try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability)) {
                 var binding = await(backend.readBinding()).orElseThrow();
@@ -72,13 +72,21 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                             capability,
                             () -> CompletableFuture.completedFuture(null));
                     var intent = bind(authority, target.metadataSha256());
-                    if (unknown) {
+                    if (scenario.unknown) {
                         state.zk.dropNextDelete = true;
                         var result = await(authority.deleteExact(budget, intent, target));
                         assertThat(result.deleteResult().outcome()).isEqualTo(DeleteOutcome.OUTCOME_UNKNOWN);
                         assertThat(result.reservationRetained()).isTrue();
                         assertThat(await(client.captureExactTarget(handle)).exactTarget())
                                 .contains(target);
+                        if (scenario.absent) {
+                            // Fixture delivery of the old operation after its callback-terminal UNKNOWN.
+                            assertThat(await(authority.deleteExact(intent.epoch(), target))
+                                            .outcome())
+                                    .isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
+                            assertThat(await(client.captureExactTarget(handle)).outcome())
+                                    .isEqualTo(M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
+                        }
                     } else {
                         // Apply the actual native delete, but never deliver its callback to the accepted invocation.
                         state.zk.holdNextDeleteReply = true;
@@ -92,9 +100,9 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                     }
                     var held = await(budget.snapshot());
                     assertThat(held.reservations()).hasSize(1);
-                    assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(unknown);
+                    assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(scenario.unknown);
                     Files.write(
-                            checkpoint(unknown),
+                            checkpoint(scenario),
                             List.of(
                                     spec.encode().toHex(),
                                     Long.toString(handle.ledgerIdentity().ledgerId()),
@@ -113,10 +121,10 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
 
     @Test
     void readAfterServerRestart() throws Exception {
-        for (boolean unknown : List.of(false, true)) {
-            var lines = Files.readAllLines(checkpoint(unknown));
+        for (var scenario : Scenario.values()) {
+            var lines = Files.readAllLines(checkpoint(scenario));
             assertThat(lines).hasSize(10);
-            var capability = capability(scope(unknown));
+            var capability = capability(scenario.scope);
             var spec = M5BookKeeperNativeCreateSpecV2.decode(
                     CanonicalBytes.copyOf(HexFormat.of().parseHex(lines.get(0))));
             var run = spec.configurations().get(0);
@@ -144,7 +152,7 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                 var held = await(budget.snapshot());
                 assertThat(Sha256Digest.hash(held.encode()).toHex()).isEqualTo(lines.get(4));
                 assertThat(held.reservations()).hasSize(1);
-                assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(unknown);
+                assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(scenario.unknown);
                 try (var client = M5BookKeeperNativeCreateClientV2.connect(uri(), capability, spec, binding)) {
                     var authority = client.deleteAuthority(handle);
                     var epoch = await(authority.read()).orElseThrow();
@@ -152,12 +160,15 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                     assertThat(Sha256Digest.hash(epoch.encode()).toHex()).isEqualTo(lines.get(2));
                     assertThat(Sha256Digest.hash(intent.encode()).toHex()).isEqualTo(lines.get(3));
                     assertThat(intent.ledgerMetadataSha256()).isEqualTo(target.metadataSha256());
-                    if (unknown) {
+                    if (scenario == Scenario.UNKNOWN_PRESENT) {
                         assertThat(await(client.captureExactTarget(handle)).exactTarget())
                                 .contains(target);
-                        var observed = await(authority.reconcileCellDelete(budget, intent, target));
-                        assertThat(observed.deleteResult().outcome()).isEqualTo(DeleteOutcome.OUTCOME_UNKNOWN);
+                        var observed = await(authority.reconcileCellDeleteAbsence(budget, intent));
+                        assertThat(observed.deleteResult().outcome()).isEqualTo(DeleteOutcome.EXACT_LEDGER_REMAINS);
                         assertThat(observed.reservationRetained()).isTrue();
+                    } else if (scenario == Scenario.UNKNOWN_ABSENT) {
+                        assertThat(await(client.captureExactTarget(handle)).outcome())
+                                .isEqualTo(M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
                     } else {
                         assertThat(await(client.captureExactTarget(handle)).outcome())
                                 .isEqualTo(M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
@@ -171,7 +182,7 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                 }
             }
         }
-        // A fresh healthy configured Cell can still perform actual deletion while both unresolved heads remain full.
+        // A fresh healthy configured Cell can still delete while all three unresolved heads remain full.
         var capability = capability("cell-restart-healthy");
         var spec = spec(capability);
         try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability)) {
@@ -194,23 +205,23 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                 assertThat(await(budget.snapshot()).reservations()).isEmpty();
             }
         }
-        for (boolean unknown : List.of(false, true)) {
-            try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability(scope(unknown)))) {
+        for (var scenario : Scenario.values()) {
+            try (var backend = M5BookKeeperNamespaceAuthorityV2.connect(uri(), capability(scenario.scope))) {
                 assertThat(Sha256Digest.hash(
                                         await(backend.nativeDeleteCellBudget().snapshot())
                                                 .encode())
                                 .toHex())
-                        .isEqualTo(Files.readAllLines(checkpoint(unknown)).get(4));
+                        .isEqualTo(Files.readAllLines(checkpoint(scenario)).get(4));
             }
         }
     }
 
     @Test
     void recoverFencedHoldsAfterServerRestart() throws Exception {
-        for (boolean unknown : List.of(false, true)) {
-            var lines = Files.readAllLines(checkpoint(unknown));
+        for (var scenario : Scenario.values()) {
+            var lines = Files.readAllLines(checkpoint(scenario));
             assertThat(lines).hasSize(10);
-            var capability = capability(scope(unknown));
+            var capability = capability(scenario.scope);
             var spec = M5BookKeeperNativeCreateSpecV2.decode(
                     CanonicalBytes.copyOf(HexFormat.of().parseHex(lines.get(0))));
             var run = spec.configurations().get(0);
@@ -225,13 +236,22 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                 var held = await(budget.snapshot());
                 assertThat(Sha256Digest.hash(held.encode()).toHex()).isEqualTo(lines.get(4));
                 assertThat(held.reservations()).hasSize(1);
-                assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(unknown);
+                assertThat(held.reservations().get(0).terminalUnknown()).isEqualTo(scenario.unknown);
                 try (var client = M5BookKeeperNativeCreateClientV2.connect(uri(), capability, spec, binding)) {
                     var authority = client.deleteAuthority(handle);
                     var predecessor = await(authority.read()).orElseThrow();
                     var oldIntent = await(authority.readIntent()).orElseThrow();
                     assertThat(Sha256Digest.hash(predecessor.encode()).toHex()).isEqualTo(lines.get(2));
                     assertThat(Sha256Digest.hash(oldIntent.encode()).toHex()).isEqualTo(lines.get(3));
+                    if (scenario == Scenario.UNKNOWN_ABSENT) {
+                        var observed = await(authority.reconcileCellDeleteAbsence(budget, oldIntent));
+                        assertThat(observed.deleteResult().outcome()).isEqualTo(DeleteOutcome.AUTHORITATIVELY_ABSENT);
+                        assertThat(observed.reservationRetained()).isFalse();
+                        assertThat(await(budget.snapshot()).reservations()).isEmpty();
+                        assertThat(await(authority.read())).contains(predecessor);
+                        assertThat(await(authority.readIntent())).contains(oldIntent);
+                        continue;
+                    }
                     assertThatThrownBy(() -> await(authority.reconcileFencedCellDelete(budget, oldIntent)))
                             .hasRootCauseMessage("native delete predecessor epoch is not fenced");
                     assertThat(await(budget.snapshot())).isEqualTo(held);
@@ -242,7 +262,7 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
                     assertThat(await(budget.snapshot()).reservations()).isEmpty();
                     assertThat(await(client.captureExactTarget(handle)).outcome())
                             .isEqualTo(
-                                    unknown
+                                    scenario.unknown
                                             ? M5BookKeeperDeleteAdapterV1.CaptureOutcome.EXACT_TARGET
                                             : M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
                     assertThat(await(authority.read())).contains(successor);
@@ -252,13 +272,26 @@ class M5BookKeeperDeleteCellBudgetV2RestartTest {
         }
     }
 
-    private static String scope(boolean unknown) {
-        return unknown ? "cell-restart-unknown" : "cell-restart-active";
+    private enum Scenario {
+        ACTIVE_ABSENT(false, false, "cell-restart-active", "-active"),
+        UNKNOWN_PRESENT(true, false, "cell-restart-unknown", "-unknown"),
+        UNKNOWN_ABSENT(true, true, "cell-restart-unknown-absent", "-unknown-absent");
+
+        final boolean unknown;
+        final boolean absent;
+        final String scope;
+        final String suffix;
+
+        Scenario(boolean unknown, boolean absent, String scope, String suffix) {
+            this.unknown = unknown;
+            this.absent = absent;
+            this.scope = scope;
+            this.suffix = suffix;
+        }
     }
 
-    private static Path checkpoint(boolean unknown) {
-        return Path.of(
-                System.getProperty("nereus.m5.nativeCell.restartCheckpoint") + (unknown ? "-unknown" : "-active"));
+    private static Path checkpoint(Scenario scenario) {
+        return Path.of(System.getProperty("nereus.m5.nativeCell.restartCheckpoint") + scenario.suffix);
     }
 
     private static String uri() {

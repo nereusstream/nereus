@@ -227,22 +227,30 @@ not transport buffers, per-Binding fairness/rates or total backend storage. Cell
 per-resource native quota; explicit per-Cell provisioning does not establish a global Cell-count budget. Protocol
 Cell ownership, grace and complete M5 dispatch composition remain required before whole-M5 acceptance.
 
+`M5BookKeeperNativeDeleteAuthorityV2.reconcileCellDeleteAbsence` additionally rereads actual native metadata using
+only the permanent native intent and the instance-bound handle. It releases an exact callback-terminal UNKNOWN Cell
+hold only on authoritative ledger absence; exact presence, changed metadata or an uncertain read retains capacity.
+This does not require reconstructing the vanished full delete target from an old JVM's checkpoint, does not dispatch
+another delete and does not write M5 DONE. An unchanged native epoch/intent is verified before and after observation.
+
 `M5BookKeeperDeleteCellBudgetV2RestartTest` begins after the original bound restart checks and lifecycle cases. It
-creates two actual three-byte sealed BK ledgers with native intent bindings. For ACTIVE, the real native delete is
+creates three actual three-byte sealed BK ledgers with native intent bindings. For ACTIVE, the real native delete is
 applied but its successful callback is withheld; cancelling its observer leaves an occupied ACTIVE head even though
-actual ledger metadata is absent. For UNKNOWN, a delete-only CONNECTIONLOSS is injected without forwarding the
-transaction; the exact ledger remains and the callback-terminal hold is retained. A second restart preserves the
+actual ledger metadata is absent. For two UNKNOWN cases, a delete-only CONNECTIONLOSS is injected without forwarding
+the transaction. One exact ledger remains; for the other, the fixture separately applies the old native deletion
+after the callback-terminal hold is retained, leaving actual metadata absent. A second restart preserves the
 same ZooKeeper, three bookie and Oxia containers, images and data, with changed start times.
 
 The fresh JVM reads the original native head/epoch/intent hashes before any mutation. ACTIVE remains ineligible for
-unknown reconciliation despite native absence; UNKNOWN observes exact presence and remains charged. Both reject
-new deletion attempts without changing their heads. A new healthy configured Cell then creates, seals and deletes
-another real ledger; both occupied heads remain byte-identical afterward. Checkpoints contain fixture inputs and
-identity hashes; actual native records supply recovery observations. The runner archives both phase XMLs, hashes
-the checkpoint files and records both sets of service-restart identities/times. An additional fresh-JVM phase then
-claims strictly newer native epochs for the retained ACTIVE and UNKNOWN operations, releases each exact Cell hold,
-and confirms that the old native intents and actual ledger absence or exact presence remain separately observable.
-A real paused-callback test
+unknown reconciliation despite native absence; present UNKNOWN observes exact presence and remains charged. All three
+reject new deletion attempts without changing their heads. A new healthy configured Cell then creates, seals and
+deletes another real ledger; the three occupied heads remain byte-identical afterward. Checkpoints contain fixture
+inputs and identity hashes; actual native records supply recovery observations. The runner archives all three restart
+phase XMLs, hashes the checkpoint files and records both sets of service-restart identities/times. An additional
+fresh-JVM phase releases the absent UNKNOWN hold without an epoch change or checkpoint target. It separately claims
+strictly newer native epochs for the retained ACTIVE and present UNKNOWN operations and releases their exact Cell
+holds. Each old native intent and actual ledger absence or exact presence remains separately observable. A real
+paused-callback test
 shows that a late old delete fails at the server after the successor claim, while a new intent can reserve the Cell
 and delete the still-present ledger. These checks establish conservative retention followed by qualified fencing;
 they do not free capacity merely because the original JVM ended, establish same-epoch transport-buffer drain,

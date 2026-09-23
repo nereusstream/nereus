@@ -209,7 +209,8 @@ if cell_before!=after or len(cell_after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] fo
 if sys.argv[6]!=sys.argv[5] or sys.argv[6]==sys.argv[7]:
     raise SystemExit('Occupied Cell restart did not retain the same Oxia service and advance its start time')
 cell_checkpoints={name:hashlib.sha256((out/name).read_bytes()).hexdigest()
-    for name in ('native-cell-checkpoint-active','native-cell-checkpoint-unknown')}
+    for name in ('native-cell-checkpoint-active','native-cell-checkpoint-unknown',
+                 'native-cell-checkpoint-unknown-absent')}
 suites=[]
 for module,task,name,count in (
     ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',8),

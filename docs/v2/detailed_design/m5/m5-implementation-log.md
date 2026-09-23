@@ -2727,6 +2727,28 @@ Spotless and Checkstyle passed. Protocol/M4/grace facts in this real-backend fix
 complete writer matrix, grace authority, all-provider dispatch and M5-E/Final remain OPEN. All 17 amended
 acceptance obligations retain OPEN/null receipts.
 
+## Targetless UNKNOWN Cell absence reconciliation after restart (2026-09-23)
+
+`M5BookKeeperNativeDeleteAuthorityV2.reconcileCellDeleteAbsence` now reads actual BK metadata under the permanent
+native intent, current namespace binding and exact callback-terminal Cell hold. A fresh JVM needs no reconstructed
+full delete target: native `NoSuchLedger` releases only that Cell reservation; matching presence, changed metadata
+and uncertain reads retain it. The method rechecks the unchanged native epoch/intent after observation and never
+dispatches deletion or records M5 DONE. ACTIVE still requires a successor native epoch to release capacity.
+
+The real BK fixture now persists three occupied Cell heads. One ACTIVE operation deleted its ledger but withheld its
+callback; one UNKNOWN operation retains the exact ledger; the third reaches callback-terminal UNKNOWN before the
+fixture separately applies its old native delete, leaving the ledger absent. After two service restarts, a fresh JVM
+uses only the third case's permanent native intent and an actual absence read to release its hold without advancing
+the epoch. The other two still require the previously established successor-epoch fence. The fixture's separate
+low-level delete is controlled test delivery of the old operation, not a proof of production transport timing.
+
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 XML suites / 107 cases with zero failures, errors or skips.
+All 745 captured source inputs, XML files and three native Cell restart checkpoints were independently rehashed.
+The archive is `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-24869`, input-manifest SHA-256
+`90b2933fcda219b8c1035ce0c33371f4de98d4c392c6409aaa89854b06cbf2c5`. Same-epoch ACTIVE transport
+drain, UNKNOWN presence recovery, full M5 dispatch and M5-E/Final remain OPEN. All 17 acceptance obligations retain
+OPEN/null receipts.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

@@ -403,6 +403,44 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
     }
 
     /**
+     * Read-only reconciliation of callback-terminal UNKNOWN from permanent native intent and actual ledger metadata.
+     * A fresh process need not reconstruct the vanished full target from a local checkpoint. Presence or an
+     * uncertain read retains the Cell reservation; absence releases only Cell capacity, not M5 DONE authority.
+     */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> reconcileCellDeleteAbsence(
+            M5BookKeeperDeleteCellBudgetV2 budget, M5BookKeeperNativeDeleteIntentV2 intent) {
+        Objects.requireNonNull(budget, "budget");
+        Objects.requireNonNull(intent, "intent");
+        if (!resource.equals(intent.epoch().resource())
+                || !capabilitySha.equals(intent.epoch().capabilitySha256())) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "native Cell recovery intent belongs to another resource or capability"));
+        }
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> requireIntent(intent)
+                        .thenCompose(ignored -> budget.reconcileUnknown(
+                                binding, capability.providerScopeId(), intent, () -> manager.readLedgerMetadata(
+                                                resource.ledgerId())
+                                        .handle((observed, failure) -> {
+                                            if (failure != null) {
+                                                return absent(failure)
+                                                        ? DeleteResult.authoritativelyAbsent()
+                                                        : DeleteResult.outcomeUnknown();
+                                            }
+                                            var actual = M5BookKeeperDeleteAdapterV1.exactTarget(
+                                                    observed.getValue(), handle, capability, new byte[0]);
+                                            return actual.map(target -> target.metadataSha256()
+                                                                    .equals(intent.ledgerMetadataSha256())
+                                                            ? DeleteResult.exactLedgerRemains()
+                                                            : DeleteResult.differentLedgerOrMetadata())
+                                                    .orElseGet(DeleteResult::differentLedgerOrMetadata);
+                                        })
+                                        .thenCompose(
+                                                result -> requireIntent(intent).thenApply(unused -> result)))))
+                .thenApply(value -> value);
+    }
+
+    /**
      * Recovers only native Cell capacity after a newer permanent epoch has fenced the old delete transaction.
      * The caller must separately requalify M5 eligibility and reconcile actual ledger presence/absence; this
      * method neither dispatches deletion nor records a physical terminal.
