@@ -2909,6 +2909,23 @@ The main, unit-test and real-BK test sources compiled; Spotless and main Checkst
 changed in existing fixture paths, so no native service run was repeated for this visibility-only slice. All 17
 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Scoped BK read-owner drain reaches M4 protection release (2026-09-23)
+
+`KafkaBookKeeperReadOwnerV2` now exposes release through the same local hazard pool that admitted its native reads.
+It requires the exact closure evidence, terminated native session, active retirement batch and source identity before
+calling the existing M4 coordinator. The real BK/Oxia slow-read case confirms that cancelled observation and delayed
+native session close retain tickets, then that release without a proof head fails closed. After a test-supplied planned
+terminal and quiescence proof, the same owner releases the old source protection; Oxia returns `RELEASED` at its
+canonical key. The terminal evidence in this case is fixture-supplied, so this does not establish a global protocol
+reader drain, complete M4 proof production or M5 physical-delete eligibility.
+
+The Kafka run-source runner's legacy archive check now expects 83 cases, matching the existing native-create suite's
+ninth case. `scripts/run-v2-m5-kafka-run-source-check.sh` passed with 26 target XML suites / 110 cases or restart
+phases and 83 legacy cases, zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-11740`; 747-input manifest SHA-256:
+`0599c7d454fc7feaf93ac2da2de5477cfbbb4869e620dfb36ddd94e774c866f9`.
+All 17 acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

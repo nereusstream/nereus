@@ -1028,6 +1028,73 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             .orElseThrow()));
                     assertThat(protection.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.PROTECTED);
                 }
+                var batch = evidence.successor().activeBatches().stream()
+                        .filter(value -> value.transitionSha256()
+                                .equals(evidence.anchor().transitionSha256()))
+                        .findFirst()
+                        .orElseThrow();
+                assertThat(published.context.protections).hasSize(1);
+                var old = published.context.protections.get(0);
+                assertThatThrownBy(() -> await(owner.releaseProtectionAfterDrain(evidence, batch, old)))
+                        .hasRootCauseMessage("protection release lacks a proof head");
+                published.context.onOwner(() -> {
+                    var anchorSha = M4ReadControlCodecV1.anchorSha256(evidence.anchor());
+                    var terminalEvidence = Sha256Digest.hash(CanonicalBytes.copyOf(java.nio.ByteBuffer.allocate(64)
+                            .put(anchorSha.bytes().toByteArray())
+                            .put(descriptor.descriptorSha256().bytes().toByteArray())
+                            .array()));
+                    var terminal = new M4ReadControlRecordsV1.ReadAdmissionEpochTerminalCut(
+                            published.context.binding,
+                            anchorSha,
+                            evidence.anchor().closedReadAdmissionEpoch(),
+                            evidence.anchor().ownerEpoch(),
+                            evidence.predecessor().sourceGeneration(),
+                            1_000,
+                            evidence.anchor().capability(),
+                            M4ReadControlRecordsV1.TerminalKind.PLANNED_DRAIN,
+                            anchorSha,
+                            terminalEvidence,
+                            0,
+                            0,
+                            1);
+                    assertThat(published.context.m4.publishTerminal(terminal))
+                            .isEqualTo(
+                                    com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome
+                                            .APPLIED);
+                    var draft = new M4ReadControlRecordsV1.ReadQuiescenceProof(
+                            published.context.binding,
+                            terminal.readAdmissionEpoch(),
+                            M4ReadControlCodecV1.terminalSha256(terminal),
+                            terminal.lastAdmittedAndDrainedReadViewGeneration(),
+                            terminal.safeAfterAuthorityTimeMillis(),
+                            terminal.capability(),
+                            terminal.kind(),
+                            anchorSha);
+                    var proof = new M4ReadControlRecordsV1.ReadQuiescenceProof(
+                            draft.binding(),
+                            draft.readAdmissionEpoch(),
+                            draft.terminalCutSha256(),
+                            draft.drainedThroughReadViewGeneration(),
+                            draft.safeAfterAuthorityTimeMillis(),
+                            draft.capability(),
+                            draft.kind(),
+                            M4ReadControlCodecV1.calculateProofIdentity(draft));
+                    assertThat(published.context.m4.publishProof(proof))
+                            .isEqualTo(
+                                    com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome
+                                            .APPLIED);
+                    return null;
+                });
+                assertThat(await(owner.releaseProtectionAfterDrain(evidence, batch, old)))
+                        .isEqualTo(
+                                com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome
+                                        .APPLIED);
+                var released = published.context.onOwner(() -> M4ReadControlCodecV1.decodeProtection(published
+                        .context
+                        .store
+                        .get(keys.protection(old.sourceIdentitySha256(), old.protectionGeneration()))
+                        .orElseThrow()));
+                assertThat(released.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.RELEASED);
             }
         }
     }

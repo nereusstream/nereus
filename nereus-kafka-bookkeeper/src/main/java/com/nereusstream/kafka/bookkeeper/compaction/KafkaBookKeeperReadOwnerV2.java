@@ -33,6 +33,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Bindi
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ClosureAnchor;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
@@ -435,6 +436,33 @@ public final class KafkaBookKeeperReadOwnerV2 {
                                 observer.completeExceptionally(failure);
                             }
                         });
+                    } catch (Throwable failure) {
+                        observer.completeExceptionally(failure);
+                    }
+                },
+                observer);
+        return observer;
+    }
+
+    /** Releases this closure's source only through the hazard pool that admitted its native reads. */
+    public CompletionStage<Outcome> releaseProtectionAfterDrain(
+            DrainEvidence evidence, SourceRetirementBatch batch, SourceProtectionIdentity source) {
+        var observer = new CompletableFuture<Outcome>();
+        dispatch(
+                () -> {
+                    try {
+                        if (evidence == null
+                                || closure != evidence
+                                || !terminated.isDone()
+                                || terminated.isCompletedExceptionally()
+                                || terminated.isCancelled()
+                                || !evidence.successor().activeBatches().contains(batch)
+                                || !batch.transitionSha256()
+                                        .equals(evidence.anchor().transitionSha256())
+                                || !batch.sources().contains(source)) {
+                            throw new IllegalStateException("BK read owner lacks the exact confirmed drain and batch");
+                        }
+                        observer.complete(coordinator.releaseProtection(batch, source, hazards));
                     } catch (Throwable failure) {
                         observer.completeExceptionally(failure);
                     }
