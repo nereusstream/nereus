@@ -133,6 +133,47 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
                         .orElse(false));
     }
 
+    /** Preserve the selected lineage after an exact permanent physical DELETE_DONE, including compact done. */
+    public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> retireDeletedRoot(
+            KafkaRunRootSnapshotV1 exactSealed) {
+        Objects.requireNonNull(exactSealed, "exactSealed");
+        var expectedResource = resource(exactSealed);
+        if (exactSealed.state() != KafkaRunRootStateV1.SEALED) {
+            throw new IllegalArgumentException("only an exact sealed run root can be retired");
+        }
+        var work = guard.isPermanentlyDeleted(expectedResource).thenCompose(deleted -> {
+            if (!deleted) {
+                return CompletableFuture.completedFuture(
+                        ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict());
+            }
+            return read(exactSealed.runId()).thenCompose(observed -> {
+                if (observed.isEmpty()
+                        || !observed.orElseThrow().value().root().equals(exactSealed)
+                        || !observed.orElseThrow().value().resource().equals(expectedResource)) {
+                    return CompletableFuture.completedFuture(
+                            ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict());
+                }
+                var exact = observed.orElseThrow();
+                if (exact.value().retired()) {
+                    return CompletableFuture.completedFuture(ProviderMutationResultV1.appliedExact(exactSealed));
+                }
+                var retired = exact.value().retire();
+                return client.compareAndSet(
+                                exact.nativeValue().key(),
+                                retired.encode(),
+                                exact.nativeValue().versionId())
+                        .handle((ignored, failure) -> null)
+                        .thenCompose(ignored -> read(exactSealed.runId()))
+                        .thenApply(after -> after.map(value -> value.value().equals(retired)
+                                        ? ProviderMutationResultV1.appliedExact(exactSealed)
+                                        : ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict())
+                                .orElseGet(ProviderMutationResultV1::fencedOrConflict));
+            });
+        });
+        return work.exceptionally(failure -> ProviderMutationResultV1.outcomeUnknown())
+                .thenApply(value -> value);
+    }
+
     @Override
     public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(KafkaRunRootSnapshotV1 active) {
         var candidate = candidate(active);

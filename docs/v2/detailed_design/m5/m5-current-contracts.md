@@ -413,17 +413,20 @@ The selected child's admission bit is a positive cache of that permanent choice.
 pending child with one parent/genesis read, without walking lifetime history or rewriting the root. SEALED roots remain
 readable after selecting a successor. An additive wire-3 retired form retains the original link and successor while
 closing this catalog's read admission; retries cannot reopen it, and a retired parent without a choice fences new
-successors. No proof-bound native retirement mutation writes that form yet. Existing selected roots therefore remain
-readable, and this representation is not a reference-free proof or physical-delete authority. These permanent records
-are not a bounded lifetime history or quota solution.
+successors. `retireDeletedRoot` now writes that form only after rereading the same physical resource's permanent
+`DELETE_DONE` authority (full or compact), matching the exact SEALED root, and reconciling its native CAS by reread.
+An OPEN, READ_FENCED or DELETE_INTENT resource cannot take this path. The marker write is a post-delete lineage
+cleanup, not a pre-delete reference-free producer or physical-delete authority; selected roots remain readable before
+the marker. These permanent records are not a bounded lifetime history or quota solution.
 A real BK/Oxia restart fixture writes that form through a test-only native CAS. After restart, it verifies the old
 root's read veto, the selected successor's continued readability, and the old ledger's still-readable physical bytes.
-This verifies persistence of the representation, not production retirement admission or deletion.
+This verifies persistence of the representation, not production deletion. The new post-delete marker path currently
+has synthetic permanent-DONE unit coverage; no real physical-delete-to-root-retirement trace has passed.
 The K3 lifecycle now confirms the exact stored retired marker through the native run-root authority before changing
 its local state from SEALED to RETIRED. A caller's retirement permit alone cannot make this transition; a missing or
 mismatched marker, or a failed authority read, leaves the local run SEALED. The restart fixture checks both sides of
-this transition around its test-only CAS. This confirmation does not write the marker or prove reference freedom.
-Every root mutation acquires its ledger ticket; successor selection acquires both parent and child tickets before
+this transition around its test-only CAS. This confirmation does not itself write the marker or prove reference freedom.
+Create/seal/successor root mutations acquire ledger tickets; successor selection acquires both parent and child tickets before
 native verification or prewrites. The exact root and optional parent enter the context. Only irreversible native root
 or selection facts reconcile prior invocations; unknown results retain tickets and observer cancellation does not stop
 completion. The factory rereads both actual namespace assignments before each root operation.

@@ -87,6 +87,15 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
     }
 
+    /** Permanent done is a monotonic same-resource veto, including its compact representation. */
+    public CompletionStage<Boolean> isPermanentlyDeleted(PhysicalResourceIdV2 resource) {
+        Objects.requireNonNull(resource, "resource");
+        return coordinator.inspect(resource.authorityKey()).thenApply(value -> value.filter(
+                        observed -> observed.resource().equals(resource)
+                                && observed.state() == TargetDeleteAuthorityStateV1.DELETE_DONE_V1)
+                .isPresent());
+    }
+
     /** No absent authority is created; initialization and quota reservation belong to resource admission. */
     public <T> CompletionStage<Result<T>> execute(
             List<? extends PhysicalResourceIdV2> resources,

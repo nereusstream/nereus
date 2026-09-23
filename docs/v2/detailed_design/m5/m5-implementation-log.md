@@ -3083,6 +3083,27 @@ All captured sources and archived XML were independently checked with zero failu
 M5-C logical authority correction, not proof of complete real floor adapters, writer admission or physical GC.
 All 17 amended obligations and M5-E/Final remain OPEN/null.
 
+## Post-delete Kafka run-root retirement (2026-09-23)
+
+`OxiaKafkaRunRootAuthorityV2.retireDeletedRoot` now writes the existing M5KR retired marker only after the same
+physical ledger's authority is permanently `DELETE_DONE`, including its compact form. It requires the exact SEALED
+root and reconciles the one-key native CAS by reread, so a lost CAS response cannot be reported as success without
+the stored marker. The selected successor link remains intact; OPEN and nonterminal delete states cannot trigger
+this post-delete metadata cleanup. The root marker is still not a pre-delete reference-free proof, and no complete
+physical-delete-to-root-retirement caller is wired.
+
+The 11-case run-root unit suite passed, including synthetic full/compact DONE and CAS response-loss cases; the real
+BK test source compiled. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 95/95 main tasks and its BK/Oxia restart
+phases. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-98178`; target 747-input manifest SHA-256:
+`c220b2a009e8000cec88a6fc0d47f7b665c919a0be95dda313c3a47c01a58c9f`; summary SHA-256:
+`b56ef9b72e00d91e473e6acd34b6a8957a0aea56d336acbc542c14efbf5248d2`. Its 26 XML suites contain 117
+cases or restart phases. The fresh 732-input legacy manifest SHA-256 is
+`b3c2f167807d44ebbd447054ef18c4b143d0ebbbd0ca02ff43358a8e776fb54b`; summary SHA-256:
+`62df5ecc1433dc9cb826b58b0393e25ed736ccd2379550d06e4778984d41e480`; its 21 XML suites contain 83 cases.
+All captured sources and archived XML were independently checked with zero failures, errors or skips. The real root
+restart fixture still writes its retired marker by test-only CAS; this run does not prove the new post-delete method
+against an actual physical deletion. All 17 amended obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

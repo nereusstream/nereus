@@ -42,6 +42,7 @@ import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteDoneV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
 import java.util.Arrays;
@@ -133,6 +134,56 @@ class OxiaKafkaRunRootAuthorityV2Test {
                 .isEmpty();
         assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
         assertThat(join(f.roots.sealRoot(a, sealed)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+    }
+
+    @Test
+    void permanentDeleteDoneRetiresExactSealedRootAndKeepsSuccessorLineage() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        var b = root(2, 1, 10);
+        f.admit(a, b);
+        join(f.roots.createRoot(a));
+        var sealed = sealed(a, 10);
+        join(f.roots.sealRoot(a, sealed));
+        join(f.roots.createSuccessor(sealed, b));
+        var selected = f.stored(a).successor();
+
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(join(f.roots.openRoot(a.runId()))).contains(sealed);
+        var resource = f.record(a).resource();
+        var done = SyntheticDeleteAuthorityFixturesV2.phases(resource).get(3);
+        f.client.put(resource.authorityKey(), M5TargetDeleteAuthorityCodecV1.encodeAuthority(done));
+        assertThat(join(f.roots.retireDeletedRoot(sealed(a, 11))).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
+        f.client.put(resource.authorityKey(), M5TargetDeleteDoneV2.from(done).encode());
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
+        assertThat(join(f.roots.isDurablyRetired(sealed))).isTrue();
+        assertThat(f.stored(a).successor()).isEqualTo(selected);
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
+    }
+
+    @Test
+    void retirementCasResponseLossIsReconciledFromTheNativeMarker() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        join(f.roots.createRoot(a));
+        var sealed = sealed(a, 10);
+        join(f.roots.sealRoot(a, sealed));
+        var resource = f.record(a).resource();
+        var done = SyntheticDeleteAuthorityFixturesV2.phases(resource).get(3);
+        f.client.put(resource.authorityKey(), M5TargetDeleteAuthorityCodecV1.encodeAuthority(done));
+        f.client.loseAndBlock = f.roots.nativeRootKey(a.runId());
+
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        f.client.blockReads = false;
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
     }
 
     @Test
