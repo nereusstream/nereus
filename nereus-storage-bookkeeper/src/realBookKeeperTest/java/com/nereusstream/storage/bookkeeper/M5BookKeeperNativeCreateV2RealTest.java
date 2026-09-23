@@ -125,12 +125,21 @@ class M5BookKeeperNativeCreateV2RealTest {
                             .toByteArray())
                     .containsExactly(1, 2, 3);
             reader.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
-            // Test-owned resource deletion is fault injection; this create fence grants no M5 delete authority.
-            client.nativeClient()
-                    .newDeleteLedgerOp()
-                    .withLedgerId(id.ledgerId())
-                    .execute()
-                    .get(30, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> client.nativeClient()
+                            .newDeleteLedgerOp()
+                            .withLedgerId(id.ledgerId())
+                            .execute()
+                            .get(30, TimeUnit.SECONDS))
+                    .hasRootCauseInstanceOf(
+                            org.apache.bookkeeper.client.BKException.BKUnauthorizedAccessException.class);
+            assertThat(client.nativeClient().getLedgerMetadata(id.ledgerId()).get(10, TimeUnit.SECONDS))
+                    .isNotNull();
+            // An independent test administrator removes the ledger to exercise the permanent create fence.
+            var configuration = RealBookKeeperClientConfigurationV1.from(uri, CAPABILITY);
+            try (var admin = (BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(configuration)
+                    .build()) {
+                admin.newDeleteLedgerOp().withLedgerId(id.ledgerId()).execute().get(30, TimeUnit.SECONDS);
+            }
             var late = client.newSession();
             assertThat(late.createReservedRunLedger(run, id)
                             .toCompletableFuture()

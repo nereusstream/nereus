@@ -40,7 +40,7 @@ import org.apache.zookeeper.Op;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
-/** Create-only SPI decorator. Native read/recovery/write/delete semantics stay in the locked BK implementation. */
+/** Guarded create SPI decorator; ordinary BK delete cannot bypass the separate M5 native delete authority. */
 final class M5BookKeeperNativeLedgerManagerV2 implements LedgerManager {
     private final AbstractZkLedgerManager delegate;
     private final M5BookKeeperNativeCreateGuardV2 guard;
@@ -135,7 +135,7 @@ final class M5BookKeeperNativeLedgerManagerV2 implements LedgerManager {
 
     @Override
     public CompletableFuture<Void> removeLedgerMetadata(long ledgerId, Version version) {
-        return delegate.removeLedgerMetadata(ledgerId, version);
+        return CompletableFuture.failedFuture(new BKException.BKUnauthorizedAccessException());
     }
 
     @Override

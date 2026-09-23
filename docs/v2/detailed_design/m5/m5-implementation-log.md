@@ -2879,6 +2879,24 @@ BK/Oxia service restarts and exact input rehash. Archive:
 Resource-birth OPEN facts and protocol ownership remain fixture-supplied. This result creates no M5 receipt,
 aggregate/source-bound Final or production authority; all 17 amended acceptance obligations remain OPEN/null.
 
+## Guarded BK client rejects ordinary ledger deletion (2026-09-23)
+
+The M5 guarded BookKeeper ledger manager previously delegated ordinary `removeLedgerMetadata` to BookKeeper even
+though its create scope grants no physical-delete authority. A caller holding that client could invoke the standard
+BookKeeper delete operation without an M5 intent, native GC epoch or Cell reservation. The guarded manager now rejects
+that entry point. The separate M5 native delete authority still performs its server-fenced ZooKeeper transaction.
+The real BK regression confirms that ordinary deletion through the guarded client fails while the sealed ledger
+remains readable; an independent test administrator then removes that test ledger to exercise the permanent create
+fence. The four native-delete cases also pass.
+
+`scripts/run-v2-m5-bookkeeper-task-terminal-check.sh` passed 21 archived XML suites / 83 cases or restart phases,
+with zero failures, errors or skips and exact input rehash after BK/Oxia restart. Archive:
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-39919`; input-manifest SHA-256:
+`1f919a29976c880d8079637320089f3781f21a6673eff9b6176569e36b2babe1`.
+This closes the ordinary-delete bypass only for the guarded BK client. Protocol eligibility, full writer admission,
+resource-birth facts and the M5 dispatcher remain incomplete; all 17 acceptance obligations stay OPEN/null, with
+no M5-E receipt, aggregate/source-bound Final or production authority.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
