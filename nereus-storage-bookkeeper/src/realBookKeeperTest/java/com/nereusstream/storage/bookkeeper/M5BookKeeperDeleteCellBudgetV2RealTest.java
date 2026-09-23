@@ -211,14 +211,14 @@ class M5BookKeeperDeleteCellBudgetV2RealTest {
                 var pending = authority.deleteExact(budget, oldIntent, target);
                 await(ready);
                 assertThat(await(budget.snapshot()).reservations()).hasSize(1);
-                assertThatThrownBy(() -> await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                assertThatThrownBy(() -> await(authority.reconcileFencedCellDelete(budget, oldIntent)))
                         .hasRootCauseMessage("native delete predecessor epoch is not fenced");
                 assertThat(await(budget.snapshot()).reservations()).hasSize(1);
 
                 var successor = await(authority.claim(Optional.of(oldIntent.epoch()), UUID.randomUUID()));
                 assertThat(successor.nativeVersion())
                         .isGreaterThan(oldIntent.epoch().nativeVersion());
-                assertThat(await(authority.reconcileFencedActiveCellDelete(budget, oldIntent)))
+                assertThat(await(authority.reconcileFencedCellDelete(budget, oldIntent)))
                         .isTrue();
                 assertThat(await(budget.snapshot()).reservations()).isEmpty();
                 gate.complete(null);

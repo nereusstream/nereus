@@ -407,7 +407,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
      * The caller must separately requalify M5 eligibility and reconcile actual ledger presence/absence; this
      * method neither dispatches deletion nor records a physical terminal.
      */
-    public CompletionStage<Boolean> reconcileFencedActiveCellDelete(
+    public CompletionStage<Boolean> reconcileFencedCellDelete(
             M5BookKeeperDeleteCellBudgetV2 budget, M5BookKeeperNativeDeleteIntentV2 oldIntent) {
         Objects.requireNonNull(budget, "budget");
         Objects.requireNonNull(oldIntent, "oldIntent");
@@ -417,7 +417,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                     "native Cell recovery intent belongs to another resource or capability"));
         }
         return guard.requireNamespaceBinding()
-                .thenCompose(binding -> budget.reconcileFencedActive(
+                .thenCompose(binding -> budget.reconcileFenced(
                         binding, capability.providerScopeId(), oldIntent, () -> read().thenCompose(observed -> {
                             var successor = observed.orElseThrow(
                                     () -> new IllegalStateException("native delete epoch is absent"));

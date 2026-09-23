@@ -2682,26 +2682,29 @@ All 745 current-source inputs and every XML were independently rehashed; the inp
 `PASS_V2_M5_KAFKA_RUN_SOURCE_NON_PROMOTABLE`. Its native paths do not produce the synthetic competing-descriptor
 proof above. All 17 amended acceptance obligations and the five M5-E children/Final remain OPEN/null.
 
-## Successor native epoch recovers a fenced ACTIVE Cell hold (2026-09-23)
+## Successor native epoch recovers fenced ACTIVE and UNKNOWN Cell holds (2026-09-23)
 
-`M5BookKeeperNativeDeleteAuthorityV2.reconcileFencedActiveCellDelete` now releases an exact ACTIVE Cell reservation
-only after reading a strictly newer permanent GC epoch for the same physical BK ledger and verifying that epoch's
+`M5BookKeeperNativeDeleteAuthorityV2.reconcileFencedCellDelete` now releases an exact ACTIVE or callback-terminal
+UNKNOWN Cell reservation only after reading a strictly newer permanent GC epoch for the same physical BK ledger and
+verifying that epoch's
 native ownership checks. The retained hold must match the complete old native intent digest, resource and configured
 Cell. Every old delete transaction checks its old epoch in the ZooKeeper multi with ledger deletion: one that ran
-before the successor claim can only be reconciled by actual ledger observation; one that runs afterward cannot
-delete. The recovery call only releases capacity. It neither retries the old delete nor records M5 DONE or ledger
+before the successor claim requires separate actual ledger observation; one that runs afterward cannot delete.
+The recovery call only releases capacity. It neither retries the old delete nor records M5 DONE or ledger
 absence, and a same-epoch or wrong-intent attempt keeps the hold.
 
 The real BK test pauses an old deletion after it has reserved the Cell, advances the native epoch, releases the old
 hold, then delivers the delayed callback. ZooKeeper rejects its old transaction; the ledger remains present until
 a newly bound intent deletes it. Separate-JVM tests first verify the ACTIVE and terminal-UNKNOWN heads survived a
-second restart unchanged, then a fresh JVM claims a successor epoch and clears only the exact ACTIVE hold. The
+second restart unchanged, then a fresh JVM claims successor epochs and clears each exact hold. The real ledger is
+absent for ACTIVE and still the exact target for UNKNOWN, independently of Cell capacity recovery. The
 source-locked BK/Oxia runner passed 26 XML suites and 107 cases with zero failures/errors/skips. All 745 captured
 inputs and XML files were independently rehashed; the archive is
-`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-17510`, input-manifest SHA-256
-`966f35bd5e36cdb721932d9892522a56211a8f3a79182d8c3700a39aa67c1d4e`.
-This is native capacity recovery under an epoch fence, not same-epoch transport drain, protocol eligibility,
-grace, full physical dispatch or an M5-E/Final receipt. All 17 amended acceptance obligations remain OPEN/null.
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-49011`, input-manifest SHA-256
+`eed6abaa505d41bd2690664f723a563af437ab576f5e60ed433859722c0390c8`.
+This is native capacity recovery under an epoch fence. Same-epoch transport drain and UNKNOWN presence recovery,
+protocol eligibility, grace, full physical dispatch and an M5-E/Final receipt remain open. All 17 amended acceptance
+obligations remain OPEN/null.
 
 ## Remaining ordered work
 

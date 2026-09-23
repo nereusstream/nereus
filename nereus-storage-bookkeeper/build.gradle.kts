@@ -198,7 +198,7 @@ tasks.register<Test>("v2M5NativeDeleteCellBudgetRealTest") {
 mapOf(
     "Write" to "writeBeforeServerRestart",
     "Read" to "readAfterServerRestart",
-    "Recover" to "recoverFencedActiveAfterServerRestart",
+    "Recover" to "recoverFencedHoldsAfterServerRestart",
 ).forEach { (phase, method) ->
     tasks.register<Test>("v2M5NativeDeleteCellRestart${phase}Test") {
         group = "verification"

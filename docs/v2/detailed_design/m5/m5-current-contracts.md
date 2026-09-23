@@ -205,12 +205,13 @@ Two additional actual native tests verify cancelled held invocation, occupied-he
 rejection of duplicate/full/foreign-Cell dispatch, independent configured Cells, release after known pre-dispatch
 failure and native completion, and terminal-unknown retention followed by read-only absence release. Intent token and
 M5 authority digests in those low-level fixtures are synthetic. The additional separate-JVM Cell restart phases
-below establish occupied-head persistence. A newer permanent native GC epoch now permits exact ACTIVE hold release:
+below establish occupied-head persistence. A newer permanent native GC epoch now permits exact ACTIVE or
+callback-terminal UNKNOWN hold release:
 the old delete transaction checks its old epoch at the ZooKeeper server, so it either linearized before the successor
 claim or is rejected afterward. The budget checks the held resource and complete old native intent, then rereads and
 verifies the successor before removing that operation's hold. This frees only Cell capacity; it does not infer ledger
-absence, dispatch a new delete, refresh M5 eligibility or settle quota. Same-epoch transport drain and terminal-UNKNOWN
-presence recovery remain OPEN. These limits account logical native operations,
+absence, dispatch a new delete, refresh M5 eligibility or settle quota. Same-epoch transport drain and
+terminal-UNKNOWN presence recovery remain OPEN. These limits account logical native operations,
 not transport buffers, per-Binding fairness/rates or total backend storage. Cell heads are not charged to the separate
 per-resource native quota; explicit per-Cell provisioning does not establish a global Cell-count budget. Protocol
 Cell ownership, grace and complete M5 dispatch composition remain required before whole-M5 acceptance.
@@ -228,11 +229,12 @@ new deletion attempts without changing their heads. A new healthy configured Cel
 another real ledger; both occupied heads remain byte-identical afterward. Checkpoints contain fixture inputs and
 identity hashes; actual native records supply recovery observations. The runner archives both phase XMLs, hashes
 the checkpoint files and records both sets of service-restart identities/times. An additional fresh-JVM phase then
-claims a strictly newer native epoch for the retained ACTIVE operation, releases its exact Cell hold and confirms
-that the old native intent and actual ledger absence are still separately observable. A real paused-callback test
+claims strictly newer native epochs for the retained ACTIVE and UNKNOWN operations, releases each exact Cell hold,
+and confirms that the old native intents and actual ledger absence or exact presence remain separately observable.
+A real paused-callback test
 shows that a late old delete fails at the server after the successor claim, while a new intent can reserve the Cell
 and delete the still-present ledger. These checks establish conservative retention followed by qualified fencing;
-they do not free ACTIVE capacity merely because the original JVM ended, establish same-epoch transport-buffer drain,
+they do not free capacity merely because the original JVM ended, establish same-epoch transport-buffer drain,
 or supply per-Binding fairness or a complete dispatcher.
 
 The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
