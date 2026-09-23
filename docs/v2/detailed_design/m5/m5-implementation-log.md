@@ -2850,6 +2850,16 @@ manifest SHA-256 `64687ad04fb4e67e93bb7182ac01c8e7e91fc99bf8da837e8bc9b08973971a
 Full mixed catalog admission, protocol ownership, M4 RELEASED and retained-result/backend buffer accounting remain
 OPEN. All 17 acceptance rows and M5-E/Final remain OPEN/null.
 
+The same real BK/Oxia case now also closes the first generation's M4 fallback exactly, compiles the selected-plus-raw
+input with the existing semantic compiler, and publishes a second native BK generation through guarded multi-source
+tickets. Recovery reads the selected descriptor, output batches and gaps from real BK/Oxia; the previous fallback
+batch remains in the selector's active history. The focused case and the full source-locked runner passed, again
+with 26 XML suites / 110 cases or restart phases and no failures, errors or skips. The new archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-45093`; its 747-input manifest SHA-256 is
+`f184d67354dee635c2822dc8f4daf2b499a628830bc54f8a9eb73b3fe0f46418`.
+Protocol roots, key proofs and resource-birth facts in this case remain fixture-supplied; this does not establish
+complete protocol-owner admission, M4 RELEASED or any aggregate M5 authority.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

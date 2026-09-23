@@ -177,7 +177,17 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         new KafkaBookKeeperSelectedSourceV2.Bounds(128, 32, 1000, 1_000_000, 500_000),
                         published.context.owner);
                 var raw = rawReader(f, f.roots, BOUNDS, shared);
+                var oldSelected = await(selected.capture());
+                assertThat(published.context.onOwner(() -> published.context.m4.closeFallback(
+                                oldSelected.selector(),
+                                descriptor.descriptorSha256(),
+                                oldSelected.selector().sourceGeneration() + 1,
+                                published.context.protections)))
+                        .isEqualTo(
+                                com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome
+                                        .APPLIED);
                 var captured = await(selected.capture());
+                assertThat(captured.selector().mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_ONLY);
                 var plan = mixedPlan(input.plan(), captured, secondSnapshot);
                 var mixed = new KafkaBookKeeperMixedSourceV2(shared, selected, raw);
                 var members = await(mixed.resolve(plan));
@@ -199,6 +209,34 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(shared.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
                 assertNativeReadTickets(f, descriptor, 0);
                 assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+
+                var semantic = new KafkaSemanticCompactorV1().compileSemantic(plan);
+                var nextInput = new KafkaBookKeeperCompactionTestSupportV2.Input(
+                        plan,
+                        semantic,
+                        KafkaBookKeeperCompactionLayoutV2.plan(
+                                plan,
+                                semantic,
+                                f.binding.physicalNamespace(),
+                                f.source.capabilitySnapshot(),
+                                4303,
+                                512,
+                                1024),
+                        input.capabilityEvidence());
+                try (var next = new Published(f, nextInput, published.context.root)) {
+                    var nextDescriptor = next.writeAndPublish(mixed);
+                    var view = next.context.recover();
+                    assertThat(view.descriptor()).isEqualTo(nextDescriptor);
+                    assertThat(view.parsedBatches()).isEqualTo(semantic.outputBatches());
+                    assertThat(view.gaps()).isEqualTo(semantic.gaps());
+                    assertThat(view.allowsPredecessorOffset(0)).isFalse();
+                    assertThat(next.context.onOwner(() ->
+                                    next.context.m4.readSelector().orElseThrow().activeBatches()))
+                            .anyMatch(batch -> batch.sources().equals(published.context.protections));
+                    assertThat(shared.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
+                    assertNativeReadTickets(f, nextDescriptor, 0);
+                    assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+                }
             }
         }
     }
@@ -1816,7 +1854,7 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 batches,
                 previous.keyProofs(),
                 previous.transactions(),
-                previous.leaderEpochs(),
+                List.of(new KafkaCompactionRecordsV1.LeaderEpochRange(1, 0, 4)),
                 previous.undecidableOffsets(),
                 previous.recoveryRequiredOffsets());
     }
