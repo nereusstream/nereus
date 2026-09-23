@@ -2706,6 +2706,27 @@ This is native capacity recovery under an epoch fence. Same-epoch transport drai
 protocol eligibility, grace, full physical dispatch and an M5-E/Final receipt remain open. All 17 amended acceptance
 obligations remain OPEN/null.
 
+## Exact M5 INTENT dispatch through the bound BK Cell path (2026-09-23)
+
+`KafkaBookKeeperDeleteObservationAuthorityV2.dispatchBoundDelete` now carries the current Oxia M5 INTENT into the
+actual budgeted BK deletion instead of leaving the real bound-route fixture to invoke that low-level operation
+directly. The adapter requires the bound route and exact stored M5 value, native GC owner and durable intent,
+complete eligibility fact vector, exact sealed BK identity and matching dispatch token/authority digest. It repeats
+route, M5, owner, fact and native-intent checks after reading the external identity; the BK delete then reserves
+Cell dispatch/unknown capacity and atomically checks native epoch, intent and ledger metadata versions. A changed
+audit/grace fact before dispatch leaves the real ledger and Cell head unchanged; an older native intent also fails
+before reservation. After a same-service restart, the new JVM deletes through this adapter and separately
+reconciles actual absence to permanent M5 DONE and quota settlement. A successful native response alone never
+creates an M5 terminal.
+
+The source-locked BK/Oxia runner passed 26 XML suites / 107 cases with zero failures, errors or skips. All 745
+captured inputs and every XML were independently rehashed; the archive is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-91793`, input-manifest SHA-256
+`46e703db45474c967c2e28005e6ff2043e69f72f175d40c305026b4dc01d6808`. The Kafka BK module unit suite,
+Spotless and Checkstyle passed. Protocol/M4/grace facts in this real-backend fixture remain synthetic, and the
+complete writer matrix, grace authority, all-provider dispatch and M5-E/Final remain OPEN. All 17 amended
+acceptance obligations retain OPEN/null receipts.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
@@ -2722,8 +2743,8 @@ obligations remain OPEN/null.
    the coordinator. Public native GC claim/bind now require the unique bound authority route and active quota;
    native epoch/intent canonical capacity now has atomic permanent reservation. Bound native deletion also reserves
    logical dispatch/unknown slots per configured Cell. Complete protocol proof production, unaccounted-namespace
-   migration, backend provisioning, grace, per-Binding/transport admission, same-epoch ACTIVE recovery and dispatch
-   remain incomplete.
+   migration, backend provisioning, grace, per-Binding/transport admission, same-epoch ACTIVE recovery and the full
+   M5 dispatcher remain incomplete.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 

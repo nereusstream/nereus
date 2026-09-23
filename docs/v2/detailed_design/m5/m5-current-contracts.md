@@ -130,9 +130,19 @@ numeric deadline/observed-time fields alone are not proof of native time authori
 Real BK/Oxia cases verify actual GC-owner takeover and same-owner epoch refresh, forged/shadowed native fact
 rejection, exact intent binding and changed-M5-intent recovery. One fixture performs the bound low-level native delete
 and current-owner absence completion/compaction; protocol/M4 eligibility remains synthetic and M4 selection remains
-unchanged. The adapter does not prove grace or reserve Cell dispatch/unknown capacity. Native epoch/intent canonical
-capacity now has the separate reservation described below. Complete protocol proof production, unguarded legacy
+unchanged. Intent binding alone does not prove grace or reserve Cell dispatch/unknown capacity. Native epoch/intent
+canonical capacity has the separate reservation described below. Complete protocol proof production, unguarded legacy
 ledgers, all-provider dispatch and full writer coverage remain OPEN.
+
+`KafkaBookKeeperDeleteObservationAuthorityV2.dispatchBoundDelete` now joins the exact current Oxia M5 INTENT to
+its permanent BK intent and configured native Cell budget. It checks the active bound route, exact M5 value,
+native owner, complete eligibility fact vector and sealed ledger identity; after the external identity read it
+rereads the route, M5 value, owner, fact vector and native intent before reserving Cell capacity and issuing the
+server-fenced native delete. It rejects a stale native token or changed eligibility fact without dispatch or Cell
+mutation. Its result is only a native operation outcome: the coordinator must independently reconcile actual
+absence, write/compact M5 DONE and settle quota. The real BK/Oxia restart phase exercises that sequence; the
+protocol, M4 and grace facts in this fixture are synthetic, so writer closure, real source membership and full M5-D
+dispatch admission remain OPEN.
 
 `BoundPhysicalDeleteAuthorityRouteV2` now supplies explicit unique-route and active-resource admission to public GC
 claim/bind. `OxiaPhysicalMetadataNamespaceV2.openAuthorityRoute` installs actual native marker/binding revalidation;
@@ -147,10 +157,11 @@ requires a durable native intent and the Cell budget below. Failure after accept
 The bound runner adds one active-route case and two independent-JVM restart phases. They reject manually constructed
 routes, unreserved resources and grants lacking active authorities, then verify persisted native epoch/intent and
 exact M5 value/hash/version before takeover. The new owner advances native epoch, refreshes M5 intent, binds the new
-token, removes the fixture ledger through the native intent path and completes/compacts done. Durable quota settles,
+token, removes the fixture ledger through the budgeted BK adapter path and completes/compacts done. Durable quota settles,
 then rejects another claim without changing the epoch. This route uses the existing Oxia authority-byte reservation;
-it supplies neither Cell dispatch/unknown slots nor grace. Protocol/M4 eligibility remains synthetic. Complete
-cross-Cell/all-writer admission and the full dispatcher still require implementation and source-bound evidence.
+the dispatch adapter separately uses the native Cell slots, while grace and protocol/M4 eligibility remain synthetic.
+Complete cross-Cell/all-writer admission and the full M5 dispatcher still require implementation and source-bound
+evidence.
 
 `M5BookKeeperNativeDeleteQuotaV2` adds one permanent 104-byte M5NQ head at the actual BK namespace's
 `nereus-m5-native-v2/delete-capacity` path. It accounts the canonical head path/value plus both permanent epoch/intent

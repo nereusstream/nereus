@@ -126,6 +126,29 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             assertThat(nativeIntent.intentAuthoritySha256()).isEqualTo(refreshed.canonicalStoredSha256());
             assertThat(await(route.requireActiveResource(resource))).isEqualTo(f.binding);
             assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isPresent();
+            var refreshedGrace = M5TargetDeleteAuthorityCodecV1.decodeAuthority(refreshed.canonicalStoredBytes())
+                    .eligibilitySnapshot()
+                    .orElseThrow()
+                    .members()
+                    .get(0)
+                    .physicalReferences()
+                    .observations()
+                    .stream()
+                    .filter(row -> row.kind()
+                            == com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceKindV1
+                                    .AUDIT_GRACE)
+                    .findFirst()
+                    .orElseThrow()
+                    .authority();
+            var currentGrace = await(semanticFacts.read(refreshedGrace.key())).orElseThrow();
+            var heldBefore = await(f.backend.nativeDeleteCellBudget().snapshot());
+            await(semanticFacts.compareAndSet(
+                    Optional.of(currentGrace), refreshedGrace.key(), currentGrace.canonicalStoredBytes()));
+            assertThatThrownBy(() -> await(
+                            gc.dispatchBoundDelete(route, f.backend.nativeDeleteCellBudget(), refreshed, nativeIntent)))
+                    .hasRootCauseMessage("native intent eligibility authority changed: " + refreshedGrace.key());
+            assertThat(await(f.backend.nativeDeleteCellBudget().snapshot())).isEqualTo(heldBefore);
+            assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isPresent();
         }
     }
 
@@ -220,7 +243,10 @@ class KafkaBookKeeperBoundDeleteV2RealTest {
             // Low-level deletion of this test-owned fixture. Full protocol/grace/Cell admission is still separate.
             assertThatThrownBy(() -> await(nativeAuthority.deleteExact(bound, target)))
                     .hasRootCauseMessage("bound native delete requires Cell budget");
-            var deleted = await(nativeAuthority.deleteExact(cellBudget, bound, target));
+            assertThatThrownBy(() -> await(gc.dispatchBoundDelete(route, cellBudget, refreshed, previousIntent)))
+                    .hasRootCauseMessage("native binding differs from exact M5 delete intent");
+            assertThat(await(cellBudget.snapshot())).isEqualTo(originalBudget);
+            var deleted = await(gc.dispatchBoundDelete(route, cellBudget, refreshed, bound));
             assertThat(deleted.deleteResult().outcome())
                     .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
             assertThat(deleted.reservationRetained()).isFalse();

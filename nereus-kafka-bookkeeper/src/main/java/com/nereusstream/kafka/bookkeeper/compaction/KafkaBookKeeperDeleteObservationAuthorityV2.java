@@ -21,6 +21,7 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2.Snapshot;
@@ -87,6 +88,55 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
         CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireRoute(route)
                 .thenCompose(ignored -> bindIntent((ExactMetadataTransactionStoreV1) route, exactIntent))
                 .thenCompose(value -> requireRoute(route).thenApply(ignored -> value));
+        return operation.thenApply(value -> value);
+    }
+
+    /**
+     * Dispatches only the exact currently bound M5 INTENT through the configured native Cell reservation. Protocol
+     * ownership, grace and complete source membership must be supplied by the eligibility facts' real producers.
+     * A native response is not a durable M5 terminal; absence and DONE require separate reconciliation.
+     */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> dispatchBoundDelete(
+            BoundPhysicalDeleteAuthorityRouteV2 route,
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            VersionedValue exactIntent,
+            M5BookKeeperNativeDeleteIntentV2 bound) {
+        Objects.requireNonNull(budget, "budget");
+        Objects.requireNonNull(exactIntent, "exactIntent");
+        Objects.requireNonNull(bound, "bound");
+        var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());
+        var context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(intent);
+        if (!resource.authorityKey().equals(exactIntent.key())
+                || !resource.equals(intent.target().resourceId())
+                || !resource.equals(bound.epoch().resource())
+                || !bound.intentAuthoritySha256().equals(exactIntent.canonicalStoredSha256())
+                || !bound.dispatchTokenSha256()
+                        .equals(intent.deleteIntent().orElseThrow().dispatchTokenSha256())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native binding differs from exact M5 delete intent"));
+        }
+        var eligibility = intent.eligibilitySnapshot().orElseThrow();
+        var external = intent.externalIdentity().orElseThrow();
+        CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> operation = requireRoute(route)
+                .thenCompose(ignored -> requireExactIntent(route, exactIntent))
+                .thenCompose(ignored -> requireCurrent(resource, context))
+                .thenCompose(ignored -> requireFreshEligibility(route, eligibility))
+                .thenCompose(ignored -> reader.rereadTarget(external))
+                .thenCompose(target -> {
+                    var exactTarget = target.orElseThrow(
+                            () -> new IllegalStateException("native target is absent; reconcile M5 done"));
+                    if (!bound.ledgerMetadataSha256().equals(exactTarget.metadataSha256())) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalStateException("native binding differs from exact BK ledger identity"));
+                    }
+                    return requireRoute(route)
+                            .thenCompose(ignored -> requireExactIntent(route, exactIntent))
+                            .thenCompose(ignored -> requireCurrent(resource, context))
+                            .thenCompose(ignored -> requireFreshEligibility(route, eligibility))
+                            .thenCompose(ignored -> nativeAuthority.requireIntent(bound))
+                            .thenCompose(ignored -> nativeAuthority.deleteExact(budget, bound, exactTarget));
+                });
+        // The exposed observer cannot cancel an admitted native deletion or its Cell cleanup.
         return operation.thenApply(value -> value);
     }
 
