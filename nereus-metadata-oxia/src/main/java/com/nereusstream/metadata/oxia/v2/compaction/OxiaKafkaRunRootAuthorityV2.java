@@ -232,6 +232,9 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
                 if (!current.initialLink().equals(candidate.initialLink())) {
                     return CompletableFuture.completedFuture(Optional.of(conflict(current.encode())));
                 }
+                if (current.retired()) {
+                    return CompletableFuture.completedFuture(Optional.of(conflict(current.encode())));
+                }
                 if (candidate.root().state() == KafkaRunRootStateV1.SEALED) {
                     return CompletableFuture.completedFuture(
                             current.root().state() == KafkaRunRootStateV1.SEALED
@@ -256,11 +259,23 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
     }
 
     private CompletionStage<Optional<Terminal>> rejectedChoice(KafkaRunRootRecordV2 candidate) {
+        if (candidate.root().predecessorRunId().isPresent()) {
+            return read(candidate.root().predecessorRunId().orElseThrow())
+                    .thenApply(parent -> parent.flatMap(value -> value.value().retired()
+                            ? Optional.of(conflict(value.value().encode()))
+                            : value.value()
+                                    .successor()
+                                    .filter(link -> !link.equals(candidate.initialLink()))
+                                    .map(link -> conflict(link.encode()))));
+        }
         return choice(candidate).thenApply(chosen -> chosen.filter(value -> !value.equals(candidate.initialLink()))
                 .map(value -> conflict(value.encode())));
     }
 
     private CompletionStage<Boolean> selected(KafkaRunRootRecordV2 candidate) {
+        if (candidate.retired()) {
+            return CompletableFuture.completedFuture(false);
+        }
         if (candidate.admitted()) {
             return CompletableFuture.completedFuture(true);
         }

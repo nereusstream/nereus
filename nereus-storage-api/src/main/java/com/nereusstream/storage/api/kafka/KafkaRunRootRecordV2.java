@@ -32,12 +32,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Bounded run record: unpublished prewrite, admitted root, and one irreversible successor selection. */
+/** Bounded run record: unpublished prewrite, admitted root, one successor choice, and retired read admission. */
 public record KafkaRunRootRecordV2(
         PhysicalResourceIdV2.BookKeeperLedger resource,
         KafkaRunRootSnapshotV1 root,
         boolean admitted,
-        Optional<Link> successor) {
+        Optional<Link> successor,
+        boolean retired) {
     public static final int MAX_BYTES = 32768;
     private static final int MAGIC = 0x4d354b52;
 
@@ -125,10 +126,20 @@ public record KafkaRunRootRecordV2(
         Scope.of(root);
         if (resource.ledgerId() != root.ledgerIdentity().ledgerId()
                 || !admitted && root.state() != KafkaRunRootStateV1.ACTIVE
+                || retired && (!admitted || root.state() != KafkaRunRootStateV1.SEALED)
                 || successor.isPresent() && (!admitted || root.state() != KafkaRunRootStateV1.SEALED)
                 || successor.filter(link -> link.runId().equals(root.runId())).isPresent()) {
             throw new IllegalArgumentException("run record identity, admission, or successor is invalid");
         }
+    }
+
+    /** Wire-2 source compatibility for active and sealed roots. */
+    public KafkaRunRootRecordV2(
+            PhysicalResourceIdV2.BookKeeperLedger resource,
+            KafkaRunRootSnapshotV1 root,
+            boolean admitted,
+            Optional<Link> successor) {
+        this(resource, root, admitted, successor, false);
     }
 
     public static KafkaRunRootRecordV2 pending(
@@ -145,11 +156,15 @@ public record KafkaRunRootRecordV2(
     }
 
     public KafkaRunRootRecordV2 admit() {
+        if (retired) {
+            throw new IllegalStateException("retired run cannot reopen read admission");
+        }
         return new KafkaRunRootRecordV2(resource, root, true, successor);
     }
 
     public KafkaRunRootRecordV2 seal(KafkaRunRootSnapshotV1 sealed) {
         if (!admitted
+                || retired
                 || root.state() != KafkaRunRootStateV1.ACTIVE
                 || sealed.state() != KafkaRunRootStateV1.SEALED
                 || !active(sealed).equals(root)) {
@@ -160,6 +175,7 @@ public record KafkaRunRootRecordV2(
 
     public KafkaRunRootRecordV2 select(KafkaRunRootRecordV2 child) {
         if (!admitted
+                || retired
                 || root.state() != KafkaRunRootStateV1.SEALED
                 || !resource.namespace().equals(child.resource().namespace())
                 || !Scope.of(root).equals(Scope.of(child.root()))
@@ -176,6 +192,14 @@ public record KafkaRunRootRecordV2(
         return new KafkaRunRootRecordV2(resource, root, true, Optional.of(child.initialLink()));
     }
 
+    /** Representation only; a caller must prove reference-free retirement before persisting this successor. */
+    public KafkaRunRootRecordV2 retire() {
+        if (!admitted || retired || root.state() != KafkaRunRootStateV1.SEALED) {
+            throw new IllegalStateException("only an admitted sealed run can retire once");
+        }
+        return new KafkaRunRootRecordV2(resource, root, true, successor, true);
+    }
+
     public Link initialLink() {
         return new Link(
                 root.runId(),
@@ -186,7 +210,10 @@ public record KafkaRunRootRecordV2(
         var physical = resource.canonicalBytes().toByteArray();
         var scope = Scope.of(root).encode().toByteArray();
         var out = ByteBuffer.allocate(MAX_BYTES);
-        out.putInt(MAGIC).putShort((short) 2).put((byte) (admitted ? 1 : 0));
+        out.putInt(MAGIC).putShort((short) (retired ? 3 : 2)).put((byte) (admitted ? 1 : 0));
+        if (retired) {
+            out.put((byte) 1);
+        }
         out.putInt(physical.length).put(physical).putInt(scope.length).put(scope);
         out.putLong(root.creatorOwnerEpoch())
                 .putInt(root.kafkaLeaderEpoch())
@@ -205,10 +232,15 @@ public record KafkaRunRootRecordV2(
     public static KafkaRunRootRecordV2 decode(CanonicalBytes bytes) {
         try {
             var in = verified(bytes);
-            if (in.getInt() != MAGIC || in.getShort() != 2) {
+            if (in.getInt() != MAGIC) {
+                throw new IllegalArgumentException("unknown run-root record wire");
+            }
+            short wire = in.getShort();
+            if (wire != 2 && wire != 3) {
                 throw new IllegalArgumentException("unknown run-root record wire");
             }
             boolean admitted = flag(in);
+            boolean retired = wire == 3 && flag(in);
             var physical = PhysicalResourceIdCodecV2.decode(CanonicalBytes.copyOf(take(in, in.getInt())));
             if (!(physical instanceof PhysicalResourceIdV2.BookKeeperLedger resource)) {
                 throw new IllegalArgumentException("run root has a non-BookKeeper resource");
@@ -259,7 +291,7 @@ public record KafkaRunRootRecordV2(
                     state == 1 ? OptionalLong.empty() : OptionalLong.of(end),
                     state == 1 ? KafkaRunRootStateV1.ACTIVE : KafkaRunRootStateV1.SEALED,
                     predecessor);
-            var value = new KafkaRunRootRecordV2(resource, root, admitted, successor);
+            var value = new KafkaRunRootRecordV2(resource, root, admitted, successor, retired);
             if (in.hasRemaining() || !value.encode().equals(bytes)) {
                 throw new IllegalArgumentException("noncanonical run-root record");
             }

@@ -2957,6 +2957,22 @@ legacy cases, with zero failures, errors or skips. Archive:
 This is fixture qualification, not complete source retirement or physical-delete authority. All 17 acceptance
 obligations and M5-E/Final remain OPEN/null.
 
+## Additive run-root retirement representation and read veto (2026-09-23)
+
+The native Kafka run-root codec retains exact wire-2 bytes for pending, ACTIVE and SEALED records and accepts an
+additive wire-3 retired record. Retirement preserves the immutable initial selection identity, sealed root and any
+successor link; the Oxia catalog no longer admits that record as a readable raw source. Stale seal retries conflict,
+and a new successor against a retired parent without a prior choice conflicts with exact physical-ticket cleanup.
+The test injects the retired record into an in-memory Oxia client to verify read and retry behavior. There is no
+production proof-bound retirement write, native restart of a retired marker, complete reference-free producer or GC
+handoff; the existing real selected root is still live.
+
+The focused Oxia run-root test and style checks passed. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 26
+source-locked suites / 112 cases or restart phases and 83 legacy cases, with zero failures, errors or skips across
+actual BK/Oxia service restarts. Archive: `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-77255`;
+747-input manifest SHA-256: `543dd65602b415c561f0de56e202ea0edc66a7b254b1f5f46bd9542626f3530d`.
+All 17 acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

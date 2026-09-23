@@ -62,11 +62,16 @@ class OxiaKafkaRunRootAuthorityV2Test {
         var sealed = active.admit().seal(sealed(active.root(), 10));
         var child = f.record(root(2, 1, 10));
         var chosen = sealed.select(child);
-        for (var record : List.of(active, active.admit(), sealed, chosen)) {
+        var retired = chosen.retire();
+        for (var record : List.of(active, active.admit(), sealed, chosen, retired)) {
             assertThat(KafkaRunRootRecordV2.decode(record.encode())).isEqualTo(record);
             assertThat(record.initialLink()).isEqualTo(active.initialLink());
             assertThat(record.encode().length()).isLessThan(1024);
         }
+        assertThat(retired.retired()).isTrue();
+        assertThatThrownBy(retired::admit).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(retired::retire).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> retired.select(child)).isInstanceOf(IllegalArgumentException.class);
         assertThat(KafkaRunRootRecordV2.Link.decode(child.initialLink().encode()))
                 .isEqualTo(child.initialLink());
         assertThatThrownBy(() -> chosen.select(f.record(root(3, 1, 10)))).isInstanceOf(IllegalArgumentException.class);
@@ -101,6 +106,49 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThat(f.tickets(b)).isZero();
         assertThat(f.verifications).isEqualTo(3);
         assertThat(join(f.roots.createRoot(a)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+    }
+
+    @Test
+    void retiredRecordClosesReadAdmissionWithoutErasingItsSuccessorChoice() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        var b = root(2, 1, 10);
+        f.admit(a, b);
+        assertThat(join(f.roots.createRoot(a)).exactProof()).contains(a);
+        var sealed = sealed(a, 10);
+        assertThat(join(f.roots.sealRoot(a, sealed)).exactProof()).contains(sealed);
+        assertThat(join(f.roots.createSuccessor(sealed, b)).exactProof()).contains(b);
+        var old = f.stored(a);
+        var retired = old.retire();
+        f.client.put(f.roots.nativeRootKey(a.runId()), retired.encode());
+
+        assertThat(f.stored(a)).isEqualTo(retired);
+        assertThat(f.stored(a).successor()).isEqualTo(old.successor());
+        assertThat(f.stored(a).initialLink()).isEqualTo(old.initialLink());
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .isEmpty();
+        assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
+        assertThat(join(f.roots.sealRoot(a, sealed)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+    }
+
+    @Test
+    void retiredParentWithoutSuccessorFencesNewChildAndReleasesPhysicalTickets() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        var b = root(2, 1, 10);
+        f.admit(a, b);
+        assertThat(join(f.roots.createRoot(a)).exactProof()).contains(a);
+        var sealed = sealed(a, 10);
+        assertThat(join(f.roots.sealRoot(a, sealed)).exactProof()).contains(sealed);
+        f.client.put(f.roots.nativeRootKey(a.runId()), f.stored(a).retire().encode());
+
+        assertThat(join(f.roots.createSuccessor(sealed, b)).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(b.runId()))))
+                .isEmpty();
+        assertThat(f.tickets(a)).isZero();
+        assertThat(f.tickets(b)).isZero();
     }
 
     @Test
