@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.bookkeeper.compaction;
 
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,10 +46,15 @@ public final class KafkaBookKeeperReadCellBudgetV2 {
                     Math.multiplyExact((long) capacity, bounds.decodedBytes()));
         }
 
-        /** Native frames and retained canonical payload have separate configured allowances. */
+        /** Reserve both bounded root snapshots as well as native frames and retained canonical payload. */
         public static Usage forRunSource(KafkaBookKeeperRunSourceV2.Bounds bounds) {
             Objects.requireNonNull(bounds, "bounds");
-            return new Usage(1, 1, Math.addExact(bounds.nativeBytes(), bounds.payloadBytes()), bounds.decodedBytes());
+            long roots = Math.multiplyExact(2L, KafkaRunRootRecordV2.MAX_BYTES);
+            return new Usage(
+                    1,
+                    1,
+                    Math.addExact(Math.addExact(bounds.nativeBytes(), bounds.payloadBytes()), roots),
+                    bounds.decodedBytes());
         }
 
         Usage plus(Usage other) {

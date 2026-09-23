@@ -2973,6 +2973,21 @@ actual BK/Oxia service restarts. Archive: `build/m5-kafka-run-source/nereus-v2-m
 747-input manifest SHA-256: `543dd65602b415c561f0de56e202ea0edc66a7b254b1f5f46bd9542626f3530d`.
 All 17 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Raw-run root-read Cell reservation (2026-09-23)
+
+The raw BK run reader now reserves two maximum-size canonical run-root records in its fixed Binding/Cell encoded-byte
+share before its first selected-root catalog read. This covers the initial selected root and the reread after scanning;
+the existing real-path test checks the new charge. Other metadata discovery, codec scratch, backend buffers and
+transport queues are still outside complete Cell memory/I/O accounting. Root retirement remains a read veto only:
+there is no production proof-bound retirement mutation or physical-delete handoff.
+
+Compilation, Spotless and Checkstyle passed. `scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 source-locked
+BK/Oxia suites / 112 cases or restart phases and 83 legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-20270`; 747-input manifest SHA-256:
+`b1acd9bfa478aeccb06d18b34530a53a8598a0fde7d5fcd0b6ab9d1bcbce577d`. The 747 source hashes and 26 XML
+suites, plus 732 legacy source hashes and 21 legacy XML suites, were independently rechecked. All 17 acceptance
+obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

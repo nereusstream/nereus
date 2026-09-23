@@ -643,7 +643,8 @@ class KafkaBookKeeperRunSourceV2RealTest {
                     M5MaterializationCodecV1.calculateSourceSetSha256(extents),
                     extents);
             var charge = KafkaBookKeeperReadCellBudgetV2.Usage.forRunSource(BOUNDS);
-            assertThat(charge.encodedBytes()).isEqualTo(BOUNDS.nativeBytes() + BOUNDS.payloadBytes());
+            assertThat(charge.encodedBytes())
+                    .isEqualTo(BOUNDS.nativeBytes() + BOUNDS.payloadBytes() + 2L * KafkaRunRootRecordV2.MAX_BYTES);
             var shared = new KafkaBookKeeperReadCellBudgetV2(
                     f.scope.providerScope(), charge, java.util.Map.of(one.binding(), charge));
             try (var published = new Published(f, input, NativeContext.root())) {
