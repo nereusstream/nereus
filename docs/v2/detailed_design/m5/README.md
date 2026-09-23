@@ -255,13 +255,14 @@ composition remain OPEN; this result creates no M5-E child or aggregate Final.
   native session creation through actual read/session termination. It closes local admission before exact M4 closure
   and supports exact retry after unknown response. Its public entry now requires fixed process-local Cell/Binding
   shares for owner count, read slots and configured encoded/decoded bytes, retained through native read/session
-  termination. Six owner tests, seven unchanged M4 recovery tests and three native owner cases pass within the current
-  104-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
+  termination. Seven owner tests, seven unchanged M4 recovery tests and three native owner cases pass within the current
+  110-case/phase bound run. A healthy Binding reads while its same-Cell sibling remains held. After confirmed native
   termination, an exact-operation retry handle can finish unresolved physical ticket cleanup without clearing a live
   same-Context reader; unknown close grants no handle. Selected-generation compaction capture/resolution now requires
   the same shared budget and uses the scoped owner's M4 planner/hazard/session lifetime, including native restart.
-  It creates no M4 terminal or RELEASED record; global process admission, full cache/transport budgeting
-  and crash reconciliation remain required.
+  The owner creates no M4 terminal/proof. With a test-supplied terminal/proof after actual native drain, it releases
+  the old source protection through its own hazard pool; M5 eligibility rereads that exact Oxia version. Global
+  protocol admission, full cache/transport budgeting, crash reconciliation and physical-delete eligibility remain required.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

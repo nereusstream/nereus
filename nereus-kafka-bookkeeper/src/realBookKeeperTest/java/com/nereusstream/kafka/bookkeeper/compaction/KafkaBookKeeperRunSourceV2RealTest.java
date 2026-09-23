@@ -32,7 +32,9 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootCatalogV2;
@@ -52,6 +54,8 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.M4ReleaseBindingV1;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
@@ -59,6 +63,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -1095,6 +1100,66 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         .get(keys.protection(old.sourceIdentitySha256(), old.protectionGeneration()))
                         .orElseThrow()));
                 assertThat(released.state()).isEqualTo(M4ReadControlRecordsV1.ProtectionState.RELEASED);
+                String protectionKey = keys.protection(old.sourceIdentitySha256(), old.protectionGeneration());
+                var storedRelease =
+                        await(published.context.route.read(protectionKey)).orElseThrow();
+                assertThat(storedRelease.canonicalStoredBytes())
+                        .isEqualTo(M4ReadControlCodecV1.encodeProtection(released));
+                var release = new M4ReleaseBindingV1(
+                        old.sourceIdentitySha256(),
+                        old.protectionGeneration(),
+                        new AuthorityFactV1(
+                                protectionKey, storedRelease.metadataVersion(), storedRelease.canonicalStoredSha256()),
+                        storedRelease.canonicalStoredBytes(),
+                        released.releasedByBatchSha256().orElseThrow(),
+                        released.releaseProofHeadSha256().orElseThrow());
+                var oldLedger = new PhysicalResourceIdV2.BookKeeperLedger(
+                        f.binding.physicalNamespace(), root.ledgerIdentity().ledgerId());
+                var rawFacts = new Oxia09ExactMetadataTransactionStoreV1(f.oxia);
+                var eligibility = SyntheticDeleteAuthorityFixturesV2.replacement(
+                        oldLedger,
+                        1,
+                        (suffix, bytes) -> {
+                            String key = "/m5-native-read-owner-facts/"
+                                    + oldLedger.sha256().toHex() + suffix;
+                            if (rawFacts.read(key).toCompletableFuture().join().isEmpty()) {
+                                rawFacts.compareAndSet(Optional.empty(), key, bytes)
+                                        .toCompletableFuture()
+                                        .join();
+                            }
+                            var fact = rawFacts.read(key)
+                                    .toCompletableFuture()
+                                    .join()
+                                    .orElseThrow();
+                            assertThat(fact.canonicalStoredBytes()).isEqualTo(bytes);
+                            return new AuthorityFactV1(key, fact.metadataVersion(), fact.canonicalStoredSha256());
+                        },
+                        release);
+                var facts = new ExactMetadataTransactionStoreV1() {
+                    @Override
+                    public CompletionStage<Optional<VersionedValue>> read(String key) {
+                        return key.equals(protectionKey) ? published.context.route.read(key) : rawFacts.read(key);
+                    }
+
+                    @Override
+                    public CompletionStage<MutationOutcome> compareAndSet(
+                            Optional<VersionedValue> expected, String key, CanonicalBytes candidate) {
+                        return CompletableFuture.failedFuture(new UnsupportedOperationException("read-only facts"));
+                    }
+
+                    @Override
+                    public CompletionStage<TransactionOutcome> conditionalTransaction(ExactTransaction transaction) {
+                        return CompletableFuture.failedFuture(new UnsupportedOperationException("read-only facts"));
+                    }
+
+                    @Override
+                    public boolean supportsAtomicMultiKeyTransactions() {
+                        return false;
+                    }
+                };
+                var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(
+                        f.source, f.handles.get(root.runId()), UUID.randomUUID());
+                await(gc.requireFreshEligibility(facts, eligibility));
             }
         }
     }

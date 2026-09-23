@@ -2926,6 +2926,21 @@ phases and 83 legacy cases, zero failures, errors or skips. Archive:
 `0599c7d454fc7feaf93ac2da2de5477cfbbb4869e620dfb36ddd94e774c866f9`.
 All 17 acceptance obligations and M5-E/Final remain OPEN/null.
 
+## Native M4 release reread by M5 eligibility (2026-09-23)
+
+The existing BK/Oxia slow-read case now constructs its M5 replacement-eligibility snapshot with the exact M4
+`RELEASED` bytes and native metadata version produced by the scoped read owner. The M4 fact is read through its
+Binding lifecycle route; synthetic floor, reference, semantic and namespace facts remain on a separate Oxia route.
+The production M5 eligibility freshness check rereads each fact from its matching route and accepts the real M4
+protection key/version. This verifies the M4-to-M5 version-vector handoff without replacing the missing protocol
+terminal authority, complete source inventory, grace, writer admission or physical dispatch.
+
+`scripts/run-v2-m5-kafka-run-source-check.sh` passed 26 target XML suites / 110 cases or restart phases and 83
+legacy cases, with zero failures, errors or skips. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-43277`; 747-input manifest SHA-256:
+`3e2063fdbe59892ce81a8a2eff22e7d4ea76999ab24e22d7c8ab506edf7c0e46`.
+All 17 acceptance obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

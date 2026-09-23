@@ -539,10 +539,14 @@ local admission, waits for accepted reads and native session termination, then r
 exact M4 closure path closes local admission before CAS; unknown/conflicting closure cannot return local drain
 material, and exact retry retains the old read until actual completion. Cancellation of reads, work or an outer
 observer cannot bypass cleanup; an ended owner cannot issue another read or late selector transition. Native delayed
-read/close verification passes. Its privately constructed local evidence is not an M4 terminal/proof or RELEASED
-record. Public `run` now requires the fixed process-local Cell reservation below. Full protocol-owner population
-admission, retained result-cache/backend transport accounting, crash-ticket reconciliation and actual M4 release remain
-OPEN. Existing service-restart cases do not prove reconstruction of this owner's local drain.
+read/close verification passes. Its privately constructed local evidence is not an M4 terminal/proof. After the
+native session terminates, the same owner can release its old protection through the hazard pool that admitted its
+reads; a real BK/Oxia case confirms the canonical `RELEASED` version is then reread by M5 eligibility. That case
+supplies the planned terminal/proof and all other eligibility facts as fixtures, so it does not establish complete
+protocol-owner quiescence or physical-delete eligibility. Public `run` requires the fixed process-local Cell
+reservation below. Full protocol-owner population admission, retained result-cache/backend transport accounting
+and crash-ticket reconciliation remain OPEN. Existing service-restart cases do not prove reconstruction of this
+owner's local drain.
 
 `KafkaBookKeeperReadCellBudgetV2` fixes a Cell's admitted Binding shares before use. Full Binding identity includes
 BindingId, incarnation and storage epoch; a changed epoch or foreign Cell cannot consume another share. At most

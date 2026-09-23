@@ -28,8 +28,10 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Proof
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.M4ReleaseBindingV1;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 /** Synthetic deletion proofs for unit/native metadata-storage tests only; no actual Provider/BK delete is certified. */
@@ -91,6 +93,22 @@ public final class SyntheticDeleteAuthorityFixturesV2 {
                 0,
                 PositionDomain.KAFKA_OFFSET,
                 facts::apply);
+    }
+
+    /** Synthetic non-M4 facts with one exact M4 release supplied by a native read-owner case. */
+    public static DeleteEligibilitySnapshotV2 replacement(
+            PhysicalResourceIdV2 resource,
+            long generation,
+            BiFunction<String, CanonicalBytes, AuthorityFactV1> facts,
+            M4ReleaseBindingV1 release) {
+        return M5DeleteEligibilityTestFixtures.snapshot(
+                resource,
+                DeleteEligibilitySnapshotV2.ReclamationReason.REPLACED_REPRESENTATION,
+                generation,
+                0,
+                PositionDomain.KAFKA_OFFSET,
+                facts::apply,
+                Optional.of(release));
     }
 
     public static Sha256Digest digest(String value) {

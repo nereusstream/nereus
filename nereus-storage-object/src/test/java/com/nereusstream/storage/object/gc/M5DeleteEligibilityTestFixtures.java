@@ -112,9 +112,26 @@ final class M5DeleteEligibilityTestFixtures {
             long floor,
             PositionDomain domain,
             FactFactory facts) {
-        var binding =
-                new BindingIdentity(new TopicBindingId(digest("binding")), digest("incarnation"), digest("epoch"));
-        var capability = new CapabilityBinding(1, digest("capability"));
+        return snapshot(resource, reason, generation, floor, domain, facts, Optional.empty());
+    }
+
+    static DeleteEligibilitySnapshotV2 snapshot(
+            PhysicalResourceIdV2 resource,
+            ReclamationReason reason,
+            long generation,
+            long floor,
+            PositionDomain domain,
+            FactFactory facts,
+            Optional<M4ReleaseBindingV1> actualRelease) {
+        var actualProtection =
+                actualRelease.map(value -> M4ReadControlCodecV1.decodeProtection(value.canonicalProtectionBytes()));
+        var binding = actualProtection
+                .map(SourceProtection::binding)
+                .orElseGet(() -> new BindingIdentity(
+                        new TopicBindingId(digest("binding")), digest("incarnation"), digest("epoch")));
+        var capability = actualProtection
+                .map(value -> value.identity().capability())
+                .orElseGet(() -> new CapabilityBinding(1, digest("capability")));
         var identity = new IdentityEnvelope(digest("cell"), digest("scope"), binding, 1, 1, 1, capability);
         var coverage = new ProtocolCoverage(domain, 0, 100);
         var floorRows = Arrays.stream(FloorClassV1.values())
@@ -145,21 +162,23 @@ final class M5DeleteEligibilityTestFixtures {
                 1,
                 capability);
         var trimBytes = M5RetentionCodecV1.encodeTrimFrontier(trim);
-        var releaseBytes = M4ReadControlCodecV1.encodeProtection(new SourceProtection(
-                binding,
-                new SourceProtectionIdentity(digest("m4-source"), 1, 1, 1, capability),
-                ProtectionState.RELEASED,
-                Optional.of(digest("m4-batch")),
-                Optional.of(digest("m4-proof-head"))));
-        var release = new M4ReleaseBindingV1(
-                digest("m4-source"),
-                1,
-                facts.create(
-                        "/cell/" + new M4ReadControlKeysV1(7, binding).protection(digest("m4-source"), 1),
-                        releaseBytes),
-                releaseBytes,
-                digest("m4-batch"),
-                digest("m4-proof-head"));
+        var release = actualRelease.orElseGet(() -> {
+            var releaseBytes = M4ReadControlCodecV1.encodeProtection(new SourceProtection(
+                    binding,
+                    new SourceProtectionIdentity(digest("m4-source"), 1, 1, 1, capability),
+                    ProtectionState.RELEASED,
+                    Optional.of(digest("m4-batch")),
+                    Optional.of(digest("m4-proof-head"))));
+            return new M4ReleaseBindingV1(
+                    digest("m4-source"),
+                    1,
+                    facts.create(
+                            "/cell/" + new M4ReadControlKeysV1(7, binding).protection(digest("m4-source"), 1),
+                            releaseBytes),
+                    releaseBytes,
+                    digest("m4-batch"),
+                    digest("m4-proof-head"));
+        });
         var references = Arrays.stream(ReferenceKindV1.values())
                 .map(kind -> new ReferenceObservationV1(
                         kind,
