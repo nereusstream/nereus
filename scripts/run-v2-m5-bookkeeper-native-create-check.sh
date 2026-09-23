@@ -66,7 +66,7 @@ paths.extend([root/'nereus-storage-bookkeeper/build.gradle.kts',
 manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 (out/'tested-inputs.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY
-"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --rerun-tasks \
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=1 --rerun-tasks \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   "-Pv2M5RetentionOxiaServiceAddress=127.0.0.1:$m5_port" \
   "-Pv2M5BookKeeperOxiaRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
@@ -89,7 +89,7 @@ test "$(docker inspect --format '{{.Image}}' "$m5_oxia_owned_id")" = "$m5_oxia_i
 m5_started_after="$(docker inspect --format '{{.State.StartedAt}}' "$m5_oxia_owned_id")"
 test "$m5_started_before" != "$m5_started_after"
 m5_wait_ready
-"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache \
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=1 \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   "-Pv2M5RetentionOxiaServiceAddress=127.0.0.1:$m5_port" \
   "-Pv2M5BookKeeperOxiaRestartCheckpoint=$m5_output/restart-checkpoint.txt" \
@@ -113,7 +113,7 @@ suites=[]
 for module,task,name,count in (
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
     ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',9),
-    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',3),
+    ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRealTest','KafkaBookKeeperNativeCreateV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartWriteTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperNativeCreateRestartReadTest','KafkaBookKeeperNativeCreateV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperOxiaControlRealTest','KafkaBookKeeperOxiaControlV2RealTest',5),

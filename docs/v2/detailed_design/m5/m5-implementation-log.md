@@ -2860,6 +2860,25 @@ with 26 XML suites / 110 cases or restart phases and no failures, errors or skip
 Protocol roots, key proofs and resource-birth facts in this case remain fixture-supplied; this does not establish
 complete protocol-owner admission, M4 RELEASED or any aggregate M5 authority.
 
+## BK reservation reread uncertainty and native-create source lock (2026-09-23)
+
+After an uncertain native ZooKeeper reservation create, a failed reconciliation read used to become
+`BKLedgerExistException`, which classified a possibly applied reservation as a definitive conflict. The guard now
+reports the read failure as an uncertain ZooKeeper result; an exact matching read still reconciles success, and an
+exact nonmatching record remains a conflict. A real BK fault case loses the committed create response and the
+following read response, verifies the uncertain result, and then observes the durable reservation. The native-create
+suite has 9 real BK cases, all passing.
+
+`scripts/run-v2-m5-bookkeeper-native-create-check.sh` now runs its Gradle graph with one worker so the existing
+unmodified M4 control-capacity latency assertion is measured without competing Gradle tasks. Its native-create
+evidence inventory also matches the current 9-case storage and 4-case Kafka suites. The complete source-locked
+runner passed 10 archived XML suites / 37 cases or restart phases, with zero failures, errors or skips, including
+BK/Oxia service restarts and exact input rehash. Archive:
+`build/m5-bookkeeper-native-create/nereus-v2-m5-bk-native-create-10793`; input-manifest SHA-256:
+`5cb70adae38acc6b99736280b322fdc5f137a8806ed25136094705b7825dc0d3`.
+Resource-birth OPEN facts and protocol ownership remain fixture-supplied. This result creates no M5 receipt,
+aggregate/source-bound Final or production authority; all 17 amended acceptance obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;
