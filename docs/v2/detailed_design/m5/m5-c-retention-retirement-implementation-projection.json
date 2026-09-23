@@ -24,9 +24,12 @@
     "serverImagePlatform": "linux/arm64",
     "serverImageRecipeSha256": "31388e201ce95fd61c1505a8628a66993ec8c070ba02ad5f71aa647ae066d238",
     "tests": [
+      "nativeM4ReleaseIsConsumedByM5BindingFence",
       "bindingAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
       "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart"
     ],
+    "canonicalM4ReleaseKeyRequired": true,
+    "nativeM4ReleaseFixtureTerminalAndDrain": "SYNTHETIC",
     "clientReconnectRequired": true,
     "stalePredecessorRejected": true,
     "atomicMultiKeyTransactionUsed": false

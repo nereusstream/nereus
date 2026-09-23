@@ -2591,6 +2591,25 @@ was independently checked by `/tmp/nereus-m5-raw-pre-admit-verify.py` and record
 All 17 amended acceptance obligations remain OPEN/null; the five M5-E children and aggregate Final remain
 outstanding, and the three M6-deferred rows remain PLANNED/null.
 
+## Canonical M4 release to M5 fence on native Oxia (2026-09-23)
+
+The M5 Binding retirement coordinator now checks that a release supplied for a canonical M4 selector comes from
+that Binding's exact canonical `protections/<source>-<generation>` key. The check runs both when fencing and when
+retiring the BatchId. A versioned `RELEASED` value at another key cannot substitute for the M4 source-protection
+authority, even if its canonical bytes and BatchId match. Legacy noncanonical M5-C fixture keys remain supported;
+they do not establish production M4 provenance.
+
+The source-locked real Oxia test now runs `M4ReadControlCoordinatorV1` through the canonical Cell/shard adapter:
+it creates admitted capability and `PROTECTED` source authority, introduces and closes fallback, publishes a
+terminal/proof, and applies `releaseProtection`. M5 then reads the same Oxia selector, proof head and versioned
+protection, enrolls its writer and fences the exact BatchId. Copying the released bytes to another native Oxia key
+is rejected before the fence, leaving the selector unchanged. The final
+`scripts/run-v2-m5-retention-retirement-check.sh` run passed 61 Gradle tasks, including the three real Oxia
+integration cases, Checkstyle, Spotless and contract/source checks. This is implementation evidence only: the test
+terminal and drain facts are controlled fixtures, not a native read-owner drain or production release producer.
+The other two M5-C Oxia cases still use synthetic release facts. No M5-E child, Final or scenario promotion is
+claimed; all 17 amended obligations remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

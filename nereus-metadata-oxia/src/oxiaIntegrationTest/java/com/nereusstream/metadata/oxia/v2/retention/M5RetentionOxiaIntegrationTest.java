@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia.v2.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.aggregate.FrameEncodingPolicyValueV1;
 import com.nereusstream.domain.aggregate.InitialStorageEpochV1;
 import com.nereusstream.domain.aggregate.PolicyCatalogDigest;
@@ -38,6 +39,7 @@ import com.nereusstream.domain.protocol.PulsarPersistenceName;
 import com.nereusstream.domain.protocol.PulsarProtocolCellIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicName;
+import com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStore;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorValueV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
@@ -46,16 +48,25 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.V
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityEvidence;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityKind;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ProtectionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadAdmissionEpochTerminalCut;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadQuiescenceProof;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.TerminalKind;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingAuthorityStateV1;
 import com.nereusstream.storage.object.retention.M5BindingRetirementCoordinatorV1;
@@ -101,6 +112,159 @@ class M5RetentionOxiaIntegrationTest {
             new IdentityEnvelope(digest("m5-cell"), digest("m5-provider"), BINDING, 11, 13, 17, CAPABILITY);
     private static final ProtocolCoverage COVERAGE = new ProtocolCoverage(PositionDomain.KAFKA_OFFSET, 0, 1_000);
     private static final Sha256Digest PLACEHOLDER = digest("m5-placeholder");
+
+    @Test
+    void nativeM4ReleaseIsConsumedByM5BindingFence() throws Exception {
+        String root = "/nereus/v2/m5/retention/m4-release-" + UUID.randomUUID();
+        int shard = 7;
+        M4ReadControlKeysV1 keys = new M4ReadControlKeysV1(shard, BINDING);
+        CapabilityEvidence evidence = new CapabilityEvidence(
+                BINDING,
+                1,
+                1,
+                CapabilityKind.DURABLE_DRAIN_ONLY_V1,
+                CapabilityState.ADMITTED,
+                digest("m4-adapter"),
+                digest("m4-backend"),
+                digest("m4-contract"),
+                digest("m4-verifier"),
+                digest("m4-receipt-id"),
+                digest("m4-receipt"),
+                digest("m4-clock"),
+                10_000,
+                0,
+                0);
+        CapabilityBinding capability =
+                new CapabilityBinding(1, M4ReadControlCodecV1.capabilityEvidenceSha256(evidence));
+        SourceProtectionIdentity source = new SourceProtectionIdentity(digest("m4-native-source"), 1, 2, 7, capability);
+        BindingReadSelector initial = new BindingReadSelector(
+                BINDING,
+                digest("m4-initial-view"),
+                1,
+                1,
+                7,
+                SelectorMode.PREFERRED_ONLY,
+                AdmissionState.ADMITTING,
+                Optional.empty(),
+                capability,
+                List.of(),
+                List.of());
+
+        try (AsyncOxiaClient client = connect()) {
+            Oxia09ExactMetadataTransactionStoreV1 exact = new Oxia09ExactMetadataTransactionStoreV1(client);
+            M4ReadControlCoordinatorV1 m4 = new M4ReadControlCoordinatorV1(
+                    new OxiaCanonicalControlMetadataStore(client, root, shard), shard, BINDING);
+            assertThat(m4.createCapability(evidence)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            assertThat(m4.createSelector(initial)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            assertThat(m4.createProtection(new SourceProtection(
+                            BINDING, source, ProtectionState.PROTECTED, Optional.empty(), Optional.empty())))
+                    .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            assertThat(m4.introduceFallback(initial, digest("m4-fallback-view"), 8, List.of(source)))
+                    .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            BindingReadSelector fallback = m4.readSelector().orElseThrow();
+            assertThat(m4.closeFallback(fallback, digest("m4-preferred-view"), 9, List.of(source)))
+                    .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            BindingReadSelector closed = m4.readSelector().orElseThrow();
+            SourceRetirementBatch batch = closed.activeBatches().get(0);
+            var anchor = closed.pendingAnchors().get(0);
+            ReadAdmissionEpochTerminalCut terminal = new ReadAdmissionEpochTerminalCut(
+                    BINDING,
+                    M4ReadControlCodecV1.anchorSha256(anchor),
+                    2,
+                    1,
+                    8,
+                    1_000,
+                    capability,
+                    TerminalKind.PLANNED_DRAIN,
+                    digest("m4-closed"),
+                    digest("m4-drained"),
+                    0,
+                    0,
+                    1);
+            assertThat(m4.publishTerminal(terminal)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            ReadQuiescenceProof draft = new ReadQuiescenceProof(
+                    BINDING,
+                    2,
+                    M4ReadControlCodecV1.terminalSha256(terminal),
+                    8,
+                    1_000,
+                    capability,
+                    terminal.kind(),
+                    digest("m4-proof-placeholder"));
+            ReadQuiescenceProof proof = new ReadQuiescenceProof(
+                    draft.binding(),
+                    draft.readAdmissionEpoch(),
+                    draft.terminalCutSha256(),
+                    draft.drainedThroughReadViewGeneration(),
+                    draft.safeAfterAuthorityTimeMillis(),
+                    draft.capability(),
+                    draft.kind(),
+                    M4ReadControlCodecV1.calculateProofIdentity(draft));
+            assertThat(m4.publishProof(proof)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            assertThat(m4.releaseProtection(batch, source, new BindingReadHazardPoolV1(2, 4)))
+                    .isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+
+            String selectorKey = root + "/" + keys.selector();
+            String protectionKey =
+                    root + "/" + keys.protection(source.sourceIdentitySha256(), source.protectionGeneration());
+            VersionedValue released = read(exact, protectionKey);
+            SourceProtection decoded = M4ReadControlCodecV1.decodeProtection(released.canonicalStoredBytes());
+            VersionedValue head = read(exact, root + "/" + keys.proofHead());
+            assertThat(decoded.state()).isEqualTo(ProtectionState.RELEASED);
+            assertThat(decoded.releaseProofHeadSha256()).contains(head.canonicalStoredSha256());
+            M4ReleaseBindingV1 release = new M4ReleaseBindingV1(
+                    source.sourceIdentitySha256(),
+                    source.protectionGeneration(),
+                    fact(released),
+                    released.canonicalStoredBytes(),
+                    batch.batchIdSha256(),
+                    head.canonicalStoredSha256());
+
+            M5BindingRetirementCoordinatorV1 m5 = new M5BindingRetirementCoordinatorV1(exact);
+            VersionedValue open = read(exact, selectorKey);
+            assertThat(M5BindingAuthorityCodecV1.projectSelector(open.canonicalStoredBytes()))
+                    .isEqualTo(closed);
+            assertThat(m5.enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                                    selectorKey, open, registry(capability).enrollment()))
+                            .toCompletableFuture()
+                            .join())
+                    .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+            open = read(exact, selectorKey);
+            VersionedValue forged = create(exact, root + "/forged-release", released.canonicalStoredBytes());
+            M4ReleaseBindingV1 wrongKey = new M4ReleaseBindingV1(
+                    source.sourceIdentitySha256(),
+                    source.protectionGeneration(),
+                    fact(forged),
+                    forged.canonicalStoredBytes(),
+                    batch.batchIdSha256(),
+                    head.canonicalStoredSha256());
+            VersionedValue exactOpen = open;
+            assertThatThrownBy(() -> m5.fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                    selectorKey,
+                                    exactOpen,
+                                    batch.batchIdSha256(),
+                                    digest("m4-wrong-key"),
+                                    List.of(wrongKey)))
+                            .toCompletableFuture()
+                            .join())
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                    .hasRootCauseMessage("M4 release is not at the canonical source-protection key");
+            assertThat(read(exact, selectorKey)).isEqualTo(open);
+            assertThat(m5.fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                    selectorKey,
+                                    open,
+                                    batch.batchIdSha256(),
+                                    digest("m4-native-fence"),
+                                    List.of(release)))
+                            .toCompletableFuture()
+                            .join())
+                    .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+            assertThat(M5BindingAuthorityCodecV1.decodeAuthority(
+                                    read(exact, selectorKey).canonicalStoredBytes())
+                            .state())
+                    .isEqualTo(BindingAuthorityStateV1.REFERENCE_SCAN_FENCED_V1);
+        }
+    }
 
     @Test
     void bindingAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart() throws Exception {
@@ -407,9 +571,13 @@ class M5RetentionOxiaIntegrationTest {
     }
 
     static M5ClosedWriterRegistryV1 registry() {
+        return registry(CAPABILITY);
+    }
+
+    private static M5ClosedWriterRegistryV1 registry(CapabilityBinding capability) {
         return new M5ClosedWriterRegistryV1(List.of(new WriterDeclarationV1(
                 "com.nereusstream.m5.RealOxiaClosedWriter",
-                CAPABILITY,
+                capability,
                 List.of(FloorClassV1.values()),
                 List.of(ReferenceKindV1.values()),
                 digest("m5-real-oxia-writer-source"))));

@@ -42,9 +42,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Ticket/fence/same-key retirement coordinator selected by ADR 0146. */
 public final class M5BindingRetirementCoordinatorV1 {
+    private static final Pattern CANONICAL_M4_SELECTOR =
+            Pattern.compile("^((?:/[A-Za-z0-9_-]+)*/?v2/object-wal/shards/[0-9]{10}/read-m4/([0-9a-f]{64}))/selector$");
+
     public enum Outcome {
         EXISTING_TERMINAL,
         APPLIED_EXACT,
@@ -252,7 +257,7 @@ public final class M5BindingRetirementCoordinatorV1 {
                 .filter(value -> value.state() == BatchMetadataStateV1.FULL_V1)
                 .orElseThrow(() -> new IllegalArgumentException("fence target is not one FULL_V1 slot"));
         SourceRetirementBatch batch = slot.fullBatch();
-        validateReleases(batch, request.releases());
+        validateReleases(request.authorityKey(), batch, request.releases());
         return requireFreshReleases(request.releases()).thenCompose(ignored -> {
             ReferenceScanFenceV1 fence = new ReferenceScanFenceV1(
                     ReferenceTargetKindV1.RETIREMENT_BATCH,
@@ -316,7 +321,7 @@ public final class M5BindingRetirementCoordinatorV1 {
         BatchAuthoritySlotV1 fullSlot = current.slot(fence.targetIdentitySha256())
                 .filter(slot -> slot.state() == BatchMetadataStateV1.FULL_V1)
                 .orElseThrow(() -> new IllegalArgumentException("fenced target is not one FULL_V1 slot"));
-        validateReleases(fullSlot.fullBatch(), proof.m4Releases());
+        validateReleases(request.authorityKey(), fullSlot.fullBatch(), proof.m4Releases());
         RetiredSourceRetirementBatchTombstoneV1 tombstone =
                 M5RetentionCodecV1.finalizeRetiredBatch(new RetiredSourceRetirementBatchTombstoneV1(
                         BatchMetadataStateV1.RETIRED_V1,
@@ -470,12 +475,31 @@ public final class M5BindingRetirementCoordinatorV1 {
         return M5BindingAuthorityCodecV1.decodeAuthority(value.canonicalStoredBytes());
     }
 
-    private static void validateReleases(SourceRetirementBatch batch, List<M4ReleaseBindingV1> releases) {
+    private static void validateReleases(
+            String authorityKey, SourceRetirementBatch batch, List<M4ReleaseBindingV1> releases) {
+        Matcher canonicalSelector = CANONICAL_M4_SELECTOR.matcher(authorityKey);
+        if (authorityKey.contains("v2/object-wal/shards/") && !canonicalSelector.matches()) {
+            throw new IllegalArgumentException("canonical M4 selector authority key is malformed");
+        }
+        if (canonicalSelector.matches()
+                && !canonicalSelector
+                        .group(2)
+                        .equals(batch.binding().bindingId().digest().toHex())) {
+            throw new IllegalArgumentException("canonical M4 selector Binding differs from the retirement batch");
+        }
         if (releases.size() != batch.sources().size()) {
             throw new IllegalArgumentException("batch retirement lacks every exact M4 RELEASED member");
         }
         Map<Sha256Digest, M4ReleaseBindingV1> indexed = new HashMap<>();
         for (M4ReleaseBindingV1 release : releases) {
+            if (canonicalSelector.matches()) {
+                String protectionKey = canonicalSelector.group(1) + "/protections/"
+                        + release.sourceIdentitySha256().toHex() + "-"
+                        + String.format(java.util.Locale.ROOT, "%020d", release.protectionGeneration());
+                if (!release.protectionAuthority().key().equals(protectionKey)) {
+                    throw new IllegalArgumentException("M4 release is not at the canonical source-protection key");
+                }
+            }
             if (!release.releasedByBatchSha256().equals(batch.batchIdSha256())
                     || indexed.put(release.sourceIdentitySha256(), release) != null) {
                 throw new IllegalArgumentException("M4 release BatchId or source uniqueness differs");
