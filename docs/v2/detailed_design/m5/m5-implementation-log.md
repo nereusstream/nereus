@@ -3104,6 +3104,28 @@ All captured sources and archived XML were independently checked with zero failu
 restart fixture still writes its retired marker by test-only CAS; this run does not prove the new post-delete method
 against an actual physical deletion. All 17 amended obligations and M5-E/Final remain OPEN/null.
 
+## Permanent-DONE veto on Kafka run-root read admission (2026-09-26)
+
+`OxiaKafkaRunRootAuthorityV2` now requires a present, matching physical authority that has not reached permanent
+full or compact `DELETE_DONE` before `openRoot` or the native run-source catalog returns a root. A root with no
+retired marker can no longer be newly read after DONE; its selected successor remains readable. READ_FENCED and
+DELETE_INTENT keep root metadata visible for lineage and recovery; a separate physical ticket denies new native
+capture after READ_FENCED. The real run-source test exposed that distinction during validation. The separate
+`isDurablyRetired` check still requires the actual root marker, so this read veto does not invent a local retirement
+terminal. The read decision is not a durable pin for a previously returned root, nor a substitute for real
+reference-free proof or the incomplete pre-delete writer matrix.
+
+The 12-case root unit suite, Checkstyle and Spotless passed. `scripts/run-v2-m5-kafka-run-source-check.sh` passed
+95/95 main tasks and its real BK/Oxia restart phases. Archive:
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-95339`; target 747-input manifest SHA-256:
+`aba14e3958aa8d90dad3b24fd0c2286dbecd6065cc3236b9e04c4efddc2568bd`; summary SHA-256:
+`477c1179cc10bd63c77f4e6feccbdd2ecdf7e0e81d39fea0ddd259440eec62ba`. Its 26 XML suites contain 118
+cases or restart phases. The fresh 732-input legacy manifest SHA-256 is
+`ecaa7ca7c2f56ee40935e80b7a1602e6a950214143adbb8a1c9aa4b195b5ff20`; summary SHA-256:
+`eabcf41890ba2d9a44095099c2e8aaec612948b13dae726a586a817d4e96dea6`; its 21 XML suites contain 83 cases.
+All archived XML and captured sources were independently checked with zero failures, errors or skips. All 17 amended
+obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

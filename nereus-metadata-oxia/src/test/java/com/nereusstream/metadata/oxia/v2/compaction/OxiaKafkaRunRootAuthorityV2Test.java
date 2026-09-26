@@ -154,6 +154,11 @@ class OxiaKafkaRunRootAuthorityV2Test {
         var resource = f.record(a).resource();
         var done = SyntheticDeleteAuthorityFixturesV2.phases(resource).get(3);
         f.client.put(resource.authorityKey(), M5TargetDeleteAuthorityCodecV1.encodeAuthority(done));
+        assertThat(join(f.roots.isDurablyRetired(sealed))).isFalse();
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .isEmpty();
+        assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
         assertThat(join(f.roots.retireDeletedRoot(sealed(a, 11))).outcome())
                 .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
         assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
@@ -164,6 +169,35 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThat(f.stored(a).successor()).isEqualTo(selected);
         assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
         assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
+    }
+
+    @Test
+    void selectedRootRequiresPresentNonDeletedPhysicalAuthorityForMetadataReads() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        join(f.roots.createRoot(a));
+        var sealed = sealed(a, 10);
+        join(f.roots.sealRoot(a, sealed));
+        assertThat(join(f.roots.openRoot(a.runId()))).contains(sealed);
+        var resource = f.record(a).resource();
+
+        f.client.values.remove(resource.authorityKey());
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .isEmpty();
+        f.client.put(
+                resource.authorityKey(),
+                M5TargetDeleteAuthorityCodecV1.encodeAuthority(
+                        SyntheticDeleteAuthorityFixturesV2.phases(resource).get(1)));
+        assertThat(join(f.roots.openRoot(a.runId()))).contains(sealed);
+        assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
+                .isPresent();
+        f.client.put(
+                resource.authorityKey(),
+                M5TargetDeleteAuthorityCodecV1.encodeAuthority(
+                        SyntheticDeleteAuthorityFixturesV2.phases(resource).get(2)));
+        assertThat(join(f.roots.openRoot(a.runId()))).contains(sealed);
     }
 
     @Test

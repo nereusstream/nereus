@@ -162,7 +162,7 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
     raise SystemExit('Native BK restart did not retain all four exact containers and change their start times')
 suites=[]
 for module,task,name,count in (
-    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',11),
+    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',12),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartWriteTest','KafkaBookKeeperRunRootsV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartReadTest','KafkaBookKeeperRunRootsV2RealTest',1),

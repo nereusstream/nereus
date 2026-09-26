@@ -234,7 +234,7 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
-    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',11),
+    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',12),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',4),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartWriteTest','KafkaBookKeeperRunRootsV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartReadTest','KafkaBookKeeperRunRootsV2RealTest',1),

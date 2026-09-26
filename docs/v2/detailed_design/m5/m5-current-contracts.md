@@ -415,9 +415,12 @@ readable after selecting a successor. An additive wire-3 retired form retains th
 closing this catalog's read admission; retries cannot reopen it, and a retired parent without a choice fences new
 successors. `retireDeletedRoot` now writes that form only after rereading the same physical resource's permanent
 `DELETE_DONE` authority (full or compact), matching the exact SEALED root, and reconciling its native CAS by reread.
-An OPEN, READ_FENCED or DELETE_INTENT resource cannot take this path. The marker write is a post-delete lineage
-cleanup, not a pre-delete reference-free producer or physical-delete authority; selected roots remain readable before
-the marker. These permanent records are not a bounded lifetime history or quota solution.
+An OPEN, READ_FENCED or DELETE_INTENT resource cannot take this path. `openRoot` and the native source catalog require
+a present, matching physical authority that has not reached permanent `DELETE_DONE`; missing authority or DONE closes
+root metadata admission even before the retired marker CAS. READ_FENCED and DELETE_INTENT leave root metadata visible
+for lineage and recovery, while the separate physical read ticket prevents a new BK capture after READ_FENCED. The
+marker write is a post-delete lineage cleanup, not a pre-delete reference-free producer or physical-delete authority;
+these permanent records are not a bounded lifetime history or quota solution.
 A real BK/Oxia restart fixture writes that form through a test-only native CAS. After restart, it verifies the old
 root's read veto, the selected successor's continued readability, and the old ledger's still-readable physical bytes.
 This verifies persistence of the representation, not production deletion. The new post-delete marker path currently

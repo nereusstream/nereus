@@ -328,10 +328,15 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
         if (candidate.retired()) {
             return CompletableFuture.completedFuture(false);
         }
-        if (candidate.admitted()) {
-            return CompletableFuture.completedFuture(true);
-        }
-        return choice(candidate).thenApply(chosen -> chosen.equals(Optional.of(candidate.initialLink())));
+        return guard.isRootMetadataReadable(candidate.resource()).thenCompose(readable -> {
+            if (!readable) {
+                return CompletableFuture.completedFuture(false);
+            }
+            if (candidate.admitted()) {
+                return CompletableFuture.completedFuture(true);
+            }
+            return choice(candidate).thenApply(chosen -> chosen.equals(Optional.of(candidate.initialLink())));
+        });
     }
 
     private CompletionStage<Optional<Link>> choice(KafkaRunRootRecordV2 candidate) {
