@@ -423,8 +423,12 @@ marker write is a post-delete lineage cleanup, not a pre-delete reference-free p
 these permanent records are not a bounded lifetime history or quota solution.
 A real BK/Oxia restart fixture writes that form through a test-only native CAS. After restart, it verifies the old
 root's read veto, the selected successor's continued readability, and the old ledger's still-readable physical bytes.
-This verifies persistence of the representation, not production deletion. The new post-delete marker path currently
-has synthetic permanent-DONE unit coverage; no real physical-delete-to-root-retirement trace has passed.
+This verifies persistence of the representation, not production deletion. `KafkaBookKeeperRunDeleteFinalizerV2` now
+joins native absence reconciliation, permanent DONE compaction, exact root retirement, marker reread and durable quota
+settlement in that order. It accepts the original exact INTENT again after completion; a remaining ledger or unresolved
+step cannot return success. A focused real BK/Oxia trace deletes a test-owned sealed run, retires its root, preserves its
+selected successor and retries the same INTENT after settlement. Its protocol eligibility, reference inventory and
+grace facts remain synthetic; this does not prove complete reference-free production or ordinary-reader safety.
 The K3 lifecycle now confirms the exact stored retired marker through the native run-root authority before changing
 its local state from SEALED to RETIRED. A caller's retirement permit alone cannot make this transition; a missing or
 mismatched marker, or a failed authority read, leaves the local run SEALED. The restart fixture checks both sides of

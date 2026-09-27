@@ -56,6 +56,7 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.ImmutableRetainedStoragePayload;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2;
@@ -65,6 +66,7 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
 import java.nio.file.Files;
@@ -74,10 +76,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -217,6 +221,77 @@ class KafkaBookKeeperRunRootsV2RealTest {
             assertThat(await(f.nativeClient.read(f.roots.nativeRootKey(root.runId()))))
                     .isEmpty();
             assertThat(await(f.nativeClient.read(f.roots.nativeGenesisKey()))).isEmpty();
+        }
+    }
+
+    @Test
+    void boundNativeDeleteFinishesPermanentDoneBeforeRetiringTheSealedRunRoot() throws Exception {
+        try (var f = new Fixture(1506, "deleted-root", null)) {
+            var run = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            f.writeData(run);
+            await(run.drain());
+            var sealed = await(run.seal(f.footer(
+                            run.snapshot().runBinding(), 2, run.snapshot().nextEntryId())))
+                    .root();
+            var next = await(run.createSuccessor(f.runBinding(1)));
+            await(next.drain());
+            var child = await(next.seal(f.footer(
+                            next.snapshot().runBinding(), 2, next.snapshot().nextEntryId())))
+                    .root();
+            await(f.source.fenceCreates());
+
+            var handle = run.snapshot().handle();
+            var resource = f.record(sealed).resource();
+            var gc = new KafkaBookKeeperDeleteObservationAuthorityV2(f.source, handle, UUID.randomUUID());
+            var namespace = await(OxiaPhysicalMetadataNamespaceV2.connect(f.oxia, f.binding.metadataNamespace()));
+            var route = await(namespace.openAuthorityRoute(
+                    f.backend, gc.readOnlyFacts(new Oxia09ExactMetadataTransactionStoreV1(f.oxia))));
+            var deletes = new M5TargetDeleteAuthorityCoordinatorV1(
+                    route, gc, new KafkaBookKeeperDeleteIdentityReaderV2(f.source, handle));
+            var open = await(route.read(resource.authorityKey())).orElseThrow();
+            var facts = nativeDeleteFacts(f, resource);
+            var qualified = await(deletes.qualifyEligibility(
+                            open,
+                            SyntheticDeleteAuthorityFixturesV2.replacement(
+                                    resource,
+                                    M5TargetDeleteAuthorityCodecV1.decodeAuthority(open.canonicalStoredBytes())
+                                                    .authorityRevision()
+                                            + 1,
+                                    facts)))
+                    .observed()
+                    .orElseThrow();
+            await(gc.claim(route, Optional.empty()));
+            var observation = await(gc.observe(1, Optional.empty()));
+            var fenced = await(deletes.prepareIdentityRead(
+                            qualified, SyntheticDeleteAuthorityFixturesV2.digest("run-root-delete-read"), observation))
+                    .observed()
+                    .orElseThrow();
+            var identity = await(new KafkaBookKeeperDeleteIdentityReaderV2(f.source, handle)
+                    .capture(M5TargetDeleteAuthorityCodecV1.decodeAuthority(fenced.canonicalStoredBytes())));
+            var intent = await(deletes.bindDeleteIntent(
+                            fenced, identity, SyntheticDeleteAuthorityFixturesV2.digest("run-root-delete-dispatch")))
+                    .observed()
+                    .orElseThrow();
+            var bound = await(gc.bindIntent(route, intent));
+            var finalizer = new KafkaBookKeeperRunDeleteFinalizerV2(deletes, route.quota(), f.roots);
+            var permit = new KafkaRunRetirementPermitV1(true, true, 0, true);
+            assertThatThrownBy(() -> await(finalizer.finishAbsent(intent, sealed)))
+                    .hasRootCauseMessage("native target absence was not established");
+            assertThat(await(f.roots.openRoot(sealed.runId()))).contains(sealed);
+            assertThatThrownBy(() -> await(run.retire(permit)))
+                    .hasRootCauseMessage("run root lacks its exact durable retirement marker");
+
+            var deleted = await(gc.dispatchBoundDelete(route, f.backend.nativeDeleteCellBudget(), intent, bound));
+            assertThat(deleted.deleteResult().outcome())
+                    .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
+            assertThat(await(f.source.captureExactTarget(handle)).exactTarget()).isEmpty();
+            assertThat(await(finalizer.finishAbsent(intent, sealed))).isEqualTo(sealed);
+            assertThat(await(finalizer.finishAbsent(intent, sealed))).isEqualTo(sealed);
+            assertThat(await(f.roots.openRoot(sealed.runId()))).isEmpty();
+            assertThat(await(f.roots.openRoot(child.runId()))).contains(child);
+            assertThat(await(f.roots.isDurablyRetired(sealed))).isTrue();
+            assertThat(await(run.retire(permit)).state()).isEqualTo(KafkaBookKeeperRunStateV1.RETIRED);
+            assertThat(await(route.quota().settle(resource))).isEqualTo(M5GcQuotaCoordinatorV2.Result.SETTLED);
         }
     }
 
@@ -382,6 +457,24 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 OptionalLong.of(end),
                 KafkaRunRootStateV1.SEALED,
                 root.predecessorRunId());
+    }
+
+    private static BiFunction<String, CanonicalBytes, AuthorityFactV1> nativeDeleteFacts(
+            Fixture fixture, PhysicalResourceIdV2 resource) {
+        var metadata = new Oxia09ExactMetadataTransactionStoreV1(fixture.oxia);
+        return (suffix, bytes) -> {
+            String key = "/native-run-delete-facts/" + resource.sha256().toHex() + suffix;
+            try {
+                if (await(metadata.read(key)).isEmpty()) {
+                    await(metadata.compareAndSet(Optional.empty(), key, bytes));
+                }
+                var actual = await(metadata.read(key)).orElseThrow();
+                assertThat(actual.canonicalStoredBytes()).isEqualTo(bytes);
+                return new AuthorityFactV1(key, actual.metadataVersion(), actual.canonicalStoredSha256());
+            } catch (Exception failure) {
+                throw new IllegalStateException("native delete fact was not stored exactly", failure);
+            }
+        };
     }
 
     static final class Fixture implements AutoCloseable {

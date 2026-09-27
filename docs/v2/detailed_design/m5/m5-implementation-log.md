@@ -3126,6 +3126,29 @@ cases or restart phases. The fresh 732-input legacy manifest SHA-256 is
 All archived XML and captured sources were independently checked with zero failures, errors or skips. All 17 amended
 obligations and M5-E/Final remain OPEN/null.
 
+## BK run post-delete finalization (2026-09-27)
+
+`KafkaBookKeeperRunDeleteFinalizerV2` composes exact native absence/DONE reconciliation, compact permanent DONE,
+`KafkaRunRootAuthority.retireDeletedRoot`, an exact stored-marker reread and durable quota settlement. A remaining
+native ledger rejects finalization before a root marker is written. Unresolved compaction, root mutation or quota
+settlement reports failure and can be retried with the original exact INTENT; the selected successor remains intact.
+The finalizer does not create eligibility, dispatch a delete or supply GC scheduling.
+
+Compilation, Checkstyle and Spotless passed. `scripts/run-v2-m5-kafka-run-roots-check.sh` passed 83/83 main tasks
+and its real BK/Oxia restart phase. Its nine archived suites contain 50 cases/phases, including the new test-owned
+native ledger deletion, root retirement and same-INTENT retry trace. Archive:
+`build/m5-kafka-run-roots/nereus-v2-m5-kafka-run-roots-53395`; 744-input manifest SHA-256:
+`dfde67413d829c3c0c13c6701875bd03fe8a436282483072b911dbbbfe8c005f`; summary SHA-256:
+`54f03eb9a3c350bdfdf1ff7c091367c7c35bf46cee4221ba5cd306156ee2d665`. The fresh legacy run passed 83 cases in
+21 suites; its 733-input manifest SHA-256 is `c5a9c69789a9df34ed1c15f97ad1cfd0c4366d75942f37e3fe5d7ef0b5af5301`;
+summary SHA-256: `caf9e27193635bbf6029afe661dda118b58e06f93859cb69a4c0a9ecb18c3c4a`. The root runner's stale
+71-case legacy expectation was updated to the existing 83-case baseline. All captured sources and archived XML were
+checked with zero failures, errors or skips. The broader run-source runner was not rerun on this source.
+
+The deletion trace still uses synthetic protocol eligibility, reference inventory and grace facts. It does not
+prove ordinary-reader safety, complete real eligibility, finalizer restart recovery or an aggregate M5 receipt.
+All 17 amended obligations and M5-E/Final remain OPEN/null.
+
 ## Remaining ordered work
 
 1. Extend completed raw-run and selected-compacted-generation input capture to the remaining required source representations;

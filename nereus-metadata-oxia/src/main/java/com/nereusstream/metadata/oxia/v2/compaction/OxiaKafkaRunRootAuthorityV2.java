@@ -134,6 +134,7 @@ public final class OxiaKafkaRunRootAuthorityV2 implements KafkaRunRootAuthority,
     }
 
     /** Preserve the selected lineage after an exact permanent physical DELETE_DONE, including compact done. */
+    @Override
     public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> retireDeletedRoot(
             KafkaRunRootSnapshotV1 exactSealed) {
         Objects.requireNonNull(exactSealed, "exactSealed");

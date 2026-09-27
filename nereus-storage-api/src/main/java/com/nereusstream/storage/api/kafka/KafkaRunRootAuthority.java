@@ -33,6 +33,10 @@ public interface KafkaRunRootAuthority {
     /** Authoritative exact stored-marker check; read admission intentionally hides retired roots. */
     CompletionStage<Boolean> isDurablyRetired(KafkaRunRootSnapshotV1 exactSealed);
 
+    /** Retire an exact sealed root only after its physical resource has permanent DELETE_DONE authority. */
+    CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> retireDeletedRoot(
+            KafkaRunRootSnapshotV1 exactSealed);
+
     CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> sealRoot(
             KafkaRunRootSnapshotV1 expectedActive, KafkaRunRootSnapshotV1 sealedCandidate);
 

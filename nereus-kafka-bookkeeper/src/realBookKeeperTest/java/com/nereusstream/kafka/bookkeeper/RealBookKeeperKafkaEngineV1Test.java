@@ -491,6 +491,13 @@ class RealBookKeeperKafkaEngineV1Test {
         }
 
         @Override
+        public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> retireDeletedRoot(
+                KafkaRunRootSnapshotV1 exactSealed) {
+            return CompletableFuture.failedFuture(
+                    new UnsupportedOperationException("fixture has no physical delete authority"));
+        }
+
+        @Override
         public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> sealRoot(
                 KafkaRunRootSnapshotV1 expectedActive, KafkaRunRootSnapshotV1 sealedCandidate) {
             if (!expectedActive.equals(roots.get(expectedActive.runId()))) {
