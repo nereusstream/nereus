@@ -52,8 +52,6 @@ import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRecoveryOutcomeV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRecoveryRequestV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperTakeoverRecoveryV1;
-import com.nereusstream.kafka.bookkeeper.recovery.KafkaElectionKindV1;
-import com.nereusstream.kafka.bookkeeper.recovery.KafkaElectionRecoveryBoundaryV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaRecoveryBatchProtocolAdapterV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunSnapshotV1;
@@ -259,19 +257,41 @@ class RealBookKeeperKafkaEngineV1Test {
                 context.binding().storageEpochId(),
                 context.binding().creatorOwnerEpoch() + 1,
                 context.binding().kafkaLeaderEpoch() + 1);
+        // This legacy engine test exercises actual BK. Native admission is separately tested with real Oxia.
+        var root = context.lifecycle().snapshot().root();
+        var physicalNamespace = new com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace(
+                com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.ProviderKind.BOOKKEEPER,
+                com.nereusstream.domain.bytes.CanonicalUtf8.fromString("legacy-engine-real-bk"),
+                com.nereusstream.domain.bytes.CanonicalUtf8.fromString("ledger-id-space"));
+        var selected = new com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2(
+                new com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.BookKeeperLedger(
+                        physicalNamespace, root.ledgerIdentity().ledgerId()),
+                root,
+                true,
+                Optional.empty());
+        var closed = new com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1(
+                Sha256Digest.hash(com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Scope.of(root)
+                        .encode()),
+                new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(
+                        root.creatorOwnerEpoch(), root.kafkaLeaderEpoch(), 1, 1, 1),
+                true,
+                Optional.empty(),
+                List.of(selected.initialLink()));
         KafkaBookKeeperRecoveryRequestV1 request = new KafkaBookKeeperRecoveryRequestV1(
                 context.binding(),
                 context.lifecycle().snapshot().handle(),
                 100,
                 OptionalLong.empty(),
                 new KafkaBookKeeperRecoveryEnvelopeV1(32, 1_000_000, 1_000_000),
-                new KafkaElectionRecoveryBoundaryV1(KafkaElectionKindV1.ISR_ELECTION, 102, 102, 102),
-                recoveredFence);
+                closed,
+                selected,
+                recoveredFence,
+                Optional.empty());
         var recovered = recovery.recover(request).toCompletableFuture().get(30, TimeUnit.SECONDS);
 
-        assertThat(recovered.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_WITH_INERT_RESIDUE);
+        assertThat(recovered.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_EXACT);
         assertThat(recovered.physicalRecoveredEndOffset()).isEqualTo(103);
-        assertThat(recovered.newLeaderLeo()).hasValue(102);
+        assertThat(recovered.newLeaderLeo()).hasValue(103);
         assertThat(recovered.progress().entries()).isEqualTo(4);
         context.session().closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
         newOwner.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);

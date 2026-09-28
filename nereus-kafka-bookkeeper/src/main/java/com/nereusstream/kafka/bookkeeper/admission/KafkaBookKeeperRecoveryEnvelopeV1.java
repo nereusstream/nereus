@@ -19,6 +19,11 @@ import java.util.Objects;
 /** Mandatory simultaneous entry, byte, and elapsed-time recovery envelope. */
 public record KafkaBookKeeperRecoveryEnvelopeV1(
         long maximumEntries, long maximumEncodedBytes, long maximumElapsedNanos) {
+    /** Current native BK recovery ceiling retained from the K9 selection. */
+    public static KafkaBookKeeperRecoveryEnvelopeV1 selectedDefault() {
+        return new KafkaBookKeeperRecoveryEnvelopeV1(4_096, 8_388_608, 30_000_000_000L);
+    }
+
     public KafkaBookKeeperRecoveryEnvelopeV1 {
         if (maximumEntries <= 0 || maximumEncodedBytes <= 0 || maximumElapsedNanos <= 0) {
             throw new IllegalArgumentException("all recovery envelope dimensions must be positive");

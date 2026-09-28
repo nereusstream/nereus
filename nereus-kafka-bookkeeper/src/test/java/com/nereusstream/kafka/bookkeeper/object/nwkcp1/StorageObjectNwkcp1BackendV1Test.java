@@ -97,6 +97,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32C;
@@ -132,7 +135,7 @@ class StorageObjectNwkcp1BackendV1Test {
                         2,
                         new SecureRandom(new byte[] {1, 2, 3})),
                 () -> 0);
-        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata);
+        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata, ROOT_PREFIX);
         Sha256Digest digest = ObjectKafkaTestFixtures.digest(55);
         String key = Nwkcp1ObjectKeyV1.objectKey(ROOT_PREFIX, digest);
         Nwkcp1BackendV1.CreatedObjectToken forgedCreated = new Nwkcp1BackendV1.CreatedObjectToken() {
@@ -212,7 +215,7 @@ class StorageObjectNwkcp1BackendV1Test {
                         new SecureRandom(new byte[] {1, 2, 3})),
                 () -> 0);
         metadata.unknownNextCas = true;
-        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata);
+        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata, ROOT_PREFIX);
         var root = objectSession.rootSha256();
         var context = new KafkaNwkcp1WalRunContextV1(root, ObjectKafkaTestFixtures.runBinding());
         var store = new ObjectKafkaProtocolCheckpointStoreV1(ROOT_PREFIX, context, 9, backend);
@@ -275,7 +278,7 @@ class StorageObjectNwkcp1BackendV1Test {
                         2,
                         new SecureRandom(new byte[] {1, 2, 3})),
                 () -> 0);
-        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata);
+        var backend = new StorageObjectNwkcp1BackendV1(objectSession, metadata, ROOT_PREFIX);
         var context = new KafkaNwkcp1WalRunContextV1(objectSession.rootSha256(), ObjectKafkaTestFixtures.runBinding());
         var store = new ObjectKafkaProtocolCheckpointStoreV1(ROOT_PREFIX, context, 9, backend);
         var state = ObjectKafkaTestFixtures.checkpoint(100);
@@ -339,7 +342,7 @@ class StorageObjectNwkcp1BackendV1Test {
                 ROOT_PREFIX,
                 new KafkaNwkcp1WalRunContextV1(fixture.session.rootSha256(), ObjectKafkaTestFixtures.runBinding()),
                 9,
-                new StorageObjectNwkcp1BackendV1(fixture.session, fixture.metadata));
+                new StorageObjectNwkcp1BackendV1(fixture.session, fixture.metadata, ROOT_PREFIX));
         protocolStore
                 .publish(ObjectKafkaTestFixtures.checkpoint(100))
                 .toCompletableFuture()
@@ -366,17 +369,62 @@ class StorageObjectNwkcp1BackendV1Test {
         assertThat(fixture.session.runtimeState()).isEqualTo(WalRunRuntime.State.ADMITTING);
         assertThat(fixture.transport.objects).hasSize(2);
 
-        fixture.pipeline.writeResolveAndInstall(
-                laneOnePlan, laneOneTicket, laneOneCommit, nativeState(laneOneCommit), 11);
+        assertThatThrownBy(() -> fixture.pipeline.writeResolveAndInstall(
+                        laneOnePlan, laneOneTicket, laneOneCommit, nativeState(laneOneCommit), 11))
+                .hasMessageContaining("continuous predecessor");
         assertThat(fixture.physical.resolvedThrough(1)).isZero();
         assertThat(fixture.physical.resolvedThrough(0)).isEqualTo(-1);
 
         fixture.pipeline.writeResolveAndInstall(
                 laneZeroPlan, laneZeroTicket, laneZeroCommit, nativeState(laneZeroCommit), 12);
         assertThat(fixture.physical.resolvedThrough(0)).isZero();
+        fixture.pipeline.writeResolveAndInstall(
+                laneOnePlan, laneOneTicket, laneOneCommit, nativeState(laneOneCommit), 13);
+        assertThat(fixture.physical.resolvedThrough(1)).isZero();
         assertThat(fixture.transport.objects).hasSize(3);
         assertThat(fixture.transport.puts).isEqualTo(3);
         fixture.session.close();
+    }
+
+    @Test
+    void exactCreationPublicationProofIsBoundToSessionCandidateAndLifetime() throws IOException {
+        PipelineFixture fixture = pipelineFixture();
+        PipelineFixture other = pipelineFixture();
+        fixture.transport.proveCreation = true;
+        var commit = commitForRoot(fixture.root, 0);
+        var ticket = fixture.tracker.assignPosition(fixture.tracker.reserveBeforePosition(), commit);
+        var plan = plan(fixture, 0, List.of(ticket), List.of(commit));
+        var candidate = fixture.session.admitAndSealNwg1(
+                fixture.session.validateNwg1Plan(plan, fixture.verificationContext), 1);
+        assertThat(fixture.session.conditionalCreateNwg1(candidate).persistenceEvidence())
+                .isPresent();
+        var extent = fixture.session.readAndAuthenticateNwg1ForPublication(candidate, fixture.verificationContext);
+        assertThat(fixture.transport.fullGets).isZero();
+        assertThatThrownBy(
+                        () -> other.session.readAndAuthenticateNwg1ForPublication(candidate, other.verificationContext))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact pending WalRun reservation");
+        assertThatThrownBy(() -> other.session.verifySelectedNwg1AppendUnitForPublication(
+                        extent, other.verificationContext, 0, (frame, payload) -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another WalRun session");
+        fixture.session.drain();
+        assertThat(fixture.session
+                        .verifySelectedNwg1AppendUnitForPublication(
+                                extent, fixture.verificationContext, 0, (frame, payload) -> {})
+                        .frameCount())
+                .isOne();
+        fixture.session.providerResolved(candidate);
+        assertThatThrownBy(() -> fixture.session.verifySelectedNwg1AppendUnitForPublication(
+                        extent, fixture.verificationContext, 0, (frame, payload) -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact pending WalRun reservation");
+        fixture.session.close();
+        assertThatThrownBy(() ->
+                        fixture.session.readAndAuthenticateNwg1ForPublication(candidate, fixture.verificationContext))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+        other.session.close();
     }
 
     @Test
@@ -384,29 +432,31 @@ class StorageObjectNwkcp1BackendV1Test {
         PipelineFixture fixture = pipelineFixture();
         KafkaSpeculativeCommitV1 firstCommit = commitForRoot(fixture.root, 0);
         KafkaSpeculativeCommitV1 secondCommit = commitForRoot(fixture.root, 1);
-        var firstReservation = fixture.tracker.reserveBeforePosition();
+        var physicalReservation = fixture.pipeline.reservePhysicalBeforePosition(4096);
+        var firstReservation = fixture.tracker.reserveBeforePosition(physicalReservation);
         var firstTicket = fixture.tracker.assignPosition(firstReservation, firstCommit);
-        var secondReservation = fixture.tracker.reserveBeforePosition();
+        var secondReservation = fixture.tracker.reserveBeforePosition(physicalReservation);
         var secondTicket = fixture.tracker.assignPosition(secondReservation, secondCommit);
         GroupEncodingPlanV1 sharedPlan =
                 plan(fixture, 2, List.of(firstTicket, secondTicket), List.of(firstCommit, secondCommit));
         // Plan admission and sealed-body self-verification consume four calls; reject the first publication member.
-        fixture.nativeVerifier.rejectCall = 5;
+        fixture.nativeVerifier.rejectCall = 6;
 
         var result = fixture.pipeline.writeResolveAndInstallShared(
                 sharedPlan,
                 List.of(
-                        new KafkaNwg1ObjectPipelineV1.SharedMember(firstTicket, firstCommit, nativeState(firstCommit)),
                         new KafkaNwg1ObjectPipelineV1.SharedMember(
-                                secondTicket, secondCommit, nativeState(secondCommit))),
+                                firstTicket, firstCommit, nativeState(firstCommit), fixture.tracker),
+                        new KafkaNwg1ObjectPipelineV1.SharedMember(
+                                secondTicket, secondCommit, nativeState(secondCommit), fixture.tracker)),
                 20);
 
         assertThat(result.isolatedFailures())
                 .extracting(KafkaNwg1ObjectPipelineV1.IsolatedMemberFailure::ticket)
-                .containsExactly(firstTicket);
+                .containsExactly(secondTicket);
         assertThat(result.verifiedMembers())
                 .extracting(KafkaNwg1ObjectPipelineV1.VerifiedMember::ticket)
-                .containsExactly(secondTicket);
+                .containsExactly(firstTicket);
         assertThat(fixture.physical.resolvedThrough(2)).isZero();
         assertThat(fixture.publisher.queueDepth()).isOne();
         fixture.pipeline.flushCheckpointForSeal();
@@ -427,7 +477,37 @@ class StorageObjectNwkcp1BackendV1Test {
     }
 
     @Test
-    void checkpointIoFailureRetainsDebtButCurrentVerifiedMemberReachesM2Tracker() {
+    void cancellationAndUnassignedTakeoverReleasePrePositionPhysicalDebtOnce() {
+        PipelineFixture fixture = pipelineFixture();
+        try {
+            var first = fixture.tracker.reserveBeforePosition();
+            var second = fixture.tracker.reserveBeforePosition();
+            assertThat(fixture.publisher.uncoveredExtentCount()).isEqualTo(2);
+            assertThat(fixture.publisher.uncoveredBodyBytes()).isEqualTo(8192);
+            fixture.tracker.cancelBeforePosition(first);
+            assertThat(fixture.publisher.uncoveredExtentCount()).isOne();
+            assertThat(fixture.publisher.uncoveredBodyBytes()).isEqualTo(4096);
+            assertThatThrownBy(() -> fixture.tracker.cancelBeforePosition(first))
+                    .isInstanceOf(IllegalStateException.class);
+            fixture.tracker.discardOnTakeover(7);
+            assertThat(fixture.publisher.uncoveredExtentCount()).isZero();
+            assertThat(fixture.publisher.uncoveredBodyBytes()).isZero();
+            assertThat(fixture.tracker.pendingUnits()).isZero();
+            assertThat(fixture.tracker.reservedLocatorBytes()).isZero();
+            assertThatThrownBy(() -> fixture.tracker.cancelBeforePosition(second))
+                    .isInstanceOf(IllegalStateException.class);
+            fixture.publisher.requireFinalCoverage(com.nereusstream.storage.object.control.LaneSequenceVector.empty());
+            var reused = fixture.pipeline.reservePhysicalBeforePosition(4096);
+            reused.cancelUnused();
+            assertThat(fixture.publisher.uncoveredExtentCount()).isZero();
+            assertThat(fixture.transport.puts).isZero();
+        } finally {
+            fixture.session.close();
+        }
+    }
+
+    @Test
+    void checkpointIoFailureRetainsDebtButCurrentVerifiedMemberReachesM2Tracker() throws InterruptedException {
         ExactMetadata metadata = new ExactMetadata();
         PipelineFixture fixture =
                 pipelineFixture(root(new WalCheckpointPolicy(0, 1, 1024 * 1024, 5_000, 16, 8192)), metadata);
@@ -438,6 +518,8 @@ class StorageObjectNwkcp1BackendV1Test {
         metadata.failNextCas = true;
 
         fixture.pipeline.writeResolveAndInstall(firstPlan, firstTicket, firstCommit, nativeState(firstCommit), 30);
+        assertThat(metadata.physicalCasFailed.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                .isTrue();
 
         assertThat(fixture.tracker.readyAt(0)).isPresent();
         assertThat(fixture.physical.resolvedThrough(0)).isZero();
@@ -445,10 +527,13 @@ class StorageObjectNwkcp1BackendV1Test {
         assertThat(fixture.transport.puts).isOne();
 
         KafkaSpeculativeCommitV1 secondCommit = commitForRoot(fixture.root, 1);
+        assertThatThrownBy(fixture.tracker::reserveBeforePosition).hasMessageContaining("pre-position");
+        fixture.publisher.flush();
         var secondReservation = fixture.tracker.reserveBeforePosition();
         var secondTicket = fixture.tracker.assignPosition(secondReservation, secondCommit);
         GroupEncodingPlanV1 secondPlan = plan(fixture, 1, List.of(secondTicket), List.of(secondCommit));
         fixture.pipeline.writeResolveAndInstall(secondPlan, secondTicket, secondCommit, nativeState(secondCommit), 31);
+        fixture.publisher.flush();
 
         assertThat(fixture.physical.resolvedThrough(1)).isZero();
         assertThat(fixture.publisher.queueDepth()).isZero();
@@ -620,14 +705,10 @@ class StorageObjectNwkcp1BackendV1Test {
         KafkaSpeculativeCommitV1 earlier = commitForRoot(fixture.root, 0);
         var laterTicket = fixture.tracker.assignPosition(fixture.tracker.reserveBeforePosition(), later);
         var earlierTicket = fixture.tracker.assignPosition(fixture.tracker.reserveBeforePosition(), earlier);
-        fixture.pipeline.writeResolveAndInstall(
-                plan(fixture, 0, List.of(laterTicket), List.of(later)), laterTicket, later, nativeState(later), 48);
-        fixture.pipeline.writeResolveAndInstall(
-                plan(fixture, 0, List.of(earlierTicket), List.of(earlier)),
-                earlierTicket,
-                earlier,
-                nativeState(earlier),
-                49);
+        // Construct untrusted persisted bytes directly: the normal pipeline now rejects this gap before granting it.
+        installPhysicalForParserOnly(fixture, plan(fixture, 0, List.of(laterTicket), List.of(later)), laterTicket, 48);
+        installPhysicalForParserOnly(
+                fixture, plan(fixture, 0, List.of(earlierTicket), List.of(earlier)), earlierTicket, 49);
         fixture.pipeline.flushCheckpointForSeal();
         WalRunRuntime.RecoveredState recoveredState = fixture.session.runtimeRecoveryState();
         fixture.session.close();
@@ -998,6 +1079,110 @@ class StorageObjectNwkcp1BackendV1Test {
         objectSession.close();
     }
 
+    @Test
+    void recoveredPhysicalRowsKeepCompositeLeaseUntilConcurrentReadFinishes() throws Exception {
+        var transport = new FakeTransport();
+        var metadata = new ExactMetadata();
+        var rootRecord = root();
+        var reference = new WalRunLifecycleManager(metadata)
+                .createRoot(WalRunControlKeys.rootKey(rootRecord.shardId(), rootRecord.shardRunEpoch()), rootRecord);
+        assertThat(metadata.putIfAbsent(
+                        WalRunControlKeys.checkpointHeadKey(rootRecord.shardId(), rootRecord.shardRunEpoch()),
+                        WalRunControlCodec.encodeCheckpointHead(
+                                WalCheckpointHeadV1.empty(reference.rootSha256(), rootRecord.shardRunEpoch(), 1))))
+                .isEqualTo(ControlMutationOutcome.APPLIED);
+        var context = new Nwg1VerificationContextV1(
+                rootRecord.protocolCellIdentity(),
+                rootRecord.providerScopeId().digest().bytes().toByteArray(),
+                reference.rootSha256().bytes().toByteArray(),
+                Nwg1EnvelopeV1.decode(rootRecord.wrappedRunKey().framedBytes().toByteArray()),
+                (binding, kind, version) ->
+                        ObjectKafkaTestFixtures.digest(30).bytes().toByteArray(),
+                (bytes, partition, epoch, start, end) -> new Nwg1VerificationContextV1.NativeCoverage(start, end),
+                0,
+                0);
+        var protocolBody = CanonicalBytes.copyOf(new byte[] {1, 2, 3});
+        var identity = new ObjectIdentity(
+                rootRecord.providerConfiguration().exclusiveNamespacePrefix()
+                        + "/protocol/kafka/nwkcp1-v1/objects/sha256-v1-"
+                        + Sha256Digest.hash(protocolBody).toHex() + ".nwkcp1",
+                protocolBody.length(),
+                Sha256Digest.hash(protocolBody));
+        transport.objects.put(identity.key(), protocolBody.toByteArray());
+        var restored = restoreForReplay(
+                rootRecord,
+                reference,
+                metadata,
+                transport,
+                new WalRunRuntime(rootRecord).recoveryState(),
+                context,
+                new OwnerOpenRecoveryCoordinator.ProtocolRecoveryHandler() {
+                    @Override
+                    public void stage(
+                            ProviderResolvedExtentRowV1 row,
+                            Nwg1ObjectReaderV1.AuthenticatedPrefix prefix,
+                            com.nereusstream.storage.object.recovery.BoundedObjectTailRecovery.SelectedAppendUnitReader
+                                    reader) {
+                        throw new AssertionError("empty physical inventory cannot stage an extent");
+                    }
+
+                    @Override
+                    public void install(WalRunObjectSession session) throws IOException {
+                        var entered = new CountDownLatch(1);
+                        var release = new CountDownLatch(1);
+                        transport.beforeFullGet = () -> {
+                            entered.countDown();
+                            try {
+                                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                            } catch (InterruptedException failure) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError(failure);
+                            }
+                        };
+                        var executor = Executors.newSingleThreadExecutor();
+                        try {
+                            var read = executor.submit(() -> session.readVerifiedProtocolObject(identity));
+                            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+                            var occupied = session.recoverySnapshot();
+                            assertThat(occupied.currentConcurrency()).isEqualTo(2);
+                            assertThatThrownBy(() -> session.consumeRecoveredPhysicalRows(ignored -> {}))
+                                    .hasMessageContaining("concurrent I/O");
+                            assertThat(session.recoverySnapshot()).isEqualTo(occupied);
+                            assertThatThrownBy(session::close).hasMessageContaining("retains Provider operations");
+                            release.countDown();
+                            assertThat(read.get(10, TimeUnit.SECONDS)).isEqualTo(protocolBody);
+                            assertThat(session.recoverySnapshot().currentConcurrency())
+                                    .isOne();
+                            session.consumeRecoveredPhysicalRows(ignored -> {});
+                            assertThat(session.recoverySnapshot().currentConcurrency())
+                                    .isZero();
+                            assertThat(session.recoverySnapshot().workingMemoryBytes())
+                                    .isZero();
+                        } catch (InterruptedException failure) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException(failure);
+                        } catch (java.util.concurrent.ExecutionException
+                                | java.util.concurrent.TimeoutException failure) {
+                            throw new IOException(failure);
+                        } finally {
+                            release.countDown();
+                            executor.shutdownNow();
+                            try {
+                                assertThat(executor.awaitTermination(15, TimeUnit.SECONDS))
+                                        .isTrue();
+                            } catch (InterruptedException failure) {
+                                Thread.currentThread().interrupt();
+                                throw new IOException(failure);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void abort() {}
+                });
+        restored.close();
+    }
+
     private static WalRunObjectSession restoreForReplay(
             WalRunRootRecord root,
             com.nereusstream.storage.object.control.WalRunReference rootReference,
@@ -1133,6 +1318,48 @@ class StorageObjectNwkcp1BackendV1Test {
         recoveredSession.close();
     }
 
+    private static void installPhysicalForParserOnly(
+            PipelineFixture fixture,
+            GroupEncodingPlanV1 plan,
+            KafkaObjectCompletionTrackerV1.AssignedTicket ticket,
+            long now) {
+        try {
+            var physical = fixture.publisher.bindPlan(
+                    List.of(fixture.tracker.checkpointAttachment(ticket, fixture.publisher)),
+                    plan.canonicalPlanSha256(),
+                    plan.requireAdmission(fixture.root.nwg1AdmissionCaps()).canonicalBodyBytes());
+            var candidate = fixture.session.admitAndSealNwg1(
+                    fixture.session.validateNwg1Plan(plan, fixture.verificationContext), now);
+            fixture.session.conditionalCreateNwg1(candidate);
+            fixture.publisher.sequenceStarted(physical);
+            var read = fixture.session.readAndAuthenticateNwg1ForPublication(candidate, fixture.verificationContext);
+            var header = read.authenticatedPrefix().header();
+            fixture.session.providerResolved(candidate);
+            fixture.physical.resolve(
+                    new com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectExtentIdentityV1(
+                            fixture.session.rootSha256(),
+                            header.laneId(),
+                            header.laneSequence(),
+                            header.directoryPrefixEnd(),
+                            header.canonicalBodyLength(),
+                            candidate.identity().bodySha256()));
+            fixture.publisher.enqueue(
+                    physical,
+                    new com.nereusstream.storage.object.control.ProviderResolvedExtentDescriptor(
+                            fixture.session.rootSha256(),
+                            new com.nereusstream.storage.object.control.ProviderResolvedExtentRowV1(
+                                    com.nereusstream.storage.object.control.WalLaneId.fromCode(header.laneId()),
+                                    header.laneSequence(),
+                                    Math.toIntExact(header.directoryPrefixEnd()),
+                                    header.canonicalBodyLength(),
+                                    candidate.identity().bodySha256(),
+                                    read.providerProof()),
+                            now));
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
     private static PipelineFixture pipelineFixture() {
         return pipelineFixture(root(), new ExactMetadata());
     }
@@ -1177,7 +1404,16 @@ class StorageObjectNwkcp1BackendV1Test {
                 WalCheckpointHeadV1.empty(session.rootSha256(), root.shardRunEpoch(), 1),
                 session);
         publisher.initializeHead();
-        var pipeline = new KafkaNwg1ObjectPipelineV1(root, session, verificationContext, physical, tracker, publisher);
+        var authorization = new com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectAuthorizationV1(
+                metadata,
+                root.shardId(),
+                new com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectAuthorizationV1.Bounds(
+                        128, 64, 64L * 1024 * 1024, 1024));
+        authorization.open(commitForRoot(root, 0).expectedFence(), 0, Optional.empty());
+        tracker.bindAuthorization(authorization, commitForRoot(root, 0).expectedFence(), 1024 * 1024);
+        tracker.bindCheckpointPublisher(publisher, 4096);
+        var pipeline = new KafkaNwg1ObjectPipelineV1(
+                root, session, verificationContext, physical, tracker, publisher, authorization);
         return new PipelineFixture(
                 root,
                 transport,
@@ -1316,6 +1552,7 @@ class StorageObjectNwkcp1BackendV1Test {
         buffer.putInt(12, leaderEpoch);
         buffer.put(16, (byte) 2);
         buffer.putInt(23, 0);
+        buffer.putLong(35, -1);
         buffer.putLong(43, -1L);
         buffer.putShort(51, (short) -1);
         buffer.putInt(53, -1);
@@ -1379,7 +1616,7 @@ class StorageObjectNwkcp1BackendV1Test {
         }
     }
 
-    private static WalRunRootRecord root() {
+    static WalRunRootRecord root() {
         return root(new WalCheckpointPolicy(0, 16, 1024 * 1024, 5_000, 16, 8192));
     }
 
@@ -1472,6 +1709,8 @@ class StorageObjectNwkcp1BackendV1Test {
     }
 
     private static final class ExactMetadata implements CanonicalControlMetadataStore {
+        private final java.util.concurrent.CountDownLatch physicalCasFailed =
+                new java.util.concurrent.CountDownLatch(1);
         private final Map<String, CanonicalBytes> values = new HashMap<>();
         private final Map<String, Integer> getCounts = new HashMap<>();
         private boolean unknownNextCas;
@@ -1502,8 +1741,9 @@ class StorageObjectNwkcp1BackendV1Test {
         @Override
         public synchronized ControlMutationOutcome compareAndSet(
                 String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
-            if (failNextCas) {
+            if (failNextCas && !key.contains("/authorize/")) {
                 failNextCas = false;
+                physicalCasFailed.countDown();
                 throw new IllegalStateException("synthetic checkpoint CAS I/O failure");
             }
             CanonicalBytes current = values.get(key);
@@ -1513,7 +1753,7 @@ class StorageObjectNwkcp1BackendV1Test {
                 return ControlMutationOutcome.DEFINITIVE_CONFLICT;
             }
             values.put(key, exactCandidate);
-            if (unknownNextCas) {
+            if (unknownNextCas && !key.contains("/authorize/")) {
                 unknownNextCas = false;
                 return ControlMutationOutcome.RESPONSE_UNKNOWN;
             }
@@ -1521,7 +1761,7 @@ class StorageObjectNwkcp1BackendV1Test {
         }
     }
 
-    private static final class FakeKmsTransport implements KmsTransport {
+    static final class FakeKmsTransport implements KmsTransport {
         private int unwrapCalls;
 
         @Override
@@ -1541,8 +1781,10 @@ class StorageObjectNwkcp1BackendV1Test {
         private final Map<String, byte[]> objects = new HashMap<>();
         private final CanonicalBytes version = CanonicalBytes.copyOf(new byte[] {1});
         private boolean unknownNextCreate;
+        private boolean proveCreation;
         private boolean failNextList;
         private boolean failNextFullGet;
+        private volatile Runnable beforeFullGet;
         private int fullGets;
         private int rangeGets;
         private int puts;
@@ -1552,6 +1794,15 @@ class StorageObjectNwkcp1BackendV1Test {
         public ObjectProviderCapabilities capabilities() {
             return new ObjectProviderCapabilities(
                     "test-c1", true, true, true, true, true, 64 * 1024 * 1024L, 4 * 1024 * 1024, 1_000);
+        }
+
+        @Override
+        public ConditionalCreateResponse putIfAbsentWithEvidence(ObjectIdentity identity, InputStream body)
+                throws IOException {
+            var outcome = putIfAbsent(identity, body);
+            return outcome == ConditionalCreateResult.CREATED && proveCreation
+                    ? new ConditionalCreateResponse(outcome, Optional.of(identity), Optional.of(version))
+                    : ConditionalCreateResponse.outcome(outcome);
         }
 
         @Override
@@ -1583,6 +1834,11 @@ class StorageObjectNwkcp1BackendV1Test {
             }
             byte[] body = require(key);
             fullGets++;
+            var hook = beforeFullGet;
+            beforeFullGet = null;
+            if (hook != null) {
+                hook.run();
+            }
             return stream(body, 0, body.length);
         }
 
@@ -1610,6 +1866,7 @@ class StorageObjectNwkcp1BackendV1Test {
                     listed.add(new ListedObject(key, body.length, Optional.empty()));
                 }
             });
+            listed.sort(java.util.Comparator.comparing(ListedObject::key));
             return new ListPage(listed, Optional.empty());
         }
 

@@ -14,7 +14,12 @@ public final class Nwg1ObjectWriterV1 {
             byte[] walRunKey,
             Nwg1VerificationContextV1 verificationContext) {
         Nwg1SealedObjectV1 sealed = sealEncodedPlan(plan, laneSequence, walRunKey);
-        Nwg1ObjectReaderV1.read(sealed.body(), sealed.bodySha256(), verificationContext, walRunKey);
+        var decoded = Nwg1ObjectReaderV1.read(sealed.body(), sealed.bodySha256(), verificationContext, walRunKey);
+        try {
+            sealed.recordSelfVerification(plan, verificationContext, decoded);
+        } finally {
+            decoded.eraseOwnedFrames();
+        }
         return sealed;
     }
 

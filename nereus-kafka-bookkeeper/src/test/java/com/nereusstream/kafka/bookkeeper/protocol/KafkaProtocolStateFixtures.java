@@ -59,12 +59,7 @@ final class KafkaProtocolStateFixtures {
                 startOffset,
                 endOffset,
                 new KafkaPartitionFrontiersV1(
-                        predecessor.frontiers().trimStartOffset(),
-                        allocated,
-                        durable,
-                        endOffset,
-                        predecessor.frontiers().highWatermark(),
-                        predecessor.frontiers().lastStableOffset()),
+                        predecessor.frontiers().trimStartOffset(), allocated, durable, endOffset, endOffset, endOffset),
                 references(referenceGeneration));
     }
 

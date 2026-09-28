@@ -1,13 +1,20 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: Normative
 sourceTuple: v2-m1
 ---
 
 # Object WAL
+
+NSIP-1 T4's first Kafka Object batch uses exact Provider persistence plus a durable per-Binding/partition Head CAS
+grant. The same key orders grants, common checkpoint selection and Owner closure. Real MinIO/Oxia covers response
+loss, shared-member closure, physical rollover and repeated cold partition-state recovery. This amends the earlier
+cached-Owner-only completion assumption below; the historical M3 receipts retain their original source/contract.
+Native Object Broker profiles remain fail-closed. The current NSIP-1 M4 read adaptation has limited-scope coordination acceptance;
+complete M5 retirement and performance qualification remain pending. The historical M4 Final is unchanged.
 
 ## Cost model and group commit
 
@@ -119,14 +126,38 @@ records, and batched messages do not. Full ticket equality is ring-slot ABA prot
 Position Domain adjacency remain authority. Ticket, cached predecessor, runtime gap, and local completion order are not
 wire/metadata/API/config.
 
-Each validated commit unit is dispatched independently. Owner Epoch is checked from the cached owner fence on every
-completion, not by remote metadata and not as durable frontier identity. Normal completion uses a bounded ring/window;
+Each validated commit unit is dispatched independently. Kafka checks its exact Owner and continuous predecessor with
+a durable grant CAS after upload and native-payload validation; completion carries that grant receipt. Cached Owner
+checks alone are insufficient for Kafka legal history. Normal completion uses a bounded ring/window;
 recovery uses bounded collect plus Position Domain sort, creates fresh tickets, and reuses the ring. A long-lived
 ordered map is not the default contract. Durable Object resolution releases payload/ciphertext/compression buffers; a
 gap retains only coverage, idempotency identity, descriptor reference, and an owner-local future.
 
-One shared Object validation yields one reusable `VerifiedExtent`. The ACK path performs no new HEAD/GET, KMS,
-metadata call, whole-Object verification, or directory re-decryption. A shard-owned segmented active-tail index may
+One shared Object validation yields one reusable `VerifiedExtent`. Kafka's tracker/publication cut reuses that
+verification and its authorization receipt; it does not repeat Provider/KMS verification. The preceding durable grant
+CAS remains synchronous ACK-path metadata work. NSIP-1 T4's second batch reuses the complete writer self-check and
+an opaque exact persistence proof bound to the actual session, immutable candidate, and full ObjectIdentity. Qualified
+successful PUT uses no publication GET; UNKNOWN/EXISTING perform one full-GET length/SHA proof, and a success without
+typed creation evidence retains a full GET. Selected Binding/native policy and independent commit-delta checks remain.
+The S3 adapter captures actual version IDs; production Roots still admit only NONE. T4's third batch reserves physical
+descriptor/body debt before Kafka offsets, including unresolved PUTs, and narrows one shared reservation to exact sealed
+body bytes before sequence allocation. Foreground completion only enqueues that reservation; a run-owned serial worker
+publishes physical checkpoints outside publication waits. Provider/session and publisher I/O use short monitor cuts and
+actual operation leases. UNKNOWN reconciliation claims exact-identity LIST reservations under a short recovery lock;
+working-set/concurrency admission precedes reservation mutation and retry/full-GET charges. Temporary rejection retains
+any pending reservation. An incomplete Provider attempt retains its fully charged reservation until complete inventory
+settles it under the existing contract; settled inventory is never returned to pending after a semantic validation failure.
+Actual attempt charges remain cumulative, and Provider I/O stays outside the recovery lock. Restored physical-row
+consumption refuses concurrent I/O before releasing its composite working set. The synchronous authorization CAS remains
+a publication prerequisite. KMS Cell run-key operations now keep remote wrap/unwrap and full NWG1
+seal/verification outside its shared state lock using operation-owned key copies. Same-key misses share one unwrap;
+actual operations, pending loads and resident key slots share bounded Cell budgets. Pre-Root new-run admission reserves
+one slot and creates a random key/wrapped envelope on the private current generation. An exact Root publication retains
+that candidate through UNKNOWN and transfers its key handle with Provider authority into the WalRun lease. Admission
+selects a private successor generation when the old generation's CLOSED history is full, while live run leases continue
+and old raw references remain fenced. Focused real MinIO/Oxia publication now creates a new key per run and verifies
+stored objects through fresh unwrap; the transport is a local KMS test substitute. Native Broker/process
+and long-running integration remain M6 work. A shard-owned segmented active-tail index may
 aggregate locators by binding, extent, contiguous typed coverage, and contiguous directory-row span using
 Kafka-offset-range or Pulsar-ledger/entry-range structures. A generic `ProtocolCoverage` TreeMap is forbidden on the
 normal append/ACK hot path, and the index need not allocate one heavyweight object per Binding or append unit.
@@ -140,9 +171,10 @@ For Kafka, that same cut compares exact Binding/incarnation, Storage Epoch, Owne
 predecessor state version before one fenced state-root replacement coherently publishes producer,
 transaction/aborted, leader-epoch state and `ReadableFrontier`/LEO. A stale callback cannot publish then discover its
 fence loss. `acks=1`, `acks=all`, HW, and LSO then follow ADR 0087; provider resolution or Object materialization alone
-never advances Kafka visibility. Neither an async physical checkpoint page nor one remote manifest mutation per
-commit set is added to the ACK cut. WalRun Root/key identity plus bounded LIST keeps resolved groups recoverable, while
-low-frequency manifest generations remain source-selection authority.
+never advances Kafka visibility. Async physical checkpoint pages and remote manifest mutations do not grant commits.
+Kafka authorization Head selects the complete legal source prefix, with exact Object identity and locator for each
+member; bounded LIST only reconciles physical inventory or unknown PUT results. Low-frequency manifest generations
+retain their independent source-selection duties.
 
 Failure of Object digest, KMS envelope, fixed header, or directory AEAD blocks every member. After those layers
 validate, a frame/commit-set AEAD, CRC, native-checksum, or typed-coverage failure blocks only that binding's complete
@@ -197,8 +229,9 @@ carry one binding's Owner/Storage Epoch or one Topic-specific soft packing ident
 authoritative for all lanes. Each group leaf has the structural form
 `<laneId:[0-2]>/<laneSequence19>/<directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64hex>.nwg` below the Root prefix;
 the lane is one ASCII digit and the three remaining numeric fields are zero-padded 19-digit non-negative values.
-Checkpoint/manifest rows store its structured fields rather than the full key. No per-group metadata-service row is
-required for ACK.
+Physical checkpoint/manifest rows store its structured fields rather than the full key. Kafka's separate per-Binding
+authorization Head carries exact member Object identity/locator and requires its grant CAS for ACK; physical inventory
+does not create a second per-group ACK authority.
 
 The Root's control-plane session authority is not copied into the NWG1 Header, leaf, HKDF info, nonce, or Object
 identity. Header cross-binding uses the exact Root SHA instead.
@@ -229,16 +262,28 @@ complete key, Provider scope, proof algorithm/scope, or binding state. Runtime d
 defensive combiner admission. A page remains bounded by both 256 actual rows and 64 KiB canonical bytes, so admitted
 token bytes may reduce rows/page.
 
-The combiner admits one page candidate at a time. Candidate identity derives from Root, ordinal, predecessor SHA, and
-page-body SHA. Takeover CASes only publisher epoch while preserving the committed head/vector; unknown responses accept
-only exact candidate equality, definitive conflicts adopt only a same-Root component-wise non-regressing head, and no
-publisher locally merges predecessors. Each failed publisher epoch can leave at most one bounded unreachable page.
+The Kafka combiner charges all pre-position reservations, including unresolved Provider candidates, against Root extent,
+body and age limits. Shared members attach to one physical reservation while retaining independent authorization debt.
+Resolved enqueue consumes its existing slot; only exact Head coverage releases physical debt. Capacity exhaustion stops
+new offsets/sequences while already admitted candidates can finish. Existing Pulsar descriptor-only callers keep their
+bounded resolution admission and caller-owned scheduling.
+
+The combiner admits one page candidate at a time. It freezes selected rows, page key/bytes and expected/candidate Heads
+under a short monitor cut, performs metadata I/O outside the monitor, and applies results to that same candidate and
+generation. New enqueue cannot change a retained UNKNOWN candidate after a failed reconciliation read. Candidate
+identity derives from Root, ordinal, predecessor SHA, and page-body SHA. Takeover checks drained I/O and an admitting
+run, then CASes only publisher epoch while preserving the committed head/vector; unknown responses accept
+only exact candidate equality; definitive conflicts require the same Root/publisher epoch and an exact descendant of
+the expected page with a component-wise non-regressing vector. No publisher locally merges predecessors. Each failed publisher epoch can leave at most one bounded unreachable page.
 
 Policy is Protocol Cell x shard scoped and persisted in the next Root. Proactive cadence may be disabled, but aggregate
-uncovered provider-resolved extent/byte bounds and per-lane age are finite. Under ADR 0096's conservative owner-open
+admitted uncovered extent/body bounds and the oldest reservation age are finite. Under ADR 0096's conservative owner-open
 amendment, recovery/handoff first verifies the complete exact checkpoint chain and then strong-LIST folds all three
 uncovered lane tails. An invalid or incomplete checkpoint stream fails closed and cannot fall back to a second full-run
-LIST path. Besides Root identity, the Seal binds only one provider-resolved terminal sequence vector, one final
+LIST path. Seal drains actual publication I/O and requires all reservations/candidates/rows to be covered by the exact
+terminal vector before stopping the publisher. Its metadata operation retains the session resources until real I/O
+ends; an exact Seal retry checks the covered Head without reopening the stopped publisher. Besides Root identity,
+the Seal binds only one provider-resolved terminal sequence vector, one final
 checkpoint-head key/SHA, and minimum aggregate count/body-byte completeness facts. Three lane-local chains are not used.
 
 ### Kafka protocol checkpoints are a separate Object family
@@ -271,6 +316,14 @@ WAL/source on which checkpoint replay depends. Unselected residue requires bound
 The Head/terminal lifecycle remains outside append ACK and cannot authorize physical recovery omission, protection
 release, or source GC. Exact Head wire, key grammar, vector caps, and backend mapping are M3 evidence outputs.
 
+The production NWKCP1 backend uses the canonical metadata Head
+`v2/object-wal/shards/<shard>/runs/<runEpoch>/protocol/kafka/nwkcp1-v1/head`, independently of its Root-bound Provider
+Object prefix. Physical successor creation retains that exact terminal Head contract. Separately, NSIP-1's Binding
+authorization Head selects a SHA-named NWKCP1 common-state control record and keeps all protected locators. Only that
+selection clears uncovered recovery debt; physical rollover and Owner takeover preserve it. Authorized cold recovery
+reads the selected common state and only explicit granted tail objects, without LIST discovery. Its source/history
+caps backpressure until separate protected retirement is implemented.
+
 M3 implementation evidence uses two closed, parser-checked TSV artifacts rather than an opaque receipt attachment.
 The WalRun recovery manifest binds the exact control wire, lazy-lane, checkpoint publication/recovery, Seal/successor,
 lineage, bounded-tail, and Provider/KMS-session test identities. The NWKCP1 protocol fixture is emitted by the
@@ -297,7 +350,8 @@ reopens that run. A same-call CAS self-winner converges exactly; a different win
 owner-open attempt under that winner's persisted envelope, never under the losing candidate's budget. Recovery walks
 the bounded lineage to the retirement frontier, and every group header binds its Root
 SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owner-open, rollover, and handoff use these
-records; normal admitted group append performs no metadata-service I/O.
+records. Physical group identity allocation remains local; Kafka's post-upload durable authorization CAS performs
+metadata-service I/O and belongs to ACK.
 
 Acknowledged group objects remain directly readable through the published owner-local active-tail view. Takeover first
 recovers physical inventory, then may publish Binding views independently; unrelated typed gaps do not block B. A new
@@ -325,6 +379,12 @@ The captured logical scope binds Binding/incarnation, Storage Epoch/Position Dom
 Frontier, active-tail view version, manifest view identity/generation, and source-protection generation. One snapshot
 may read disjoint manifest and active-tail ranges; one Kafka commit set/Pulsar entry and every separately declared
 whole-range fallback remain source-pure.
+
+In the current NSIP-1 M4-local adapter, Kafka Object reads select LEO/HW/LSO from the same captured root as their
+route table; Kafka and Pulsar planners begin at the first intersecting ordered route and execute against the exact
+captured cell's physical route ordinal. A four-extent real MinIO/Oxia Kafka read performed eight range GETs with four
+distinct Objects, so that sampled request did not justify a prefix or append-unit cache. These focused changes do not
+replace source protection, full append-unit authentication, or the historical M4 Final.
 
 Reclamation is two-stage. First durably publish `PREFERRED_WITH_FALLBACK`, drain older-view pins, and retire only
 obsolete index structures. Then one Binding/incarnation selector CAS atomically selects bounded `PREFERRED_ONLY`,

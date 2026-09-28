@@ -95,7 +95,7 @@ public final class PulsarObjectWalM4ReaderV1 {
                     if (outcome != BindingReadPlannerV1.Outcome.PLANNED || reusablePlan.size() != 1) {
                         throw new IllegalStateException("captured Pulsar source plan failed closed: " + outcome);
                     }
-                    PhysicalRoute expected = cell.requirePhysical(reusablePlan.route(0));
+                    PhysicalRoute expected = cell.requirePhysical(reusablePlan.routeOrdinal(0), reusablePlan.route(0));
                     return bridge.readCaptured(cell.view(), binding, position).thenApply(result -> {
                         if (!result.binding().equals(binding)
                                 || !result.position().equals(position)

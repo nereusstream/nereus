@@ -55,11 +55,43 @@ class C1ObjectProviderSessionTest {
         ProviderObjectResult existing = session.conditionalCreate(body);
 
         assertThat(created.outcome()).isEqualTo(ProviderObjectOutcome.APPLIED_EXACT);
+        assertThat(created.persistenceEvidence()).isEmpty();
         assertThat(existing.outcome()).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
         assertThat(existing.versionToken()).isPresent();
         assertThat(transport.putCalls).isEqualTo(2);
         assertThat(transport.fullGetCalls).isEqualTo(1);
         assertThat(session.acceptedOperations()).isZero();
+    }
+
+    @Test
+    void typedCreationEvidenceRequiresExactIdentityAndCannotChangeOutcomeOrVersion() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        transport.proveCreation = true;
+        C1ObjectProviderSession session = session(transport, "cell-a");
+        TestBody body = body("cell-a/run/0/typed", 1, 2, 3);
+        ProviderObjectResult result = session.conditionalCreate(body);
+        assertThat(result.persistenceEvidence()).isPresent();
+        assertThat(result.versionToken())
+                .contains(FakeTransport.version(body.identity().key()));
+        assertThat(transport.fullGetCalls).isZero();
+        assertThatThrownBy(() -> new ProviderObjectResult(
+                        ProviderObjectOutcome.EXISTING_EXACT, result.versionToken(), result.persistenceEvidence()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() ->
+                        new ProviderObjectResult(result.outcome(), Optional.empty(), result.persistenceEvidence()))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        TestBody next = body("cell-a/run/0/substitution", 4, 5, 6);
+        transport.creationIdentityOverride = identity(next.identity().key(), 4, 5, 7);
+        assertThatThrownBy(() -> session.conditionalCreate(next))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("substituted");
+        assertThat(session.unknownObjectCount()).isOne();
+        assertThat(session.reconcileUnknown(next.identity(), "cell-a/run/0/", 10, 100, 102_400, 1024)
+                        .objectResult()
+                        .outcome())
+                .isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
+        session.close();
     }
 
     @Test
@@ -78,6 +110,7 @@ class C1ObjectProviderSessionTest {
         assertRejectedBody(session, new TestBody(identity("cell-a/run/0/sha", 1, 2), new byte[] {1, 3}), "SHA-256");
 
         transport.returnCreatedWithoutReading = true;
+        transport.proveCreation = true;
         TestBody unconsumed = body("cell-a/run/0/unconsumed", 1, 2);
         assertThatThrownBy(() -> session.conditionalCreate(unconsumed))
                 .isInstanceOf(IOException.class)
@@ -811,6 +844,8 @@ class C1ObjectProviderSessionTest {
         private ConditionalCreateResult nextCreate;
         private boolean storeOnUnknown;
         private boolean returnCreatedWithoutReading;
+        private boolean proveCreation;
+        private ObjectIdentity creationIdentityOverride;
         private boolean replayFirstKeyOnSecondListPage;
         private Long listedBodyLengthOverride;
         private Optional<CanonicalBytes> listedVersionTokenOverride;
@@ -829,6 +864,18 @@ class C1ObjectProviderSessionTest {
         @Override
         public ObjectProviderCapabilities capabilities() {
             return capabilities;
+        }
+
+        @Override
+        public ConditionalCreateResponse putIfAbsentWithEvidence(ObjectIdentity identity, InputStream body)
+                throws IOException {
+            var result = putIfAbsent(identity, body);
+            return result == ConditionalCreateResult.CREATED && proveCreation
+                    ? new ConditionalCreateResponse(
+                            result,
+                            Optional.of(creationIdentityOverride == null ? identity : creationIdentityOverride),
+                            Optional.of(version(identity.key())))
+                    : ConditionalCreateResponse.outcome(result);
         }
 
         @Override

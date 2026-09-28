@@ -55,5 +55,28 @@ jobs:
           java-version: '21'
       - name: Install verification tools
         run: sudo apt-get update && sudo apt-get install -y ripgrep
-      - name: V2 M4 final gate
-        run: ./gradlew v2M4Check
+      - name: V2 M4 historical Final at its published source
+        run: |
+          historical="$RUNNER_TEMP/m4-final-source"
+          git worktree add --detach "$historical" 3c01457295258cf586d56630a63067469be34743
+          trap 'git worktree remove --force "$historical"' EXIT
+          (cd "$historical" && ./gradlew v2M4Check)
+      - name: Check out source-locked Pulsar composite for current modules
+        run: |
+          pulsar_source="$RUNNER_TEMP/nsip-pulsar-source"
+          pulsar_commit=a14e0e6f4e49be0677318b4ceefc7b85b445823b
+          git init --quiet "$pulsar_source"
+          git -C "$pulsar_source" remote add origin https://github.com/nereusstream/pulsar.git
+          git -C "$pulsar_source" fetch --quiet --depth=1 --no-tags origin \
+            +refs/heads/nereus/v2-m2-pulsar-native-offload:refs/remotes/origin/nereus/v2-m2-pulsar-native-offload
+          test "$(git -C "$pulsar_source" rev-parse refs/remotes/origin/nereus/v2-m2-pulsar-native-offload)" = "$pulsar_commit"
+          git -C "$pulsar_source" checkout --quiet --detach "$pulsar_commit"
+      - name: Current NSIP read-path modules
+        run: |
+          ./gradlew -PpulsarCheckout="$RUNNER_TEMP/nsip-pulsar-source" \
+            :nereus-storage-object:test :nereus-kafka-bookkeeper:test :nereus-pulsar-offload:test \
+            :nereus-storage-object:spotlessCheck :nereus-kafka-bookkeeper:spotlessCheck \
+            :nereus-pulsar-offload:spotlessCheck \
+            :nereus-storage-object:checkstyleMain :nereus-storage-object:checkstyleTest \
+            :nereus-kafka-bookkeeper:checkstyleMain :nereus-kafka-bookkeeper:checkstyleTest \
+            :nereus-pulsar-offload:checkstyleMain :nereus-pulsar-offload:checkstyleTest

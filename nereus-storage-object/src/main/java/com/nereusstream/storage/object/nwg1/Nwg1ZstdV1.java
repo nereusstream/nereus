@@ -35,16 +35,16 @@ public final class Nwg1ZstdV1 {
     }
 
     public static byte[] decompress(byte[] frame, int decodedLength) {
-        validateStandardFrame(frame, decodedLength);
-        byte[] decoded = Zstd.decompress(frame, decodedLength);
-        if (Zstd.isError(decoded.length) || decoded.length != decodedLength) {
-            fail("ZSTD decoded length mismatch");
-        }
-        return decoded;
+        return decodeStandardFrame(frame, decodedLength);
     }
 
     /** Rejects dictionaries, skippable frames, missing/wrong content size, trailing or concatenated bytes. */
     public static void validateStandardFrame(byte[] frame, int expectedDecodedLength) {
+        byte[] decoded = decodeStandardFrame(frame, expectedDecodedLength);
+        java.util.Arrays.fill(decoded, (byte) 0);
+    }
+
+    private static byte[] decodeStandardFrame(byte[] frame, int expectedDecodedLength) {
         if (frame == null
                 || frame.length < 6
                 || expectedDecodedLength <= 0
@@ -86,6 +86,7 @@ public final class Nwg1ZstdV1 {
         if (decoded.length != expectedDecodedLength) {
             fail("ZSTD decoded size mismatch");
         }
+        return decoded;
     }
 
     private static FrameFacts parseFrame(byte[] frame) {

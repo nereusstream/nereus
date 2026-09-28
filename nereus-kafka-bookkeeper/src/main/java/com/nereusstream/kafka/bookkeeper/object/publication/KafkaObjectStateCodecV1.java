@@ -15,8 +15,15 @@
 package com.nereusstream.kafka.bookkeeper.object.publication;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.identity.Id128;
+import com.nereusstream.domain.identity.KafkaTopicId;
+import com.nereusstream.domain.identity.StorageEpochId;
+import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectActiveTailStateV1;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +48,40 @@ public final class KafkaObjectStateCodecV1 {
             throw new IllegalStateException("Kafka Object locator fixed wire length drifted");
         }
         return encoded;
+    }
+
+    public static KafkaObjectExtentLocatorV1 decodeLocator(CanonicalBytes bytes) {
+        if (bytes.length() != LOCATOR_BYTES) {
+            throw new IllegalArgumentException("Object locator length differs from its fixed wire");
+        }
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+            int tagLength = in.readInt();
+            if (tagLength != LOCATOR_TAG.length()
+                    || !LOCATOR_TAG.equals(new String(in.readNBytes(tagLength), StandardCharsets.UTF_8))) {
+                throw new IllegalArgumentException("Object locator tag differs");
+            }
+            var binding = new KafkaObjectBindingKeyV1(
+                    new TopicBindingId(Sha256Digest.copyOf(in.readNBytes(32))),
+                    new KafkaTopicId(Id128.fromBytes(in.readNBytes(16))),
+                    in.readInt(),
+                    new StorageEpochId(Sha256Digest.copyOf(in.readNBytes(32))));
+            long start = in.readLong();
+            long end = in.readLong();
+            var extent = new KafkaObjectExtentIdentityV1(
+                    Sha256Digest.copyOf(in.readNBytes(32)),
+                    in.readInt(),
+                    in.readLong(),
+                    in.readLong(),
+                    in.readLong(),
+                    Sha256Digest.copyOf(in.readNBytes(32)));
+            var locator = new KafkaObjectExtentLocatorV1(binding, start, end, extent, in.readInt(), in.readInt());
+            if (in.read() != -1 || !locator(locator).equals(bytes)) {
+                throw new IllegalArgumentException("Object locator is not canonical");
+            }
+            return locator;
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("Object locator is truncated", failure);
+        }
     }
 
     public static CanonicalBytes activeTail(KafkaObjectActiveTailStateV1 state) {

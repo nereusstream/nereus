@@ -61,17 +61,17 @@ public final class PulsarObjectBindingReadAdapterV1 {
                 throw new IllegalArgumentException("Pulsar M4 logical and physical route counts differ");
             }
             for (int index = 0; index < routes.size(); index++) {
-                if (!routes.route(index).equals(physicalRoutes.get(index).route())) {
+                if (routes.route(index) != physicalRoutes.get(index).route()) {
                     throw new IllegalArgumentException("Pulsar M4 logical and physical route order differs");
                 }
             }
         }
 
-        public PhysicalRoute requirePhysical(PulsarBindingReadRouteV1 route) {
-            return physicalRoutes.stream()
-                    .filter(candidate -> candidate.route().equals(route))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("planned Pulsar route is absent from read cell"));
+        public PhysicalRoute requirePhysical(int ordinal, PulsarBindingReadRouteV1 route) {
+            if (ordinal < 0 || ordinal >= physicalRoutes.size() || routes.route(ordinal) != route) {
+                throw new IllegalArgumentException("planned Pulsar route is absent from captured read cell");
+            }
+            return physicalRoutes.get(ordinal);
         }
     }
 

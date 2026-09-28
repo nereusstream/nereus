@@ -18,11 +18,16 @@ import java.util.Objects;
 
 /** Original committed Kafka Offset Range retained for one native duplicate identity. */
 public record KafkaProducerBatchResultV1(
-        KafkaBatchDuplicateIdentityV1 identity, long startOffset, long endOffsetExclusive) {
+        KafkaBatchDuplicateIdentityV1 identity, long startOffset, long endOffsetExclusive, long maxTimestamp) {
     public KafkaProducerBatchResultV1 {
         Objects.requireNonNull(identity, "identity");
         if (startOffset < 0 || endOffsetExclusive <= startOffset) {
             throw new IllegalArgumentException("producer batch result range is invalid");
         }
+    }
+
+    public KafkaProducerBatchResultV1(
+            KafkaBatchDuplicateIdentityV1 identity, long startOffset, long endOffsetExclusive) {
+        this(identity, startOffset, endOffsetExclusive, -1);
     }
 }

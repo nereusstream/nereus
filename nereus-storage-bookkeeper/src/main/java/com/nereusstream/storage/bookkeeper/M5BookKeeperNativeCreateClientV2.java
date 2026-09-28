@@ -114,7 +114,24 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
     }
 
     public M5BookKeeperNativeCreateSpecV2 spec() {
-        return spec;
+        return driver().createSpec();
+    }
+
+    /** Advances the exact guarded create scope, retaining one current run and its permanent native fence. */
+    public M5BookKeeperNativeCreateSpecV2 admitCreateConfiguration(RunLedgerConfigurationV1 configuration)
+            throws Exception {
+        if (!configuration.equals(RunLedgerConfigurationV1.from(capability, configuration.runId()))) {
+            throw new IllegalArgumentException("new run changes the admitted capability");
+        }
+        var next = M5BookKeeperNativeCreateSpecV2.of(
+                spec.nativeInstanceId(),
+                Sha256Digest.hash(
+                        CanonicalBytes.copyOf(("M5-NATIVE-RUN/" + spec.taskId().toHex() + "/"
+                                        + configuration.runId().value().toHex())
+                                .getBytes(StandardCharsets.US_ASCII))),
+                java.util.List.of(configuration));
+        driver().activateCreateScope(next);
+        return next;
     }
 
     public BookKeeperCapabilitySnapshotV1 capabilitySnapshot() {
@@ -170,8 +187,7 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
      */
     public CompletionStage<ExactLedgerEntryV1> readNativeRunHeader(RunLedgerHandleV1 handle) {
         var configuration = RunLedgerConfigurationV1.from(capability, handle.runId());
-        if (!spec.configurations().contains(configuration)
-                || !handle.providerScopeId().equals(capability.providerScopeId())
+        if (!handle.providerScopeId().equals(capability.providerScopeId())
                 || !handle.configurationDigest().equals(capability.configurationDigest())) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("header handle is outside native scope"));

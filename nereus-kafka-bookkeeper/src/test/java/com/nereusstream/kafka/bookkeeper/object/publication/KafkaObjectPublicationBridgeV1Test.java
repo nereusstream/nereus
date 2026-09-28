@@ -30,6 +30,7 @@ import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectBindingReadAdapt
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1;
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1.ValidatedRange;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOffsetAssignedAppendV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1;
 import com.nereusstream.storage.object.read.BindingReadAsyncExecutorV1;
 import com.nereusstream.storage.object.read.BindingReadBatchContextV1;
 import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
@@ -258,7 +259,8 @@ class KafkaObjectPublicationBridgeV1Test {
             capturedBeforeInnerPin.closeNewSourceUse();
             assertThat(capturedBeforeInnerPin.terminalClearExactLease()).isTrue();
 
-            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> read = reader.read(0, 1, 1);
+            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> read =
+                    reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED);
             providerStarted.get(10, TimeUnit.SECONDS);
             assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.PINNED);
             assertThatThrownBy(() -> protection.prepareManifestRetirement(
@@ -284,6 +286,104 @@ class KafkaObjectPublicationBridgeV1Test {
             KafkaObjectCoherentProtocolSnapshotV1 retired =
                     context.coordinator.retireObjectTail(protection, plan, context.tracker);
             assertThat(retired.activeTail().locators()).isEmpty();
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
+    void m4PhysicalRouteOrdinalCannotBeReusedAcrossReadCells() {
+        Context context = context(ignored -> {});
+        KafkaSpeculativeCommitV1 commit = ObjectKafkaTestFixtures.commit(0);
+        stage(context.coordinator, commit);
+        Ready ready = ready(context, commit);
+        KafkaObjectCoherentProtocolSnapshotV1 published =
+                context.bridge.publishNext(() -> {}).orElseThrow();
+        var first = (KafkaObjectBindingReadAdapterV1.ReadCell)
+                KafkaObjectBindingReadAdapterV1.publish(published, m4Selector(published))
+                        .publicationCell()
+                        .protocolStateReference();
+        var second = (KafkaObjectBindingReadAdapterV1.ReadCell)
+                KafkaObjectBindingReadAdapterV1.publish(published, m4Selector(published))
+                        .publicationCell()
+                        .protocolStateReference();
+
+        assertThat(first.routes().route(0)).isEqualTo(second.routes().route(0));
+        assertThat(first.requirePhysical(0, first.routes().route(0)).locator()).isEqualTo(ready.locator);
+        assertThatThrownBy(() -> first.requirePhysical(0, second.routes().route(0)))
+                .hasMessageContaining("captured read cell");
+        assertThatThrownBy(() -> first.requirePhysical(1, first.routes().route(0)))
+                .hasMessageContaining("captured read cell");
+    }
+
+    @Test
+    void m4RefreshKeepsTheOldPhysicalPlanPinnedAndNewReadCapturesTheNewGeneration() throws Exception {
+        Context context = context(ignored -> {});
+        KafkaSpeculativeCommitV1 commit = ObjectKafkaTestFixtures.commit(0);
+        stage(context.coordinator, commit);
+        ready(context, commit);
+        KafkaObjectCoherentProtocolSnapshotV1 published =
+                context.bridge.publishNext(() -> {}).orElseThrow();
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        CompletableFuture<CanonicalBytes> provider = new CompletableFuture<>();
+        AtomicInteger providerCalls = new AtomicInteger();
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            KafkaObjectWalM4ReaderV1 reader = new KafkaObjectWalM4ReaderV1(
+                    published,
+                    m4Selector(published),
+                    locator -> () -> {},
+                    (locator, start, end) -> {
+                        providerCalls.incrementAndGet();
+                        return provider.thenApply(bytes -> new ValidatedRange(locator, start, end, bytes));
+                    },
+                    pool,
+                    eventLoop);
+            var oldRead = reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED);
+            awaitProviderCalls(providerCalls, 1);
+            reader.refresh(published, m4Selector(published, 2));
+            var newRead = reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED);
+            awaitProviderCalls(providerCalls, 2);
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.PINNED);
+            assertThat(pool.scan(published.root().fence().bindingId(), 2)).isEqualTo(ScanOutcome.PINNED);
+
+            provider.complete(CanonicalBytes.copyOf(new byte[] {1, 2, 3}));
+            assertThat(oldRead.get(10, TimeUnit.SECONDS).capturedSourceGeneration())
+                    .isOne();
+            assertThat(newRead.get(10, TimeUnit.SECONDS).capturedSourceGeneration())
+                    .isEqualTo(2);
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.CLEAN);
+            assertThat(pool.scan(published.root().fence().bindingId(), 2)).isEqualTo(ScanOutcome.CLEAN);
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
+    void m4NullProviderCompletionReleasesTheInnerPinAndOuterHazard() {
+        Context context = context(ignored -> {});
+        KafkaSpeculativeCommitV1 commit = ObjectKafkaTestFixtures.commit(0);
+        stage(context.coordinator, commit);
+        ready(context, commit);
+        KafkaObjectCoherentProtocolSnapshotV1 published =
+                context.bridge.publishNext(() -> {}).orElseThrow();
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        AtomicInteger pinCloses = new AtomicInteger();
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            KafkaObjectWalM4ReaderV1 reader = new KafkaObjectWalM4ReaderV1(
+                    published,
+                    m4Selector(published),
+                    locator -> pinCloses::incrementAndGet,
+                    (locator, start, end) -> CompletableFuture.completedFuture(null),
+                    pool,
+                    eventLoop);
+
+            assertThatThrownBy(() -> reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED)
+                            .join())
+                    .hasRootCauseMessage("Kafka reader substituted its captured locator/range");
+            assertThat(pinCloses).hasValue(1);
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.CLEAN);
         } finally {
             eventLoop.shutdownNow();
         }
@@ -324,7 +424,7 @@ class KafkaObjectPublicationBridgeV1Test {
                     pool,
                     eventLoop);
             for (int index = 0; index < 200; index++) {
-                reader.read(0, 1, 1).get(10, TimeUnit.SECONDS);
+                reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED).get(10, TimeUnit.SECONDS);
             }
 
             com.sun.management.ThreadMXBean bean =
@@ -340,7 +440,9 @@ class KafkaObjectPublicationBridgeV1Test {
             long elapsedStart = System.nanoTime();
             for (int index = 0; index < operations; index++) {
                 long started = System.nanoTime();
-                assertThat(reader.read(0, 1, 1).get(10, TimeUnit.SECONDS).ranges())
+                assertThat(reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED)
+                                .get(10, TimeUnit.SECONDS)
+                                .ranges())
                         .hasSize(1);
                 latencyNanos[index] = System.nanoTime() - started;
             }
@@ -365,10 +467,11 @@ class KafkaObjectPublicationBridgeV1Test {
             int beforeCapacityCalls = providerCalls.get();
             List<CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult>> pending = new ArrayList<>();
             for (int index = 0; index < pool.capacity(); index++) {
-                pending.add(reader.read(0, 1, 1));
+                pending.add(reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED));
             }
             awaitProviderCalls(providerCalls, beforeCapacityCalls + pool.capacity());
-            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> rejected = reader.read(0, 1, 1);
+            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> rejected =
+                    reader.read(0, 1, KafkaReadIsolationV1.READ_COMMITTED);
             assertThatThrownBy(rejected::join)
                     .hasRootCauseInstanceOf(BindingReadAsyncExecutorV1.AdmissionException.class)
                     .hasRootCauseMessage("M4 read admission failed before source I/O: EXHAUSTED");
@@ -579,8 +682,17 @@ class KafkaObjectPublicationBridgeV1Test {
                 KafkaCoherentCommitCoordinatorV1.bootstrapObject(ObjectKafkaTestFixtures.fence(), 0, observer);
         int exactBytes = KafkaObjectStateCodecV1.exactLocatorBytes();
         var tracker = new KafkaObjectCompletionTrackerV1(8, exactBytes * 8L, 6);
+        var authority = new KafkaObjectAuthorizationV1(
+                new ObjectAuthorizationTestMetadata(),
+                0,
+                new KafkaObjectAuthorizationV1.Bounds(128, 64, 64L * 1024 * 1024, 1024));
+        authority.open(coordinator.captureObject().root().fence(), 0, Optional.empty());
+        tracker.bindAuthorization(authority, coordinator.captureObject().root().fence(), 1024);
         return new Context(
-                coordinator, tracker, new KafkaObjectPublicationBridgeV1(binding(), 0, tracker, coordinator));
+                coordinator,
+                tracker,
+                authority,
+                new KafkaObjectPublicationBridgeV1(binding(), 0, tracker, coordinator));
     }
 
     private static Ready ready(Context context, KafkaSpeculativeCommitV1 commit) {
@@ -608,11 +720,13 @@ class KafkaObjectPublicationBridgeV1Test {
         physical.resolve(extent);
         context.tracker.sequenceStarted(ticket);
         context.tracker.providerDispatched(ticket);
-        context.tracker.providerResolved(
-                ticket,
-                physical,
-                new KafkaVerifiedNwg1CommitV1(locator, ObjectKafkaTestFixtures.digest(14), 1),
-                nativeState);
+        var verified = new KafkaVerifiedNwg1CommitV1(locator, ObjectKafkaTestFixtures.digest(14), 1);
+        verified.authorize(
+                context.authority,
+                new com.nereusstream.storage.object.provider.ObjectIdentity(
+                        "test/exact", extent.bodyLength(), extent.bodySha()),
+                commit);
+        context.tracker.providerResolved(ticket, physical, verified, nativeState);
         return new Ready(reservation, ticket, locator);
     }
 
@@ -635,12 +749,16 @@ class KafkaObjectPublicationBridgeV1Test {
     }
 
     private static BindingReadSelector m4Selector(KafkaObjectCoherentProtocolSnapshotV1 snapshot) {
+        return m4Selector(snapshot, 1);
+    }
+
+    private static BindingReadSelector m4Selector(KafkaObjectCoherentProtocolSnapshotV1 snapshot, long generation) {
         return new BindingReadSelector(
                 KafkaObjectBindingReadAdapterV1.bindingIdentity(snapshot),
                 ObjectKafkaTestFixtures.digest(20),
                 snapshot.root().fence().ownerEpoch(),
                 1,
-                1,
+                generation,
                 SelectorMode.PREFERRED_ONLY,
                 AdmissionState.ADMITTING,
                 Optional.empty(),
@@ -669,6 +787,7 @@ class KafkaObjectPublicationBridgeV1Test {
     private record Context(
             KafkaCoherentCommitCoordinatorV1 coordinator,
             KafkaObjectCompletionTrackerV1 tracker,
+            KafkaObjectAuthorizationV1 authority,
             KafkaObjectPublicationBridgeV1 bridge) {}
 
     private record Ready(

@@ -59,12 +59,21 @@ public final class KafkaNwg1ObjectPipelineV1 {
     public record SharedMember(
             KafkaObjectCompletionTrackerV1.AssignedTicket ticket,
             KafkaSpeculativeCommitV1 commit,
-            KafkaObjectNativeStateV1 nativeState) {
+            KafkaObjectNativeStateV1 nativeState,
+            KafkaObjectCompletionTrackerV1 completionTracker) {
         public SharedMember {
             Objects.requireNonNull(ticket, "ticket");
             Objects.requireNonNull(commit, "commit");
             Objects.requireNonNull(nativeState, "nativeState");
+            Objects.requireNonNull(completionTracker, "completionTracker");
         }
+    }
+
+    public SharedMember member(
+            KafkaObjectCompletionTrackerV1.AssignedTicket ticket,
+            KafkaSpeculativeCommitV1 commit,
+            KafkaObjectNativeStateV1 nativeState) {
+        return new SharedMember(ticket, commit, nativeState, tracker);
     }
 
     public record VerifiedMember(
@@ -91,15 +100,19 @@ public final class KafkaNwg1ObjectPipelineV1 {
         }
     }
 
+    public record AuthorizationMemberFailure(KafkaObjectCompletionTrackerV1.AssignedTicket ticket, String reason) {}
+
     public record SharedWriteResult(
             ObjectIdentity identity,
             List<VerifiedMember> verifiedMembers,
-            List<IsolatedMemberFailure> isolatedFailures) {
+            List<IsolatedMemberFailure> isolatedFailures,
+            List<AuthorizationMemberFailure> authorizationFailures) {
         public SharedWriteResult {
             Objects.requireNonNull(identity, "identity");
             verifiedMembers = List.copyOf(verifiedMembers);
             isolatedFailures = List.copyOf(isolatedFailures);
-            if (verifiedMembers.isEmpty() && isolatedFailures.isEmpty()) {
+            authorizationFailures = List.copyOf(authorizationFailures);
+            if (verifiedMembers.isEmpty() && isolatedFailures.isEmpty() && authorizationFailures.isEmpty()) {
                 throw new IllegalArgumentException("shared result contains no members");
             }
         }
@@ -112,10 +125,10 @@ public final class KafkaNwg1ObjectPipelineV1 {
     private final KafkaObjectPhysicalFrontiersV1 physicalFrontiers;
     private final KafkaObjectCompletionTrackerV1 tracker;
     private final WalCheckpointPublisher checkpointPublisher;
+    private final KafkaObjectAuthorizationV1 authorization;
+    private final java.util.Set<KafkaObjectCompletionTrackerV1> memberTrackers = new java.util.HashSet<>();
     private final Map<KafkaObjectCompletionTrackerV1.AssignedTicket, PendingWrite> pending = new LinkedHashMap<>();
     private final Map<Sha256Digest, PendingSharedWrite> pendingShared = new LinkedHashMap<>();
-    private long lastCheckpointPublishMillis = -1;
-    private RuntimeException checkpointDebtFailure;
 
     @SuppressWarnings("ParameterNumber")
     public KafkaNwg1ObjectPipelineV1(
@@ -124,7 +137,8 @@ public final class KafkaNwg1ObjectPipelineV1 {
             Nwg1VerificationContextV1 verificationContext,
             KafkaObjectPhysicalFrontiersV1 physicalFrontiers,
             KafkaObjectCompletionTrackerV1 tracker,
-            WalCheckpointPublisher checkpointPublisher) {
+            WalCheckpointPublisher checkpointPublisher,
+            KafkaObjectAuthorizationV1 authorization) {
         this.root = Objects.requireNonNull(root, "root");
         this.objectSession = Objects.requireNonNull(objectSession, "objectSession");
         this.rootSha = objectSession.rootSha256();
@@ -132,6 +146,9 @@ public final class KafkaNwg1ObjectPipelineV1 {
         this.physicalFrontiers = Objects.requireNonNull(physicalFrontiers, "physicalFrontiers");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
         this.checkpointPublisher = Objects.requireNonNull(checkpointPublisher, "checkpointPublisher");
+        this.authorization = Objects.requireNonNull(authorization, "authorization");
+        memberTrackers.add(tracker);
+        tracker.bindCheckpointPublisher(checkpointPublisher);
         if (rootSha.isZero()
                 || !com.nereusstream.storage.object.control.WalRunControlCodec.rootSha256(root)
                         .equals(rootSha)
@@ -147,8 +164,17 @@ public final class KafkaNwg1ObjectPipelineV1 {
         }
     }
 
+    public synchronized void bindTracker(KafkaObjectCompletionTrackerV1 memberTracker) {
+        memberTracker.bindCheckpointPublisher(checkpointPublisher);
+        memberTrackers.add(memberTracker);
+    }
+
+    public WalCheckpointPublisher.Reservation reservePhysicalBeforePosition(long maximumBodyBytes) {
+        return checkpointPublisher.reserveBeforePosition(maximumBodyBytes);
+    }
+
     /** Performs every effect in order and installs only a fully authenticated complete commit-set locator. */
-    public synchronized KafkaVerifiedNwg1CommitV1 writeResolveAndInstall(
+    public KafkaVerifiedNwg1CommitV1 writeResolveAndInstall(
             GroupEncodingPlanV1 plan,
             KafkaObjectCompletionTrackerV1.AssignedTicket ticket,
             KafkaSpeculativeCommitV1 commit,
@@ -160,74 +186,112 @@ public final class KafkaNwg1ObjectPipelineV1 {
         Objects.requireNonNull(nativeState, "nativeState");
         requirePlanAuthority(plan);
         requireSinglePlanMember(plan, ticket, commit);
-        PendingWrite write = pending.get(ticket);
-        if (write == null) {
-            WalRunObjectSession.ValidatedNwg1Plan validated = objectSession.validateNwg1Plan(plan, verificationContext);
-            prepareCheckpointCapacity(validated.canonicalBodyBytes(), nowMillis);
-            KafkaObjectCompletionTrackerV1.SequenceClaim claim = tracker.claimSequence(ticket);
-            write = new PendingWrite(plan.canonicalPlanSha256(), commit, nativeState, validated, claim);
-            pending.put(ticket, write);
-        } else {
-            write.requireRetry(plan, commit, nativeState);
-        }
-        if (write.candidate == null) {
-            try {
-                write.candidate = objectSession.admitAndSealNwg1(write.validatedPlan, nowMillis);
-                if (write.sequenceClaim != null) {
-                    tracker.completeSequenceAfterEffect(write.sequenceClaim);
-                    write.sequenceClaim = null;
-                }
-            } catch (WalRunObjectSession.Nwg1AdmissionFailure failure) {
-                if (failure.sequenceEffect().isPresent() && write.sequenceClaim != null) {
-                    tracker.completeSequenceAfterEffect(write.sequenceClaim);
-                    write.sequenceClaim = null;
-                } else if (failure.sequenceEffect().isEmpty() && write.sequenceClaim != null) {
-                    tracker.abortSequenceBeforeEffect(write.sequenceClaim);
-                    pending.remove(ticket);
-                } else if (failure.sequenceEffect().isEmpty()) {
-                    throw new IllegalStateException(
-                            "retried NWG1 admission lost its retained sequence effect", failure);
-                }
-                throw failure;
+        tracker.requireAuthorization(authorization, commit.expectedFence());
+        PendingWrite write;
+        synchronized (this) {
+            write = pending.get(ticket);
+            if (write == null) {
+                WalRunObjectSession.ValidatedNwg1Plan validated =
+                        objectSession.validateNwg1Plan(plan, verificationContext);
+                var physicalReservation = checkpointPublisher.bindPlan(
+                        List.of(tracker.checkpointAttachment(ticket, checkpointPublisher)),
+                        plan.canonicalPlanSha256(),
+                        validated.canonicalBodyBytes());
+                tracker.requireCandidateBodyCharge(validated.canonicalBodyBytes());
+                KafkaObjectCompletionTrackerV1.SequenceClaim claim = tracker.claimSequence(ticket);
+                write = new PendingWrite(plan.canonicalPlanSha256(), commit, nativeState, validated, claim);
+                write.physicalReservation = physicalReservation;
+                pending.put(ticket, write);
+            } else {
+                write.requireRetry(plan, commit, nativeState);
             }
+            if (write.inFlight) {
+                throw new IllegalStateException("exact NWG1 pipeline candidate already has in-flight work");
+            }
+            write.inFlight = true;
         }
-        WalRunObjectSession.AdmittedNwg1Candidate candidate = write.candidate;
-        if (!write.dispatched) {
-            tracker.providerDispatched(ticket);
-            write.dispatched = true;
-        }
-        ObjectIdentity identity = candidate.identity();
         try {
-            if (!write.providerExact) {
-                resolveSingleProviderCandidate(write, candidate, ticket);
-                write.providerExact = true;
+            if (write.candidate == null) {
+                try {
+                    write.candidate = objectSession.admitAndSealNwg1(write.validatedPlan, nowMillis);
+                    checkpointPublisher.sequenceStarted(write.physicalReservation);
+                    if (write.sequenceClaim != null) {
+                        tracker.completeSequenceAfterEffect(write.sequenceClaim);
+                        write.sequenceClaim = null;
+                    }
+                } catch (WalRunObjectSession.Nwg1AdmissionFailure failure) {
+                    if (failure.sequenceEffect().isPresent() && write.sequenceClaim != null) {
+                        checkpointPublisher.sequenceStarted(write.physicalReservation);
+                        tracker.completeSequenceAfterEffect(write.sequenceClaim);
+                        write.sequenceClaim = null;
+                    } else if (failure.sequenceEffect().isEmpty() && write.sequenceClaim != null) {
+                        tracker.abortSequenceBeforeEffect(write.sequenceClaim);
+                        removePending(ticket);
+                    } else if (failure.sequenceEffect().isEmpty()) {
+                        throw new IllegalStateException(
+                                "retried NWG1 admission lost its retained sequence effect", failure);
+                    }
+                    throw failure;
+                }
             }
-            WalRunObjectSession.AuthenticatedNwg1PublicationExtent publicationExtent =
-                    objectSession.readAndAuthenticateNwg1ForPublication(candidate, verificationContext);
-            long selectedFrameOrdinal = plan.appendUnits().get(0).firstFrameOrdinal();
-            Nwg1ObjectReaderV1.VerifiedAppendUnit verifiedUnit =
-                    objectSession.verifySelectedNwg1AppendUnitForPublication(
+            WalRunObjectSession.AdmittedNwg1Candidate candidate = write.candidate;
+            if (!write.dispatched) {
+                tracker.providerDispatched(ticket);
+                write.dispatched = true;
+            }
+            ObjectIdentity identity = candidate.identity();
+            try {
+                if (!write.providerExact) {
+                    resolveSingleProviderCandidate(write, candidate, ticket);
+                    write.providerExact = true;
+                }
+                if (write.publicationExtent == null) {
+                    write.publicationExtent =
+                            objectSession.readAndAuthenticateNwg1ForPublication(candidate, verificationContext);
+                }
+                var publicationExtent = write.publicationExtent;
+                if (write.verified == null) {
+                    long selectedFrameOrdinal = plan.appendUnits().get(0).firstFrameOrdinal();
+                    var verifiedUnit = objectSession.verifySelectedNwg1AppendUnitForPublication(
                             publicationExtent,
                             verificationContext,
                             selectedFrameOrdinal,
-                            (ignoredFrame, ignoredPayload) -> {});
-            KafkaVerifiedNwg1CommitV1 verified =
-                    verifyCommit(publicationExtent.authenticatedPrefix(), verifiedUnit, commit, ticket, identity);
-            physicalFrontiers.requireNext(verified.locator().extent());
-            ProviderResolvedExtentDescriptor descriptor = descriptor(
-                    publicationExtent.authenticatedPrefix().header(),
-                    identity,
-                    publicationExtent.providerProof(),
-                    nowMillis);
-            objectSession.providerResolved(candidate);
-            physicalFrontiers.resolve(verified.locator().extent());
-            checkpointPublisher.enqueue(descriptor);
-            publishCheckpointPerPolicy(nowMillis);
-            tracker.providerResolved(ticket, physicalFrontiers, verified, nativeState);
-            pending.remove(ticket);
-            return verified;
-        } catch (IOException failure) {
-            throw new IllegalStateException("Kafka NWG1 Provider pipeline failed", failure);
+                            (frame, payload) -> verifyAssignedPayload(commit, frame, payload));
+                    write.verified = verifyCommit(
+                            publicationExtent.authenticatedPrefix(), verifiedUnit, commit, ticket, identity);
+                }
+                var verified = write.verified;
+                if (!write.physicalResolved) {
+                    physicalFrontiers.requireNext(verified.locator().extent());
+                    ProviderResolvedExtentDescriptor descriptor = descriptor(
+                            publicationExtent.authenticatedPrefix().header(),
+                            identity,
+                            publicationExtent.providerProof(),
+                            nowMillis);
+                    objectSession.providerResolved(candidate);
+                    physicalFrontiers.resolve(verified.locator().extent());
+                    checkpointPublisher.enqueue(write.physicalReservation, descriptor);
+                    write.physicalResolved = true;
+                }
+                try {
+                    verified.authorize(authorization, identity, commit);
+                } catch (KafkaObjectAuthorizationV1.Fenced fenced) {
+                    tracker.bindingRejectedAfterPhysicalResolution(
+                            ticket, physicalFrontiers, verified.locator().extent());
+                    removePending(ticket);
+                    throw fenced;
+                }
+                tracker.providerResolved(ticket, physicalFrontiers, verified, nativeState);
+                removePending(ticket);
+                return verified;
+            } catch (IOException failure) {
+                throw new IllegalStateException("Kafka NWG1 Provider pipeline failed", failure);
+            }
+        } finally {
+            synchronized (this) {
+                write.inFlight = false;
+                notifyAll();
+            }
         }
     }
 
@@ -239,14 +303,14 @@ public final class KafkaNwg1ObjectPipelineV1 {
         ObjectIdentity identity = candidate.identity();
         ProviderObjectResult result;
         if (write.requiresReconciliation) {
-            result = objectSession.reconcileUnknownExtent(identity);
+            result = objectSession.reconcileUnknownNwg1Candidate(candidate);
         } else {
             try {
                 result = objectSession.conditionalCreateNwg1(candidate);
             } catch (IOException failure) {
                 write.requiresReconciliation = true;
                 try {
-                    result = objectSession.reconcileUnknownExtent(identity);
+                    result = objectSession.reconcileUnknownNwg1Candidate(candidate);
                 } catch (IOException | RuntimeException reconciliationFailure) {
                     reconciliationFailure.addSuppressed(failure);
                     throw reconciliationFailure;
@@ -255,16 +319,18 @@ public final class KafkaNwg1ObjectPipelineV1 {
         }
         if (result.outcome() == ProviderObjectOutcome.OUTCOME_UNKNOWN) {
             write.requiresReconciliation = true;
-            result = objectSession.reconcileUnknownExtent(identity);
+            result = objectSession.reconcileUnknownNwg1Candidate(candidate);
         }
         if (result.outcome() == ProviderObjectOutcome.DEFINITIVE_CONFLICT) {
             objectSession.providerConflict(candidate);
-            pending.remove(ticket);
+            checkpointPublisher.definitiveNoObject(write.physicalReservation);
+            removePending(ticket);
             throw new IllegalStateException("Provider returned a definitive NWG1 identity conflict");
         }
         if (result.outcome() == ProviderObjectOutcome.DEFINITIVELY_NOT_APPLIED) {
             objectSession.providerAbsent(candidate);
-            pending.remove(ticket);
+            checkpointPublisher.definitiveNoObject(write.physicalReservation);
+            removePending(ticket);
             throw new IllegalStateException("Provider proved the allocated NWG1 identity absent");
         }
         if (result.outcome() != ProviderObjectOutcome.APPLIED_EXACT
@@ -279,95 +345,174 @@ public final class KafkaNwg1ObjectPipelineV1 {
      * Resolves one physical shared Object exactly once, then range-verifies every selected Kafka append unit. Typed
      * binding/unit failures remain attached to their owning tickets while verified siblings can reach protocol ACK.
      */
-    public synchronized SharedWriteResult writeResolveAndInstallShared(
+    public SharedWriteResult writeResolveAndInstallShared(
             GroupEncodingPlanV1 plan, List<SharedMember> members, long nowMillis) {
         Objects.requireNonNull(plan, "plan");
         members = List.copyOf(members);
-        if (members.size() < 2) {
-            throw new IllegalArgumentException("shared Kafka NWG1 path requires at least two members");
+        if (members.isEmpty()) {
+            throw new IllegalArgumentException("Kafka NWG1 member path requires at least one member");
         }
         requirePlanAuthority(plan);
         requirePlanMembers(plan, members);
+        for (SharedMember member : members) {
+            member.completionTracker()
+                    .requireAuthorization(authorization, member.commit().expectedFence());
+        }
         Sha256Digest planSha = plan.canonicalPlanSha256();
-        PendingSharedWrite write = pendingShared.get(planSha);
-        if (write == null) {
-            WalRunObjectSession.ValidatedNwg1Plan validated = objectSession.validateNwg1Plan(plan, verificationContext);
-            prepareCheckpointCapacity(validated.canonicalBodyBytes(), nowMillis);
-            List<KafkaObjectCompletionTrackerV1.SequenceClaim> claims = tracker.claimSequences(
-                    members.stream().map(SharedMember::ticket).toList());
-            write = new PendingSharedWrite(planSha, members, validated, claims);
-            pendingShared.put(planSha, write);
-        } else {
-            write.requireRetry(plan, members);
-        }
-        if (write.candidate == null) {
-            try {
-                write.candidate = objectSession.admitAndSealNwg1(write.validatedPlan, nowMillis);
-                if (!write.sequenceClaims.isEmpty()) {
-                    tracker.completeSequencesAfterEffect(write.sequenceClaims);
-                    write.sequenceClaims = List.of();
+        PendingSharedWrite write;
+        synchronized (this) {
+            write = pendingShared.get(planSha);
+            if (write == null) {
+                WalRunObjectSession.ValidatedNwg1Plan validated =
+                        objectSession.validateNwg1Plan(plan, verificationContext);
+                var physicalReservation = checkpointPublisher.bindPlan(
+                        members.stream()
+                                .map(member -> member.completionTracker()
+                                        .checkpointAttachment(member.ticket(), checkpointPublisher))
+                                .toList(),
+                        planSha,
+                        validated.canonicalBodyBytes());
+                for (SharedMember member : members) {
+                    member.completionTracker().requireCandidateBodyCharge(validated.canonicalBodyBytes());
                 }
-            } catch (WalRunObjectSession.Nwg1AdmissionFailure failure) {
-                if (failure.sequenceEffect().isPresent() && !write.sequenceClaims.isEmpty()) {
-                    tracker.completeSequencesAfterEffect(write.sequenceClaims);
-                    write.sequenceClaims = List.of();
-                } else if (failure.sequenceEffect().isEmpty() && !write.sequenceClaims.isEmpty()) {
-                    tracker.abortSequencesBeforeEffect(write.sequenceClaims);
-                    pendingShared.remove(planSha);
-                } else if (failure.sequenceEffect().isEmpty()) {
-                    throw new IllegalStateException(
-                            "retried shared NWG1 admission lost its retained sequence effect", failure);
-                }
-                throw failure;
+                List<KafkaObjectCompletionTrackerV1.SequenceClaim> claims = claimShared(members);
+                write = new PendingSharedWrite(planSha, members, validated, claims);
+                write.physicalReservation = physicalReservation;
+                pendingShared.put(planSha, write);
+            } else {
+                write.requireRetry(plan, members);
             }
-        }
-        if (!write.dispatched) {
-            tracker.providerDispatched(
-                    members.stream().map(SharedMember::ticket).toList());
-            write.dispatched = true;
+            if (write.inFlight) {
+                throw new IllegalStateException("exact NWG1 pipeline candidate already has in-flight work");
+            }
+            write.inFlight = true;
         }
         try {
-            authenticateSharedPublication(write);
-            for (int index = 0; index < members.size(); index++) {
-                if (write.verifiedMembers.containsKey(index) || write.isolatedFailures.containsKey(index)) {
-                    continue;
-                }
-                SharedMember member = members.get(index);
-                long selectedFrame = plan.appendUnits().get(index).firstFrameOrdinal();
+            if (write.candidate == null) {
                 try {
-                    Nwg1ObjectReaderV1.VerifiedAppendUnit selected =
-                            objectSession.verifySelectedNwg1AppendUnitForPublication(
-                                    write.publicationExtent,
-                                    verificationContext,
-                                    selectedFrame,
-                                    (ignoredFrame, ignoredPayload) -> {});
-                    KafkaVerifiedNwg1CommitV1 verified = verifyCommit(
-                            write.publicationExtent.authenticatedPrefix(),
-                            selected,
-                            member.commit(),
-                            member.ticket(),
-                            write.identity);
-                    write.verifiedMembers.put(index, new VerifiedMember(member.ticket(), verified));
-                } catch (Nwg1ValidationException failure) {
-                    if (failure.scope() != Nwg1IsolationScopeV1.BINDING
-                            && failure.scope() != Nwg1IsolationScopeV1.APPEND_UNIT) {
-                        throw failure;
+                    write.candidate = objectSession.admitAndSealNwg1(write.validatedPlan, nowMillis);
+                    checkpointPublisher.sequenceStarted(write.physicalReservation);
+                    if (!write.sequenceClaims.isEmpty()) {
+                        finishSharedClaims(write, true);
+                        write.sequenceClaims = List.of();
                     }
-                    write.isolatedFailures.put(
-                            index,
-                            new IsolatedMemberFailure(
-                                    member.ticket(), failure.rejection(), failure.stage(), failure.scope()));
+                } catch (WalRunObjectSession.Nwg1AdmissionFailure failure) {
+                    if (failure.sequenceEffect().isPresent() && !write.sequenceClaims.isEmpty()) {
+                        checkpointPublisher.sequenceStarted(write.physicalReservation);
+                        finishSharedClaims(write, true);
+                        write.sequenceClaims = List.of();
+                    } else if (failure.sequenceEffect().isEmpty() && !write.sequenceClaims.isEmpty()) {
+                        finishSharedClaims(write, false);
+                        removeShared(planSha);
+                    } else if (failure.sequenceEffect().isEmpty()) {
+                        throw new IllegalStateException(
+                                "retried shared NWG1 admission lost its retained sequence effect", failure);
+                    }
+                    throw failure;
                 }
             }
-            if (write.verifiedMembers.size() + write.isolatedFailures.size() != members.size()) {
-                throw new IllegalStateException("shared Kafka NWG1 result did not classify every member");
+            if (!write.dispatched) {
+                for (SharedMember member : members) {
+                    member.completionTracker().providerDispatched(member.ticket());
+                }
+                write.dispatched = true;
             }
-            finalizeSharedPhysical(write, nowMillis);
-            SharedWriteResult result = write.result();
-            pendingShared.remove(planSha);
-            return result;
-        } catch (IOException failure) {
-            throw new IllegalStateException("Kafka shared NWG1 Provider pipeline failed", failure);
+            try {
+                authenticateSharedPublication(write);
+                for (int index = 0; index < members.size(); index++) {
+                    if (write.verifiedMembers.containsKey(index)
+                            || write.isolatedFailures.containsKey(index)
+                            || write.authorizationFailures.containsKey(index)) {
+                        continue;
+                    }
+                    SharedMember member = members.get(index);
+                    long selectedFrame = plan.appendUnits().get(index).firstFrameOrdinal();
+                    try {
+                        Nwg1ObjectReaderV1.VerifiedAppendUnit selected =
+                                objectSession.verifySelectedNwg1AppendUnitForPublication(
+                                        write.publicationExtent,
+                                        verificationContext,
+                                        selectedFrame,
+                                        (frame, payload) -> verifyAssignedPayload(member.commit(), frame, payload));
+                        KafkaVerifiedNwg1CommitV1 verified = verifyCommit(
+                                write.publicationExtent.authenticatedPrefix(),
+                                selected,
+                                member.commit(),
+                                member.ticket(),
+                                write.identity);
+                        write.verifiedMembers.put(index, new VerifiedMember(member.ticket(), verified));
+                    } catch (Nwg1ValidationException failure) {
+                        if (failure.scope() != Nwg1IsolationScopeV1.BINDING
+                                && failure.scope() != Nwg1IsolationScopeV1.APPEND_UNIT) {
+                            throw failure;
+                        }
+                        write.isolatedFailures.put(
+                                index,
+                                new IsolatedMemberFailure(
+                                        member.ticket(), failure.rejection(), failure.stage(), failure.scope()));
+                    }
+                }
+                for (int index = 0; index < members.size(); index++) {
+                    VerifiedMember verified = write.verifiedMembers.get(index);
+                    if (verified != null) {
+                        try {
+                            verified.verifiedCommit()
+                                    .authorize(
+                                            authorization,
+                                            write.identity,
+                                            members.get(index).commit());
+                        } catch (KafkaObjectAuthorizationV1.Fenced fenced) {
+                            write.verifiedMembers.remove(index);
+                            write.authorizationFailures.put(
+                                    index,
+                                    new AuthorizationMemberFailure(
+                                            members.get(index).ticket(), fenced.getMessage()));
+                        }
+                    }
+                }
+                if (write.verifiedMembers.size() + write.isolatedFailures.size() + write.authorizationFailures.size()
+                        != members.size()) {
+                    throw new IllegalStateException("shared Kafka NWG1 result did not classify every member");
+                }
+                finalizeSharedPhysical(write, nowMillis);
+                SharedWriteResult result = write.result();
+                removeShared(planSha);
+                return result;
+            } catch (IOException failure) {
+                throw new IllegalStateException("Kafka shared NWG1 Provider pipeline failed", failure);
+            }
+        } finally {
+            synchronized (this) {
+                write.inFlight = false;
+                notifyAll();
+            }
+        }
+    }
+
+    private List<KafkaObjectCompletionTrackerV1.SequenceClaim> claimShared(List<SharedMember> members) {
+        var claims = new ArrayList<KafkaObjectCompletionTrackerV1.SequenceClaim>();
+        try {
+            for (SharedMember member : members) {
+                memberTrackers.add(member.completionTracker());
+                claims.add(member.completionTracker().claimSequence(member.ticket()));
+            }
+        } catch (RuntimeException failure) {
+            for (int index = 0; index < claims.size(); index++) {
+                members.get(index).completionTracker().abortSequenceBeforeEffect(claims.get(index));
+            }
+            throw failure;
+        }
+        return List.copyOf(claims);
+    }
+
+    private static void finishSharedClaims(PendingSharedWrite write, boolean effected) {
+        for (int index = 0; index < write.sequenceClaims.size(); index++) {
+            var tracker = write.members.get(index).completionTracker();
+            if (effected) {
+                tracker.completeSequenceAfterEffect(write.sequenceClaims.get(index));
+            } else {
+                tracker.abortSequenceBeforeEffect(write.sequenceClaims.get(index));
+            }
         }
     }
 
@@ -393,10 +538,11 @@ public final class KafkaNwg1ObjectPipelineV1 {
             SharedMember member = write.members.get(index);
             VerifiedMember verified = write.verifiedMembers.get(index);
             if (verified != null) {
-                tracker.requireProviderResolvedCandidate(
-                        member.ticket(), verified.verifiedCommit(), member.nativeState());
+                member.completionTracker()
+                        .requireProviderResolvedCandidate(
+                                member.ticket(), verified.verifiedCommit(), member.nativeState());
             } else {
-                tracker.requireBindingRejectionCandidate(member.ticket());
+                member.completionTracker().requireBindingRejectionCandidate(member.ticket());
             }
         }
         physicalFrontiers.requireNext(write.extent);
@@ -408,16 +554,17 @@ public final class KafkaNwg1ObjectPipelineV1 {
         WalRunObjectSession.AdmittedNwg1Candidate candidate = write.candidate;
         objectSession.providerResolved(candidate);
         physicalFrontiers.resolve(write.extent);
-        checkpointPublisher.enqueue(descriptor);
-        publishCheckpointPerPolicy(nowMillis);
+        checkpointPublisher.enqueue(write.physicalReservation, descriptor);
         for (int index = 0; index < write.members.size(); index++) {
             SharedMember member = write.members.get(index);
             VerifiedMember verified = write.verifiedMembers.get(index);
             if (verified != null) {
-                tracker.providerResolved(
-                        member.ticket(), physicalFrontiers, verified.verifiedCommit(), member.nativeState());
+                member.completionTracker()
+                        .providerResolved(
+                                member.ticket(), physicalFrontiers, verified.verifiedCommit(), member.nativeState());
             } else {
-                tracker.bindingRejectedAfterPhysicalResolution(member.ticket(), physicalFrontiers, write.extent);
+                member.completionTracker()
+                        .bindingRejectedAfterPhysicalResolution(member.ticket(), physicalFrontiers, write.extent);
             }
         }
         write.physicalResolved = true;
@@ -428,14 +575,14 @@ public final class KafkaNwg1ObjectPipelineV1 {
         ObjectIdentity identity = candidate.identity();
         ProviderObjectResult result;
         if (write.requiresReconciliation) {
-            result = objectSession.reconcileUnknownExtent(identity);
+            result = objectSession.reconcileUnknownNwg1Candidate(candidate);
         } else {
             try {
                 result = objectSession.conditionalCreateNwg1(candidate);
             } catch (IOException failure) {
                 write.requiresReconciliation = true;
                 try {
-                    result = objectSession.reconcileUnknownExtent(identity);
+                    result = objectSession.reconcileUnknownNwg1Candidate(candidate);
                 } catch (IOException | RuntimeException reconciliationFailure) {
                     reconciliationFailure.addSuppressed(failure);
                     throw reconciliationFailure;
@@ -444,16 +591,18 @@ public final class KafkaNwg1ObjectPipelineV1 {
         }
         if (result.outcome() == ProviderObjectOutcome.OUTCOME_UNKNOWN) {
             write.requiresReconciliation = true;
-            result = objectSession.reconcileUnknownExtent(identity);
+            result = objectSession.reconcileUnknownNwg1Candidate(candidate);
         }
         if (result.outcome() == ProviderObjectOutcome.DEFINITIVE_CONFLICT) {
             objectSession.providerConflict(candidate);
-            pendingShared.remove(write.planSha);
+            checkpointPublisher.definitiveNoObject(write.physicalReservation);
+            removeShared(write.planSha);
             throw new IllegalStateException("Provider returned a definitive shared NWG1 identity conflict");
         }
         if (result.outcome() == ProviderObjectOutcome.DEFINITIVELY_NOT_APPLIED) {
             objectSession.providerAbsent(candidate);
-            pendingShared.remove(write.planSha);
+            checkpointPublisher.definitiveNoObject(write.physicalReservation);
+            removeShared(write.planSha);
             throw new IllegalStateException("Provider proved the shared NWG1 identity absent");
         }
         if (result.outcome() != ProviderObjectOutcome.APPLIED_EXACT
@@ -465,30 +614,32 @@ public final class KafkaNwg1ObjectPipelineV1 {
     }
 
     /** Flushes the same Root-bound physical publisher used by normal resolution before constructing the Seal. */
-    public synchronized void flushCheckpointForSeal() {
-        while (checkpointPublisher.queueDepth() > 0) {
-            publishCheckpointOrFail("final checkpoint flush did not advance");
-        }
-        checkpointDebtFailure = null;
+    public void flushCheckpointForSeal() {
+        checkpointPublisher.flush();
         checkpointPublisher.requireFinalCoverage(physicalFrontiers.snapshotVector());
     }
 
     /** Final local barrier before the caller builds and publishes the physical Seal through the same session. */
-    public synchronized void prepareTerminalClosure() {
-        if (!pending.isEmpty() || !pendingShared.isEmpty() || tracker.pendingUnits() != 0) {
-            throw new IllegalStateException(
-                    "unresolved Kafka Object candidates or M2 completion tickets forbid terminal closure");
+    public void prepareTerminalClosure() {
+        synchronized (this) {
+            if (!pending.isEmpty()
+                    || !pendingShared.isEmpty()
+                    || memberTrackers.stream().anyMatch(t -> t.pendingUnits() != 0)) {
+                throw new IllegalStateException(
+                        "unresolved Kafka Object candidates or M2 completion tickets forbid terminal closure");
+            }
         }
         if (objectSession.runtimeState() != com.nereusstream.storage.object.control.WalRunRuntime.State.SEALED) {
             throw new IllegalStateException("Kafka Object runtime must be stopped and sealed before closure");
         }
         flushCheckpointForSeal();
+        checkpointPublisher.closeAfterDrain();
         objectSession.drain();
         objectSession.requireTerminalClosable();
     }
 
     /** Publishes the exact physical Seal derived only from this pipeline's Root-bound publisher and Object session. */
-    public synchronized WalRunTerminalClosureProofV1 publishPhysicalSeal(WalRunLifecycleManager lifecycle) {
+    public WalRunTerminalClosureProofV1 publishPhysicalSeal(WalRunLifecycleManager lifecycle) {
         Objects.requireNonNull(lifecycle, "lifecycle");
         prepareTerminalClosure();
         var head = checkpointPublisher.head();
@@ -528,59 +679,12 @@ public final class KafkaNwg1ObjectPipelineV1 {
                 nowMillis);
     }
 
-    private void prepareCheckpointCapacity(long candidateBodyBytes, long nowMillis) {
-        if (candidateBodyBytes <= 0 || nowMillis < 0) {
-            throw new IllegalArgumentException("checkpoint candidate body/timestamp is outside its domain");
-        }
-        if (checkpointDebtFailure != null) {
-            if (checkpointPublisher.queueDepth() == 0) {
-                checkpointDebtFailure = null;
-            } else {
-                publishCheckpointOrFail("checkpoint debt blocks a new NWG1 admission");
-            }
-        }
-        while (checkpointPublisher.queueDepth() >= root.checkpointPolicy().maxUncheckpointedExtents()
-                || Math.addExact(checkpointPublisher.queuedBodyBytes(), candidateBodyBytes)
-                        > root.checkpointPolicy().maxUncheckpointedBytes()
-                || checkpointPublisher.requiresAgeForcing(nowMillis)) {
-            publishCheckpointOrFail("checkpoint bound forcing made no progress");
-            lastCheckpointPublishMillis = nowMillis;
-        }
+    private synchronized void removePending(KafkaObjectCompletionTrackerV1.AssignedTicket ticket) {
+        pending.remove(ticket);
     }
 
-    private void publishCheckpointPerPolicy(long nowMillis) {
-        boolean hardExtentBound =
-                checkpointPublisher.queueDepth() >= root.checkpointPolicy().maxUncheckpointedExtents();
-        boolean hardByteBound =
-                checkpointPublisher.queuedBodyBytes() >= root.checkpointPolicy().maxUncheckpointedBytes();
-        boolean hardAgeBound = checkpointPublisher.requiresAgeForcing(nowMillis);
-        long cadence = root.checkpointPolicy().proactiveCadenceMillis();
-        if (lastCheckpointPublishMillis < 0) {
-            lastCheckpointPublishMillis = nowMillis;
-        } else if (nowMillis < lastCheckpointPublishMillis) {
-            throw new IllegalArgumentException("checkpoint publication clock regressed");
-        }
-        boolean cadenceDue = cadence > 0 && nowMillis - lastCheckpointPublishMillis >= cadence;
-        if (hardExtentBound || hardByteBound || hardAgeBound || cadenceDue) {
-            try {
-                publishCheckpointOrFail("checkpoint policy forcing made no progress");
-                lastCheckpointPublishMillis = nowMillis;
-            } catch (RuntimeException failure) {
-                // Physical resolution is already terminal. Retain local debt and let this member reach M2 publication;
-                // later admissions and Seal are backpressured until the exact same descriptor is checkpointed.
-                checkpointDebtFailure = failure;
-            }
-        }
-    }
-
-    private void publishCheckpointOrFail(String message) {
-        try {
-            checkpointPublisher.publishNext().orElseThrow(() -> new IllegalStateException(message));
-            checkpointDebtFailure = null;
-        } catch (RuntimeException failure) {
-            checkpointDebtFailure = failure;
-            throw failure;
-        }
+    private synchronized void removeShared(Sha256Digest planSha) {
+        pendingShared.remove(planSha);
     }
 
     private void requirePlanAuthority(GroupEncodingPlanV1 plan) {
@@ -608,10 +712,12 @@ public final class KafkaNwg1ObjectPipelineV1 {
         if (plan.appendUnits().size() != members.size()) {
             throw new IllegalArgumentException("shared Kafka NWG1 plan/member inventory differs");
         }
-        HashSet<KafkaObjectCompletionTrackerV1.AssignedTicket> tickets = new HashSet<>();
+        Map<KafkaObjectCompletionTrackerV1, HashSet<KafkaObjectCompletionTrackerV1.AssignedTicket>> tickets =
+                new java.util.IdentityHashMap<>();
         for (int index = 0; index < members.size(); index++) {
             SharedMember member = members.get(index);
-            if (!tickets.add(member.ticket())) {
+            if (!tickets.computeIfAbsent(member.completionTracker(), ignored -> new HashSet<>())
+                    .add(member.ticket())) {
                 throw new IllegalArgumentException("shared Kafka NWG1 members repeat a completion ticket");
             }
             requirePlanMember(plan, index, member.ticket(), member.commit());
@@ -660,6 +766,33 @@ public final class KafkaNwg1ObjectPipelineV1 {
         }
         if (next != commit.endOffsetExclusive()) {
             throw new IllegalArgumentException("Kafka NWG1 planned frames differ from complete commit-set coverage");
+        }
+    }
+
+    private static void verifyAssignedPayload(
+            KafkaSpeculativeCommitV1 commit, Nwg1ObjectReaderV1.VerifiedFrame frame, java.nio.ByteBuffer payload) {
+        int ordinal = Math.toIntExact(frame.appendUnitFrameOrdinal());
+        if (ordinal >= commit.batches().size()) {
+            throw new IllegalArgumentException("Object payload has excess native batches");
+        }
+        byte[] raw = new byte[payload.remaining()];
+        payload.get(raw);
+        try {
+            var assigned = com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1.validate(
+                    com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1.parse(
+                            CanonicalBytes.copyOf(raw)));
+            var expected = commit.batches().get(ordinal);
+            var delta = new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1()
+                    .protocolDelta(assigned);
+            if (assigned.baseOffset() != expected.startOffset()
+                    || assigned.endOffsetExclusive() != expected.endOffsetExclusive()
+                    || assigned.partitionLeaderEpoch() != commit.expectedFence().kafkaLeaderEpoch()
+                    || !delta.equals(expected.delta())) {
+                throw new IllegalArgumentException(
+                        "Object native payload differs from its complete speculative commit");
+            }
+        } finally {
+            Arrays.fill(raw, (byte) 0);
         }
     }
 
@@ -812,6 +945,8 @@ public final class KafkaNwg1ObjectPipelineV1 {
     }
 
     private static final class PendingWrite {
+        private WalCheckpointPublisher.Reservation physicalReservation;
+        private boolean inFlight;
         private final Sha256Digest planSha;
         private final KafkaSpeculativeCommitV1 commit;
         private final KafkaObjectNativeStateV1 nativeState;
@@ -821,6 +956,9 @@ public final class KafkaNwg1ObjectPipelineV1 {
         private boolean dispatched;
         private boolean requiresReconciliation;
         private boolean providerExact;
+        private boolean physicalResolved;
+        private WalRunObjectSession.AuthenticatedNwg1PublicationExtent publicationExtent;
+        private KafkaVerifiedNwg1CommitV1 verified;
 
         private PendingWrite(
                 Sha256Digest planSha,
@@ -848,12 +986,15 @@ public final class KafkaNwg1ObjectPipelineV1 {
     }
 
     private static final class PendingSharedWrite {
+        private WalCheckpointPublisher.Reservation physicalReservation;
+        private boolean inFlight;
         private final Sha256Digest planSha;
         private final List<SharedMember> members;
         private final WalRunObjectSession.ValidatedNwg1Plan validatedPlan;
         private List<KafkaObjectCompletionTrackerV1.SequenceClaim> sequenceClaims;
         private final Map<Integer, VerifiedMember> verifiedMembers = new LinkedHashMap<>();
         private final Map<Integer, IsolatedMemberFailure> isolatedFailures = new LinkedHashMap<>();
+        private final Map<Integer, AuthorizationMemberFailure> authorizationFailures = new LinkedHashMap<>();
         private WalRunObjectSession.AdmittedNwg1Candidate candidate;
         private ObjectIdentity identity;
         private KafkaObjectExtentIdentityV1 extent;
@@ -883,11 +1024,13 @@ public final class KafkaNwg1ObjectPipelineV1 {
         private SharedWriteResult result() {
             ArrayList<VerifiedMember> verified = new ArrayList<>();
             ArrayList<IsolatedMemberFailure> failures = new ArrayList<>();
+            ArrayList<AuthorizationMemberFailure> authorization = new ArrayList<>();
             for (int index = 0; index < members.size(); index++) {
                 Optional.ofNullable(verifiedMembers.get(index)).ifPresent(verified::add);
                 Optional.ofNullable(isolatedFailures.get(index)).ifPresent(failures::add);
+                Optional.ofNullable(authorizationFailures.get(index)).ifPresent(authorization::add);
             }
-            return new SharedWriteResult(identity, verified, failures);
+            return new SharedWriteResult(identity, verified, failures, authorization);
         }
     }
 }

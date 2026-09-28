@@ -52,7 +52,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-/** AWS SDK v2 transport for the M3 C1 strategy. Content proof is performed by full GET, never ETag or metadata. */
+/** AWS SDK v2 C1 transport. Exact creation uses checked conditional PUT; uncertain/existing content uses full GET. */
 public final class S3C1ObjectProviderTransport implements ObjectProviderTransport, AutoCloseable {
     public static final long EVIDENCED_MAXIMUM_OBJECT_BYTES = 64L * 1024 * 1024;
     public static final int EVIDENCED_MAXIMUM_RANGE_BYTES = 64 * 1024 * 1024;
@@ -197,25 +197,40 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
 
     @Override
     public ConditionalCreateResult putIfAbsent(ObjectIdentity identity, InputStream body) throws IOException {
+        return putIfAbsentWithEvidence(identity, body).outcome();
+    }
+
+    @Override
+    public ConditionalCreateResponse putIfAbsentWithEvidence(ObjectIdentity identity, InputStream body)
+            throws IOException {
         requireOpen();
         validateIdentity(identity);
         Objects.requireNonNull(body, "body");
         try {
-            client.putObject(
+            String expectedChecksum = Base64.getEncoder()
+                    .encodeToString(identity.bodySha256().bytes().toByteArray());
+            var response = client.putObject(
                     PutObjectRequest.builder()
                             .bucket(bucket)
                             .key(identity.key())
                             .ifNoneMatch("*")
-                            .checksumSHA256(Base64.getEncoder()
-                                    .encodeToString(
-                                            identity.bodySha256().bytes().toByteArray()))
+                            .checksumSHA256(expectedChecksum)
                             .build(),
                     RequestBody.fromInputStream(body, identity.bodyLength()));
-            return ConditionalCreateResult.CREATED;
+            if (response.checksumSHA256() == null) {
+                // Providers without a checked success checksum retain the remote-verification path.
+                return ConditionalCreateResponse.outcome(ConditionalCreateResult.CREATED);
+            }
+            if (!expectedChecksum.equals(response.checksumSHA256())) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.INTEGRITY, "conditional PUT success checksum differs");
+            }
+            return new ConditionalCreateResponse(
+                    ConditionalCreateResult.CREATED, Optional.of(identity), versionToken(response.versionId()));
         } catch (S3Exception failure) {
-            return classifyConditionalCreateFailure(failure);
+            return ConditionalCreateResponse.outcome(classifyConditionalCreateFailure(failure));
         } catch (SdkClientException failure) {
-            return ConditionalCreateResult.RESPONSE_UNKNOWN;
+            return ConditionalCreateResponse.outcome(ConditionalCreateResult.RESPONSE_UNKNOWN);
         } catch (CancellationException failure) {
             throw new S3C1ProviderException(
                     S3C1ProviderException.Kind.OUTCOME_UNKNOWN, "conditional PUT was cancelled", failure);

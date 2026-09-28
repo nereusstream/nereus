@@ -41,7 +41,12 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
     static final String DRIVER_SCHEME = "m5zk";
     static final String SPEC_PROPERTY = "nereusM5NativeCreateSpecV2";
     static final String NAMESPACE_BINDING_PROPERTY = "nereusM5NamespaceAuthorityBindingV2";
-    private M5BookKeeperNativeCreateGuardV2 guard;
+
+    record CreateScope(M5BookKeeperNativeCreateSpecV2 spec, M5BookKeeperNativeCreateGuardV2 guard) {}
+
+    private volatile CreateScope createScope;
+    private Optional<com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2> namespaceBinding;
+
     private java.util.List<org.apache.zookeeper.data.ACL> nativeAcls;
 
     static void register() {
@@ -78,13 +83,15 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
                     || !layout.getManagerFactoryClass().equals(HierarchicalLedgerManagerFactory.class.getName())) {
                 throw new IllegalArgumentException("native M5 profile requires exact hierarchical layout version 1");
             }
-            var namespaceBinding = Optional.ofNullable(configuration.getString(NAMESPACE_BINDING_PROPERTY))
+            namespaceBinding = Optional.ofNullable(configuration.getString(NAMESPACE_BINDING_PROPERTY))
                     .map(value -> com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2.decode(
                             CanonicalBytes.copyOf(Base64.getDecoder().decode(value))));
-            nativeAcls = java.util.List.copyOf(ZkUtils.getACLs(nativeConfiguration));
-            guard = new M5BookKeeperNativeCreateGuardV2(
-                    zk, ledgersRootPath, spec, ZkUtils.getACLs(nativeConfiguration), namespaceBinding);
-            var factory = new FencedFactory(spec);
+            nativeAcls = new java.util.ArrayList<>(ZkUtils.getACLs(nativeConfiguration));
+            createScope = new CreateScope(
+                    spec,
+                    new M5BookKeeperNativeCreateGuardV2(
+                            zk, ledgersRootPath, spec, ZkUtils.getACLs(nativeConfiguration), namespaceBinding));
+            var factory = new FencedFactory();
             factory.initialize(nativeConfiguration, layoutManager, layout.getManagerVersion());
             lmFactory = factory;
             return this;
@@ -100,18 +107,34 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
 
     @Override
     public synchronized LedgerManagerFactory getLedgerManagerFactory() throws MetadataException {
-        if (lmFactory == null || guard == null) {
+        if (lmFactory == null || createScope == null) {
             throw new MetadataException(Code.METADATA_SERVICE_ERROR, "native M5 create profile is not admitted");
         }
         return lmFactory;
     }
 
     public CompletableFuture<Void> fenceCreates() {
-        return guard.fenceCreates();
+        return createScope.guard().fenceCreates();
     }
 
     M5BookKeeperNativeCreateGuardV2 guard() {
-        return guard;
+        return createScope.guard();
+    }
+
+    synchronized void activateCreateScope(M5BookKeeperNativeCreateSpecV2 spec) throws Exception {
+        if (!spec.namespace().equals(createScope.spec().namespace())) {
+            throw new IllegalArgumentException("create scope changes the native namespace");
+        }
+        if (spec.equals(createScope.spec())) {
+            return;
+        }
+        var replacement = new M5BookKeeperNativeCreateGuardV2(zk, ledgersRootPath, spec, nativeAcls, namespaceBinding);
+        createScope.guard().fenceCreates().get();
+        createScope = new CreateScope(spec, replacement);
+    }
+
+    M5BookKeeperNativeCreateSpecV2 createSpec() {
+        return createScope.spec();
     }
 
     java.util.List<org.apache.zookeeper.data.ACL> nativeAcls() {
@@ -119,16 +142,10 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
     }
 
     private final class FencedFactory extends HierarchicalLedgerManagerFactory {
-        private final M5BookKeeperNativeCreateSpecV2 spec;
-
-        private FencedFactory(M5BookKeeperNativeCreateSpecV2 spec) {
-            this.spec = spec;
-        }
-
         @Override
         public LedgerManager newLedgerManager() {
             var delegate = (AbstractZkLedgerManager) super.newLedgerManager();
-            return new M5BookKeeperNativeLedgerManagerV2(delegate, guard, spec, getZk(), acls);
+            return new M5BookKeeperNativeLedgerManagerV2(delegate, () -> createScope, getZk(), acls);
         }
 
         @Override
@@ -137,11 +154,13 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
             return new LedgerIdGenerator() {
                 @Override
                 public void generateLedgerId(GenericCallback<Long> callback) {
+                    var accepted = createScope;
                     delegate.generateLedgerId((rc, ledgerId) -> {
                         if (rc != BKException.Code.OK) {
                             callback.operationComplete(rc, null);
                         } else {
-                            guard.reserve(ledgerId)
+                            accepted.guard()
+                                    .reserve(ledgerId)
                                     .whenComplete((ignored, failure) -> callback.operationComplete(
                                             failure == null ? BKException.Code.OK : BKException.Code.ZKException,
                                             failure == null ? ledgerId : null));

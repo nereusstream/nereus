@@ -26,6 +26,8 @@ import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectStateCode
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectActiveTailStateV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendProtocolHooksV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOffsetAssignedAppendV1;
+import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1;
+import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendResultV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedDurableCommitObserver;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedDurableCommitV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionCommitSlotV1;
@@ -41,8 +43,13 @@ import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionSpeculativeSlotV
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionStateReferenceV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionStateReferencesV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /** K5 bridge from post-offset speculative admission to one ordered K1 coherent publication per durable group. */
 public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurableCommitObserver {
@@ -53,8 +60,10 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
 
     private final KafkaPartitionPublicationCellV1 publicationCell;
     private final KafkaProtocolStateRepositoryV1 repository;
-    private final RunLedgerHandleV1 expectedHandle;
+    private RunLedgerHandleV1 expectedHandle;
     private final StorageProfile storageProfile;
+    private final Map<List<KafkaBatchDuplicateIdentityV1>, CompletionStage<KafkaOrderedAppendResultV1>> inFlight =
+            new HashMap<>();
 
     private KafkaCoherentCommitCoordinatorV1(
             KafkaPartitionPublicationCellV1 publicationCell,
@@ -147,12 +156,12 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
             KafkaPartitionPublicationObserver observer) {
         Objects.requireNonNull(fence, "fence");
         Objects.requireNonNull(recovered, "recovered");
-        Objects.requireNonNull(recoveredTail, "recoveredTail");
+        Objects.requireNonNull(recoveredTail, "recoveredTail").requireAuthorization(recovered);
         Objects.requireNonNull(observer, "observer");
         var oldRun = recovered.vector().runBinding();
         if (trimStartOffset < 0
                 || trimStartOffset > nativeHighWatermark
-                || nativeHighWatermark > newLeaderLeo
+                || nativeHighWatermark != newLeaderLeo
                 || recovered.vector().recoveryCoveredThrough() != newLeaderLeo
                 || !recovered.vector().isAlignedCompoundCheckpoint()
                 || !oldRun.bindingId().equals(fence.bindingId())
@@ -215,7 +224,6 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
             KafkaPartitionFenceV1 fence,
             long trimStartOffset,
             long newLeaderLeo,
-            long nativeHighWatermark,
             KafkaProtocolCheckpointStateV1 recovered,
             RunLedgerHandleV1 expectedNewRunHandle,
             KafkaPartitionPublicationObserver observer) {
@@ -225,8 +233,7 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
         Objects.requireNonNull(observer, "observer");
         var oldRun = recovered.vector().runBinding();
         if (trimStartOffset < 0
-                || trimStartOffset > nativeHighWatermark
-                || nativeHighWatermark > newLeaderLeo
+                || trimStartOffset > newLeaderLeo
                 || recovered.vector().recoveryCoveredThrough() != newLeaderLeo
                 || !recovered.vector().isAlignedCompoundCheckpoint()
                 || !oldRun.bindingId().equals(fence.bindingId())
@@ -239,13 +246,11 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                 || expectedNewRunHandle.runId().equals(oldRun.runId())) {
             throw new IllegalArgumentException("recovered protocol state differs from the new leader/run boundary");
         }
-        long firstUnstable = recovered
-                .transactionState()
-                .firstUnstableOffset(nativeHighWatermark)
-                .orElse(nativeHighWatermark);
-        long lastStableOffset = Math.min(nativeHighWatermark, firstUnstable);
+        long firstUnstable =
+                recovered.transactionState().firstUnstableOffset(newLeaderLeo).orElse(newLeaderLeo);
+        long lastStableOffset = Math.min(newLeaderLeo, firstUnstable);
         if (lastStableOffset < trimStartOffset) {
-            throw new IllegalArgumentException("native HW leaves an unstable transaction before Log Start");
+            throw new IllegalArgumentException("shared commit leaves an unstable transaction before Log Start");
         }
         KafkaProtocolStateRepositoryV1 repository = new KafkaProtocolStateRepositoryV1();
         KafkaActiveTailStateV1 activeTail = KafkaActiveTailStateV1.empty(newLeaderLeo);
@@ -268,7 +273,7 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                 repository.store(0, KafkaProtocolStateCodecV1.checkpoint(recovered), recovered),
                 seed("K7-RECOVERED-SOURCE-PROTECTION-SEED-V1"));
         KafkaPartitionFrontiersV1 frontiers = new KafkaPartitionFrontiersV1(
-                trimStartOffset, newLeaderLeo, newLeaderLeo, newLeaderLeo, nativeHighWatermark, lastStableOffset);
+                trimStartOffset, newLeaderLeo, newLeaderLeo, newLeaderLeo, newLeaderLeo, lastStableOffset);
         KafkaPartitionProtocolStateV1 initial = new KafkaPartitionProtocolStateV1(fence, 0, frontiers, references);
         return new KafkaCoherentCommitCoordinatorV1(
                 new KafkaPartitionPublicationCellV1(initial, observer),
@@ -281,9 +286,69 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
         return publicationCell;
     }
 
+    /** Called only after the old run's compound checkpoint, index, close and root seal are exact. */
+    public synchronized void switchBookKeeperRun(
+            RunLedgerHandleV1 oldHandle,
+            RunLedgerHandleV1 newHandle,
+            KafkaProtocolCheckpointStateV1 checkpoint,
+            Sha256Digest sourceDigest) {
+        requireProfile(StorageProfile.BOOKKEEPER);
+        var before = capture();
+        long end = before.root().frontiers().durableEndOffset();
+        if (!expectedHandle.equals(oldHandle)
+                || oldHandle.equals(newHandle)
+                || !oldHandle.providerScopeId().equals(newHandle.providerScopeId())
+                || !before.speculativeQueue().commits().isEmpty()
+                || !checkpoint.vector().isAlignedCompoundCheckpoint()
+                || checkpoint.vector().recoveryCoveredThrough() != end
+                || !checkpoint.producerState().equals(before.committedProducerState())
+                || !checkpoint.transactionState().equals(before.transactionState())
+                || !checkpoint.leaderEpochIndex().equals(before.leaderEpochIndex())) {
+            throw new IllegalArgumentException("run switch differs from its exact durable protocol cut");
+        }
+        var refs = before.root().references();
+        var tail = KafkaActiveTailStateV1.empty(end);
+        var replacement = new KafkaPartitionStateReferencesV1(
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.runTable().generation()), sourceDigest),
+                repository.store(
+                        Math.incrementExact(refs.activeTail().generation()),
+                        KafkaProtocolStateCodecV1.activeTail(tail),
+                        tail),
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.sourceMap().generation()), sourceDigest),
+                refs.committedProducerState(),
+                refs.speculativeProducerQueue(),
+                refs.transactionIndex(),
+                refs.leaderEpochIndex(),
+                repository.store(
+                        Math.incrementExact(refs.checkpointVector().generation()),
+                        KafkaProtocolStateCodecV1.checkpoint(checkpoint),
+                        checkpoint),
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.sourceProtection().generation()), sourceDigest));
+        var result = publicationCell.switchBookKeeperRun(before.root(), replacement);
+        if (!result.published()) {
+            throw new KafkaCoherentPublicationException("run switch root was not selected: " + result.outcome());
+        }
+        expectedHandle = newHandle;
+        repository.retainCurrent(result.observedState().references());
+    }
+
     public KafkaAppendProtocolHooksV1 protocolHooks(KafkaProtocolAppendPlanV1 plan) {
         Objects.requireNonNull(plan, "plan");
         return new KafkaAppendProtocolHooksV1() {
+            @Override
+            public Optional<CompletionStage<KafkaOrderedAppendResultV1>> findDuplicateBeforeOffsetAssignment() {
+                return findDuplicate(plan);
+            }
+
+            @Override
+            public void registerAssignedResult(
+                    long startOffset, long endOffsetExclusive, CompletionStage<KafkaOrderedAppendResultV1> result) {
+                registerInFlight(plan, startOffset, endOffsetExclusive, result);
+            }
+
             @Override
             public void validateBeforeOffsetAssignment() {
                 validate(plan);
@@ -294,6 +359,78 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                 stage(plan, assigned);
             }
         };
+    }
+
+    private synchronized Optional<CompletionStage<KafkaOrderedAppendResultV1>> findDuplicate(
+            KafkaProtocolAppendPlanV1 plan) {
+        // Object's independent authorization/publication pipeline retains its existing responsibilities in this slice.
+        if (storageProfile != StorageProfile.BOOKKEEPER) {
+            return Optional.empty();
+        }
+        var before = captureComponents();
+        if (!plan.expectedFence().equals(before.root().fence())) {
+            return Optional.empty();
+        }
+        var identities = duplicateIdentities(plan);
+        if (identities.isEmpty()) {
+            return Optional.empty();
+        }
+        var pending = inFlight.get(identities);
+        if (pending != null) {
+            return Optional.of(pending);
+        }
+        long start = -1;
+        long end = -1;
+        for (var identity : identities) {
+            var known = before.producers().findDuplicate(identity);
+            if (known.isEmpty() || end >= 0 && known.orElseThrow().startOffset() != end) {
+                return Optional.empty();
+            }
+            if (start < 0) {
+                start = known.orElseThrow().startOffset();
+            }
+            end = known.orElseThrow().endOffsetExclusive();
+        }
+        return Optional.of(CompletableFuture.completedFuture(
+                KafkaOrderedAppendResultV1.assigned(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED, start, end)));
+    }
+
+    private synchronized void registerInFlight(
+            KafkaProtocolAppendPlanV1 plan,
+            long startOffset,
+            long endOffsetExclusive,
+            CompletionStage<KafkaOrderedAppendResultV1> result) {
+        if (storageProfile != StorageProfile.BOOKKEEPER) {
+            return;
+        }
+        var identities = duplicateIdentities(plan);
+        if (identities.isEmpty()) {
+            return;
+        }
+        if (endOffsetExclusive - startOffset != plan.logicalOffsetCount()
+                || inFlight.putIfAbsent(identities, result) != null) {
+            throw new KafkaCoherentPublicationException(
+                    "duplicate result registration differs from original admission");
+        }
+        result.whenComplete((ignored, failure) -> {
+            synchronized (KafkaCoherentCommitCoordinatorV1.this) {
+                inFlight.remove(identities, result);
+            }
+        });
+    }
+
+    private static List<KafkaBatchDuplicateIdentityV1> duplicateIdentities(KafkaProtocolAppendPlanV1 plan) {
+        if (plan.batches().stream().anyMatch(batch -> batch.duplicateIdentity().isEmpty())) {
+            return List.of();
+        }
+        return plan.batches().stream()
+                .map(batch -> batch.duplicateIdentity().orElseThrow())
+                .toList();
+    }
+
+    /** Resident repository accounting; already-resolved immutable snapshots are owned by their callers. */
+    public synchronized int retainedProtocolComponents() {
+        return repository.retainedComponents();
     }
 
     public synchronized KafkaCoherentProtocolSnapshotV1 capture() {
@@ -370,12 +507,23 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                         frontiers.allocatedEndOffset(),
                         commit.endOffsetExclusive(),
                         commit.endOffsetExclusive(),
-                        frontiers.highWatermark(),
-                        frontiers.lastStableOffset()),
+                        commit.endOffsetExclusive(),
+                        Math.min(
+                                commit.endOffsetExclusive(),
+                                transactions
+                                        .firstUnstableOffset(commit.endOffsetExclusive())
+                                        .orElse(commit.endOffsetExclusive()))),
                 replacement);
         KafkaPartitionPublicationResultV1 result = publicationCell.publish(slot);
+        repository.retainCurrent(publicationCell.capture().references());
         if (!result.published()) {
             throw new KafkaCoherentPublicationException("coherent commit publication failed: " + result.outcome());
+        }
+        var identities = head.batches().stream()
+                .map(batch -> batch.delta().duplicateIdentity())
+                .toList();
+        if (identities.stream().allMatch(Optional::isPresent)) {
+            inFlight.remove(identities.stream().map(Optional::orElseThrow).toList());
         }
     }
 
@@ -384,6 +532,7 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
             KafkaObjectCompletionTrackerV1.ReadyCompletion completion) {
         requireProfile(StorageProfile.OBJECT);
         Objects.requireNonNull(completion, "completion");
+        completion.authorization().require(completion.commitSet(), completion.locator());
         KafkaObjectCoherentProtocolSnapshotV1 before = captureObject();
         KafkaSpeculativeCommitV1 head = before.speculativeQueue().head();
         if (!head.equals(completion.commitSet())
@@ -408,7 +557,7 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
             throw new KafkaCoherentPublicationException(
                     "Object completion native state differs from the exact speculative transition");
         }
-        if (nativeState.highWatermark() > head.endOffsetExclusive()
+        if (nativeState.highWatermark() != head.endOffsetExclusive()
                 || nativeState.lastStableOffset() != recomputedLastStableOffset) {
             throw new KafkaCoherentPublicationException(
                     "Object completion HW/LSO differs from the selected transaction state");
@@ -595,6 +744,9 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                 assigned.startOffset(),
                 assigned.endOffsetExclusive(),
                 replacement));
+        if (storageProfile == StorageProfile.BOOKKEEPER) {
+            repository.retainCurrent(publicationCell.capture().references());
+        }
         if (!result.published()) {
             throw new KafkaCoherentPublicationException("speculative protocol publication failed: " + result.outcome());
         }

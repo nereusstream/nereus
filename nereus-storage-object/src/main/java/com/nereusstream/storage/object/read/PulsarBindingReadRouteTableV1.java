@@ -46,4 +46,22 @@ public final class PulsarBindingReadRouteTableV1 {
     public PulsarBindingReadRouteV1 route(int index) {
         return routes[index];
     }
+
+    /** First route at or after this typed ledger/entry position. */
+    public int firstIntersecting(long virtualLedgerId, long startEntryIdInclusive) {
+        int low = 0;
+        int high = routes.length;
+        while (low < high) {
+            int middle = low + (high - low) / 2;
+            PulsarBindingReadRouteV1 route = routes[middle];
+            if (route.virtualLedgerId() < virtualLedgerId
+                    || route.virtualLedgerId() == virtualLedgerId
+                            && route.endEntryIdExclusive() <= startEntryIdInclusive) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return low;
+    }
 }

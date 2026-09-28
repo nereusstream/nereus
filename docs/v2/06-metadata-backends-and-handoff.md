@@ -9,6 +9,17 @@ sourceTuple: v2-m1
 
 # Metadata backends and handoff
 
+Native Kafka Controller assignment remains the sole Broker/leader authority. BK storage qualification additionally
+uses an Oxia per-partition Owner admission head: run attachment and OPEN-to-CLOSED are ordered by one version CAS,
+with a bounded exact run set and immutable closure archive. Acquisition/recovery/activation must validate the current
+native assignment and reject stale callbacks. Metadata closure is followed by BK fence/recovery; neither replaces
+the other. Normal BK append adds no per-batch control I/O. Object core authorization uses synchronous per-Binding Head CAS after exact upload. Owner, continuous grant
+prefix, checkpoint selection and closure are ordered on that one key; Oxia 0.9 multi-key transactions are not assumed. The native BK slice closes the prior Owner admission, fences all legal ledgers, installs
+complete recovered protocol state and obtains native Controller RECOVERED acknowledgement before request/coordinator
+readiness. A final publisher guard compares the current topic UUID/leader/epoch and recovered carrier. Actual
+Controller/Broker tests cover superseded recovery and repeated cold relocation; the normal final-source real-cluster
+task passes.
+
 ## Capability boundaries
 
 V2 does not expose one broad metadata API whose operations must map identically to KRaft and MetadataStore/Oxia. M1's
@@ -303,3 +314,11 @@ hide in an aggregate append metric.
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
 `V2-META-001..007`, `V2-KAF-META-001..005`, `V2-OBJ-015/020..024`, `V2-READ-003..015`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001..002`, and `V2-POSITION-002..018`.
+
+NSIP-1 T4 adds the narrow shard-local `authorize/<scope>/head` and `authorize/<scope>/records/<sha256>` families.
+The scope hashes Binding, topic UUID, partition and Storage Epoch. The Head persists its capacity policy, exact Owner
+fence and complete continuous source descriptors. An immutable CLOSED snapshot is effective only when Head-selected;
+a successor preserves its SHA lineage. Checkpoint selection persists the existing NWKCP1 common state in an immutable
+control record and releases only the exact covered debt. Recovery reads selected references rather than granting from
+LIST; member closure does not close the shared physical WalRun. See [NSIP-1 §6.4](NSIP/nsip-1.md#64-object-启用前必须定稿的唯一协议)
+for fault ordering and first-batch limits. Native Object Broker compatibility and M4/M5 retirement remain separate gates.

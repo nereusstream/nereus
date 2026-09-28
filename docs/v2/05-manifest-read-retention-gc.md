@@ -137,6 +137,14 @@ the storage layer does not silently delete aborted batches/control markers as a 
 advance LEO/HW/LSO. A sequential Fetch cursor is disposable and may not retain this read pin across requests; the next
 Fetch captures a new view and discards the cursor unless every run/source/index/state identity still matches.
 
+The current NSIP-1 M4-local Kafka Object reader now derives the replica, read-uncommitted or read-committed bound from
+the same captured coherent root used for its route plan; a caller cannot carry an earlier numeric HW/LSO into a later
+cell. Kafka/Pulsar route tables retain their one-pass ordered/non-overlapping validation and now locate the first
+intersecting route before scanning only covered intervals. Physical routes are selected by an ordinal bound to that
+exact immutable read cell, so a value-equal route from another cell cannot be reused. BK sequential lookup bounds are
+computed once per captured request/snapshot. These local changes do not alter fallback, compaction gap visibility,
+read pins, the M4 RELEASED protocol or the frozen M4 Final receipt.
+
 Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
 state. One later Binding/incarnation selector CAS competes atomically with takeover/read grant and performs the complete
 `PWF(O,E,ADMITTING) -> PO(O,E+1,ADMITTING,batch[last=E],anchor[E])` cut. It closes E, grants no-fallback E+1, and

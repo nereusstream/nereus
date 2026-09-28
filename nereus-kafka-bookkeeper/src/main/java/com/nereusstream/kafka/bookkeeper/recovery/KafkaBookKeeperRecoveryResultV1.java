@@ -16,16 +16,19 @@ package com.nereusstream.kafka.bookkeeper.recovery;
 
 import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryProgressV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaBookKeeperActiveTailLocatorV1;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Physical candidate, election cut, protocol state, and cumulative envelope accounting. */
+/** Complete legal prefix, protocol state, rebuilt locators, and cumulative envelope accounting. */
 public record KafkaBookKeeperRecoveryResultV1(
         KafkaBookKeeperRecoveryOutcomeV1 outcome,
         long physicalRecoveredEndOffset,
         OptionalLong newLeaderLeo,
         Optional<KafkaProtocolCheckpointStateV1> recoveredProtocolState,
+        List<KafkaBookKeeperActiveTailLocatorV1> recoveredLocators,
         KafkaBookKeeperRecoveryProgressV1 progress,
         OptionalLong conflictEntryId,
         String detail) {
@@ -33,6 +36,7 @@ public record KafkaBookKeeperRecoveryResultV1(
         Objects.requireNonNull(outcome, "outcome");
         Objects.requireNonNull(newLeaderLeo, "newLeaderLeo");
         Objects.requireNonNull(recoveredProtocolState, "recoveredProtocolState");
+        recoveredLocators = List.copyOf(Objects.requireNonNull(recoveredLocators, "recoveredLocators"));
         Objects.requireNonNull(progress, "progress");
         Objects.requireNonNull(conflictEntryId, "conflictEntryId");
         Objects.requireNonNull(detail, "detail");
@@ -41,6 +45,7 @@ public record KafkaBookKeeperRecoveryResultV1(
         if (physicalRecoveredEndOffset < 0
                 || recovered != newLeaderLeo.isPresent()
                 || recovered != recoveredProtocolState.isPresent()
+                || !recovered && !recoveredLocators.isEmpty()
                 || recovered
                         && recoveredProtocolState.orElseThrow().vector().recoveryCoveredThrough()
                                 != newLeaderLeo.getAsLong()) {

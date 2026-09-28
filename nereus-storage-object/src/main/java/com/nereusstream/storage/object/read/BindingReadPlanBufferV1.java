@@ -19,6 +19,7 @@ public final class BindingReadPlanBufferV1 {
     private final long[] starts;
     private final long[] ends;
     private final BindingReadRouteV1[] routes;
+    private final int[] routeOrdinals;
     private int size;
 
     public BindingReadPlanBufferV1(int capacity) {
@@ -28,6 +29,7 @@ public final class BindingReadPlanBufferV1 {
         starts = new long[capacity];
         ends = new long[capacity];
         routes = new BindingReadRouteV1[capacity];
+        routeOrdinals = new int[capacity];
     }
 
     void reset() {
@@ -37,13 +39,14 @@ public final class BindingReadPlanBufferV1 {
         size = 0;
     }
 
-    boolean append(long startInclusive, long endExclusive, BindingReadRouteV1 route) {
+    boolean append(long startInclusive, long endExclusive, BindingReadRouteV1 route, int routeOrdinal) {
         if (size == routes.length) {
             return false;
         }
         starts[size] = startInclusive;
         ends[size] = endExclusive;
         routes[size] = route;
+        routeOrdinals[size] = routeOrdinal;
         size++;
         return true;
     }
@@ -65,6 +68,11 @@ public final class BindingReadPlanBufferV1 {
     public BindingReadRouteV1 route(int index) {
         checkIndex(index);
         return routes[index];
+    }
+
+    public int routeOrdinal(int index) {
+        checkIndex(index);
+        return routeOrdinals[index];
     }
 
     private void checkIndex(int index) {

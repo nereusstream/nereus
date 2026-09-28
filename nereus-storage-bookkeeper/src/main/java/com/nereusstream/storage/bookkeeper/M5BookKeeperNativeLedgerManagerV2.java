@@ -43,26 +43,26 @@ import org.apache.zookeeper.data.ACL;
 /** Guarded create SPI decorator; ordinary BK delete cannot bypass the separate M5 native delete authority. */
 final class M5BookKeeperNativeLedgerManagerV2 implements LedgerManager {
     private final AbstractZkLedgerManager delegate;
-    private final M5BookKeeperNativeCreateGuardV2 guard;
-    private final M5BookKeeperNativeCreateSpecV2 spec;
+    private final java.util.function.Supplier<M5BookKeeperNativeMetadataDriverV2.CreateScope> scopes;
     private final ZooKeeper zk;
     private final List<ACL> acls;
 
     M5BookKeeperNativeLedgerManagerV2(
             AbstractZkLedgerManager delegate,
-            M5BookKeeperNativeCreateGuardV2 guard,
-            M5BookKeeperNativeCreateSpecV2 spec,
+            java.util.function.Supplier<M5BookKeeperNativeMetadataDriverV2.CreateScope> scopes,
             ZooKeeper zk,
             List<ACL> acls) {
         this.delegate = delegate;
-        this.guard = guard;
-        this.spec = spec;
+        this.scopes = scopes;
         this.zk = zk;
         this.acls = List.copyOf(acls);
     }
 
     @Override
     public CompletableFuture<Versioned<LedgerMetadata>> createLedgerMetadata(long ledgerId, LedgerMetadata input) {
+        var scope = scopes.get();
+        var spec = scope.spec();
+        var guard = scope.guard();
         final LedgerMetadata metadata;
         final byte[] bytes;
         try {

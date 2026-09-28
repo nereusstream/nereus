@@ -118,7 +118,7 @@ class KafkaProducerTransactionStateV1Test {
     }
 
     @Test
-    void abortMarkerBuildsNativeAbortedTransactionIndexAndRequiresAnOpenTransaction() {
+    void abortMarkerBuildsNativeAbortedTransactionIndexAndAnEmptyMarkerDoesNotInventATransaction() {
         KafkaTransactionStateV1 state = KafkaTransactionStateV1.empty()
                 .apply(commit(20, transactional(9, 0, KafkaTransactionBatchKindV1.TRANSACTIONAL_DATA, -1)));
         state = state.apply(commit(21, transactional(9, 1, KafkaTransactionBatchKindV1.ABORT_MARKER, 6)));
@@ -130,9 +130,7 @@ class KafkaProducerTransactionStateV1Test {
         });
         KafkaSpeculativeCommitV1 orphanMarker =
                 commit(30, transactional(10, 0, KafkaTransactionBatchKindV1.ABORT_MARKER, 6));
-        assertThatThrownBy(() -> KafkaTransactionStateV1.empty().apply(orphanMarker))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("no ongoing");
+        assertThat(KafkaTransactionStateV1.empty().apply(orphanMarker)).isEqualTo(KafkaTransactionStateV1.empty());
     }
 
     private static KafkaSpeculativeCommitV1 commit(long startOffset, KafkaProtocolBatchDeltaV1 batch) {
@@ -154,6 +152,9 @@ class KafkaProducerTransactionStateV1Test {
 
     private static KafkaProtocolBatchDeltaV1 transactional(
             long producerId, int sequence, KafkaTransactionBatchKindV1 kind, int coordinatorEpoch) {
+        if (kind == KafkaTransactionBatchKindV1.COMMIT_MARKER || kind == KafkaTransactionBatchKindV1.ABORT_MARKER) {
+            return KafkaProtocolBatchDeltaV1.marker(kind, producerId, (short) 0, coordinatorEpoch);
+        }
         return batch(producerId, 0, sequence, sequence, 1, kind, coordinatorEpoch);
     }
 

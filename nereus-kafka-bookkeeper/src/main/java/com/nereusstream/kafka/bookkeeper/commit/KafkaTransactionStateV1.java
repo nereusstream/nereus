@@ -77,7 +77,12 @@ public record KafkaTransactionStateV1(
             KafkaProtocolBatchDeltaV1 delta = batch.delta();
             switch (delta.transactionKind()) {
                 case NONE -> {
-                    // No partition transaction state.
+                    if (delta.duplicateIdentity()
+                            .filter(identity -> ongoing.containsKey(identity.producerId()))
+                            .isPresent()) {
+                        throw new IllegalArgumentException(
+                                "non-transactional DATA from a producer with an ongoing transaction");
+                    }
                 }
                 case TRANSACTIONAL_DATA ->
                     ongoing.putIfAbsent(
@@ -86,7 +91,8 @@ public record KafkaTransactionStateV1(
                 case COMMIT_MARKER, ABORT_MARKER -> {
                     OngoingTransactionV1 opened = ongoing.remove(delta.transactionalProducerId());
                     if (opened == null) {
-                        throw new IllegalArgumentException("transaction marker has no ongoing partition transaction");
+                        // Native Kafka accepts marker retries and markers for an empty transaction.
+                        continue;
                     }
                     completed.add(new CompletedTransactionV1(
                             delta.transactionalProducerId(),

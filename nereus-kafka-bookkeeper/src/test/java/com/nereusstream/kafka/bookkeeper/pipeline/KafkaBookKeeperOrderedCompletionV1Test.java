@@ -48,6 +48,29 @@ class KafkaBookKeeperOrderedCompletionV1Test {
     }
 
     @Test
+    void completionCallbackRunsOutsidePipelineLockAfterCapacityRelease() {
+        var context = KafkaBookKeeperPipelineAdmissionV1Test.context(1, 10, 20_000);
+        context.session().delayedEntryId = 1;
+        var plan = KafkaPipelineTestFixtures.plan(context.lifecycle(), 1, 100);
+        var result = context.pipeline().submit(plan.request(), plan::assignment);
+        var observed = result.thenRun(() -> {
+            assertThat(Thread.holdsLock(context.pipeline())).isFalse();
+            assertThat(context.partition().snapshot().groups()).isZero();
+            assertThat(context.global().snapshot().groups()).isZero();
+            var next = KafkaPipelineTestFixtures.plan(context.lifecycle(), 1, 101);
+            assertThat(context.pipeline()
+                            .submit(next.request(), next::assignment)
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+        });
+        context.session().completeDelayedAppend();
+        observed.toCompletableFuture().join();
+        assertThat(context.commits()).containsExactly("100:101", "101:102");
+    }
+
+    @Test
     void definitiveAFailureFencesAlreadyDurableB() {
         KafkaBookKeeperPipelineAdmissionV1Test.Context context =
                 KafkaBookKeeperPipelineAdmissionV1Test.context(3, 10, 20_000);

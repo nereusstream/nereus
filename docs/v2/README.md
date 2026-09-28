@@ -16,6 +16,12 @@ performance-first BookKeeper WAL.
 
 ## Current status
 
+- [NSIP-1](NSIP/nsip-1.md) is the current Kafka single-Owner contract: RF=1/minISR=1, complete shared commit for
+  BK ACK/HW, checkpoint-plus-tail cold takeover, and a persisted grant for the Object core. The native BK
+  Controller/Broker slice, Object authorization/KMS slice, and M4 read adaptation have limited-scope acceptance;
+  M1–M4 first-commit cleanup passed applicable local checks and awaits overall coordination acceptance. Historical
+  M2 follower-observation receipts stay bound to their original source and do not define a second current runtime mode.
+  Complete M5 and native Object process wiring remain separate.
 - Current M5 lifecycle authority is [ADR 0148](../decisions/0148-v2-m5-lifecycle-contract-amendment.md) and the
   [current contract view](detailed_design/m5/m5-current-contracts.md). Amendment 3 supersedes the listed identity,
   reclamation, BK carrier, history and recovery clauses. Revised implementation and source-bound evidence remain
@@ -232,13 +238,13 @@ performance-first BookKeeper WAL.
   The accepted [M2-K0 implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md)
   now fixes how exact `NBKE2` bytes/caps, numeric classes, modules, provider sessions, and evidence gates must land.
   Their production implementation and 10k/100k evidence remain `NotStarted`; no runtime is implied.
-- ADR 0087 fixes Kafka protocol semantics over every profile: distinct Allocated/Durable/LEO/HW/LSO frontiers,
-  native duplicate identity plus speculative producer state, fenced locator/protocol publication, compact descriptor
-  replication with hard-bounded Observed/Applied eligibility, election-bounded tail adoption, profile-neutral BK/Object
-  protocol checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
-  semantic compaction. `NBKE2` checkpoint carriage is M2, exact Object `NWKCP1` bytes/Head/key caps are M3, and native
-  Kafka transport/process activation is M6. The M2 carrier is verified by M2 Final, and M3 Final closes the exact
-  `NWKCP1` scope; native transport/process activation remains M6 work.
+- ADR 0087, revised by NSIP-1, fixes Kafka protocol semantics over every profile: distinct
+  Allocated/Durable/LEO/HW/LSO frontiers, native duplicate identity plus speculative producer state, fenced
+  locator/protocol publication, one legal shared commit under RF=1/minISR=1, profile-neutral BK/Object protocol
+  checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
+  semantic compaction. The original M2/M3 Final receipts retain their tested-source bounds; the current BK
+  checkpoint-plus-tail and Object authorization paths have separate limited-scope validation. Native Object
+  transport/process activation remains M6 work.
 - ADR 0088, [ADR 0089's exact Header amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
   accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) freeze the exact
   256-byte Header offsets, 116/104/96/48-byte NWG1 rows, strict code/cap/crypto tables, six-vector/114-component A corpus,
@@ -626,10 +632,10 @@ receipt/Final validation is implemented under a focused non-promotion gate. Exec
 pure-V2 pruning, and N2/N3 promotion are complete for the current source tuple. ADR 0086 resolves the
 Kafka BookKeeper semantic layout. The accepted M2-K0 contract now closes its implementation-input structure while
 leaving production wire/constants/provider/gates and dedicated-ledger scale as M2 implementation/evidence.
-ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer, including fenced publication,
-native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct
-BK/Object protocol checkpoint carriers with a terminal selection Head, without selecting Java structures or numeric
-queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; M6 owns native Kafka integration.
+ADR 0087 originally closed the protocol-frontier/idempotency/transaction/Fetch semantic layer; NSIP-1 now supersedes
+its logical follower-observation and election-adoption clauses with RF=1/minISR=1, complete shared commit and cold
+Owner takeover. The distinct BK/Object protocol checkpoint carriers and terminal selection Head remain. M2 owns the
+BK carrier; M3 owns exact `NWKCP1`; M6 owns native Object Broker integration.
 ADR 0088 closes `V2-OPEN-OBJ-17` at the documentation/input layer by freezing the NWG1 v1 structures, caps, crypto,
 golden/mutation/trace contracts, and evidence taxonomy. Later M3 descendants implement its machine projections,
 immutable bytes, production codec, executable ordinary gates, and exact-source receipts. Later accepted allocator
@@ -946,7 +952,7 @@ block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.
 Partial recovery omission, remaining numeric caps,
 and any tombstone-deletion authority remain evidence gates. The rows below
-are the remaining active 0.2 evidence gates.
+record historical and still-open 0.2 evidence gates; current NSIP-1 status is stated above.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
@@ -955,7 +961,7 @@ are the remaining active 0.2 evidence gates.
 | `V2-OPEN-OBJ-22` | execute bounded recovery and skip-hit evidence; only an SLO miss may reopen a whole-WalRun-first, Root/Seal-bound recovery omission certificate | M3/M7 recovery optimization decision |
 | `V2-OPEN-OBJ-24` | admit a Provider version token only after canonical-binary cap, immutable-version, FULL_OBJECT SHA-256, rows/page, and range-benefit evidence; otherwise retain Root mode NONE | M3 checkpoint provider-proof admission |
 | `V2-OPEN-READ-15` | execute M4/M5 tombstone lifetime/capacity and concrete-backend ordered-history/lineage/stale-create evidence before reconsidering a metadata-only tombstone-deletion authority; 0.2 otherwise retains `RETIRED_V1` permanently | M4/M5 optional metadata-retirement authority |
-| `V2-OPEN-BK-02` | implement M2-K0's exact NBKE2/index/footer/checkpoint bytes, hard parser/admission caps, module/provider surfaces, and non-promotable input gate; then use M2-K9 evidence to select apply-lag/pipeline/recovery/waiter/cursor/rollover defaults and validate the accepted one-ledger-chain-per-partition layout at 10k/100k partitions; exact Object `NWKCP1` bytes/Head/key caps remain M3, and pooled lanes or storage-native ISR require a new ADR | M2 Kafka BookKeeper implementation and evidence admission |
+| `V2-OPEN-BK-02` | Historical M2-K0/K9 implementation and evidence closed at their exact source. Current NSIP-1 uses the selected BK recovery envelope with single-Owner shared commit and cold takeover; the old replica lag and ISR defaults are no longer a current mode | Historical M2 evidence; current NSIP-1 validation |
 | `V2-OPEN-KAF-DATA-01` | select an explicit evidence-backed initial profile for `__share_group_state`; it cannot inherit a tenant default, while `__consumer_offsets` and `__transaction_state` are already fixed to `BOOKKEEPER_WAL_ONLY` | M6/release internal-topic admission |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

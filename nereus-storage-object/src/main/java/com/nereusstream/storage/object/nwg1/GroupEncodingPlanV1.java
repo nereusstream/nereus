@@ -56,6 +56,14 @@ public final class GroupEncodingPlanV1 {
         public byte[] preAeadBytes() {
             return preAeadBytes.clone();
         }
+
+        public int decodedPayloadLength() {
+            return decodedPayload.length;
+        }
+
+        public int preAeadBytesLength() {
+            return preAeadBytes.length;
+        }
     }
 
     private final int protocolKind;
@@ -74,6 +82,7 @@ public final class GroupEncodingPlanV1 {
     private final List<Nwg1DirectoryV1.BindingContext> bindings;
     private final List<Nwg1DirectoryV1.AppendUnit> appendUnits;
     private final List<PlannedFrame> frames;
+    private final Sha256Digest canonicalPlanSha256;
 
     @SuppressWarnings("ParameterNumber")
     public GroupEncodingPlanV1(
@@ -114,13 +123,14 @@ public final class GroupEncodingPlanV1 {
         }
         long decoded = 0;
         for (PlannedFrame frame : this.frames) {
-            decoded = Math.addExact(decoded, frame.decodedPayload().length);
+            decoded = Math.addExact(decoded, frame.decodedPayloadLength());
         }
         if (decoded == 0 && protocolKind != 2) {
             throw new IllegalArgumentException("zero-byte Kafka plan");
         }
         validateUnitDigests();
-        requireAdmission(Nwg1RootAdmissionCaps.formatHardCaps());
+        var facts = requireAdmission(Nwg1RootAdmissionCaps.formatHardCaps());
+        canonicalPlanSha256 = computeCanonicalPlanSha256(facts);
     }
 
     private void validateUnitDigests() {
@@ -138,7 +148,7 @@ public final class GroupEncodingPlanV1 {
                 if (frame.appendUnitOrdinal() != unitOrdinal) {
                     throw new IllegalArgumentException("frame differs from its dense append-unit range");
                 }
-                digest.update(frame.decodedPayload());
+                digest.update(frame.decodedPayload);
             }
             if (!MessageDigest.isEqual(unit.assignedPayloadSha256(), digest.digest())) {
                 throw new IllegalArgumentException("assigned payload digest mismatch");
@@ -160,8 +170,8 @@ public final class GroupEncodingPlanV1 {
         long totalDecodedBytes = 0;
         long[] decodedPerAppendUnit = new long[appendUnits.size()];
         for (PlannedFrame frame : frames) {
-            long decodedBytes = frame.decodedPayload().length;
-            long storedBytes = Math.addExact(frame.preAeadBytes().length, (long) Nwg1ConstantsV1.GCM_TAG_BYTES);
+            long decodedBytes = frame.decodedPayloadLength();
+            long storedBytes = Math.addExact(frame.preAeadBytesLength(), (long) Nwg1ConstantsV1.GCM_TAG_BYTES);
             if (decodedBytes > caps.maxDecodedFrameBytes() || storedBytes > caps.maxStoredFrameBytes()) {
                 throw new IllegalArgumentException("NWG1 frame exceeds the exact Root admission caps");
             }
@@ -233,7 +243,10 @@ public final class GroupEncodingPlanV1 {
 
     /** Exact domain-separated streaming identity of every immutable pre-AEAD plan input. */
     public Sha256Digest canonicalPlanSha256() {
-        AdmissionFacts facts = requireAdmission(Nwg1RootAdmissionCaps.formatHardCaps());
+        return canonicalPlanSha256;
+    }
+
+    private Sha256Digest computeCanonicalPlanSha256(AdmissionFacts facts) {
         MessageDigest digest = sha256();
         updateBytes(digest, "NEREUS-NWG1-SEALED-PLAN-V1".getBytes(StandardCharsets.US_ASCII));
         updateInt(digest, protocolKind);
@@ -253,8 +266,8 @@ public final class GroupEncodingPlanV1 {
         updateBytes(digest, directory);
         updateInt(digest, frames.size());
         for (PlannedFrame frame : frames) {
-            updateBytes(digest, frame.decodedPayload());
-            updateBytes(digest, frame.preAeadBytes());
+            updateBytes(digest, frame.decodedPayload);
+            updateBytes(digest, frame.preAeadBytes);
         }
         return Sha256Digest.copyOf(digest.digest());
     }
@@ -305,13 +318,13 @@ public final class GroupEncodingPlanV1 {
         long nextOffset = directoryPrefixEnd;
         java.util.ArrayList<Nwg1DirectoryV1.Frame> rows = new java.util.ArrayList<>(frames.size());
         for (PlannedFrame frame : frames) {
-            long stored = Math.addExact(frame.preAeadBytes().length, 16L);
+            long stored = Math.addExact(frame.preAeadBytesLength(), 16L);
             rows.add(new Nwg1DirectoryV1.Frame(
                     frame.appendUnitOrdinal(),
                     stored,
                     nextOffset,
-                    frame.decodedPayload().length,
-                    crc32c(frame.decodedPayload()),
+                    frame.decodedPayloadLength(),
+                    crc32c(frame.decodedPayload),
                     frame.coverage0(),
                     frame.coverage1(),
                     frame.actualCodecKind(),
@@ -333,13 +346,13 @@ public final class GroupEncodingPlanV1 {
     }
 
     long actualPayloadBytes() {
-        return frames.stream().mapToLong(frame -> frame.decodedPayload().length).sum();
+        return frames.stream().mapToLong(PlannedFrame::decodedPayloadLength).sum();
     }
 
     long canonicalBodyLength(long prefixEnd) {
         long result = prefixEnd;
         for (PlannedFrame frame : frames) {
-            result = Math.addExact(result, frame.preAeadBytes().length + 16L);
+            result = Math.addExact(result, frame.preAeadBytesLength() + 16L);
         }
         return result;
     }

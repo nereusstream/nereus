@@ -16,6 +16,7 @@ package com.nereusstream.storage.object.control;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.storage.object.kms.KmsCellSession;
 import com.nereusstream.storage.object.recovery.CumulativeRecoveryBudget;
 import com.nereusstream.storage.object.recovery.RecoveryEnvelopeExceededException;
 import java.util.HashSet;
@@ -101,6 +102,15 @@ public final class WalRunLifecycleManager {
         return new FreshRootPublication(reference, Optional.of(new NewWalRunOwnerAuthority(reference, root)));
     }
 
+    /** Publishes only the exact candidate bound to an unconsumed, budgeted new-run key creation. */
+    public FreshRootPublication createRootAndInitializePointer(
+            String rootKey, WalRunRootRecord root, KmsCellSession.NewRunKeyCreation newRunKey) {
+        Objects.requireNonNull(newRunKey, "newRunKey").markRootPublicationAttempt(root);
+        // The caller retains this same key handle and Root candidate through UNKNOWN/retry; recover-only outcomes
+        // have no fresh owner authority and may release the handle after the exact Root is independently recoverable.
+        return createRootAndInitializePointer(rootKey, root);
+    }
+
     public record FreshRootPublication(WalRunReference reference, Optional<NewWalRunOwnerAuthority> ownerAuthority) {
         public FreshRootPublication {
             Objects.requireNonNull(reference, "reference");
@@ -164,11 +174,12 @@ public final class WalRunLifecycleManager {
         WalRunControlKeys.requireSealKey(
                 sealKey, seal.root().shardId(), seal.root().shardRunEpoch());
         WalRunObjectSession session = Objects.requireNonNull(sealedSession, "sealedSession");
-        session.requireTerminalClosable();
-        WalRunRootRecord root = verifySealRecord(seal);
-        session.requireExactSealedClosure(root, seal);
-        createImmutableExact(sealKey, WalRunControlCodec.encodeSeal(seal), "WalRun Seal");
-        return new WalRunTerminalClosureProofV1(sealKey, seal);
+        try (var lease = session.acquireTerminalIo()) {
+            WalRunRootRecord root = verifySealRecord(seal);
+            session.requireExactSealedClosure(root, seal);
+            createImmutableExact(sealKey, WalRunControlCodec.encodeSeal(seal), "WalRun Seal");
+            return new WalRunTerminalClosureProofV1(sealKey, seal);
+        }
     }
 
     private WalRunRootRecord verifySealRecord(WalRunSealRecord seal) {

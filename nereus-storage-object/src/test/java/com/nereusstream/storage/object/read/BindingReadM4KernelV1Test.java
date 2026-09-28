@@ -28,6 +28,7 @@ import com.nereusstream.storage.object.read.BindingReadRouteV1.SourcePurity;
 import com.nereusstream.storage.object.read.BindingReadSourceRefV1.SourceKind;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -108,6 +109,57 @@ class BindingReadM4KernelV1Test {
 
         assertThat(BindingReadPlannerV1.plan(cell, 0, 8, 8, new BindingReadPlanBufferV1(1)))
                 .isEqualTo(BindingReadPlannerV1.Outcome.SAFE_FAILURE_CAPACITY);
+    }
+
+    @Test
+    void orderedRouteLookupStartsAtTheFirstIntersectingOffsetAndPreservesGaps() {
+        List<BindingReadRouteV1> routes = new ArrayList<>();
+        for (int index = 0; index < 128; index++) {
+            routes.add(route(index * 2L, index * 2L + 2, false));
+        }
+        BindingReadRouteTableV1 table = new BindingReadRouteTableV1(routes);
+        BindingReadPublicationCellV1 cell = new BindingReadPublicationCellV1(1, 256, 1, table, routes);
+        BindingReadPlanBufferV1 plan = new BindingReadPlanBufferV1(1);
+
+        assertThat(table.firstIntersecting(255)).isEqualTo(127);
+        assertThat(table.firstIntersecting(256)).isEqualTo(128);
+        assertThat(BindingReadPlannerV1.plan(cell, 255, 256, 256, plan))
+                .isEqualTo(BindingReadPlannerV1.Outcome.PLANNED);
+        assertThat(plan.routeOrdinal(0)).isEqualTo(127);
+        assertThat(plan.route(0)).isSameAs(routes.get(127));
+
+        BindingReadRouteTableV1 gap = new BindingReadRouteTableV1(List.of(route(0, 2, false), route(4, 6, false)));
+        assertThat(BindingReadPlannerV1.plan(new BindingReadPublicationCellV1(1, 6, 1, gap, routes), 2, 5, 6, plan))
+                .isEqualTo(BindingReadPlannerV1.Outcome.SAFE_FAILURE_GAP_OR_AMBIGUITY);
+        assertThat(plan.size()).isZero();
+        assertThatThrownBy(() -> new BindingReadRouteTableV1(List.of(route(2, 4, false), route(0, 2, false))))
+                .hasMessageContaining("overlap or are not position ordered");
+        assertThatThrownBy(() -> new BindingReadRouteTableV1(List.of(route(0, 3, false), route(2, 4, false))))
+                .hasMessageContaining("overlap or are not position ordered");
+    }
+
+    @Test
+    void typedPulsarRouteLookupStartsAtTheFirstIntersectingLedgerEntry() {
+        List<PulsarBindingReadRouteV1> routes = new ArrayList<>();
+        routes.add(pulsarRoute(4, 0, 2, false));
+        for (int index = 0; index < 128; index++) {
+            routes.add(pulsarRoute(5, index * 2L, index * 2L + 2, false));
+        }
+        PulsarBindingReadRouteTableV1 table = new PulsarBindingReadRouteTableV1(routes);
+        PulsarBindingReadPlanBufferV1 plan = new PulsarBindingReadPlanBufferV1(1);
+
+        assertThat(table.firstIntersecting(5, 255)).isEqualTo(128);
+        assertThat(table.firstIntersecting(5, 256)).isEqualTo(129);
+        assertThat(PulsarBindingReadPlannerV1.plan(table, 5, 255, 256, 256, plan))
+                .isEqualTo(BindingReadPlannerV1.Outcome.PLANNED);
+        assertThat(plan.routeOrdinal(0)).isEqualTo(128);
+        assertThat(plan.route(0)).isSameAs(routes.get(128));
+        assertThatThrownBy(() -> new PulsarBindingReadRouteTableV1(
+                        List.of(pulsarRoute(5, 0, 3, false), pulsarRoute(5, 2, 4, false))))
+                .hasMessageContaining("overlap or are not ledger/entry ordered");
+        assertThatThrownBy(() -> new PulsarBindingReadRouteTableV1(
+                        List.of(pulsarRoute(5, 0, 2, false), pulsarRoute(4, 0, 2, false))))
+                .hasMessageContaining("overlap or are not ledger/entry ordered");
     }
 
     @Test

@@ -58,7 +58,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
             throw new IllegalArgumentException("Object checkpoint Root/publisher fence is outside the v1 domain");
         }
         this.publisherEpoch = publisherEpoch;
-        Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        backend.protocolHeadKey(walRunPrefix);
     }
 
     @Override
@@ -91,7 +91,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
 
     private CompletionStage<Optional<KafkaProtocolCheckpointPublicationV1>> preflight(
             KafkaProtocolCheckpointStateV1 checkpoint, Nwkcp1EncodedObjectV1 encoded) {
-        String headKey = Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        String headKey = backend.protocolHeadKey(walRunPrefix);
         return backend.readHead(headKey).thenCompose(current -> {
             if (current.isEmpty()) {
                 return CompletableFuture.completedFuture(Optional.empty());
@@ -129,7 +129,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
                     new IllegalArgumentException("checkpoint publisher takeover epoch does not advance"));
         }
         beginMutation();
-        String headKey = Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        String headKey = backend.protocolHeadKey(walRunPrefix);
         try {
             return backend.readHead(headKey)
                     .thenCompose(current -> {
@@ -161,7 +161,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
                     new KafkaObjectCheckpointException("physical closure proof belongs to another WalRun Root"));
         }
         beginMutation();
-        String headKey = Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        String headKey = backend.protocolHeadKey(walRunPrefix);
         try {
             return backend.readHead(headKey)
                     .thenCompose(current -> {
@@ -210,7 +210,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
         Objects.requireNonNull(binding, "binding");
         Objects.requireNonNull(exactTerminalHeadValue, "exactTerminalHeadValue");
         Objects.requireNonNull(recoveryContext, "recoveryContext");
-        String expectedKey = Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        String expectedKey = backend.protocolHeadKey(walRunPrefix);
         Sha256Digest expectedRoot = WalRunControlCodec.rootSha256(predecessorRoot);
         if (binding.protocolKind() != ProtocolKindV1.KAFKA
                 || !binding.terminalHeadKey().equals(expectedKey)
@@ -232,7 +232,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
     }
 
     public CompletionStage<Optional<KafkaProtocolCheckpointHeadV1>> currentHead() {
-        return backend.readHead(Nwkcp1ObjectKeyV1.headKey(walRunPrefix))
+        return backend.readHead(backend.protocolHeadKey(walRunPrefix))
                 .thenApply(value -> value.map(currentBytes -> {
                     return decodeHead(currentBytes);
                 }));
@@ -276,7 +276,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
 
     private CompletionStage<KafkaProtocolCheckpointPublicationV1> select(
             Nwkcp1EncodedObjectV1 encoded, KafkaProtocolCheckpointStateV1 checkpoint) {
-        String headKey = Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        String headKey = backend.protocolHeadKey(walRunPrefix);
         return backend.readHead(headKey).thenCompose(current -> {
             KafkaProtocolCheckpointHeadV1 before = current.map(this::decodeHead).orElse(null);
             if (before != null) {

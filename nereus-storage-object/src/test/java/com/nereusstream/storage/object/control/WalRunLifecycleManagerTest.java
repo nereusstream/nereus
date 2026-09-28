@@ -16,11 +16,73 @@ package com.nereusstream.storage.object.control;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.storage.object.kms.KmsCellSession;
+import com.nereusstream.storage.object.kms.KmsTransport;
+import com.nereusstream.storage.object.kms.RunKeyCacheIdentity;
+import com.nereusstream.storage.object.kms.WrappedRunKeyEnvelope;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class WalRunLifecycleManagerTest {
+    @Test
+    void preRootKeyRetainsOneExactCandidateAcrossUnknownAndRecoverOnlyOutcomes() {
+        requireNewKeyPublicationRetry(false);
+        requireNewKeyPublicationRetry(true);
+    }
+
+    private static void requireNewKeyPublicationRetry(boolean appliedBeforeResponseLoss) {
+        var store = new TestControlMetadataStore();
+        var manager = new WalRunLifecycleManager(store);
+        var base = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var cell = new KmsCellSession(
+                new KmsTransport() {
+                    @Override
+                    public WrappedRunKeyEnvelope wrap(String identity, byte[] key) {
+                        return new WrappedRunKeyEnvelope(
+                                "fake-kms", "test-wrap", identity, "v1", CanonicalBytes.copyOf(key));
+                    }
+
+                    @Override
+                    public byte[] unwrap(WrappedRunKeyEnvelope envelope) {
+                        return envelope.wrappedKey().toByteArray();
+                    }
+                },
+                base.providerScopeId(),
+                "kms/cell-a",
+                1,
+                new SecureRandom());
+        try (var creation = cell.beginNewRunKey(new RunKeyCacheIdentity(7, 1))) {
+            var root = copyWithEnvelope(base, creation.wrappedRunKey());
+            var rootKey = WalRunControlKeys.rootKey(7, 1);
+            assertThatThrownBy(() -> manager.createRootAndInitializePointer(rootKey, base, creation))
+                    .hasMessageContaining("exact proposed WalRun Root");
+            assertThat(store.operations()).isEmpty();
+            store.nextMode(
+                    appliedBeforeResponseLoss
+                            ? TestControlMetadataStore.NextMode.APPLY_BUT_UNKNOWN
+                            : TestControlMetadataStore.NextMode.UNKNOWN_WITHOUT_APPLY);
+            if (appliedBeforeResponseLoss) {
+                var recoverOnly = manager.createRootAndInitializePointer(rootKey, root, creation);
+                assertThat(recoverOnly.ownerAuthority()).isEmpty();
+                assertThat(manager.createRootAndInitializePointer(rootKey, root, creation)
+                                .ownerAuthority())
+                        .isEmpty();
+                assertThat(store.get(rootKey)).contains(WalRunControlCodec.encodeRoot(root));
+            } else {
+                assertThatThrownBy(() -> manager.createRootAndInitializePointer(rootKey, root, creation))
+                        .hasMessageContaining("exact candidate");
+                assertThat(creation.wrappedRunKey()).isEqualTo(root.wrappedRunKey());
+                var published = manager.createRootAndInitializePointer(rootKey, root, creation);
+                assertThat(published.ownerAuthority()).isPresent();
+                assertThat(store.get(rootKey)).contains(WalRunControlCodec.encodeRoot(root));
+            }
+        }
+        cell.close();
+    }
+
     @Test
     void responseLossAcceptsOnlyExactImmutableCandidate() {
         TestControlMetadataStore store = new TestControlMetadataStore();
@@ -478,6 +540,24 @@ class WalRunLifecycleManagerTest {
                 root.providerConfiguration(),
                 root.recoveryEnvelope(),
                 root.wrappedRunKey(),
+                root.predecessor());
+    }
+
+    private static WalRunRootRecord copyWithEnvelope(WalRunRootRecord root, WrappedRunKeyEnvelope wrappedRunKey) {
+        return new WalRunRootRecord(
+                root.shardId(),
+                root.shardRunEpoch(),
+                root.walRunSessionId(),
+                root.openedAtMillis(),
+                root.protocolCellIdentity(),
+                root.providerScopeId(),
+                root.formatContract(),
+                root.nwg1AdmissionCaps(),
+                root.bounds(),
+                root.checkpointPolicy(),
+                root.providerConfiguration(),
+                root.recoveryEnvelope(),
+                wrappedRunKey,
                 root.predecessor());
     }
 

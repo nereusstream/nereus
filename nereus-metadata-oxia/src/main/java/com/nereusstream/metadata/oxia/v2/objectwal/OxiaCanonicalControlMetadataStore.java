@@ -76,7 +76,7 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
             throw new IllegalArgumentException("Cell authority root leaves insufficient room for bounded Oxia keys");
         }
         acceptedRelativeKey = Pattern.compile(Pattern.quote(prefix)
-                + "(?:/current|"
+                + "(?:/authorize/[0-9a-f]{64}(?:/head|/records/[0-9a-f]{64})|/current|"
                 + RUN
                 + "(?:/root|/seal|/checkpoint/head|"
                 + PAGE

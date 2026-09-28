@@ -179,13 +179,15 @@ public final class C1ObjectProviderSession implements AutoCloseable {
         Operation operation = claim.operation();
         try (IdentityVerifyingInputStream input = new IdentityVerifyingInputStream(body.openStream(), identity)) {
             operation.outcome = ProviderObjectOutcome.OUTCOME_UNKNOWN;
-            ObjectProviderTransport.ConditionalCreateResult result = transport.putIfAbsent(identity, input);
+            ObjectProviderTransport.ConditionalCreateResponse response =
+                    transport.putIfAbsentWithEvidence(identity, input);
+            ObjectProviderTransport.ConditionalCreateResult result = response.outcome();
             if (result == ObjectProviderTransport.ConditionalCreateResult.CREATED) {
                 input.requireVerifiedAtEof();
             }
             ProviderObjectResult resolved =
                     switch (result) {
-                        case CREATED -> ProviderObjectResult.outcome(ProviderObjectOutcome.APPLIED_EXACT);
+                        case CREATED -> createdResult(body, identity, response);
                         case ALREADY_EXISTS -> validateExisting(identity);
                         case DEFINITIVE_CONFLICT ->
                             ProviderObjectResult.outcome(ProviderObjectOutcome.DEFINITIVE_CONFLICT);
@@ -248,8 +250,7 @@ public final class C1ObjectProviderSession implements AutoCloseable {
             Verification verification = verifyFullObject(identity);
             ProviderObjectResult resolved =
                     switch (verification.kind()) {
-                        case EXACT ->
-                            new ProviderObjectResult(ProviderObjectOutcome.EXISTING_EXACT, verification.versionToken());
+                        case EXACT -> verifiedPersistenceResult(identity, verification.versionToken());
                         case MISMATCH -> ProviderObjectResult.outcome(ProviderObjectOutcome.DEFINITIVE_CONFLICT);
                         case NOT_FOUND ->
                             exactKeyListed
@@ -667,10 +668,76 @@ public final class C1ObjectProviderSession implements AutoCloseable {
     private ProviderObjectResult validateExisting(ObjectIdentity identity) throws IOException {
         Verification verification = verifyFullObject(identity);
         return switch (verification.kind()) {
-            case EXACT -> new ProviderObjectResult(ProviderObjectOutcome.EXISTING_EXACT, verification.versionToken());
+            case EXACT -> verifiedPersistenceResult(identity, verification.versionToken());
             case MISMATCH -> ProviderObjectResult.outcome(ProviderObjectOutcome.DEFINITIVE_CONFLICT);
             case NOT_FOUND, UNKNOWN -> ProviderObjectResult.outcome(ProviderObjectOutcome.OUTCOME_UNKNOWN);
         };
+    }
+
+    private ProviderObjectResult createdResult(
+            RepeatableObjectBody body,
+            ObjectIdentity identity,
+            ObjectProviderTransport.ConditionalCreateResponse response)
+            throws IOException {
+        if (response.createdIdentity().isEmpty()) {
+            return ProviderObjectResult.outcome(ProviderObjectOutcome.APPLIED_EXACT);
+        }
+        if (!response.createdIdentity().orElseThrow().equals(identity)) {
+            throw new IOException("Provider creation evidence substituted the exact Object identity");
+        }
+        var version = copyVersionToken(response.immutableVersionToken());
+        return new ProviderObjectResult(
+                ProviderObjectOutcome.APPLIED_EXACT,
+                version,
+                Optional.of(new ExactPersistenceEvidence(
+                        this, body, identity, ProviderObjectOutcome.APPLIED_EXACT, version)));
+    }
+
+    private ProviderObjectResult verifiedPersistenceResult(ObjectIdentity identity, Optional<CanonicalBytes> version) {
+        return new ProviderObjectResult(
+                ProviderObjectOutcome.EXISTING_EXACT,
+                version,
+                Optional.of(new ExactPersistenceEvidence(
+                        this, null, identity, ProviderObjectOutcome.EXISTING_EXACT, version)));
+    }
+
+    /** Issued only after a checked exact creation response or a completed full-GET length/SHA verification. */
+    public static final class ExactPersistenceEvidence {
+        private final C1ObjectProviderSession owner;
+        private final RepeatableObjectBody createdCandidate;
+        private final ObjectIdentity identity;
+        private final ProviderObjectOutcome outcome;
+        private final Optional<CanonicalBytes> version;
+
+        private ExactPersistenceEvidence(
+                C1ObjectProviderSession owner,
+                RepeatableObjectBody createdCandidate,
+                ObjectIdentity identity,
+                ProviderObjectOutcome outcome,
+                Optional<CanonicalBytes> version) {
+            this.owner = owner;
+            this.createdCandidate = createdCandidate;
+            this.identity = identity;
+            this.outcome = outcome;
+            this.version = version;
+        }
+
+        public ProviderObjectOutcome outcome() {
+            return outcome;
+        }
+
+        public Optional<CanonicalBytes> versionToken() {
+            return version;
+        }
+
+        private void require(C1ObjectProviderSession expectedOwner, RepeatableObjectBody candidate) {
+            if (owner != expectedOwner
+                    || !identity.equals(candidate.identity())
+                    || outcome == ProviderObjectOutcome.APPLIED_EXACT && createdCandidate != candidate) {
+                throw new IllegalArgumentException(
+                        "persistence evidence belongs to a different session/candidate/identity");
+            }
+        }
     }
 
     private Verification verifyFullObject(ObjectIdentity identity) throws IOException {
@@ -1308,6 +1375,20 @@ public final class C1ObjectProviderSession implements AutoCloseable {
 
         public ProviderObjectResult conditionalCreate(RepeatableObjectBody body) throws IOException {
             return conditionalCreateInternal(body);
+        }
+
+        /** Checks the actual lease's session and the exact immutable upload body, without Provider I/O. */
+        public boolean hasExactPersistenceEvidence(ProviderObjectResult result, RepeatableObjectBody candidate) {
+            synchronized (C1ObjectProviderSession.this) {
+                if (lifecycleOwner != LifecycleOwner.WAL_RUN || state == State.CLOSED) {
+                    throw new IllegalStateException("Provider persistence evidence lease is not live");
+                }
+                if (result.persistenceEvidence().isEmpty()) {
+                    return false;
+                }
+                result.persistenceEvidence().orElseThrow().require(C1ObjectProviderSession.this, candidate);
+                return true;
+            }
         }
 
         public ProviderReconciliationResult reconcileUnknown(

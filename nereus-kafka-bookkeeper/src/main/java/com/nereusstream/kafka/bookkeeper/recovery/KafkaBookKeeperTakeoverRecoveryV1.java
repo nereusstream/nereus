@@ -23,6 +23,8 @@ import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryStatus
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaRecoveryCheckpointVectorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaAssignedProtocolBatchV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaBookKeeperActiveTailLocatorV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaBookKeeperDataLocatorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCommittedProducerStateV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaLeaderEpochIndexV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaSpeculativeCommitV1;
@@ -58,7 +60,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 
-/** K7 fenced prior-run recovery with cumulative tail bounds and native-election-limited adoption. */
+/**
+ * K7 fenced prior-run recovery with cumulative tail bounds and adoption from an immutable closed native-owner run set.
+ */
 public final class KafkaBookKeeperTakeoverRecoveryV1 {
     private final BookKeeperCellSession session;
     private final KafkaRecoveryBatchProtocolAdapterV1 protocolAdapter;
@@ -133,6 +137,21 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                 });
     }
 
+    /** Used only after the closed-history coordinator has fenced every legally admitted run. */
+    CompletionStage<KafkaBookKeeperRecoveryResultV1> recoverFenced(
+            KafkaBookKeeperRecoveryRequestV1 request, RunLedgerRecoveryProofV1 proof) {
+        if (!proof.handle().equals(request.handle())) {
+            throw new IllegalArgumentException("fenced proof belongs to another run");
+        }
+        if (request.selectedRoot()
+                .recoveryCut()
+                .filter(cut -> cut.recoveredLastAddConfirmed() != proof.lastAddConfirmed())
+                .isPresent()) {
+            throw new IllegalArgumentException("native ledger changed after the persisted fenced recovery cut");
+        }
+        return selectCheckpoint(new Context(request, proof.lastAddConfirmed(), nanoTime.getAsLong()));
+    }
+
     private CompletionStage<KafkaBookKeeperRecoveryResultV1> selectCheckpoint(Context context) {
         OptionalLong hint = context.request.hintedCheckpointEntryId();
         if (hint.isEmpty() || hint.getAsLong() > context.lastAddConfirmed) {
@@ -154,8 +173,17 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                         if (checkpoint.runBinding().equals(context.request.runBinding())
                                 && state.vector().isAlignedCompoundCheckpoint()
                                 && coveredThrough >= context.request.kafkaStartOffset()
-                                && coveredThrough
-                                        <= context.request.electionBoundary().electionAdoptableEndOffset()) {
+                                && (context.request
+                                                .selectedRoot()
+                                                .root()
+                                                .kafkaEndOffsetExclusive()
+                                                .isEmpty()
+                                        || coveredThrough
+                                                <= context.request
+                                                        .selectedRoot()
+                                                        .root()
+                                                        .kafkaEndOffsetExclusive()
+                                                        .getAsLong())) {
                             context.protocolState = state;
                             context.physicalRecoveredEndOffset = coveredThrough;
                             context.nextPhysicalOffset = coveredThrough;
@@ -198,8 +226,20 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                         OptionalLong.of(0),
                         "RUN_HEADER failed exact identity or NBKE2 validation"));
             }
-            context.protocolState = KafkaProtocolCheckpointStateV1.empty(
-                    context.request.runBinding(), context.request.kafkaStartOffset());
+            context.protocolState = context.request
+                    .precedingState()
+                    .map(previous -> new KafkaProtocolCheckpointStateV1(
+                            new KafkaRecoveryCheckpointVectorV1(
+                                    context.request.runBinding(),
+                                    context.request.kafkaStartOffset(),
+                                    context.request.kafkaStartOffset(),
+                                    context.request.kafkaStartOffset(),
+                                    context.request.kafkaStartOffset()),
+                            previous.producerState(),
+                            previous.transactionState(),
+                            previous.leaderEpochIndex()))
+                    .orElseGet(() -> KafkaProtocolCheckpointStateV1.empty(
+                            context.request.runBinding(), context.request.kafkaStartOffset()));
             context.physicalRecoveredEndOffset = context.request.kafkaStartOffset();
             context.nextPhysicalOffset = context.request.kafkaStartOffset();
             return scan(context, 1);
@@ -237,15 +277,8 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                 return completed(finish(context));
             }
             if (frame instanceof Nbke2DataV1 data) {
-                DataAcceptance acceptance = acceptData(context, entryId, data);
-                if (acceptance == DataAcceptance.ELECTION_BOUNDARY_SPLITS_BATCH) {
-                    return completed(failure(
-                            context.request,
-                            KafkaBookKeeperRecoveryOutcomeV1.ELECTION_BOUNDARY_NOT_BATCH_ALIGNED,
-                            context.progress,
-                            OptionalLong.of(entryId),
-                            "native election boundary splits one complete RecordBatch group"));
-                }
+                DataAcceptance acceptance = acceptData(
+                        context, entryId, read.entry().orElseThrow().payload().length(), data);
                 if (acceptance == DataAcceptance.CONFLICT) {
                     context.conflictEntryId = OptionalLong.of(entryId);
                     return completed(finish(context));
@@ -278,7 +311,7 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
         });
     }
 
-    private DataAcceptance acceptData(Context context, long entryId, Nbke2DataV1 data) {
+    private DataAcceptance acceptData(Context context, long entryId, long encodedBytes, Nbke2DataV1 data) {
         try {
             KafkaNativeAssignedRecordBatchV1 batch = KafkaNativeAssignedRecordBatchV1.validate(
                     KafkaRawAssignedRecordBatchFactsV1.parse(data.rawAssignedRecordBatch()));
@@ -310,6 +343,13 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
             }
             group.payloadDigest.update(data.rawAssignedRecordBatch().toByteArray());
             group.batches.add(new KafkaAssignedProtocolBatchV1(data.baseOffset(), data.endOffsetExclusive(), delta));
+            group.locators.add(new KafkaBookKeeperDataLocatorV1(
+                    data.baseOffset(),
+                    data.endOffsetExclusive(),
+                    entryId,
+                    data.memberOrdinal(),
+                    data.rawAssignedRecordBatch().length()));
+            group.encodedBytes = Math.addExact(group.encodedBytes, encodedBytes);
             group.nextOffset = data.endOffsetExclusive();
             if (data.memberOrdinal() != data.memberCount() - 1) {
                 return DataAcceptance.ACCEPTED;
@@ -324,31 +364,37 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                             .equals(Sha256Digest.copyOf(group.payloadDigest.digest()))) {
                 return DataAcceptance.CONFLICT;
             }
-            long adoptable = context.request.electionBoundary().electionAdoptableEndOffset();
-            if (adoptable > group.startOffset && adoptable < group.nextOffset) {
-                return DataAcceptance.ELECTION_BOUNDARY_SPLITS_BATCH;
-            }
             context.physicalRecoveredEndOffset = group.nextOffset;
             context.nextPhysicalOffset = group.nextOffset;
-            if (group.nextOffset <= adoptable) {
-                KafkaSpeculativeCommitV1 commit = new KafkaSpeculativeCommitV1(
-                        group.startOffset, group.nextOffset, context.request.recoveredStateFence(), group.batches);
-                KafkaCommittedProducerStateV1 producers =
-                        context.protocolState.producerState().apply(commit);
-                KafkaTransactionStateV1 transactions =
-                        context.protocolState.transactionState().apply(commit);
-                KafkaLeaderEpochIndexV1 leaderEpochs = context.protocolState
-                        .leaderEpochIndex()
-                        .observe(context.request.runBinding().kafkaLeaderEpoch(), group.startOffset);
-                KafkaRecoveryCheckpointVectorV1 vector = new KafkaRecoveryCheckpointVectorV1(
-                        context.request.runBinding(),
-                        group.nextOffset,
-                        group.nextOffset,
-                        group.nextOffset,
-                        group.nextOffset);
-                context.protocolState =
-                        new KafkaProtocolCheckpointStateV1(vector, producers, transactions, leaderEpochs);
-            }
+            KafkaSpeculativeCommitV1 commit = new KafkaSpeculativeCommitV1(
+                    group.startOffset, group.nextOffset, context.request.recoveredStateFence(), group.batches);
+            KafkaCommittedProducerStateV1 producers =
+                    context.protocolState.producerState().apply(commit);
+            KafkaTransactionStateV1 transactions =
+                    context.protocolState.transactionState().apply(commit);
+            KafkaLeaderEpochIndexV1 leaderEpochs = context.protocolState
+                    .leaderEpochIndex()
+                    .observe(context.request.runBinding().kafkaLeaderEpoch(), group.startOffset);
+            KafkaRecoveryCheckpointVectorV1 vector = new KafkaRecoveryCheckpointVectorV1(
+                    context.request.runBinding(),
+                    group.nextOffset,
+                    group.nextOffset,
+                    group.nextOffset,
+                    group.nextOffset);
+            context.protocolState = new KafkaProtocolCheckpointStateV1(vector, producers, transactions, leaderEpochs);
+            context.locators.add(new KafkaBookKeeperActiveTailLocatorV1(
+                    group.startOffset,
+                    group.nextOffset,
+                    context.request.runBinding(),
+                    context.request.handle(),
+                    group.firstEntryId,
+                    entryId,
+                    group.memberCount,
+                    group.encodedBytes,
+                    descriptor.aggregateAssignedPayloadSha256(),
+                    group.appendGroupId,
+                    group.storageAttemptId,
+                    group.locators));
             context.pendingGroup = null;
             return DataAcceptance.ACCEPTED;
         } catch (RuntimeException invalidData) {
@@ -357,44 +403,42 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
     }
 
     private KafkaBookKeeperRecoveryResultV1 finish(Context context) {
-        long adoptable = context.request.electionBoundary().electionAdoptableEndOffset();
-        if (context.physicalRecoveredEndOffset < adoptable) {
+        var sealedEnd = context.request.selectedRoot().root().kafkaEndOffsetExclusive();
+        var persistedCut = context.request.selectedRoot().recoveryCut();
+        boolean cutMatches = persistedCut
+                .map(cut -> cut.recoveredLastAddConfirmed() == context.lastAddConfirmed
+                        && cut.inertFromEntryId().equals(context.conflictEntryId))
+                .orElse(context.conflictEntryId.isEmpty());
+        if (sealedEnd.isPresent() && (sealedEnd.getAsLong() != context.physicalRecoveredEndOffset || !cutMatches)) {
             return failure(
                     context,
-                    KafkaBookKeeperRecoveryOutcomeV1.PHYSICAL_SHORTFALL,
+                    KafkaBookKeeperRecoveryOutcomeV1.SEALED_END_MISMATCH,
                     context.progress,
                     context.conflictEntryId,
-                    "verified physical candidate ends before the native election boundary");
+                    "closed sealed run differs from its verified complete prefix");
         }
-        if (!context.request.electionBoundary().appliedThroughAdoptableBoundary()) {
+        if (context.protocolState.vector().recoveryCoveredThrough() != context.physicalRecoveredEndOffset) {
             return failure(
                     context,
-                    KafkaBookKeeperRecoveryOutcomeV1.REPLICA_APPLIED_SHORTFALL,
+                    KafkaBookKeeperRecoveryOutcomeV1.PROTOCOL_STATE_CONFLICT,
                     context.progress,
                     context.conflictEntryId,
-                    "elected replica has not applied through its native adoption boundary");
+                    "protocol state does not cover the legal continuous prefix");
         }
-        if (context.protocolState.vector().recoveryCoveredThrough() != adoptable) {
-            return failure(
-                    context,
-                    KafkaBookKeeperRecoveryOutcomeV1.ELECTION_BOUNDARY_NOT_BATCH_ALIGNED,
-                    context.progress,
-                    context.conflictEntryId,
-                    "recovered protocol components do not end at the native election boundary");
-        }
-        boolean residue = context.physicalRecoveredEndOffset > adoptable || context.conflictEntryId.isPresent();
+        boolean residue = context.conflictEntryId.isPresent();
         return new KafkaBookKeeperRecoveryResultV1(
                 residue
                         ? KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_WITH_INERT_RESIDUE
                         : KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_EXACT,
                 context.physicalRecoveredEndOffset,
-                OptionalLong.of(Math.min(context.physicalRecoveredEndOffset, adoptable)),
+                OptionalLong.of(context.physicalRecoveredEndOffset),
                 Optional.of(context.protocolState),
+                context.locators,
                 context.progress,
                 context.conflictEntryId,
                 residue
-                        ? "later physical bytes are inert old-epoch residue"
-                        : "physical and native election cuts agree");
+                        ? "incomplete or conflicting suffix is inert in the closed owner history"
+                        : "complete contiguous prefix recovered from the closed owner history");
     }
 
     private CompletionStage<RecoveryRead> read(Context context, long entryId) {
@@ -494,6 +538,7 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                 request.kafkaStartOffset(),
                 OptionalLong.empty(),
                 Optional.empty(),
+                List.of(),
                 progress,
                 conflictEntryId,
                 detail);
@@ -510,6 +555,7 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
                 context.physicalRecoveredEndOffset,
                 OptionalLong.empty(),
                 Optional.empty(),
+                List.of(),
                 progress,
                 conflictEntryId,
                 detail);
@@ -521,8 +567,7 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
 
     private enum DataAcceptance {
         ACCEPTED,
-        CONFLICT,
-        ELECTION_BOUNDARY_SPLITS_BATCH
+        CONFLICT
     }
 
     private static final class Context {
@@ -533,6 +578,7 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
         private final Set<Long> absentEntries = new HashSet<>();
         private KafkaBookKeeperRecoveryProgressV1 progress = KafkaBookKeeperRecoveryProgressV1.ZERO;
         private KafkaProtocolCheckpointStateV1 protocolState;
+        private final List<KafkaBookKeeperActiveTailLocatorV1> locators = new ArrayList<>();
         private long physicalRecoveredEndOffset;
         private long nextPhysicalOffset;
         private OptionalLong ignoredCheckpointEntryId = OptionalLong.empty();
@@ -556,6 +602,8 @@ public final class KafkaBookKeeperTakeoverRecoveryV1 {
         private final Id128 storageAttemptId;
         private final MessageDigest payloadDigest;
         private final List<KafkaAssignedProtocolBatchV1> batches = new ArrayList<>();
+        private final List<KafkaBookKeeperDataLocatorV1> locators = new ArrayList<>();
+        private long encodedBytes;
         private long nextOffset;
 
         private PendingGroup(

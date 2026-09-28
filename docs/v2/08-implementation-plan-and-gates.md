@@ -9,6 +9,93 @@ sourceTuple: v2-m1
 
 # Implementation plan and gates
 
+## NSIP-1 first batch
+
+[NSIP-1](NSIP/nsip-1.md) currently governs BK T1/T2/T3: RF=1/minISR=1, shared coherent HW/LSO and cold takeover
+from immutable closed Owner history. Local publication/admission tests and focused real BK/Oxia multi-run,
+transaction, crash-successor and composed partition commit/Fetch across two cold recoveries have passed. The native
+Controller has focused sole-assignment relocation tests, including a second failure and no-replacement recovery.
+Storage-only cases use fixture Controller identities; the actual 3-Broker/1-Controller test uses native KRaft assignment
+and Broker request paths. It covers disconnected Produce response/same-offset retry, ongoing transaction/COMMIT,
+persistent group offset, superseded pending recovery and two cold sole-replica relocations over actual BK/Oxia.
+Orphaned native V1 runtime/checkpoint sources and mandatory prefix/readiness configuration have been removed;
+producer-state and Fetch behavior tests now use the V2 path. The normal focused native build passes 286 tests,
+Checkstyle and SpotBugs without temporary source isolation. The normal dedicated real-cluster task and 94 stock
+Partition tests pass; the stock main/test joint compilation also passes without Nereus development inputs.
+Those first-batch results retain their original source scope. The preceding checkpoint/rollover follow-up passed
+336 Kafka BK and 32 storage BK unit tests, 20 native Nereus tests and 65 stock ProducerStateManager regressions,
+with applicable checks; stock main/test compilation also passed without Nereus development inputs. The current
+repeated-takeover fix reruns 336 Kafka BK tests, all 13 real BK/Oxia run-root cases and both normal native cluster
+cases without failures/errors/skips, with format, Checkstyle and the native task's required SpotBugs checks. The real storage case writes 40 DATA batches across more than ten
+8-entry/8-KiB runs, restores checkpoint end 39 with three charged tail entry reads, fetches old runs, and verifies
+PID retry, cross-checkpoint ongoing transactions, COMMIT/ABORT and another takeover. Actual checkpoint/close/attach
+UNKNOWN cuts stop allocation and preserve ACKed DATA. The repeated-takeover follow-up independently exercises
+checkpoint UNKNOWN and close UNKNOWN: Owner 2 commits and closes, then Owner 3 must reuse checkpoint end 3 under
+the same eight-entry/8-KiB envelope, restore HW/LSO=4/4, retry the old batch at offset 2, fetch the original bytes and
+continue Produce. Both real red cases fail before the fix and both green cases pass. Persisted recovery cuts retain
+checkpoint/footer discovery only after exact closed Owner/LAC verification and exclude inert suffixes; DATA probes
+from already covered history are not replay debt. All follow-up suites above pass; the original UNKNOWN method
+is now two independently reported parameter branches, accounting for the increase from 12 to 13 real cases.
+The native cluster uses the existing minimum 1-MiB ledger
+budget and eight entries, activates actual Owners 256/257 via test-only KRaft PartitionRecord submission, and then
+continues through another Controller relocation. This is not a 257-failover experiment.
+BOOKKEEPER_WAL_ONLY now supports common checkpoint+tail recovery and same-Owner rollover. Covered entry/byte debt
+is released only after exact checkpoint/index/close/seal/successor installation; all legal history is still fenced
+within the time bound. Current-run create qualification replaces the fixed 256-epoch preallocation. The 1,024
+Owner/run metadata bounds, source protection and checkpoint section caps remain; full retirement is not supplied.
+Wider repository `check` remains blocked by missing Pulsar managed-ledger/testmocks 5.0.0-M1-SNAPSHOT dependencies.
+NSIP-1 T4's first Object batch now implements same-key durable grants/closure, mandatory grant receipts in tracker and
+coherent publication, cumulative pre-offset admission debt, and common NWKCP1 checkpoint plus exact authorized-tail
+recovery. Eight real MinIO/Oxia cases cover lost PUT/grant replies, unavailable reconciliation reads, shared Binding
+closure, crashes before/after grant, checkpoint selection failure, physical rollover and two cold partition-state
+takeovers. The 336 Kafka module unit tests and eight canonical-control metadata tests pass with applicable format and
+Checkstyle checks. These are focused current-workspace results, not a new milestone receipt. Native Object Broker
+activation, full M4/M5/M6 acceptance, complete Kafka compatibility and performance qualification remain outside this
+batch. T4's second batch then removed redundant publication GETs/byte work, and its third batch now reserves physical
+checkpoint capacity before offsets, publishes retained page/Head candidates asynchronously, and protects real I/O with
+short lock cuts and operation leases. Coordination review then found a lost LIST reservation after temporary
+working-set/concurrency rejection. The local repair gives exact candidates short-lock reservation ownership and preserves
+pending full charges across incomplete Provider attempts. The real MinIO/Oxia suite passes 25 cases, including blocked
+page/Head/PUT/Seal, response-loss reconciliation, and exact UNKNOWN retry after a concurrent real read releases its slot.
+The third-batch repair has passed limited coordination acceptance; these remain focused workspace results. The
+subsequent T4 M3 KMS Cell slice moves remote wrap/unwrap and full NWG1 seal/verification outside the shared state lock,
+shares same-key misses under the existing run-slot and active-operation bounds, and rotates private admission
+generations after CLOSED history fills. The pre-Root new-run handle reserves a slot, creates a random key/wrapped
+envelope and transfers only with the exact published Root; uncertain metadata results retain the same candidate.
+A live long-running run continues while seven short runs create new keys and publish beyond the old history capacity.
+Focused cryptographic and real MinIO/Oxia tests verify stored objects by fresh unwrap; this M3 slice passed limited
+coordination acceptance. The KMS transport is local. Native Broker/process wiring and long-running qualification
+remain M6 work after complete M5.
+
+The subsequent NSIP-1 M4-local read slice keeps the frozen read-view/hazard/release contracts and uses the captured
+Kafka root for replica/READ_UNCOMMITTED/READ_COMMITTED bounds. Ordered Kafka/Pulsar route tables now start at the first
+intersecting range and bind physical routes by ordinal to the exact captured cell; BK sequential lookupStepCap is
+calculated once per request/snapshot. A real MinIO/Oxia four-extent read observed eight range GETs and no repeated
+Object identity, so this slice adds no request cache. These focused current-workspace changes passed limited-scope
+coordination review; they neither rewrite the historical M4 Final nor promote M5 or M6 authority.
+
+The subsequent M1–M4 pre-push cleanup removes the uncalled BK Follower descriptor/journal/apply/ISR/election kernel,
+its tests and its inactive replica-default projection. The native BK root verifier retains the same selected recovery
+envelope directly. Current-source Kafka BK tests pass 312/0/0/0; real BK, BK/Oxia run-root, MinIO/Oxia Object and
+native Kafka Controller relocation suites pass 3/0/0/0, 13/0/0/0, 28/0/0/0 and 2/0/0/0 respectively, with the
+applicable format, static and documentation checks. Historical K8/K9/K10 artifacts and Finals remain source-bound;
+this cleanup does not recertify them or complete M5/M6.
+The Build workflow replays `v2M4Check` at its published historical closure commit and runs the affected Object/Kafka/
+Pulsar read modules on current source. The current Pulsar module uses the source-locked
+`nereusstream/pulsar` commit `a14e0e6f4e49be0677318b4ceefc7b85b445823b` as an explicit Gradle composite from
+the runner's temporary directory; the historical M4 worktree has no such dependency. This no longer asks the
+historical evidence-only descendant rule to certify later implementation commits. The existing `m4-final` status
+remains a combined CI job; its success does not make current NSIP source an M4 Final. Real BK/Oxia and MinIO/Oxia
+combinations remain explicit local/source-scoped results; the adjusted workflow has not yet run on GitHub Actions.
+
+Complete the affected M1–M4 implementation, current docs and required checks first; after coordination acceptance,
+organize related commits and make one normal push. T5 completes all existing M5 obligations together with NSIP changes:
+all A–E lifecycle work, native source/owner/offload qualification, M4 RELEASED and real publish/release/delete/UNKNOWN
+combinations. The 17 OPEN/null acceptance items are not closed by focused slices. Only after the whole M5 is accepted
+make its commit/push and continue M6+. Native Object Broker entry and production-process wiring belong to M6 and do
+not delay the M1–M4 commit boundary. The current sub-batch performs no commit/push. The historical receipts below retain
+their original source and semantic boundaries.
+
 ## M5 lifecycle revision execution
 
 [Current M5 contracts](detailed_design/m5/m5-current-contracts.md) and ADR 0148 govern the current implementation.
@@ -176,27 +263,27 @@ remain required; M6-deferred activation rows cannot be promoted by these checks.
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
 | M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **Promotion-derived: implementation and pure-V2 prune are complete; current completion is exactly the trusted N3 receipts/scenario state accepted by `v2M1FinalCheck`** | `v2M1FinalCheck` |
-| M2 | Owner Epoch lane and typed frontier; Kafka BookKeeper per-partition leader-epoch-bound run chain, NBKE2 DATA/control frames, packed RecordBatch range indexes, pre-position reservation, bounded overlapping writes and fenced ordered locator/producer/transaction/leader-epoch publication; distinct Allocated/Durable/LEO/HW/LSO state, native duplicate semantics plus storage-retry digests, speculative producer deltas, profile-neutral checkpoint kernel with BK implementation, compact follower-descriptor/Observed/Applied/election-adoption primitives with hard journal/source/apply-lag eligibility, targeted floor+coverage+successor Fetch, delayed-wakeup seam, sequential cursor, bounded suffix recovery, async-Object source switch, and 10k/100k evidence; Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence; ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy | **Promotion-derived: the global current-source receipt binds exact Kafka/Pulsar Final child roots and the disjoint 21-scenario union accepted by `v2M2Check`; M3 Object WAL, M6 process activation, M8 parity, and mixed/downstream rows remain excluded** | `v2M2Check` |
-| M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority, exact per-commit Kafka leader epoch, and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; separate bounded Root-bound NWKCP1 Kafka protocol-checkpoint family selected by an independent publisher-fenced OPEN/TERMINAL Head; one publisher-epoch-fenced physical vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated fenced active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | **CLOSED / hard-frozen. Exact common tested source `e5e53e62865c21845621037bea5f18c092bd4259` binds `RANGE_SELECTED(RANGE_64)`, eleven child receipts, 26 promoted scenarios, and immutable Final SHA-256 `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M6 process activation and M8 native parity remain excluded.** | `v2M3Check` |
-| M4 | allocation-free Binding-scoped logical `BindingReadViewSnapshot`; deterministic typed protocol/profile source plan and one-shot pre-observability fallback; bounded generation-tagged hazard slots with stable conservative scanning and ABA-safe terminal drain; fused selector/terminal/proof-window/fold/capability control; exact per-source interval verification and protection-generation release CAS; four-child evidence hierarchy; no physical deletion | **CLOSED. Exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` binds four children, the evidence-selected physical/capability choices, five M4-only scenario promotions, and current immutable Final SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`. M5 physical deletion, M6 process activation, M8 native parity, and production deployment authority remain excluded.** | `v2M4Check` |
+| M2 | Original source-bound BK/Pulsar storage primitives, NBKE2, coherent producer/transaction/locator publication, targeted read and bounded checkpoint-tail recovery; the original Kafka Follower descriptor/Observed/Applied kernel is superseded by NSIP-1 shared commit and cold Owner takeover | Historical M2 Final remains bound to its exact tested source. Current BK T2/T3 single-Owner path has separate limited-scope native BK/Controller acceptance; the old Follower kernel is absent from current source | Historical `v2M2Check`; current NSIP checks |
+| M3 | Original NWG1 Object WAL, Root-bound NWKCP1, publication and recovery; NSIP-1 adds exact persistent authorization, closed Owner history, asynchronous physical checkpoint and KMS Cell lock/lease correction | Historical M3 Final retains its exact-source scope. Current NSIP Object core and KMS slice have limited-scope real MinIO/Oxia coordination acceptance; native Object Broker/process wiring remains M6 | Historical `v2M3Check`; current NSIP checks |
+| M4 | Original Binding read view, source planning, generation hazards, exact interval verification and protection release; NSIP-1 adapts Kafka HW/LSO from the captured root, direct Kafka/Pulsar ordered route lookup, and BK per-snapshot lookup statistics | Historical M4 Final retains exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` and its five M4-only scenario promotions. Current NSIP M4-local read adaptation has separate limited-scope acceptance; complete M5 release/delete and native Object process work remain outside it | Historical `v2M4Check`; current NSIP checks |
 | M5 | deterministic materialization with Object-WAL reuse/index-only/rewrite selection; immutable generation and selector publication; Kafka-semantic compaction plus complete index rebuild; typed logical retention and exact reference-free proof; consume exact `RELEASED`; irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction and final Pulsar aggregate tombstone; final provider/source revalidation; per-Cell admission/isolation; conditional Object, root/data/multipart, BookKeeper, orphan, and GC execution | **IMPLEMENTATION IN PROGRESS. Design commit `c86fde3e` is hard-frozen. M5-A materialization/publication passes `v2M5MaterializationCheck`; M5-B real Kafka magic-v2 semantic rewriting and complete index rebuild passes `v2M5KafkaCompactionCheck`; M5-C Binding/Pulsar permanent metadata retirement passes source-locked real Oxia execution in `v2M5RetentionRetirementCheck`. Focused M5-D version-matched Object, exact sealed-ledger BookKeeper, pure orphan/per-Cell admission, Pulsar root-before-data ordering, and exact multipart cores pass non-promotable gates. ADR 0147 accepts target-scoped authority; `v2M5TargetDeleteAuthorityFoundationCheck` proves its pure `M5DA` model, and `v2M5TargetDeleteAuthorityCoordinatorCheck` proves exact same-key CAS reconciliation plus a durable writer-ticket guard in memory. Configured native Oxia/BK routes, bounded history, guarded task terminals, compact done and durable GC quota pass additional focused checks; complete native namespace/all-writer admission and external deletion composition remain outstanding, so no live delete authority exists. The complete M5-D gate and all five source-bound evidence children remain NotRun; all 17 M5 rows remain `PLANNED`, and physical deletion is not authorized.** | future `v2M5Check` |
-| M6 | Kafka/Pulsar broker/controller process integration; native Kafka Produce/Fetch/Admin, replica-Fetch compact descriptor transport, durable observation journal, hard-bounded Observed/Applied ISR eligibility, native election adoption, ISR/minISR/HW/LSO, delayed-Fetch purgatory, native duplicate/error semantics, transactions/control markers, leader-epoch truncation, restart/catch-up/snapshot, and protocol compatibility evidence over the M1/M2/M3 authorities; Pulsar native process integration | Planned | `v2M6Check` |
+| M6 | Kafka/Pulsar broker/controller process integration: completed minimal native BK Controller reassignment and cold recovery slice; remaining native Object Broker entry/process wiring, wider Kafka request/coordinator compatibility, process drain and native Pulsar integration | Planned beyond the accepted minimal BK slice; no mandatory logical Follower observation, journal, ISR eligibility or election-adoption mode | Future `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 
-M0, M1, M2, M3, and M4 are closed by their respective aggregate evidence. M5 detailed design is hard-frozen and its
-M5-A, M5-B, and M5-C implementation gates are complete and non-promotable; M5-D and current-source evidence have not
-run. M3's current closure is the immutable e5 Final
-identified below; its historical diagnostics and earlier Finals remain history rather than alternate current
-authority. The [M4 index](detailed_design/m4/README.md) and
+M0–M4 each retain their original exact-source aggregate evidence. NSIP-1 changes to M1–M4 have separate limited-scope
+validation and are not retroactively included in those Finals. M5 detailed design is hard-frozen; its M5-A/B/C
+implementation gates are non-promotable, and complete M5-D/current-source evidence has not run. The original M3
+closure is the immutable e5 Final at its tested source, not an alternate current-source authority. The
+[M4 index](detailed_design/m4/README.md) and
 [M4-A read-view authority](detailed_design/m4/m4-a-read-view-authority.md) and
 [M4-B typed source plan](detailed_design/m4/m4-b-source-plan-and-fallback.md), followed by
 [M4-C hazard/reclamation races](detailed_design/m4/m4-c-hazard-slot-reclamation.md) and
 [M4-D evidence ownership/freeze](detailed_design/m4/m4-d-evidence-ownership-and-freeze.md), hard-freeze the design
 boundary without claiming implementation, scenario promotion, receipt, or Final. The later M4 implementation and
 evidence tooling do not amend those frozen inputs. `v2M4DesignCheck` remains explicitly non-promotable;
-`v2M4Check` is authoritative after its four exact-source children and current immutable Final are published and
-synchronized.
+`v2M4Check` was authoritative at its four-child tested source and immutable Final; the later NSIP-1 M4-local read
+adaptation is reported separately.
 
 The [M5 index](detailed_design/m5/README.md),
 [M5-I0 implementation-input closure](detailed_design/m5/m5-i0-implementation-input-closure.md),

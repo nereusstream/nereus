@@ -63,17 +63,17 @@ public final class KafkaObjectBindingReadAdapterV1 {
                 throw new IllegalArgumentException("Kafka M4 logical and physical route counts differ");
             }
             for (int index = 0; index < routes.size(); index++) {
-                if (!routes.route(index).equals(physicalRoutes.get(index).route())) {
+                if (routes.route(index) != physicalRoutes.get(index).route()) {
                     throw new IllegalArgumentException("Kafka M4 logical and physical route order differs");
                 }
             }
         }
 
-        public PhysicalRoute requirePhysical(BindingReadRouteV1 route) {
-            return physicalRoutes.stream()
-                    .filter(candidate -> candidate.route().equals(route))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("planned Kafka route is absent from read cell"));
+        public PhysicalRoute requirePhysical(int ordinal, BindingReadRouteV1 route) {
+            if (ordinal < 0 || ordinal >= physicalRoutes.size() || routes.route(ordinal) != route) {
+                throw new IllegalArgumentException("planned Kafka route is absent from captured read cell");
+            }
+            return physicalRoutes.get(ordinal);
         }
     }
 

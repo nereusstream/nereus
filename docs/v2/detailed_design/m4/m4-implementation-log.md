@@ -160,3 +160,17 @@ The current immutable
 SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`. It closes
 `V2-OPEN-READ-08/09` and promotes exactly `V2-READ-001/003/004/005/007`. `V2-READ-002` and shared
 `V2-READ-006/008..015` remain `PLANNED` with null receipts. M5 physical deletion remains outside M4.
+
+## NSIP-1 post-Final M4-local read adaptation
+
+The current uncommitted NSIP-1 slice preserves the frozen hazard, source-purity, fallback and release contracts. Kafka
+Object reads now derive replica/HW/LSO bounds from their own captured coherent root; Kafka and Pulsar ordered route
+tables start at the first intersecting interval and bind the physical route by ordinal and route-reference identity to that
+captured cell. An accepted Kafka read keeps its old generation pin through actual provider completion after refresh,
+while a new read captures the successor. BK sequential reads compute the unchanged overflow-checked lookup step cap
+once per request/snapshot. A real MinIO/Oxia four-extent read used eight range GETs with no repeated Object extent,
+so this slice adds no request cache. A null extent-reader completion fails while closing its read pin.
+At this slice's acceptance, Object/Kafka/Pulsar unit suites passed 533/342/150 cases, and the focused real
+MinIO/Oxia request passed 1/0/0/0. Subsequent pre-push removal of obsolete Follower tests leaves the current Kafka
+module at 312/0/0/0; Object/Pulsar sources in this slice were unchanged. This slice passed limited-scope coordination
+review; the exact-source Final above is historical and has not been regenerated or promoted for this source.

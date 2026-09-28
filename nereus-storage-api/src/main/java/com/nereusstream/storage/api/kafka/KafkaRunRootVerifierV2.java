@@ -22,4 +22,10 @@ public interface KafkaRunRootVerifierV2 {
     Sha256Digest capabilitySha256();
 
     CompletionStage<Void> requireNative(KafkaRunRootRecordV2 root);
+
+    /** Independently verifies the fixed native closed ledger and complete continuous prefix in a crash cut. */
+    default CompletionStage<Void> requireRecovered(KafkaRunRootRecordV2 root, KafkaOwnerAdmissionV1 closedOwner) {
+        return java.util.concurrent.CompletableFuture.failedFuture(
+                new UnsupportedOperationException("native crash-run prefix verification is unavailable"));
+    }
 }

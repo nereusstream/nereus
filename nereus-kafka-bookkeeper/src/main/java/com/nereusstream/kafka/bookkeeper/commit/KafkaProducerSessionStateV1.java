@@ -24,16 +24,22 @@ public record KafkaProducerSessionStateV1(
         short producerEpoch,
         int lastSequence,
         long lastOffset,
-        List<KafkaProducerBatchResultV1> recentBatches) {
+        List<KafkaProducerBatchResultV1> recentBatches,
+        int coordinatorEpoch,
+        long lastMarkerOffset,
+        long lastTimestamp) {
     public static final int MAX_RECENT_BATCHES = 5;
 
     public KafkaProducerSessionStateV1 {
         recentBatches = List.copyOf(Objects.requireNonNull(recentBatches, "recentBatches"));
         if (producerId < 0
                 || producerEpoch < 0
-                || lastSequence < 0
-                || lastOffset < 0
-                || recentBatches.isEmpty()
+                || lastSequence < -1
+                || lastOffset < -1
+                || coordinatorEpoch < -1
+                || lastMarkerOffset < -1
+                || (coordinatorEpoch == -1) != (lastMarkerOffset == -1)
+                || recentBatches.isEmpty() != (lastSequence == -1 && lastOffset == -1)
                 || recentBatches.size() > MAX_RECENT_BATCHES) {
             throw new IllegalArgumentException("committed producer session is outside its bounded domain");
         }
@@ -44,12 +50,42 @@ public record KafkaProducerSessionStateV1(
             }
             previousEnd = batch.endOffsetExclusive();
         }
-        KafkaProducerBatchResultV1 last = recentBatches.get(recentBatches.size() - 1);
-        if (last.identity().producerEpoch() != producerEpoch
-                || last.identity().lastSequence() != lastSequence
-                || last.endOffsetExclusive() - 1 != lastOffset) {
-            throw new IllegalArgumentException("producer session tail differs from its recent result tail");
+        if (!recentBatches.isEmpty()) {
+            KafkaProducerBatchResultV1 last = recentBatches.get(recentBatches.size() - 1);
+            if (last.identity().producerEpoch() != producerEpoch
+                    || last.identity().lastSequence() != lastSequence
+                    || last.endOffsetExclusive() - 1 != lastOffset) {
+                throw new IllegalArgumentException("producer session tail differs from its recent result tail");
+            }
         }
+    }
+
+    public KafkaProducerSessionStateV1(
+            long producerId,
+            short producerEpoch,
+            int lastSequence,
+            long lastOffset,
+            List<KafkaProducerBatchResultV1> recentBatches,
+            int coordinatorEpoch,
+            long lastMarkerOffset) {
+        this(
+                producerId,
+                producerEpoch,
+                lastSequence,
+                lastOffset,
+                recentBatches,
+                coordinatorEpoch,
+                lastMarkerOffset,
+                -1);
+    }
+
+    public KafkaProducerSessionStateV1(
+            long producerId,
+            short producerEpoch,
+            int lastSequence,
+            long lastOffset,
+            List<KafkaProducerBatchResultV1> recentBatches) {
+        this(producerId, producerEpoch, lastSequence, lastOffset, recentBatches, -1, -1);
     }
 
     public static KafkaProducerSessionStateV1 first(KafkaProducerBatchResultV1 result) {
@@ -62,19 +98,31 @@ public record KafkaProducerSessionStateV1(
                 identity.producerEpoch(),
                 identity.lastSequence(),
                 result.endOffsetExclusive() - 1,
-                List.of(result));
+                List.of(result),
+                -1,
+                -1,
+                result.maxTimestamp());
     }
 
     public KafkaProducerSessionStateV1 append(KafkaProducerBatchResultV1 result) {
         KafkaBatchDuplicateIdentityV1 identity = result.identity();
-        if (identity.producerId() != producerId || result.startOffset() <= lastOffset) {
+        if (identity.producerId() != producerId || result.startOffset() <= Math.max(lastOffset, lastMarkerOffset)) {
             throw new IllegalArgumentException("producer result changes identity or regresses offsets");
         }
         if (identity.producerEpoch() < producerEpoch) {
             throw new IllegalArgumentException("producer epoch regresses");
         }
         if (identity.producerEpoch() > producerEpoch) {
-            return first(result);
+            var first = first(result);
+            return new KafkaProducerSessionStateV1(
+                    first.producerId(),
+                    first.producerEpoch(),
+                    first.lastSequence(),
+                    first.lastOffset(),
+                    first.recentBatches(),
+                    coordinatorEpoch,
+                    lastMarkerOffset,
+                    result.maxTimestamp());
         }
         int expectedSequence = lastSequence == Integer.MAX_VALUE ? 0 : lastSequence + 1;
         if (identity.baseSequence() != expectedSequence) {
@@ -86,6 +134,38 @@ public record KafkaProducerSessionStateV1(
             recent.remove(0);
         }
         return new KafkaProducerSessionStateV1(
-                producerId, producerEpoch, identity.lastSequence(), result.endOffsetExclusive() - 1, recent);
+                producerId,
+                producerEpoch,
+                identity.lastSequence(),
+                result.endOffsetExclusive() - 1,
+                recent,
+                coordinatorEpoch,
+                lastMarkerOffset,
+                result.maxTimestamp());
+    }
+
+    public KafkaProducerSessionStateV1 marker(short epoch, int coordinator, long offset) {
+        return marker(epoch, coordinator, offset, -1);
+    }
+
+    public KafkaProducerSessionStateV1 marker(short epoch, int coordinator, long offset, long timestamp) {
+        if (epoch < producerEpoch
+                || coordinator < coordinatorEpoch
+                || offset <= Math.max(lastOffset, lastMarkerOffset)) {
+            throw new IllegalArgumentException("transaction marker producer or coordinator epoch regresses");
+        }
+        return epoch == producerEpoch
+                ? new KafkaProducerSessionStateV1(
+                        producerId, epoch, lastSequence, lastOffset, recentBatches, coordinator, offset, timestamp)
+                : markerOnly(producerId, epoch, coordinator, offset, timestamp);
+    }
+
+    public static KafkaProducerSessionStateV1 markerOnly(long producerId, short epoch, int coordinator, long offset) {
+        return markerOnly(producerId, epoch, coordinator, offset, -1);
+    }
+
+    public static KafkaProducerSessionStateV1 markerOnly(
+            long producerId, short epoch, int coordinator, long offset, long timestamp) {
+        return new KafkaProducerSessionStateV1(producerId, epoch, -1, -1, List.of(), coordinator, offset, timestamp);
     }
 }

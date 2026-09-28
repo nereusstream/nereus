@@ -44,11 +44,10 @@ final class KafkaCheckpointTestFixtures {
 
     static KafkaProtocolCheckpointStateV1 richState() {
         KafkaBatchDuplicateIdentityV1 dataIdentity = new KafkaBatchDuplicateIdentityV1(71, (short) 0, 0, 0);
-        KafkaBatchDuplicateIdentityV1 abortIdentity = new KafkaBatchDuplicateIdentityV1(71, (short) 0, 1, 1);
         KafkaProtocolBatchDeltaV1 data = new KafkaProtocolBatchDeltaV1(
                 1, Optional.of(dataIdentity), KafkaTransactionBatchKindV1.TRANSACTIONAL_DATA, 71, -1);
-        KafkaProtocolBatchDeltaV1 abort = new KafkaProtocolBatchDeltaV1(
-                1, Optional.of(abortIdentity), KafkaTransactionBatchKindV1.ABORT_MARKER, 71, 3);
+        KafkaProtocolBatchDeltaV1 abort =
+                KafkaProtocolBatchDeltaV1.marker(KafkaTransactionBatchKindV1.ABORT_MARKER, 71, (short) 0, 3);
         KafkaSpeculativeCommitV1 commit = new KafkaSpeculativeCommitV1(
                 100,
                 102,

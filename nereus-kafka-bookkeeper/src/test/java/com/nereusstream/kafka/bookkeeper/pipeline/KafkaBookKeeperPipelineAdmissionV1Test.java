@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.bookkeeper.pipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaRunTestFixtures;
 import java.util.ArrayList;
@@ -43,6 +44,64 @@ class KafkaBookKeeperPipelineAdmissionV1Test {
 
         assertThat(sawReservations).isTrue();
         assertThat(result.outcome()).isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+    }
+
+    @Test
+    void nativeAdmissionReservesOnceAndReleasesWhenValidationReturnsBeforeAssignment() {
+        Context context = context(1, 10, 10_000);
+        var plan = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
+        try (var admission = context.pipeline.reserveAdmission(plan.request()).orElseThrow()) {
+            assertThat(context.partition.snapshot().groups()).isEqualTo(1);
+            assertThat(context.pipeline.reserveAdmission(plan.request())).isEmpty();
+            assertThat(context.pipeline
+                            .submit(plan.request(), plan::assignment, KafkaAppendProtocolHooksV1.none(), admission)
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+        }
+        assertThat(context.partition.snapshot().groups()).isZero();
+        assertThat(context.global.snapshot().groups()).isZero();
+        try (var unused = context.pipeline.reserveAdmission(plan.request()).orElseThrow()) {
+            assertThat(context.partition.snapshot().groups()).isEqualTo(1);
+        }
+        assertThat(context.partition.snapshot().groups()).isZero();
+        assertThat(context.global.snapshot().groups()).isZero();
+        assertThat(context.pipeline.speculativeEndOffset()).isEqualTo(101);
+    }
+
+    @Test
+    void convertedNativeAppendConsumesOnlyWithinItsPreOffsetUpperBound() {
+        Context context = context(1, 10, 10_000);
+        var plan = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
+        var upper = new KafkaAppendAdmissionRequestV1(2, plan.request().encodedDataBytes() + 500);
+        try (var admission = context.pipeline.reserveAdmission(upper).orElseThrow()) {
+            assertThat(context.partition.snapshot().entries()).isEqualTo(2);
+            assertThat(context.pipeline
+                            .submit(plan.request(), plan::assignment, KafkaAppendProtocolHooksV1.none(), admission)
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+        }
+        assertThat(context.partition.snapshot().entries()).isZero();
+        assertThat(context.global.snapshot().bytes()).isZero();
+        assertThat(context.pipeline.committedEndOffset()).isEqualTo(101);
+    }
+
+    @Test
+    void foreignNativeAdmissionIsRejectedWithoutClosingItsOwnersCapacity() {
+        Context owner = context(1, 10, 10_000);
+        Context other = context(1, 10, 10_000);
+        var plan = KafkaPipelineTestFixtures.plan(owner.lifecycle, 1, 100);
+        try (var admission = owner.pipeline.reserveAdmission(plan.request()).orElseThrow()) {
+            assertThatThrownBy(() -> other.pipeline.submit(
+                            plan.request(), plan::assignment, KafkaAppendProtocolHooksV1.none(), admission))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(owner.partition.snapshot().groups()).isEqualTo(1);
+            assertThat(other.pipeline.speculativeEndOffset()).isEqualTo(100);
+        }
+        assertThat(owner.partition.snapshot().groups()).isZero();
     }
 
     @Test

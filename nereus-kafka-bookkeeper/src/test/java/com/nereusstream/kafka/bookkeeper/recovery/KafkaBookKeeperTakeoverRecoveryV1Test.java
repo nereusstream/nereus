@@ -32,14 +32,14 @@ import org.junit.jupiter.api.Test;
 
 class KafkaBookKeeperTakeoverRecoveryV1Test {
     @Test
-    void recoversACompletePhysicalTailAtTheExactNativeElectionBoundary() {
+    void recoversTheCompletePrefixFromTheClosedOwnerRunSet() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
         KafkaRecoveryTestFixtures.installGroup(session, 2, 101, 1);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 102, 102, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
@@ -55,7 +55,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
     }
 
     @Test
-    void quarantinesCompleteOldEpochBytesBeyondTheElectionBoundary() {
+    void adoptsCompleteUnacknowledgedTailWithinTheClosedOwnerRunSet() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
@@ -63,15 +63,15 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         KafkaRecoveryTestFixtures.installGroup(session, 3, 102, 1);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 102, 102, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
-        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_WITH_INERT_RESIDUE);
+        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_EXACT);
         assertThat(result.physicalRecoveredEndOffset()).isEqualTo(103);
-        assertThat(result.newLeaderLeo()).hasValue(102);
+        assertThat(result.newLeaderLeo()).hasValue(103);
         assertThat(result.recoveredProtocolState().orElseThrow().vector().recoveryCoveredThrough())
-                .isEqualTo(102);
+                .isEqualTo(103);
     }
 
     @Test
@@ -83,7 +83,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         KafkaRecoveryTestFixtures.installGroup(session, 3, 101, 1);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 102, 102, OptionalLong.of(2)))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.of(2)))
                 .toCompletableFuture()
                 .join();
 
@@ -104,7 +104,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         KafkaRecoveryTestFixtures.installGroup(session, 3, 101, 1);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 102, 102, OptionalLong.of(2)))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.of(2)))
                 .toCompletableFuture()
                 .join();
 
@@ -114,35 +114,41 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
     }
 
     @Test
-    void failsWhenThePhysicalCandidateEndsBeforeTheElectionBoundary() {
+    void failsWhenTheSealedRootPromisesMoreThanThePhysicalPrefix() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 102, 102, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.requestSealed(102, OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
-        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.PHYSICAL_SHORTFALL);
+        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.SEALED_END_MISMATCH);
         assertThat(result.physicalRecoveredEndOffset()).isEqualTo(101);
         assertThat(result.newLeaderLeo()).isEmpty();
     }
 
     @Test
-    void failsUntilTheElectedReplicaHasAppliedThroughItsBoundary() {
-        KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
-        KafkaRecoveryTestFixtures.installHeader(session);
-        KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
-        KafkaRecoveryTestFixtures.installGroup(session, 2, 101, 1);
-
-        KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(102, 101, 102, OptionalLong.empty()))
-                .toCompletableFuture()
-                .join();
-
-        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.REPLICA_APPLIED_SHORTFALL);
-        assertThat(result.newLeaderLeo()).isEmpty();
+    void rejectsAnOpenOwnerCutBeforeAnyStorageIo() {
+        var request = KafkaRecoveryTestFixtures.request(OptionalLong.empty());
+        var open = new com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1(
+                request.closedOwner().scopeSha256(),
+                request.closedOwner().owner(),
+                false,
+                request.closedOwner().previous(),
+                request.closedOwner().runs());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new KafkaBookKeeperRecoveryRequestV1(
+                        request.runBinding(),
+                        request.handle(),
+                        request.kafkaStartOffset(),
+                        request.hintedCheckpointEntryId(),
+                        request.envelope(),
+                        open,
+                        request.selectedRoot(),
+                        request.recoveredStateFence(),
+                        request.precedingState()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -153,11 +159,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
                 .recover(KafkaRecoveryTestFixtures.request(
-                        101,
-                        101,
-                        101,
-                        OptionalLong.empty(),
-                        new KafkaBookKeeperRecoveryEnvelopeV1(1, 1_000_000, 1_000_000)))
+                        OptionalLong.empty(), new KafkaBookKeeperRecoveryEnvelopeV1(1, 1_000_000, 1_000_000)))
                 .toCompletableFuture()
                 .join();
 
@@ -173,7 +175,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
                 .recover(KafkaRecoveryTestFixtures.request(
-                        100, 100, 100, OptionalLong.empty(), new KafkaBookKeeperRecoveryEnvelopeV1(10, 1, 1_000_000)))
+                        OptionalLong.empty(), new KafkaBookKeeperRecoveryEnvelopeV1(10, 1, 1_000_000)))
                 .toCompletableFuture()
                 .join();
 
@@ -188,7 +190,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
                 .recover(KafkaRecoveryTestFixtures.request(
-                        100, 100, 100, OptionalLong.empty(), new KafkaBookKeeperRecoveryEnvelopeV1(10, 1_000_000, 50)))
+                        OptionalLong.empty(), new KafkaBookKeeperRecoveryEnvelopeV1(10, 1_000_000, 50)))
                 .toCompletableFuture()
                 .join();
 
@@ -201,14 +203,14 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         KafkaRunTestFixtures.FakeSession openFailure = new KafkaRunTestFixtures.FakeSession();
         openFailure.openOverride = RunLedgerOpenResultV1.withoutHandle(RunLedgerOpenOutcomeV1.ABSENT);
         KafkaBookKeeperRecoveryResultV1 absent = KafkaRecoveryTestFixtures.engine(openFailure)
-                .recover(KafkaRecoveryTestFixtures.request(100, 100, 100, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
         KafkaRunTestFixtures.FakeSession fenceFailure = new KafkaRunTestFixtures.FakeSession();
         fenceFailure.recoveryOverride = ProviderMutationResultV1.fencedOrConflict();
         KafkaBookKeeperRecoveryResultV1 fenced = KafkaRecoveryTestFixtures.engine(fenceFailure)
-                .recover(KafkaRecoveryTestFixtures.request(100, 100, 100, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
@@ -226,7 +228,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         session.entries.put(0L, CanonicalBytes.copyOf(corrupt));
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(101, 101, 101, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
@@ -241,32 +243,33 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         KafkaRecoveryTestFixtures.installPartialTwoMemberGroup(session, 1, 100);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(101, 101, 101, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
-        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.PHYSICAL_SHORTFALL);
+        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.RECOVERED_WITH_INERT_RESIDUE);
         assertThat(result.physicalRecoveredEndOffset()).isEqualTo(100);
         assertThat(result.conflictEntryId()).hasValue(1);
+        assertThat(result.newLeaderLeo()).hasValue(100);
     }
 
     @Test
-    void refusesANativeElectionBoundaryInsideACompleteBatch() {
+    void refusesASealedRootBoundaryInsideACompleteBatch() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 3);
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(101, 101, 101, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.requestSealed(101, OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
-        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.ELECTION_BOUNDARY_NOT_BATCH_ALIGNED);
+        assertThat(result.outcome()).isEqualTo(KafkaBookKeeperRecoveryOutcomeV1.SEALED_END_MISMATCH);
         assertThat(result.newLeaderLeo()).isEmpty();
     }
 
     @Test
-    void gapAfterTheAdoptablePrefixBecomesInertInsteadOfSalvaged() {
+    void gapAfterTheCompletePrefixStopsRecoveryWithoutSalvagingLaterOffsets() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
@@ -275,7 +278,7 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
         session.readOverrides.put(2L, RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.DEFINITIVELY_ABSENT));
 
         KafkaBookKeeperRecoveryResultV1 result = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(101, 101, 101, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
 
@@ -285,12 +288,12 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
     }
 
     @Test
-    void recoveredStateBootstrapsOneCoherentNewLeaderRootWithoutRecoveringHwFromWal() {
+    void recoveredStateInstallsSharedCommitHwWithoutFollowerProgress() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaRecoveryTestFixtures.installHeader(session);
         KafkaRecoveryTestFixtures.installGroup(session, 1, 100, 1);
         KafkaBookKeeperRecoveryResultV1 recovered = KafkaRecoveryTestFixtures.engine(session)
-                .recover(KafkaRecoveryTestFixtures.request(101, 101, 101, OptionalLong.empty()))
+                .recover(KafkaRecoveryTestFixtures.request(OptionalLong.empty()))
                 .toCompletableFuture()
                 .join();
         var successorBinding = KafkaRunTestFixtures.binding(7, 12, 6);
@@ -304,15 +307,14 @@ class KafkaBookKeeperTakeoverRecoveryV1Test {
                         KafkaRecoveryTestFixtures.recoveredFence(),
                         100,
                         recovered.newLeaderLeo().orElseThrow(),
-                        100,
                         recovered.recoveredProtocolState().orElseThrow(),
                         successorHandle,
                         ignored -> {})
                 .capture();
 
         assertThat(snapshot.root().frontiers().readableEndOffset()).isEqualTo(101);
-        assertThat(snapshot.root().frontiers().highWatermark()).isEqualTo(100);
-        assertThat(snapshot.root().frontiers().lastStableOffset()).isEqualTo(100);
+        assertThat(snapshot.root().frontiers().highWatermark()).isEqualTo(101);
+        assertThat(snapshot.root().frontiers().lastStableOffset()).isEqualTo(101);
         assertThat(snapshot.activeTail().startOffset()).isEqualTo(101);
         assertThat(snapshot.speculativeQueue().commits()).isEmpty();
     }

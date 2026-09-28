@@ -92,7 +92,8 @@ public final class KafkaBookKeeperTargetedReaderV1 {
         if (boundFailure.isPresent()) {
             return completed(boundFailure.orElseThrow());
         }
-        return locateInitial(snapshot, request).thenCompose(initial -> {
+        int lookupStepCap = lookupStepCap(snapshot);
+        return locateInitial(snapshot, request, lookupStepCap).thenCompose(initial -> {
             if (initial.plan().failure().isPresent()) {
                 return completed(emptyResult(initial.plan().failure().orElseThrow(), initial.cursorAccepted()));
             }
@@ -110,7 +111,8 @@ public final class KafkaBookKeeperTargetedReaderV1 {
                     initial.cursorAccepted(),
                     new ArrayList<>(),
                     0L,
-                    sequentialBatchCap(snapshot));
+                    sequentialBatchCap(snapshot),
+                    lookupStepCap);
         });
     }
 
@@ -125,7 +127,8 @@ public final class KafkaBookKeeperTargetedReaderV1 {
             boolean cursorAccepted,
             List<KafkaBookKeeperReadBatchV1> batches,
             long accumulatedBytes,
-            long remainingBatches) {
+            long remainingBatches,
+            int lookupStepCap) {
         if (remainingBatches <= 0) {
             return completed(emptyResult(
                     Failure.corrupt("sequential locator traversal exceeded its snapshot bound"), cursorAccepted));
@@ -138,7 +141,7 @@ public final class KafkaBookKeeperTargetedReaderV1 {
             batches.add(batch);
             long nextAccumulated = Math.addExact(
                     accumulatedBytes, batch.rawAssignedRecordBatch().length());
-            return successor(snapshot, current, lookupStepCap(snapshot)).thenCompose(next -> {
+            return successor(snapshot, current, lookupStepCap).thenCompose(next -> {
                 if (next.failure().isPresent()) {
                     return completed(emptyResult(next.failure().orElseThrow(), cursorAccepted));
                 }
@@ -165,16 +168,23 @@ public final class KafkaBookKeeperTargetedReaderV1 {
                             cursorAccepted));
                 }
                 return collectSequential(
-                        snapshot, request, nextBatch, cursorAccepted, batches, nextAccumulated, remainingBatches - 1);
+                        snapshot,
+                        request,
+                        nextBatch,
+                        cursorAccepted,
+                        batches,
+                        nextAccumulated,
+                        remainingBatches - 1,
+                        lookupStepCap);
             });
         });
     }
 
     private CompletionStage<InitialPlan> locateInitial(
-            KafkaBookKeeperReadSnapshotV1 snapshot, KafkaBookKeeperSequentialReadRequestV1 request) {
+            KafkaBookKeeperReadSnapshotV1 snapshot, KafkaBookKeeperSequentialReadRequestV1 request, int lookupStepCap) {
         Optional<KafkaBookKeeperReadCursorV1> supplied = request.cursor();
         if (supplied.isEmpty() || !cursorRootMatches(snapshot, request, supplied.orElseThrow())) {
-            return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+            return locate(snapshot, request.requestedOffset(), lookupStepCap)
                     .thenApply(plan -> new InitialPlan(plan, false));
         }
         KafkaBookKeeperReadCursorV1 cursor = supplied.orElseThrow();
@@ -183,13 +193,13 @@ public final class KafkaBookKeeperTargetedReaderV1 {
         if (run.isEmpty()
                 || !run.orElseThrow().runBinding().equals(cursor.runIdentity())
                 || run.orElseThrow().sourceGeneration() != cursor.sourceGeneration()) {
-            return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+            return locate(snapshot, request.requestedOffset(), lookupStepCap)
                     .thenApply(plan -> new InitialPlan(plan, false));
         }
         KafkaBookKeeperReadRunV1 matchedRun = run.orElseThrow();
         if (matchedRun.active()) {
             if (cursor.indexBlockIdentity() != -1) {
-                return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+                return locate(snapshot, request.requestedOffset(), lookupStepCap)
                         .thenApply(plan -> new InitialPlan(plan, false));
             }
             Optional<LocatedBatch> located = cursorLocator(
@@ -197,13 +207,13 @@ public final class KafkaBookKeeperTargetedReaderV1 {
             if (located.isPresent()) {
                 return completed(new InitialPlan(Plan.located(located.orElseThrow()), true));
             }
-            return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+            return locate(snapshot, request.requestedOffset(), lookupStepCap)
                     .thenApply(plan -> new InitialPlan(plan, false));
         }
         Optional<KafkaIndexBlockPointerV1> pointer =
                 matchedRun.sealedDirectory().orElseThrow().findByEntryId(cursor.indexBlockIdentity());
         if (pointer.isEmpty()) {
-            return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+            return locate(snapshot, request.requestedOffset(), lookupStepCap)
                     .thenApply(plan -> new InitialPlan(plan, false));
         }
         return loadIndexBlock(matchedRun, pointer.orElseThrow()).thenCompose(loaded -> {
@@ -215,7 +225,7 @@ public final class KafkaBookKeeperTargetedReaderV1 {
             if (located.isPresent()) {
                 return completed(new InitialPlan(Plan.located(located.orElseThrow()), true));
             }
-            return locate(snapshot, request.requestedOffset(), lookupStepCap(snapshot))
+            return locate(snapshot, request.requestedOffset(), lookupStepCap)
                     .thenApply(plan -> new InitialPlan(plan, false));
         });
     }

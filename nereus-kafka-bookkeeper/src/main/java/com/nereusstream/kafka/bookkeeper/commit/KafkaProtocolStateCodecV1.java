@@ -63,18 +63,22 @@ final class KafkaProtocolStateCodecV1 {
 
     static CanonicalBytes producers(KafkaCommittedProducerStateV1 state) {
         return encode(out -> {
-            tag(out, "K5-PRODUCER-V1");
+            tag(out, "K5-PRODUCER-V2");
             out.writeInt(state.producers().size());
             for (KafkaProducerSessionStateV1 producer : state.producers().values()) {
                 out.writeLong(producer.producerId());
                 out.writeShort(producer.producerEpoch());
                 out.writeInt(producer.lastSequence());
                 out.writeLong(producer.lastOffset());
+                out.writeInt(producer.coordinatorEpoch());
+                out.writeLong(producer.lastMarkerOffset());
+                out.writeLong(producer.lastTimestamp());
                 out.writeInt(producer.recentBatches().size());
                 for (KafkaProducerBatchResultV1 batch : producer.recentBatches()) {
                     identity(out, batch.identity());
                     out.writeLong(batch.startOffset());
                     out.writeLong(batch.endOffsetExclusive());
+                    out.writeLong(batch.maxTimestamp());
                 }
             }
         });
@@ -82,7 +86,7 @@ final class KafkaProtocolStateCodecV1 {
 
     static CanonicalBytes speculative(KafkaSpeculativeQueueV1 queue) {
         return encode(out -> {
-            tag(out, "K5-SPECULATIVE-V1");
+            tag(out, "K5-SPECULATIVE-V2");
             out.writeInt(queue.commits().size());
             for (KafkaSpeculativeCommitV1 commit : queue.commits()) {
                 out.writeLong(commit.startOffset());
@@ -101,6 +105,8 @@ final class KafkaProtocolStateCodecV1 {
                     out.writeByte(delta.transactionKind().ordinal());
                     out.writeLong(delta.transactionalProducerId());
                     out.writeInt(delta.coordinatorEpoch());
+                    out.writeShort(delta.markerProducerEpoch());
+                    out.writeLong(delta.maxTimestamp());
                 }
             }
         });

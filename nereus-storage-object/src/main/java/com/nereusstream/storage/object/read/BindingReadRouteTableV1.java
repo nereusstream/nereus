@@ -41,4 +41,19 @@ public final class BindingReadRouteTableV1 {
     public BindingReadRouteV1 route(int index) {
         return routes[index];
     }
+
+    /** First route whose end lies beyond the requested offset. */
+    public int firstIntersecting(long startInclusive) {
+        int low = 0;
+        int high = routes.length;
+        while (low < high) {
+            int middle = low + (high - low) / 2;
+            if (routes[middle].endExclusive() <= startInclusive) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return low;
+    }
 }

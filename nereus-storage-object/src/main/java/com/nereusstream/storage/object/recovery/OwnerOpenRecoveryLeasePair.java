@@ -25,7 +25,7 @@ public final class OwnerOpenRecoveryLeasePair implements AutoCloseable {
             C1ObjectProviderSession rawProvider,
             KmsCellSession rawKms) {
         synchronized (rawProvider) {
-            synchronized (rawKms) {
+            synchronized (rawKms.lifecycleMonitor()) {
                 var authorities = lineage.prepareOwnerOpenTransfers(root);
                 rawProvider.requireRecoveryTransferReady(authorities.providerAuthority());
                 rawKms.requireRecoveryTransferReady(authorities.kmsAuthority());
@@ -41,7 +41,7 @@ public final class OwnerOpenRecoveryLeasePair implements AutoCloseable {
             WalRunObjectSession.ProviderOwnerAuthority providerAuthority,
             WalRunObjectSession.KmsOwnerAuthority kmsAuthority) {
         synchronized (provider) {
-            synchronized (kms) {
+            synchronized (kms.lifecycleMonitor()) {
                 if (promoted) {
                     throw new IllegalStateException("owner-open recovery lease pair was already promoted");
                 }

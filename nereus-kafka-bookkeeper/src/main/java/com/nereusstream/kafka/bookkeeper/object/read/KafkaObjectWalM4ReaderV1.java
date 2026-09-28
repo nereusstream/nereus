@@ -20,6 +20,7 @@ import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectExtentLoc
 import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectSourceProtectionTrackerV1;
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectBindingReadAdapterV1.PhysicalRoute;
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectBindingReadAdapterV1.ReadCell;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1;
 import com.nereusstream.storage.object.read.BindingReadAsyncExecutorV1;
 import com.nereusstream.storage.object.read.BindingReadAuthorityV1;
 import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
@@ -145,11 +146,16 @@ public final class KafkaObjectWalM4ReaderV1 {
     }
 
     public CompletableFuture<ReadResult> read(
-            long startOffset, long endOffsetExclusive, long protocolUpperBoundExclusive) {
+            long startOffset, long endOffsetExclusive, KafkaReadIsolationV1 isolation) {
+        Objects.requireNonNull(isolation, "isolation");
         return asyncExecutor.execute(current, hazardPool, authority -> {
             if (!(authority.publicationCell().protocolStateReference() instanceof ReadCell cell)) {
                 throw new IllegalStateException("captured Kafka authority lacks its M3 current-source cell");
             }
+            if (authority.publicationCell().routes() != cell.routes()) {
+                throw new IllegalStateException("captured Kafka route table differs from its read cell");
+            }
+            long protocolUpperBoundExclusive = cell.snapshot().root().readUpperBound(isolation);
             BindingReadPlannerV1.Outcome outcome = BindingReadPlannerV1.plan(
                     authority.publicationCell(),
                     startOffset,
@@ -177,7 +183,7 @@ public final class KafkaObjectWalM4ReaderV1 {
         CompletableFuture<List<ValidatedRange>> sequence =
                 CompletableFuture.completedFuture(new ArrayList<>(plan.size()));
         for (int index = 0; index < plan.size(); index++) {
-            PhysicalRoute physical = cell.requirePhysical(plan.route(index));
+            PhysicalRoute physical = cell.requirePhysical(plan.routeOrdinal(index), plan.route(index));
             long start = plan.startInclusive(index);
             long end = plan.endExclusive(index);
             sequence = sequence.thenCompose(
@@ -206,13 +212,14 @@ public final class KafkaObjectWalM4ReaderV1 {
         CompletableFuture<ValidatedRange> result = new CompletableFuture<>();
         read.whenComplete((value, failure) -> {
             Throwable terminal = failure;
+            if (terminal == null
+                    && (value == null
+                            || !value.locator().equals(locator)
+                            || value.startOffset() != start
+                            || value.endOffsetExclusive() != end)) {
+                terminal = new IllegalStateException("Kafka reader substituted its captured locator/range");
+            }
             try {
-                if (failure == null
-                        && (!value.locator().equals(locator)
-                                || value.startOffset() != start
-                                || value.endOffsetExclusive() != end)) {
-                    terminal = new IllegalStateException("Kafka reader substituted its captured locator/range");
-                }
                 pin.close();
             } catch (Throwable closeFailure) {
                 if (terminal == null) {

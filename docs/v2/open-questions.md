@@ -577,30 +577,30 @@ The local Pulsar checkout already records an attempt UUID before calling the off
 opens offloaded reads from ledger metadata, and consults the offload context before BookKeeper deletion. Reusing that
 state machine best preserves the “not weaker than native Pulsar” requirement.
 
-### `V2-OPEN-BK-02`: resolved semantics and inputs; M2 implementation and evidence remain
+### `V2-OPEN-BK-02`: historical M2 evidence closed; current Kafka contract follows NSIP-1
 
 Resolved by [ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md): Kafka uses one
 Position Domain across profiles; BookKeeper-primary paths use one logical ledger chain per partition, low-frequency
 run/generation roots, packed in-ledger RecordBatch range-index checkpoints, owner-local active-tail locators, targeted
 entry reads, and ordered publication over bounded overlapping I/O. Normal append writes no per-append remote metadata.
 
-[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) also resolves the protocol semantic
-shape: Allocated/Durable/LEO/HW/LSO remain distinct; shared BookKeeper durability does not replace logical ISR;
-producer/transaction/leader-epoch state passes a fence-protected coherent publication with locators; compact native
-replica-Fetch descriptors split Observed/Applied progress under mandatory journal/source and offset/byte/age lag
-bounds; native election caps shared-tail adoption; WAL replay does not invent HW/LSO; Fetch uses coherent isolation
-snapshots, native aborted metadata, delayed local wakeup, and floor-plus-successor lookup. BK `NBKE2` and Object
-`NWKCP1` implement one protocol-checkpoint contract; one fenced terminal `KafkaProtocolCheckpointHeadV1` selects Object
-checkpoints while physical Object checkpoint pages/Seal remain physical-only. A storage-native ISR shortcut is not an
-open implementation option.
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) and
+[NSIP-1](NSIP/nsip-1.md) define the current protocol shape: one active Owner under RF=1/minISR=1, complete durable
+shared commit before success, coherent producer/transaction/locator publication, and checkpoint plus authorized-tail
+cold recovery after Controller reassignment. Allocated/Durable/LEO/HW/LSO remain distinct; WAL replay does not invent
+HW/LSO. Fetch uses a coherent isolation snapshot, aborted metadata, delayed local wakeup, and floor-plus-successor
+lookup. BK `NBKE2` and Object `NWKCP1` share the protocol-checkpoint contract; one fenced terminal
+`KafkaProtocolCheckpointHeadV1` selects Object checkpoints while physical pages/Seal remain physical-only. The old
+logical Follower Observation/Applied/ISR/election-adoption mode is historical, not a parallel current path.
 
 The accepted
-[M2-K0 implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixes the
-remaining implementation structure: exact `NBKE2` tables and hard parser/admission caps land with production codecs,
+[M2-K0 implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixed the
+historical implementation structure: exact `NBKE2` tables and hard parser/admission caps landed with production codecs,
 the minimum module graph, a Cell-scoped BookKeeper session/capability contract, immutable vectors, source locks, and a
-non-promotable `v2M2KafkaInputsCheck`. M2-K9 evidence then selects apply-lag/pipeline/recovery/waiter/cursor/rollover
-defaults and proves dedicated-ledger viability at 10k/100k partitions. Exact Object `NWKCP1` bytes and Head/vector/key
-caps are M3 outputs, not M2 inputs.
+non-promotable `v2M2KafkaInputsCheck`. The original M2-K9 evidence selected its historical
+apply-lag/pipeline/recovery/waiter/cursor/rollover defaults and dedicated-ledger scale result at its tested source.
+From the removed operational defaults, current code retains the still-used BK recovery envelope; it does not retain
+replica lag defaults. Exact Object `NWKCP1` bytes and Head/vector/key caps were M3 outputs, not M2 inputs.
 
 This document acceptance created no gate or scenario PASS by itself. The later global M2 receipt now binds the exact
 Kafka and Pulsar Final child roots and their 21 complete M2 rows; shared M2/M3/M4/M5/M6 rows remain `PLANNED`.

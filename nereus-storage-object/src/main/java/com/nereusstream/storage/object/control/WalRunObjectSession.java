@@ -31,6 +31,7 @@ import com.nereusstream.storage.object.nwg1.Nwg1VerificationContextV1;
 import com.nereusstream.storage.object.nwg1.Nwg1VerificationPathV1;
 import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
+import com.nereusstream.storage.object.provider.ProviderObjectOutcome;
 import com.nereusstream.storage.object.provider.ProviderObjectResult;
 import com.nereusstream.storage.object.provider.RepeatableObjectBody;
 import com.nereusstream.storage.object.recovery.BoundedObjectTailRecovery;
@@ -69,7 +70,67 @@ public final class WalRunObjectSession implements AutoCloseable {
     private final Nwg1RootAuthorityV1 nwg1RootAuthority;
     private final boolean recoveredCurrentRoot;
     private boolean recoveredRowsReleased;
-    private State state = State.OPEN;
+    private volatile State state = State.OPEN;
+    private int activeIo;
+    private final java.util.Set<WalCheckpointPublisher> checkpointPublishers = new java.util.HashSet<>();
+
+    synchronized void attachCheckpointPublisher(WalCheckpointPublisher publisher) {
+        requireUsable();
+        checkpointPublishers.add(publisher);
+    }
+
+    void requireCheckpointAdmission() {
+        requireOpen();
+        if (runtime.state() != WalRunRuntime.State.ADMITTING) {
+            throw new IllegalStateException("checkpoint admission requires an admitting physical run");
+        }
+    }
+
+    /** Counts actual I/O lifetime; drain/interrupt cannot release the Provider/KMS leases underneath it. */
+    synchronized IoLease acquireTerminalIo() {
+        requireTerminalClosable();
+        return acquireIo();
+    }
+
+    synchronized IoLease acquireIo() {
+        requireUsable();
+        activeIo = Math.incrementExact(activeIo);
+        return new IoLease(this, null);
+    }
+
+    private synchronized IoLease acquireCandidateIo(AdmittedNwg1Candidate candidate) {
+        requireCandidate(candidate);
+        if (candidate.ioInFlight) {
+            throw new IllegalStateException("exact NWG1 candidate already has in-flight I/O");
+        }
+        candidate.ioInFlight = true;
+        activeIo = Math.incrementExact(activeIo);
+        return new IoLease(this, candidate);
+    }
+
+    static final class IoLease implements AutoCloseable {
+        private final WalRunObjectSession owner;
+        private final AdmittedNwg1Candidate candidate;
+        private boolean closed;
+
+        private IoLease(WalRunObjectSession owner, AdmittedNwg1Candidate candidate) {
+            this.owner = owner;
+            this.candidate = candidate;
+        }
+
+        @Override
+        public void close() {
+            synchronized (owner) {
+                if (!closed) {
+                    closed = true;
+                    owner.activeIo--;
+                    if (candidate != null) {
+                        candidate.ioInFlight = false;
+                    }
+                }
+            }
+        }
+    }
 
     /** Package-local isolated-test constructor; production fresh opens require lifecycle owner authority. */
     WalRunObjectSession(
@@ -81,6 +142,7 @@ public final class WalRunObjectSession implements AutoCloseable {
                 kms,
                 BoundedObjectTailRecovery.prepareNewRoot(root, nanoTime),
                 null,
+                null,
                 null);
     }
 
@@ -91,7 +153,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             C1ObjectProviderSession provider,
             KmsCellSession kms,
             LongSupplier nanoTime) {
-        this(root, runtime, provider, kms, BoundedObjectTailRecovery.prepareNewRoot(root, nanoTime), null, null);
+        this(root, runtime, provider, kms, BoundedObjectTailRecovery.prepareNewRoot(root, nanoTime), null, null, null);
     }
 
     /** Fresh production open consumes an exact lifecycle-published Root authority once, after session readiness. */
@@ -109,7 +171,28 @@ public final class WalRunObjectSession implements AutoCloseable {
                 kms,
                 BoundedObjectTailRecovery.prepareNewRoot(root, nanoTime),
                 null,
-                ownerAuthority);
+                ownerAuthority,
+                null);
+    }
+
+    /** Fresh production open transfers the exact pre-Root key reservation with the published owner authority. */
+    public static WalRunObjectSession openNew(
+            WalRunLifecycleManager.NewWalRunOwnerAuthority ownerAuthority,
+            C1ObjectProviderSession provider,
+            KmsCellSession.NewRunKeyCreation newRunKey,
+            LongSupplier nanoTime) {
+        Objects.requireNonNull(ownerAuthority, "ownerAuthority");
+        Objects.requireNonNull(newRunKey, "newRunKey");
+        WalRunRootRecord root = ownerAuthority.requireConsumableRoot();
+        return new WalRunObjectSession(
+                root,
+                new WalRunRuntime(root),
+                provider,
+                null,
+                BoundedObjectTailRecovery.prepareNewRoot(root, nanoTime),
+                null,
+                ownerAuthority,
+                newRunKey);
     }
 
     private WalRunObjectSession(
@@ -119,14 +202,16 @@ public final class WalRunObjectSession implements AutoCloseable {
             KmsCellSession kms,
             BoundedObjectTailRecovery.PreparedNewRootRecovery preparedNewRoot,
             RecoveredWalRunRuntimeCut recoveredCut,
-            WalRunLifecycleManager.NewWalRunOwnerAuthority newOwnerAuthority) {
+            WalRunLifecycleManager.NewWalRunOwnerAuthority newOwnerAuthority,
+            KmsCellSession.NewRunKeyCreation newRunKey) {
         this.root = Objects.requireNonNull(root, "root");
         this.root.requireM3ProductionProviderProofMode();
         this.rootSha256 = WalRunControlCodec.rootSha256(root);
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         C1ObjectProviderSession suppliedProvider =
                 recoveredCut == null ? Objects.requireNonNull(rawProvider, "provider") : rawProvider;
-        KmsCellSession suppliedKms = recoveredCut == null ? Objects.requireNonNull(kms, "kms") : kms;
+        KmsCellSession suppliedKms =
+                recoveredCut == null && newRunKey == null ? Objects.requireNonNull(kms, "kms") : kms;
         if (!runtime.rootRecord().equals(root)
                 || (recoveredCut == null
                         && (!suppliedProvider.providerScopeId().equals(root.providerScopeId())
@@ -137,7 +222,8 @@ public final class WalRunObjectSession implements AutoCloseable {
                                         != root.providerConfiguration().maxObjectBodyBytes()
                                 || suppliedProvider.admittedMaximumPrefixBytes()
                                         != root.nwg1AdmissionCaps().maxDirectoryPrefixBytes()
-                                || !suppliedKms.providerScopeId().equals(root.providerScopeId())))) {
+                                || !(newRunKey == null ? suppliedKms.providerScopeId() : newRunKey.providerScopeId())
+                                        .equals(root.providerScopeId())))) {
             throw new IllegalArgumentException(
                     "WalRun authority differs: runtime/Provider/KMS Cell authorities differ from the Root");
         }
@@ -156,6 +242,9 @@ public final class WalRunObjectSession implements AutoCloseable {
         if ((preparedNewRoot == null) == (recoveredCut == null)) {
             throw new IllegalArgumentException(
                     "WalRun session must be new-root or recovered-current-root exactly once");
+        }
+        if (newRunKey != null && (newOwnerAuthority == null || recoveredCut != null)) {
+            throw new IllegalArgumentException("new run key creation requires a fresh published Root authority");
         }
         if (recoveredCut != null) {
             recoveredCut.requireConsumableFor(root);
@@ -184,12 +273,19 @@ public final class WalRunObjectSession implements AutoCloseable {
             synchronized (newOwnerAuthority) {
                 newOwnerAuthority.requireConsumableRoot();
                 synchronized (suppliedProvider) {
-                    synchronized (suppliedKms) {
+                    synchronized (newRunKey == null ? suppliedKms.lifecycleMonitor() : newRunKey.lifecycleMonitor()) {
                         suppliedProvider.requireTransferReady(providerAuthority);
-                        suppliedKms.requireTransferReady(kmsAuthority);
+                        if (newRunKey == null) {
+                            suppliedKms.requireTransferReady(kmsAuthority);
+                        } else {
+                            newRunKey.requireRootCandidate(root);
+                            newRunKey.requireTransferReady(kmsAuthority);
+                        }
                         newOwnerAuthority.consumeFor(root);
                         transferredProvider = suppliedProvider.transferToWalRun(providerAuthority);
-                        transferredKms = suppliedKms.transferToWalRun(kmsAuthority);
+                        transferredKms = newRunKey == null
+                                ? suppliedKms.transferToWalRun(kmsAuthority)
+                                : newRunKey.transferToWalRun(kmsAuthority);
                         transferredRecovery = BoundedObjectTailRecovery.fromPreparedNewRoot(
                                 transferredProvider, root, Objects.requireNonNull(preparedNewRoot, "preparedNewRoot"));
                     }
@@ -199,7 +295,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             // This constructor path is package-visible solely for isolated common tests. Production callers cannot
             // name it and must use openNew(NewWalRunOwnerAuthority, ...).
             synchronized (suppliedProvider) {
-                synchronized (suppliedKms) {
+                synchronized (suppliedKms.lifecycleMonitor()) {
                     suppliedProvider.requireTransferReady(providerAuthority);
                     suppliedKms.requireTransferReady(kmsAuthority);
                     transferredProvider = suppliedProvider.transferToWalRun(providerAuthority);
@@ -219,7 +315,7 @@ public final class WalRunObjectSession implements AutoCloseable {
     public static WalRunObjectSession restore(WalRunRootRecord root, RecoveredWalRunRuntimeCut recoveredCut) {
         Objects.requireNonNull(recoveredCut, "recoveredCut");
         WalRunRuntime restoredRuntime = recoveredCut.restoreRuntimeFor(root);
-        return new WalRunObjectSession(root, restoredRuntime, null, null, null, recoveredCut, null);
+        return new WalRunObjectSession(root, restoredRuntime, null, null, null, recoveredCut, null, null);
     }
 
     /** Performs the complete no-effect Root/format/cap/plan validation before a caller locks local rollback state. */
@@ -245,13 +341,28 @@ public final class WalRunObjectSession implements AutoCloseable {
         return new ValidatedNwg1Plan(this, plan, verificationContext, immutablePlan, facts);
     }
 
-    public synchronized ProviderObjectResult conditionalCreateNwg1(AdmittedNwg1Candidate candidate) throws IOException {
-        requireOpen();
-        requireCandidate(candidate);
-        chargeConditionalCreateAttempt(candidate.conditionalCreateAttempts);
-        candidate.conditionalCreateAttempts = Math.incrementExact(candidate.conditionalCreateAttempts);
-        return provider.conditionalCreate(
-                new CanonicalCandidateBody(candidate.identity, CanonicalBytes.copyOf(candidate.sealed.body())));
+    public ProviderObjectResult conditionalCreateNwg1(AdmittedNwg1Candidate candidate) throws IOException {
+        IoLease lease;
+        synchronized (this) {
+            requireOpen();
+            lease = acquireCandidateIo(candidate);
+            try {
+                chargeConditionalCreateAttempt(candidate.conditionalCreateAttempts);
+                candidate.conditionalCreateAttempts = Math.incrementExact(candidate.conditionalCreateAttempts);
+                candidate.persistenceResult = ProviderObjectResult.outcome(ProviderObjectOutcome.OUTCOME_UNKNOWN);
+            } catch (RuntimeException failure) {
+                lease.close();
+                throw failure;
+            }
+        }
+        try (lease) {
+            var result = provider.conditionalCreate(candidate.uploadBody);
+            synchronized (this) {
+                requireCandidate(candidate);
+                candidate.persistenceResult = result;
+            }
+            return result;
+        }
     }
 
     /** Creates a Root-bound Kafka NWKCP1 token only after exact content-key/body validation. */
@@ -267,16 +378,30 @@ public final class WalRunObjectSession implements AutoCloseable {
         return new ValidatedKafkaProtocolObject(this, identity, canonicalBody);
     }
 
-    public synchronized ProviderObjectResult conditionalCreateKafkaProtocolObject(
-            ValidatedKafkaProtocolObject candidate) throws IOException {
-        requireOpen();
-        Objects.requireNonNull(candidate, "candidate");
-        if (candidate.owner != this) {
-            throw new IllegalArgumentException("Kafka protocol Object token belongs to another WalRun session");
+    public ProviderObjectResult conditionalCreateKafkaProtocolObject(ValidatedKafkaProtocolObject candidate)
+            throws IOException {
+        IoLease lease;
+        synchronized (this) {
+            requireOpen();
+            Objects.requireNonNull(candidate, "candidate");
+            if (candidate.owner != this) {
+                throw new IllegalArgumentException("Kafka protocol Object token belongs to another WalRun session");
+            }
+            if (candidate.ioInFlight) {
+                throw new IllegalStateException("Kafka protocol Object token already has in-flight I/O");
+            }
+            chargeConditionalCreateAttempt(candidate.conditionalCreateAttempts);
+            candidate.conditionalCreateAttempts = Math.incrementExact(candidate.conditionalCreateAttempts);
+            lease = acquireIo();
+            candidate.ioInFlight = true;
         }
-        chargeConditionalCreateAttempt(candidate.conditionalCreateAttempts);
-        candidate.conditionalCreateAttempts = Math.incrementExact(candidate.conditionalCreateAttempts);
-        return provider.conditionalCreate(new CanonicalCandidateBody(candidate.identity, candidate.body));
+        try (lease) {
+            return provider.conditionalCreate(new CanonicalCandidateBody(candidate.identity, candidate.body));
+        } finally {
+            synchronized (this) {
+                candidate.ioInFlight = false;
+            }
+        }
     }
 
     /** Projects the sole Root-authorized full Object identity from a sealed NWG1 relative leaf and body. */
@@ -285,7 +410,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         Objects.requireNonNull(sealed, "sealed");
         ObjectWalLeafKeyV1 leaf = ObjectWalLeafKeyV1.parseRelative(sealed.leafUtf8());
         Sha256Digest bodySha = Sha256Digest.copyOf(sealed.bodySha256());
-        if (leaf.bodyLength() != sealed.body().length
+        if (leaf.bodyLength() != sealed.bodyLength()
                 || leaf.directoryPrefixEnd() != sealed.header().directoryPrefixEnd()
                 || !leaf.objectSha256().equals(bodySha)) {
             throw new IllegalArgumentException("sealed NWG1 leaf differs from its exact Header/body identity");
@@ -297,63 +422,90 @@ public final class WalRunObjectSession implements AutoCloseable {
      * The sole production sequence/seal cut. Validation has no sequence effect; any exception from this method
      * reports whether the exact pending reservation now exists and must be retained for same-plan retry.
      */
-    public synchronized AdmittedNwg1Candidate admitAndSealNwg1(ValidatedNwg1Plan validatedPlan, long nowMillis) {
+    public AdmittedNwg1Candidate admitAndSealNwg1(ValidatedNwg1Plan validatedPlan, long nowMillis) {
         Objects.requireNonNull(validatedPlan, "validatedPlan");
-        if (validatedPlan.owner != this) {
-            throw new Nwg1AdmissionFailure(
-                    Optional.empty(),
-                    validatedPlan.immutablePlan.canonicalPlanSha256(),
-                    new IllegalArgumentException("validated NWG1 plan belongs to another WalRun session"));
-        }
-        requireUsable();
-        if (validatedPlan.candidate != null) {
-            if (validatedPlan.candidate.terminal) {
+        LaneSequenceReservation reservation;
+        IoLease lease;
+        synchronized (this) {
+            if (validatedPlan.owner != this) {
                 throw new Nwg1AdmissionFailure(
-                        Optional.of(validatedPlan.candidate.reservation),
+                        Optional.empty(),
                         validatedPlan.immutablePlan.canonicalPlanSha256(),
-                        new IllegalStateException("validated NWG1 candidate is already terminal"));
+                        new IllegalArgumentException("validated NWG1 plan belongs to another WalRun session"));
             }
-            return validatedPlan.candidate;
+            requireUsable();
+            if (validatedPlan.candidate != null) {
+                if (validatedPlan.candidate.terminal) {
+                    throw new Nwg1AdmissionFailure(
+                            Optional.of(validatedPlan.candidate.reservation),
+                            validatedPlan.immutablePlan.canonicalPlanSha256(),
+                            new IllegalStateException("validated NWG1 candidate is already terminal"));
+                }
+                return validatedPlan.candidate;
+            }
+            if (validatedPlan.sealing) {
+                throw new Nwg1AdmissionFailure(
+                        Optional.ofNullable(validatedPlan.reservation),
+                        validatedPlan.immutablePlan.canonicalPlanSha256(),
+                        new IllegalStateException("NWG1 seal already has in-flight I/O"));
+            }
+            try {
+                reservation = runtime.admitOrRetrySealedPlan(validatedPlan.immutablePlan, nowMillis);
+                if (validatedPlan.reservation != null && !validatedPlan.reservation.equals(reservation)) {
+                    throw new IllegalStateException("validated NWG1 retry resolved to a different lane reservation");
+                }
+                validatedPlan.reservation = reservation;
+                lease = acquireIo();
+                validatedPlan.sealing = true;
+            } catch (RuntimeException failure) {
+                throw new Nwg1AdmissionFailure(
+                        Optional.ofNullable(validatedPlan.reservation),
+                        validatedPlan.immutablePlan.canonicalPlanSha256(),
+                        failure);
+            }
         }
-        LaneSequenceReservation reservation = null;
-        try {
-            reservation = runtime.admitOrRetrySealedPlan(validatedPlan.immutablePlan, nowMillis);
-            if (validatedPlan.reservation != null && !validatedPlan.reservation.equals(reservation)) {
-                throw new IllegalStateException("validated NWG1 retry resolved to a different lane reservation");
-            }
-            validatedPlan.reservation = reservation;
-            Nwg1SealedObjectV1 sealed =
+        try (lease) {
+            var sealed =
                     kms.sealNwg1(validatedPlan.plan, reservation.laneSequence(), validatedPlan.verificationContext);
-            if (sealed.body().length != validatedPlan.facts.canonicalBodyBytes()) {
+            if (sealed.bodyLength() != validatedPlan.facts.canonicalBodyBytes()) {
                 throw new IllegalStateException("sealed NWG1 body differs from the pre-sequence admission facts");
             }
-            ObjectIdentity identity = requireNwg1Identity(sealed);
-            AdmittedNwg1Candidate candidate =
-                    new AdmittedNwg1Candidate(this, validatedPlan, reservation, sealed, identity);
-            validatedPlan.candidate = candidate;
-            return candidate;
-        } catch (Nwg1AdmissionFailure failure) {
-            throw failure;
+            synchronized (this) {
+                if (!reservation.equals(validatedPlan.reservation)) {
+                    throw new IllegalStateException("NWG1 seal completion substituted the reserved candidate");
+                }
+                var candidate = new AdmittedNwg1Candidate(
+                        this, validatedPlan, reservation, sealed, requireNwg1Identity(sealed));
+                validatedPlan.candidate = candidate;
+                return candidate;
+            }
         } catch (RuntimeException failure) {
             throw new Nwg1AdmissionFailure(
-                    Optional.ofNullable(reservation), validatedPlan.immutablePlan.canonicalPlanSha256(), failure);
+                    Optional.of(reservation), validatedPlan.immutablePlan.canonicalPlanSha256(), failure);
+        } finally {
+            synchronized (this) {
+                validatedPlan.sealing = false;
+            }
         }
     }
 
     public synchronized void providerResolved(AdmittedNwg1Candidate candidate) {
         requireCandidate(candidate);
+        requireCandidateIdle(candidate);
         runtime.providerResolved(candidate.reservation, candidate.identity.bodyLength());
         candidate.terminal = true;
     }
 
     public synchronized void providerAbsent(AdmittedNwg1Candidate candidate) {
         requireCandidate(candidate);
+        requireCandidateIdle(candidate);
         runtime.providerAbsent(candidate.reservation);
         candidate.terminal = true;
     }
 
     public synchronized void providerConflict(AdmittedNwg1Candidate candidate) {
         requireCandidate(candidate);
+        requireCandidateIdle(candidate);
         runtime.providerConflict(candidate.reservation);
         candidate.terminal = true;
     }
@@ -397,6 +549,7 @@ public final class WalRunObjectSession implements AutoCloseable {
      */
     public synchronized void requireTerminalClosable() {
         if (state != State.DRAINING
+                || activeIo != 0
                 || runtime.state() != WalRunRuntime.State.SEALED
                 || provider.acceptedOperations() != 0
                 || provider.unknownObjectCount() != 0
@@ -407,57 +560,82 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     /** Full GET and strict NWG1 verification share the Root cumulative recovery budget and KMS cache lifecycle. */
-    public synchronized Nwg1ObjectReaderV1.DecodedObject readAndVerifyNwg1(
+    public Nwg1ObjectReaderV1.DecodedObject readAndVerifyNwg1(
             ObjectIdentity identity,
             Nwg1VerificationPathV1 path,
             Nwg1VerificationContextV1 verificationContext,
             long selectedFrameOrdinal)
             throws IOException {
-        requireUsable();
-        requireVerificationContext(verificationContext);
-        return switch (path) {
-            case ROUTINE_RANGE_READ ->
-                throw new IllegalArgumentException(
-                        "routine selected-unit reads require the streaming frame-consumer API");
-            case OPEN_RUN_RECOVERY -> {
-                Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
-                        recoverAndVerifyNwg1Directory(identity, verificationContext);
-                yield new Nwg1ObjectReaderV1.DecodedObject(prefix.header(), prefix.directory(), List.of());
-            }
-            case FULL_BODY_RECONCILIATION -> {
-                ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
-                CanonicalBytes body = recovery.readVerifiedExtent(identity);
-                yield kms.verifyNwg1(
-                        path,
-                        nwg1RootAuthority,
-                        verificationContext,
-                        leaf.relativeKey().getBytes(StandardCharsets.US_ASCII),
-                        body,
-                        selectedFrameOrdinal);
-            }
-        };
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireVerificationContext(verificationContext);
+            return switch (path) {
+                case ROUTINE_RANGE_READ ->
+                    throw new IllegalArgumentException(
+                            "routine selected-unit reads require the streaming frame-consumer API");
+                case OPEN_RUN_RECOVERY -> {
+                    Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
+                            recoverAndVerifyNwg1Directory(identity, verificationContext);
+                    yield new Nwg1ObjectReaderV1.DecodedObject(prefix.header(), prefix.directory(), List.of());
+                }
+                case FULL_BODY_RECONCILIATION -> {
+                    ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
+                    CanonicalBytes body = recovery.readVerifiedExtent(identity);
+                    yield kms.verifyNwg1(
+                            path,
+                            nwg1RootAuthority,
+                            verificationContext,
+                            leaf.relativeKey().getBytes(StandardCharsets.US_ASCII),
+                            body,
+                            selectedFrameOrdinal);
+                }
+            };
+        }
     }
 
     /**
-     * Performs the sole publication full GET/SHA proof and authenticates only shared Header/Directory structure.
-     * Member-local Binding, frame, codec, digest, and native semantics are deliberately deferred to the typed token
-     * API so one bad Binding cannot quarantine a valid sibling and no second Provider/KMS read is required.
+     * Uses exact session-issued persistence evidence or performs a full GET/SHA proof, then authenticates structure.
+     * The typed token rechecks current member-local Binding/native policy and independently consumes payloads.
+     * Static wire facts come from the complete writer check or the existing authenticated streaming reader;
+     * one member's failure cannot quarantine a valid sibling and no second Provider read is required.
      */
-    public synchronized AuthenticatedNwg1PublicationExtent readAndAuthenticateNwg1ForPublication(
+    public AuthenticatedNwg1PublicationExtent readAndAuthenticateNwg1ForPublication(
             AdmittedNwg1Candidate candidate, Nwg1VerificationContextV1 verificationContext) throws IOException {
-        requireCandidate(candidate);
-        requireVerificationContext(verificationContext);
-        ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(candidate.identity);
-        C1ObjectProviderSession.VerifiedObjectRead verifiedRead =
-                provider.readVerifiedObjectWithVersion(candidate.identity);
-        byte[] exactBody = verifiedRead.canonicalBody().toByteArray();
-        byte[] exactPrefix = Arrays.copyOfRange(exactBody, 0, Math.toIntExact(leaf.directoryPrefixEnd()));
-        Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
-                kms.readAuthenticatedPrefix(exactPrefix, candidate.identity.bodyLength(), verificationContext);
-        requirePrefixIdentity(prefix, leaf);
-        requirePrefixWithinRootCaps(prefix);
-        return new AuthenticatedNwg1PublicationExtent(
-                this, candidate, prefix, exactBody, requireProviderProof(verifiedRead.immutableVersionToken()));
+        try (var lease = acquireCandidateIo(candidate)) {
+            requireCandidate(candidate);
+            requireVerificationContext(verificationContext);
+            ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(candidate.identity);
+            var selfChecked = candidate.sealed.selfCheckedPrefix(verificationContext);
+            if (selfChecked.isPresent()
+                    && candidate.persistenceResult != null
+                    && provider.hasExactPersistenceEvidence(candidate.persistenceResult, candidate.uploadBody)) {
+                var prefix = selfChecked.orElseThrow();
+                requirePrefixIdentity(prefix, leaf);
+                requirePrefixWithinRootCaps(prefix);
+                return new AuthenticatedNwg1PublicationExtent(
+                        this,
+                        candidate,
+                        prefix,
+                        null,
+                        requireProviderProof(candidate.persistenceResult.versionToken()));
+            }
+            var verifiedRead = provider.readVerifiedObjectWithVersion(candidate.identity);
+            if (selfChecked.isPresent()) {
+                var prefix = selfChecked.orElseThrow();
+                requirePrefixIdentity(prefix, leaf);
+                requirePrefixWithinRootCaps(prefix);
+                return new AuthenticatedNwg1PublicationExtent(
+                        this, candidate, prefix, null, requireProviderProof(verifiedRead.immutableVersionToken()));
+            }
+            byte[] exactBody = verifiedRead.canonicalBody().toByteArray();
+            byte[] exactPrefix = Arrays.copyOfRange(exactBody, 0, Math.toIntExact(leaf.directoryPrefixEnd()));
+            Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
+                    kms.readAuthenticatedPrefix(exactPrefix, candidate.identity.bodyLength(), verificationContext);
+            requirePrefixIdentity(prefix, leaf);
+            requirePrefixWithinRootCaps(prefix);
+            return new AuthenticatedNwg1PublicationExtent(
+                    this, candidate, prefix, exactBody, requireProviderProof(verifiedRead.immutableVersionToken()));
+        }
     }
 
     /** Verifies one member-selected append unit from the authenticated publication body with zero Provider I/O. */
@@ -474,6 +652,13 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
         requireCandidate(extent.candidate);
         requireVerificationContext(verificationContext);
+        if (extent.exactBody == null) {
+            return Nwg1ObjectReaderV1.readSelfCheckedAppendUnit(
+                    extent.candidate.sealed,
+                    selectedFrameOrdinal,
+                    verificationContext,
+                    Objects.requireNonNull(consumer, "consumer"));
+        }
         return kms.readSelectedAppendUnitStreaming(
                 extent.prefix,
                 (range, ignored) -> Arrays.copyOfRange(
@@ -486,76 +671,96 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     /** Two-stage C1 prefix + exact selected append-unit frame ranges; no full GET and no recovery-budget charge. */
-    public synchronized VerifiedRoutineNwg1AppendUnit readRoutineNwg1AppendUnit(
+    public VerifiedRoutineNwg1AppendUnit readRoutineNwg1AppendUnit(
             ObjectIdentity identity,
             Nwg1VerificationContextV1 verificationContext,
             long selectedFrameOrdinal,
             Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
             throws IOException {
-        requireUsable();
-        requireVerificationContext(verificationContext);
-        ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
-        CanonicalBytes prefixBytes =
-                provider.readDirectoryPrefix(identity, leaf.directoryPrefixEnd(), Optional.empty());
-        Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
-                kms.readAuthenticatedPrefix(prefixBytes.toByteArray(), identity.bodyLength(), verificationContext);
-        requirePrefixIdentity(prefix, leaf);
-        requirePrefixWithinRootCaps(prefix);
-        Nwg1ObjectReaderV1.VerifiedAppendUnit appendUnit = kms.readSelectedAppendUnitStreaming(
-                prefix,
-                (range, ignored) -> provider.readExactRange(
-                                identity, range.inclusiveStart(), range.exclusiveEnd(), Optional.empty())
-                        .toByteArray(),
-                selectedFrameOrdinal,
-                verificationContext,
-                Objects.requireNonNull(consumer, "consumer"));
-        return new VerifiedRoutineNwg1AppendUnit(prefix, appendUnit);
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireVerificationContext(verificationContext);
+            ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
+            CanonicalBytes prefixBytes =
+                    provider.readDirectoryPrefix(identity, leaf.directoryPrefixEnd(), Optional.empty());
+            Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
+                    kms.readAuthenticatedPrefix(prefixBytes.toByteArray(), identity.bodyLength(), verificationContext);
+            requirePrefixIdentity(prefix, leaf);
+            requirePrefixWithinRootCaps(prefix);
+            Nwg1ObjectReaderV1.VerifiedAppendUnit appendUnit = kms.readSelectedAppendUnitStreaming(
+                    prefix,
+                    (range, ignored) -> provider.readExactRange(
+                                    identity, range.inclusiveStart(), range.exclusiveEnd(), Optional.empty())
+                            .toByteArray(),
+                    selectedFrameOrdinal,
+                    verificationContext,
+                    Objects.requireNonNull(consumer, "consumer"));
+            return new VerifiedRoutineNwg1AppendUnit(prefix, appendUnit);
+        }
     }
 
     /** One cumulative range-GET authenticates the complete Directory needed to rebuild exact recovery locators. */
-    public synchronized Nwg1ObjectReaderV1.AuthenticatedPrefix recoverAndVerifyNwg1Directory(
+    public Nwg1ObjectReaderV1.AuthenticatedPrefix recoverAndVerifyNwg1Directory(
             ObjectIdentity identity, Nwg1VerificationContextV1 verificationContext) throws IOException {
-        requireUsable();
-        requireVerificationContext(verificationContext);
-        ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
-        CanonicalBytes prefixBytes = recovery.reconstructDirectoryPrefixes(Map.of(identity, leaf.directoryPrefixEnd()))
-                .get(identity);
-        Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
-                kms.readAuthenticatedPrefix(prefixBytes.toByteArray(), identity.bodyLength(), verificationContext);
-        requirePrefixIdentity(prefix, leaf);
-        requirePrefixWithinRootCaps(prefix);
-        recovery.chargeDecoded(
-                prefix.directory().bindings().size(),
-                prefix.directory().frames().size(),
-                prefix.directory().appendUnits().size());
-        return prefix;
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireVerificationContext(verificationContext);
+            ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
+            CanonicalBytes prefixBytes = recovery.reconstructDirectoryPrefixes(
+                            Map.of(identity, leaf.directoryPrefixEnd()))
+                    .get(identity);
+            Nwg1ObjectReaderV1.AuthenticatedPrefix prefix =
+                    kms.readAuthenticatedPrefix(prefixBytes.toByteArray(), identity.bodyLength(), verificationContext);
+            requirePrefixIdentity(prefix, leaf);
+            requirePrefixWithinRootCaps(prefix);
+            recovery.chargeDecoded(
+                    prefix.directory().bindings().size(),
+                    prefix.directory().frames().size(),
+                    prefix.directory().appendUnits().size());
+            return prefix;
+        }
     }
 
     /** Uses a previously authenticated recovery prefix and charges only its selected append-unit frame ranges. */
-    public synchronized Nwg1ObjectReaderV1.VerifiedAppendUnit recoverAndVerifyNwg1AppendUnit(
+    public Nwg1ObjectReaderV1.VerifiedAppendUnit recoverAndVerifyNwg1AppendUnit(
             ObjectIdentity identity,
             Nwg1ObjectReaderV1.AuthenticatedPrefix prefix,
             Nwg1VerificationContextV1 verificationContext,
             long selectedFrameOrdinal,
             Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
             throws IOException {
-        requireUsable();
-        requireVerificationContext(verificationContext);
-        ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
-        requirePrefixIdentity(prefix, leaf);
-        requirePrefixWithinRootCaps(prefix);
-        return kms.readSelectedAppendUnitStreaming(
-                prefix,
-                (range, ignored) -> recovery.readExactFrameRange(identity, range.inclusiveStart(), range.exclusiveEnd())
-                        .toByteArray(),
-                selectedFrameOrdinal,
-                verificationContext,
-                Objects.requireNonNull(consumer, "consumer"));
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireVerificationContext(verificationContext);
+            ObjectWalLeafKeyV1 leaf = requireNwg1LeafIdentity(identity);
+            requirePrefixIdentity(prefix, leaf);
+            requirePrefixWithinRootCaps(prefix);
+            return kms.readSelectedAppendUnitStreaming(
+                    prefix,
+                    (range, ignored) -> recovery.readExactFrameRange(
+                                    identity, range.inclusiveStart(), range.exclusiveEnd())
+                            .toByteArray(),
+                    selectedFrameOrdinal,
+                    verificationContext,
+                    Objects.requireNonNull(consumer, "consumer"));
+        }
     }
 
-    public synchronized ProviderObjectResult reconcileUnknownExtent(ObjectIdentity identity) throws IOException {
-        requireUsable();
-        return recovery.reconcileUnknownExtent(identity);
+    public ProviderObjectResult reconcileUnknownExtent(ObjectIdentity identity) throws IOException {
+        try (var lease = acquireIo()) {
+            requireUsable();
+            return recovery.reconcileUnknownExtent(identity);
+        }
+    }
+
+    /** Retains the exact full-GET reconciliation proof on this same immutable candidate. */
+    public ProviderObjectResult reconcileUnknownNwg1Candidate(AdmittedNwg1Candidate candidate) throws IOException {
+        try (var lease = acquireCandidateIo(candidate)) {
+            requireCandidate(candidate);
+            candidate.persistenceResult = ProviderObjectResult.outcome(ProviderObjectOutcome.OUTCOME_UNKNOWN);
+            candidate.persistenceResult = recovery.reconcileUnknownExtent(candidate.identity);
+            return candidate.persistenceResult;
+        }
     }
 
     /** Authenticated routine prefix plus the compact selected-unit fold; it never retains decoded frame bytes. */
@@ -580,6 +785,9 @@ public final class WalRunObjectSession implements AutoCloseable {
     public synchronized RecoveredWalRunRuntimeCut.PhysicalRowsSummary consumeRecoveredPhysicalRows(
             RecoveredWalRunRuntimeCut.PhysicalRowConsumer consumer) throws IOException {
         requireRecoveredCurrentRoot();
+        if (activeIo != 0) {
+            throw new IllegalStateException("recovered physical rows retain concurrent I/O; drain before consuming");
+        }
         try {
             return Objects.requireNonNull(recoveredCut, "recoveredCut").consumeAuthenticatedPhysicalRows(consumer);
         } finally {
@@ -590,17 +798,20 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
     }
 
-    public synchronized ProviderObjectResult reconcileUnknownProtocolObject(ObjectIdentity identity)
-            throws IOException {
-        requireUsable();
-        requireKafkaProtocolIdentity(identity);
-        return recovery.reconcileUnknownProtocolObject(identity);
+    public ProviderObjectResult reconcileUnknownProtocolObject(ObjectIdentity identity) throws IOException {
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireKafkaProtocolIdentity(identity);
+            return recovery.reconcileUnknownProtocolObject(identity);
+        }
     }
 
-    public synchronized CanonicalBytes readVerifiedProtocolObject(ObjectIdentity identity) throws IOException {
-        requireUsable();
-        requireKafkaProtocolIdentity(identity);
-        return recovery.readVerifiedProtocolCheckpoint(identity);
+    public CanonicalBytes readVerifiedProtocolObject(ObjectIdentity identity) throws IOException {
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireKafkaProtocolIdentity(identity);
+            return recovery.readVerifiedProtocolCheckpoint(identity);
+        }
     }
 
     /**
@@ -613,8 +824,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             terminalLineageProtocolObjectReader() {
         requireUsable();
         return identity -> {
-            synchronized (WalRunObjectSession.this) {
-                requireUsable();
+            try (var lease = acquireIo()) {
                 requireKafkaProtocolIdentity(identity);
                 return provider.readVerifiedObject(identity);
             }
@@ -622,11 +832,12 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     /** Publication readback is exact full-body verification but is not charged as recovery work. */
-    public synchronized CanonicalBytes readVerifiedProtocolObjectForPublication(ObjectIdentity identity)
-            throws IOException {
-        requireUsable();
-        requireKafkaProtocolIdentity(identity);
-        return provider.readVerifiedObject(identity);
+    public CanonicalBytes readVerifiedProtocolObjectForPublication(ObjectIdentity identity) throws IOException {
+        try (var lease = acquireIo()) {
+            requireUsable();
+            requireKafkaProtocolIdentity(identity);
+            return provider.readVerifiedObject(identity);
+        }
     }
 
     public Sha256Digest rootSha256() {
@@ -652,40 +863,45 @@ public final class WalRunObjectSession implements AutoCloseable {
      * Stages exact physical checkpoint rows under this session's live recovery budget. Callers must publish staged
      * protocol state only after this method has returned successfully.
      */
-    public synchronized WalCheckpointChainVerifier.StreamingVerification verifyCheckpointChainStreaming(
+    public WalCheckpointChainVerifier.StreamingVerification verifyCheckpointChainStreaming(
             CanonicalControlMetadataStore metadata,
             WalCheckpointHeadV1 head,
             java.util.function.Consumer<ProviderResolvedExtentRowV1> verifiedRowConsumer) {
-        requireUsable();
-        return recovery.verifyCheckpointChainStreaming(metadata, head, verifiedRowConsumer);
+        try (var lease = acquireIo()) {
+            requireUsable();
+            return recovery.verifyCheckpointChainStreaming(metadata, head, verifiedRowConsumer);
+        }
     }
 
     /** Streaming descendant proof without retaining a checkpoint page chain. */
-    public synchronized WalCheckpointChainVerifier.StreamingVerification verifyCheckpointChainDescendant(
+    public WalCheckpointChainVerifier.StreamingVerification verifyCheckpointChainDescendant(
             CanonicalControlMetadataStore metadata,
             WalCheckpointHeadV1 head,
             long anchorOrdinal,
             String anchorKey,
             Sha256Digest anchorSha256) {
-        requireUsable();
-        if (anchorOrdinal < 0) {
-            return recovery.verifyCheckpointChainStreaming(metadata, head, ignored -> {});
+        try (var lease = acquireIo()) {
+            requireUsable();
+            if (anchorOrdinal < 0) {
+                return recovery.verifyCheckpointChainStreaming(metadata, head, ignored -> {});
+            }
+            Objects.requireNonNull(anchorKey, "anchorKey");
+            Objects.requireNonNull(anchorSha256, "anchorSha256");
+            boolean[] found = {false};
+            WalCheckpointChainVerifier.StreamingVerification verified =
+                    recovery.verifyCheckpointChainStreaming(metadata, head, ignored -> {}, page -> {
+                        if (page.ordinal() == anchorOrdinal
+                                && page.key().equals(anchorKey)
+                                && page.sha256().equals(anchorSha256)) {
+                            found[0] = true;
+                        }
+                    });
+            if (!found[0]) {
+                throw new IllegalStateException(
+                        "checkpoint Head conflict is not a descendant of the exact anchor page");
+            }
+            return verified;
         }
-        Objects.requireNonNull(anchorKey, "anchorKey");
-        Objects.requireNonNull(anchorSha256, "anchorSha256");
-        boolean[] found = {false};
-        WalCheckpointChainVerifier.StreamingVerification verified =
-                recovery.verifyCheckpointChainStreaming(metadata, head, ignored -> {}, page -> {
-                    if (page.ordinal() == anchorOrdinal
-                            && page.key().equals(anchorKey)
-                            && page.sha256().equals(anchorSha256)) {
-                        found[0] = true;
-                    }
-                });
-        if (!found[0]) {
-            throw new IllegalStateException("checkpoint Head conflict is not a descendant of the exact anchor page");
-        }
-        return verified;
     }
 
     public synchronized CumulativeRecoveryBudget.Snapshot enterRecoveryFallback() {
@@ -785,6 +1001,12 @@ public final class WalRunObjectSession implements AutoCloseable {
                                 candidate.reservation.canonicalPlanSha256())
                         .equals(candidate.reservation)) {
             throw new IllegalArgumentException("NWG1 candidate is not the exact pending WalRun reservation");
+        }
+    }
+
+    private static void requireCandidateIdle(AdmittedNwg1Candidate candidate) {
+        if (candidate.ioInFlight) {
+            throw new IllegalStateException("NWG1 candidate retains in-flight I/O");
         }
     }
 
@@ -943,6 +1165,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         private final GroupEncodingPlanV1.AdmissionFacts facts;
         private LaneSequenceReservation reservation;
         private AdmittedNwg1Candidate candidate;
+        private boolean sealing;
 
         private ValidatedNwg1Plan(
                 WalRunObjectSession owner,
@@ -1081,6 +1304,9 @@ public final class WalRunObjectSession implements AutoCloseable {
         private final LaneSequenceReservation reservation;
         private final Nwg1SealedObjectV1 sealed;
         private final ObjectIdentity identity;
+        private final RepeatableObjectBody uploadBody;
+        private ProviderObjectResult persistenceResult;
+        private boolean ioInFlight;
         private int conditionalCreateAttempts;
         private boolean terminal;
 
@@ -1095,6 +1321,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             this.reservation = reservation;
             this.sealed = sealed;
             this.identity = identity;
+            this.uploadBody = new SealedNwg1CandidateBody(identity, sealed);
         }
 
         public LaneSequenceReservation reservation() {
@@ -1127,7 +1354,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             this.owner = Objects.requireNonNull(owner, "owner");
             this.candidate = Objects.requireNonNull(candidate, "candidate");
             this.prefix = Objects.requireNonNull(prefix, "prefix");
-            this.exactBody = Objects.requireNonNull(exactBody, "exactBody");
+            this.exactBody = exactBody;
             this.providerProof = Objects.requireNonNull(providerProof, "providerProof");
         }
 
@@ -1149,6 +1376,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         private final ObjectIdentity identity;
         private final CanonicalBytes body;
         private int conditionalCreateAttempts;
+        private boolean ioInFlight;
 
         private ValidatedKafkaProtocolObject(WalRunObjectSession owner, ObjectIdentity identity, CanonicalBytes body) {
             this.owner = owner;
@@ -1196,16 +1424,25 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
     }
 
+    private record SealedNwg1CandidateBody(ObjectIdentity identity, Nwg1SealedObjectV1 sealed)
+            implements RepeatableObjectBody {
+        @Override
+        public InputStream openStream() {
+            return sealed.openBodyStream();
+        }
+    }
+
     @Override
     public synchronized void close() {
         if (state == State.CLOSED) {
             return;
         }
         drain();
-        if (provider.acceptedOperations() != 0 || provider.unknownObjectCount() != 0) {
+        if (activeIo != 0 || provider.acceptedOperations() != 0 || provider.unknownObjectCount() != 0) {
             throw new IllegalStateException(
                     "WalRun Object session retains Provider operations; reconcile before close");
         }
+        checkpointPublishers.forEach(WalCheckpointPublisher::close);
         if (recoveredCut != null && !recoveredRowsReleased) {
             recoveredCut.discardUnconsumedPhysicalRows();
             recovery.finishRecoveredPhysicalRows();

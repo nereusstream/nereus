@@ -101,10 +101,56 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             KafkaAppendAdmissionRequestV1 request,
             KafkaOffsetAssignmentV1 offsetAssignment,
             KafkaAppendProtocolHooksV1 protocolHooks) {
+        return submit(request, offsetAssignment, protocolHooks, null);
+    }
+
+    /** Reserve the same pipeline permits before the native Kafka log assigns offsets. */
+    public Optional<AdmissionLease> reserveAdmission(KafkaAppendAdmissionRequestV1 request) {
+        Objects.requireNonNull(request, "request");
+        synchronized (this) {
+            if (state != PipelineState.ACTIVE) {
+                return Optional.empty();
+            }
+            return reserveCapacity(request).map(capacity -> new AdmissionLease(request, capacity));
+        }
+    }
+
+    public CompletionStage<KafkaOrderedAppendResultV1> submit(
+            KafkaAppendAdmissionRequestV1 request,
+            KafkaOffsetAssignmentV1 offsetAssignment,
+            KafkaAppendProtocolHooksV1 protocolHooks,
+            AdmissionLease admission) {
+        if (admission != null && admission.owner != this) {
+            throw new IllegalArgumentException("native admission belongs to another pipeline");
+        }
+        List<Notification> notifications = new ArrayList<>();
+        try {
+            return submitAdmitted(request, offsetAssignment, protocolHooks, admission, notifications);
+        } finally {
+            if (admission != null) {
+                admission.close();
+            }
+            notifyWaiters(notifications);
+        }
+    }
+
+    private CompletionStage<KafkaOrderedAppendResultV1> submitAdmitted(
+            KafkaAppendAdmissionRequestV1 request,
+            KafkaOffsetAssignmentV1 offsetAssignment,
+            KafkaAppendProtocolHooksV1 protocolHooks,
+            AdmissionLease admission,
+            List<Notification> notifications) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(offsetAssignment, "offsetAssignment");
         Objects.requireNonNull(protocolHooks, "protocolHooks");
-        Optional<CapacityPair> capacity = reserveCapacity(request);
+        synchronized (this) {
+            var duplicate = protocolHooks.findDuplicateBeforeOffsetAssignment();
+            if (duplicate.isPresent()) {
+                return duplicate.orElseThrow().thenApply(value -> value);
+            }
+        }
+        Optional<CapacityPair> capacity =
+                admission == null ? reserveCapacity(request) : Optional.of(admission.consume(this, request));
         if (capacity.isEmpty()) {
             return CompletableFuture.completedFuture(
                     KafkaOrderedAppendResultV1.beforeAssignment(KafkaOrderedAppendOutcomeV1.CAPACITY_REJECTED));
@@ -122,6 +168,11 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                 return CompletableFuture.completedFuture(
                         KafkaOrderedAppendResultV1.beforeAssignment(KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR));
             }
+            var duplicate = protocolHooks.findDuplicateBeforeOffsetAssignment();
+            if (duplicate.isPresent()) {
+                capacity.orElseThrow().close();
+                return duplicate.orElseThrow().thenApply(value -> value);
+            }
             try {
                 protocolHooks.validateBeforeOffsetAssignment();
             } catch (RuntimeException failure) {
@@ -138,7 +189,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             }
             if (assigned.startOffset() != speculativeEndOffset) {
                 capacity.orElseThrow().close();
-                fencePending();
+                fencePending(notifications);
                 return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.assigned(
                         KafkaOrderedAppendOutcomeV1.INVALID_ASSIGNMENT,
                         assigned.startOffset(),
@@ -149,7 +200,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                 protocolHooks.prepareAfterOffsetAssignment(assigned);
             } catch (RuntimeException failure) {
                 capacity.orElseThrow().close();
-                fencePending();
+                fencePending(notifications);
                 return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.assigned(
                         KafkaOrderedAppendOutcomeV1.PROTOCOL_PREPARATION_FAILED,
                         assigned.startOffset(),
@@ -160,7 +211,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                 reservation = lifecycle.reserveDataGroup(request.memberCount());
             } catch (RuntimeException failure) {
                 capacity.orElseThrow().close();
-                fencePending();
+                fencePending(notifications);
                 return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.assigned(
                         KafkaOrderedAppendOutcomeV1.INVALID_ASSIGNMENT,
                         assigned.startOffset(),
@@ -176,7 +227,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             } catch (RuntimeException failure) {
                 lifecycle.completeDataGroup(reservation);
                 capacity.orElseThrow().close();
-                fencePending();
+                fencePending(notifications);
                 return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.assigned(
                         KafkaOrderedAppendOutcomeV1.INVALID_ASSIGNMENT,
                         assigned.startOffset(),
@@ -213,6 +264,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             slot = new Slot(durableCommit, capacity.orElseThrow());
             orderedSlots.addLast(slot);
             try {
+                protocolHooks.registerAssignedResult(slot.startOffset, slot.endOffsetExclusive, slot.result);
                 for (int index = 0; index < encodedEntries.size(); index++) {
                     memberStages.add(
                             submitMember(runSnapshot.handle(), reservation.entryId(index), encodedEntries.get(index)));
@@ -230,7 +282,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             MemberOutcome aggregate = failure == null ? aggregate(memberStages) : MemberOutcome.OUTCOME_UNKNOWN;
             finishSlot(slot, aggregate);
         });
-        return slot.result;
+        return slot.result.thenApply(value -> value);
     }
 
     public synchronized long speculativeEndOffset() {
@@ -243,6 +295,47 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
 
     public synchronized boolean fenced() {
         return state == PipelineState.FENCED;
+    }
+
+    public void fence() {
+        List<Notification> notifications = new ArrayList<>();
+        synchronized (this) {
+            fencePending(notifications);
+        }
+        notifyWaiters(notifications);
+    }
+
+    /** One-use operation-owned capacity; a native duplicate or validation failure releases unused permits. */
+    public final class AdmissionLease implements AutoCloseable {
+        private final KafkaBookKeeperOrderedPipelineV1 owner = KafkaBookKeeperOrderedPipelineV1.this;
+        private final KafkaAppendAdmissionRequestV1 request;
+        private CapacityPair capacity;
+
+        private AdmissionLease(KafkaAppendAdmissionRequestV1 request, CapacityPair capacity) {
+            this.request = request;
+            this.capacity = capacity;
+        }
+
+        private synchronized CapacityPair consume(
+                KafkaBookKeeperOrderedPipelineV1 submitting, KafkaAppendAdmissionRequestV1 submitted) {
+            if (owner != submitting
+                    || (submitted.memberCount() > request.memberCount()
+                            || submitted.encodedDataBytes() > request.encodedDataBytes())
+                    || capacity == null) {
+                throw new IllegalArgumentException("native admission does not match the pipeline append");
+            }
+            var value = capacity;
+            capacity = null;
+            return value;
+        }
+
+        @Override
+        public synchronized void close() {
+            if (capacity != null) {
+                capacity.close();
+                capacity = null;
+            }
+        }
     }
 
     private Optional<CapacityPair> reserveCapacity(KafkaAppendAdmissionRequestV1 request) {
@@ -381,22 +474,24 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
         return aggregate;
     }
 
-    private synchronized void finishSlot(Slot slot, MemberOutcome outcome) {
-        slot.state = switch (outcome) {
-            case APPLIED_EXACT -> SlotState.DURABLE;
-            case DEFINITIVELY_NOT_APPLIED -> SlotState.DEFINITIVELY_FAILED;
-            case OUTCOME_UNKNOWN -> SlotState.OUTCOME_UNKNOWN;
-        };
-        if (slot.fencedByPredecessor) {
-            slot.result.complete(KafkaOrderedAppendResultV1.assigned(
-                    KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR, slot.startOffset, slot.endOffsetExclusive));
-            slot.capacity.close();
-            return;
+    private void finishSlot(Slot slot, MemberOutcome outcome) {
+        List<Notification> notifications = new ArrayList<>();
+        synchronized (this) {
+            slot.state = switch (outcome) {
+                case APPLIED_EXACT -> SlotState.DURABLE;
+                case DEFINITIVELY_NOT_APPLIED -> SlotState.DEFINITIVELY_FAILED;
+                case OUTCOME_UNKNOWN -> SlotState.OUTCOME_UNKNOWN;
+            };
+            if (slot.fencedByPredecessor) {
+                completedSlot(slot, KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR, notifications);
+            } else {
+                drainOrderedSlots(notifications);
+            }
         }
-        drainOrderedSlots();
+        notifyWaiters(notifications);
     }
 
-    private void drainOrderedSlots() {
+    private void drainOrderedSlots(List<Notification> notifications) {
         while (!orderedSlots.isEmpty()) {
             Slot head = orderedSlots.peekFirst();
             if (head.state == SlotState.PENDING) {
@@ -407,51 +502,58 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                     commitObserver.onOrderedDurable(head.durableCommit);
                 } catch (RuntimeException failure) {
                     head.state = SlotState.OUTCOME_UNKNOWN;
-                    failHeadAndFenceSuccessors(head);
+                    failHeadAndFenceSuccessors(head, notifications);
                     return;
                 }
                 orderedSlots.removeFirst();
                 committedEndOffset = head.endOffsetExclusive;
-                head.result.complete(KafkaOrderedAppendResultV1.assigned(
-                        KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED, head.startOffset, head.endOffsetExclusive));
-                head.capacity.close();
+                completedSlot(head, KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED, notifications);
                 continue;
             }
-            failHeadAndFenceSuccessors(head);
+            failHeadAndFenceSuccessors(head, notifications);
             return;
         }
     }
 
-    private void failHeadAndFenceSuccessors(Slot head) {
+    private void failHeadAndFenceSuccessors(Slot head, List<Notification> notifications) {
         orderedSlots.removeFirst();
         KafkaOrderedAppendOutcomeV1 outcome = head.state == SlotState.DEFINITIVELY_FAILED
                 ? KafkaOrderedAppendOutcomeV1.DEFINITIVELY_FAILED
                 : KafkaOrderedAppendOutcomeV1.OUTCOME_UNKNOWN;
-        head.result.complete(KafkaOrderedAppendResultV1.assigned(outcome, head.startOffset, head.endOffsetExclusive));
-        head.capacity.close();
+        completedSlot(head, outcome, notifications);
+        fencePending(notifications);
+    }
+
+    private void fencePending(List<Notification> notifications) {
         state = PipelineState.FENCED;
         while (!orderedSlots.isEmpty()) {
-            Slot successor = orderedSlots.removeFirst();
-            fenceSuccessor(successor);
+            fenceSuccessor(orderedSlots.removeFirst(), notifications);
         }
     }
 
-    private void fencePending() {
-        state = PipelineState.FENCED;
-        while (!orderedSlots.isEmpty()) {
-            Slot slot = orderedSlots.removeFirst();
-            fenceSuccessor(slot);
-        }
-    }
-
-    private static void fenceSuccessor(Slot slot) {
+    private static void fenceSuccessor(Slot slot, List<Notification> notifications) {
         slot.fencedByPredecessor = true;
         if (slot.state != SlotState.PENDING) {
-            slot.result.complete(KafkaOrderedAppendResultV1.assigned(
-                    KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR, slot.startOffset, slot.endOffsetExclusive));
-            slot.capacity.close();
+            completedSlot(slot, KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR, notifications);
         }
     }
+
+    private static void completedSlot(
+            Slot slot, KafkaOrderedAppendOutcomeV1 outcome, List<Notification> notifications) {
+        // The actual provider terminal owns release; pending fenced successors keep their I/O capacity.
+        slot.capacity.close();
+        notifications.add(new Notification(
+                slot.result, KafkaOrderedAppendResultV1.assigned(outcome, slot.startOffset, slot.endOffsetExclusive)));
+    }
+
+    private static void notifyWaiters(List<Notification> notifications) {
+        for (Notification notification : notifications) {
+            notification.future().complete(notification.result());
+        }
+    }
+
+    private record Notification(
+            CompletableFuture<KafkaOrderedAppendResultV1> future, KafkaOrderedAppendResultV1 result) {}
 
     private static final class CapacityPair implements AutoCloseable {
         private final KafkaAppendCapacityControllerV1.Lease partition;

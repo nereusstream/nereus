@@ -32,6 +32,8 @@ import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
+import com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1;
+import com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Scope;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
@@ -245,7 +247,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
         var a = root(1, 0, 0);
         var b = root(2, 0, 0);
         f.admit(a, b);
-        f.client.holdKey = f.roots.nativeGenesisKey();
+        f.client.holdKey = f.roots.nativeOwnerKey();
         var held = f.roots.createRoot(a).toCompletableFuture();
         assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
         assertThat(join(f.roots.readSelectedRoot(f.roots.nativeRootKey(a.runId()))))
@@ -269,7 +271,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
         join(f.roots.createRoot(a));
         var sealed = sealed(a, 10);
         join(f.roots.sealRoot(a, sealed));
-        f.client.holdKey = f.roots.nativeRootKey(a.runId());
+        f.client.holdKey = f.roots.nativeOwnerKey();
         var old = f.roots.createSuccessor(sealed, b).toCompletableFuture();
         assertThat(join(f.roots.openRoot(b.runId()))).isEmpty();
         assertThat(join(f.roots.createSuccessor(sealed, c)).exactProof()).contains(c);
@@ -293,7 +295,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
         join(f.roots.createRoot(a));
         var sealed = sealed(a, 10);
         join(f.roots.sealRoot(a, sealed));
-        f.client.loseAndBlock = f.roots.nativeRootKey(a.runId());
+        f.client.loseAndBlock = f.roots.nativeOwnerKey();
         assertThat(join(f.roots.createSuccessor(sealed, b)).outcome())
                 .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
         assertThat(f.tickets(a)).isEqualTo(1);
@@ -314,7 +316,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
         var f = new Fixture();
         var a = root(1, 0, 0);
         f.admit(a);
-        f.client.holdKey = f.roots.nativeGenesisKey();
+        f.client.holdKey = f.roots.nativeOwnerKey();
         var observer = f.roots.createRoot(a).toCompletableFuture();
         assertThat(observer.cancel(false)).isTrue();
         assertThat(f.tickets(a)).isEqualTo(1);
@@ -336,6 +338,82 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThat(join(f.roots.createRoot(a)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
         assertThat(f.client.rootWrites).isZero();
         assertThat(f.verifications).isZero();
+    }
+
+    @Test
+    void closureWinsAgainstLateAttachmentAndCannotReopenTheOldOwner() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        var b = root(2, 1, 10);
+        f.admit(a, b);
+        join(f.roots.createRoot(a));
+        var sealed = sealed(a, 10);
+        join(f.roots.sealRoot(a, sealed));
+        f.client.holdKey = f.roots.nativeOwnerKey();
+        var late = f.roots.createSuccessor(sealed, b).toCompletableFuture();
+        var closed = join(f.roots.closeOwner(owner())).exactProof().orElseThrow();
+        assertThat(closed.closed()).isTrue();
+        assertThat(closed.runs()).containsExactly(f.record(a).initialLink());
+        assertThat(KafkaOwnerAdmissionV1.decode(closed.encode())).isEqualTo(closed);
+        f.client.release.run();
+        assertThat(late.join().outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(join(f.roots.openRoot(b.runId()))).isEmpty();
+        assertThat(join(f.roots.closeOwner(owner())).exactProof()).contains(closed);
+        assertThat(join(f.roots.openOwner(owner(), Optional.empty())).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        var next = new KafkaOwnerIdentityV1(4, 3, 2, 9, 31);
+        assertThat(join(f.roots.openOwner(next, Optional.of(closed))).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.APPLIED_EXACT);
+        assertThat(join(f.roots.closeOwner(owner())).exactProof()).contains(closed);
+        assertThat(join(f.roots.readClosedOwner(owner().ownerEpoch()))).contains(closed);
+        assertThat(join(f.roots.createSuccessor(sealed, b)).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+    }
+
+    @Test
+    void attachmentResponseLossIsIncludedInStableClosureEvenBeforeRootPromotion() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        f.client.loseAndBlock = f.roots.nativeOwnerKey();
+        assertThat(join(f.roots.createRoot(a)).outcome()).isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        f.client.blockReads = false;
+        var restarted = f.authority();
+        var closed = join(restarted.closeOwner(owner())).exactProof().orElseThrow();
+        assertThat(closed.runs()).containsExactly(f.record(a).initialLink());
+        assertThat(join(restarted.openRoot(a.runId()))).contains(a);
+        assertThat(join(restarted.createRoot(a)).exactProof()).contains(a);
+        assertThat(join(restarted.closeOwner(owner())).exactProof()).contains(closed);
+    }
+
+    @Test
+    void closureResponseLossAndCrashBeforeArchiveCannotLoseTheFixedRunSet() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        join(f.roots.createRoot(a));
+        f.client.loseAndBlock = f.roots.nativeOwnerKey();
+        assertThat(join(f.roots.closeOwner(owner())).outcome()).isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        f.client.blockReads = false;
+        var restarted = f.authority();
+        var closed = join(restarted.closeOwner(owner())).exactProof().orElseThrow();
+        assertThat(closed.runs()).containsExactly(f.record(a).initialLink());
+        assertThat(join(restarted.readClosedOwner(owner().ownerEpoch()))).contains(closed);
+        assertThat(join(restarted.closeOwner(owner())).exactProof()).contains(closed);
+    }
+
+    @Test
+    void rootCreationRequiresProtocolAdmissionIndependentlyOfGcTickets() {
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        f.client.values.remove(f.roots.nativeOwnerKey());
+        assertThat(join(f.roots.createRoot(a)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+    }
+
+    private static KafkaOwnerIdentityV1 owner() {
+        return new KafkaOwnerIdentityV1(3, 2, 1, 8, 30);
     }
 
     private static <T> T join(CompletionStage<T> stage) {
@@ -422,6 +500,10 @@ class OxiaKafkaRunRootAuthorityV2Test {
         }
 
         void admit(KafkaRunRootSnapshotV1... roots) {
+            if (join(this.roots.readOwnerAdmission()).isEmpty()) {
+                assertThat(join(this.roots.openOwner(owner(), Optional.empty())).outcome())
+                        .isEqualTo(ProviderMutationOutcomeV1.APPLIED_EXACT);
+            }
             for (var root : roots) {
                 var resource = record(root).resource();
                 client.put(
@@ -495,7 +577,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
                 return CompletableFuture.failedFuture(new IllegalStateException("native exact version conflict"));
             }
             put(key, bytes);
-            if (key.startsWith("/")) {
+            if (key.endsWith("/root-v2")) {
                 rootWrites++;
             }
             if (key.equals(loseAndBlock)) {

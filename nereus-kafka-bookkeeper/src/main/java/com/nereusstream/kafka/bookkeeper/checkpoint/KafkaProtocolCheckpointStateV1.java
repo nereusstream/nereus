@@ -18,6 +18,8 @@ import com.nereusstream.kafka.bookkeeper.commit.KafkaCommittedProducerStateV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaLeaderEpochIndexV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionStateV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2ProtocolCheckpointV1;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 
 /** Exact protocol components named by one compatible recovery vector. */
@@ -25,15 +27,25 @@ public record KafkaProtocolCheckpointStateV1(
         KafkaRecoveryCheckpointVectorV1 vector,
         KafkaCommittedProducerStateV1 producerState,
         KafkaTransactionStateV1 transactionState,
-        KafkaLeaderEpochIndexV1 leaderEpochIndex) {
+        KafkaLeaderEpochIndexV1 leaderEpochIndex,
+        List<KafkaCheckpointReadIndexV1> readIndexes) {
     public KafkaProtocolCheckpointStateV1 {
         Objects.requireNonNull(vector, "vector");
         Objects.requireNonNull(producerState, "producerState");
         Objects.requireNonNull(transactionState, "transactionState");
         Objects.requireNonNull(leaderEpochIndex, "leaderEpochIndex");
+        readIndexes = List.copyOf(readIndexes);
+        var sourceIds = new HashSet<com.nereusstream.storage.api.bookkeeper.StorageRunId>();
+        for (var source : readIndexes) {
+            if (!sourceIds.add(source.runId())
+                    || source.rows().get(source.rows().size() - 1).endOffsetExclusive()
+                            > vector.recoveryCoveredThrough()) {
+                throw new IllegalArgumentException("checkpoint sources repeat or escape common coverage");
+            }
+        }
         long producerCoveredThrough = vector.producerStateCoveredThrough();
         producerState.producers().values().forEach(producer -> {
-            if (producer.lastOffset() >= producerCoveredThrough) {
+            if (Math.max(producer.lastOffset(), producer.lastMarkerOffset()) >= producerCoveredThrough) {
                 throw new IllegalArgumentException("producer checkpoint state escapes its component coverage");
             }
         });
@@ -52,6 +64,14 @@ public record KafkaProtocolCheckpointStateV1(
                 throw new IllegalArgumentException("leader-epoch state escapes its checkpoint coverage");
             }
         });
+    }
+
+    public KafkaProtocolCheckpointStateV1(
+            KafkaRecoveryCheckpointVectorV1 vector,
+            KafkaCommittedProducerStateV1 producerState,
+            KafkaTransactionStateV1 transactionState,
+            KafkaLeaderEpochIndexV1 leaderEpochIndex) {
+        this(vector, producerState, transactionState, leaderEpochIndex, List.of());
     }
 
     public static KafkaProtocolCheckpointStateV1 empty(

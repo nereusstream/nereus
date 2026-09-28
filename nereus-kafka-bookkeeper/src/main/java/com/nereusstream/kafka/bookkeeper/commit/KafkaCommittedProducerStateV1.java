@@ -38,9 +38,29 @@ public record KafkaCommittedProducerStateV1(NavigableMap<Long, KafkaProducerSess
     public KafkaCommittedProducerStateV1 apply(KafkaSpeculativeCommitV1 commit) {
         TreeMap<Long, KafkaProducerSessionStateV1> replacement = new TreeMap<>(producers);
         for (KafkaAssignedProtocolBatchV1 batch : commit.batches()) {
+            var delta = batch.delta();
+            if (delta.markerProducerEpoch() >= 0) {
+                replacement.compute(
+                        delta.transactionalProducerId(),
+                        (producerId, previous) -> previous == null
+                                ? KafkaProducerSessionStateV1.markerOnly(
+                                        producerId,
+                                        delta.markerProducerEpoch(),
+                                        delta.coordinatorEpoch(),
+                                        batch.startOffset(),
+                                        delta.maxTimestamp())
+                                : previous.marker(
+                                        delta.markerProducerEpoch(),
+                                        delta.coordinatorEpoch(),
+                                        batch.startOffset(),
+                                        delta.maxTimestamp()));
+            }
             batch.delta().duplicateIdentity().ifPresent(identity -> {
-                KafkaProducerBatchResultV1 result =
-                        new KafkaProducerBatchResultV1(identity, batch.startOffset(), batch.endOffsetExclusive());
+                KafkaProducerBatchResultV1 result = new KafkaProducerBatchResultV1(
+                        identity,
+                        batch.startOffset(),
+                        batch.endOffsetExclusive(),
+                        batch.delta().maxTimestamp());
                 replacement.compute(
                         identity.producerId(),
                         (producerId, previous) ->

@@ -71,7 +71,8 @@ public final class M5BookKeeperDeleteFaultFixtureV2 implements AutoCloseable {
         guard = new M5BookKeeperNativeCreateGuardV2(zk, URI.create(uri).getPath(), spec, acls, Optional.of(binding));
         var delegate =
                 (AbstractZkLedgerManager) client.getLedgerManagerFactory().newLedgerManager();
-        manager = new M5BookKeeperNativeLedgerManagerV2(delegate, guard, spec, zk, acls);
+        manager = new M5BookKeeperNativeLedgerManagerV2(
+                delegate, () -> new M5BookKeeperNativeMetadataDriverV2.CreateScope(spec, guard), zk, acls);
     }
 
     public M5BookKeeperNativeDeleteAuthorityV2 deleteAuthority(RunLedgerHandleV1 handle) {

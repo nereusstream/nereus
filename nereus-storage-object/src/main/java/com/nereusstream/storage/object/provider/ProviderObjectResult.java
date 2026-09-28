@@ -19,15 +19,29 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Exact provider mutation result with optional immutable version token. */
-public record ProviderObjectResult(ProviderObjectOutcome outcome, Optional<CanonicalBytes> versionToken) {
+public record ProviderObjectResult(
+        ProviderObjectOutcome outcome,
+        Optional<CanonicalBytes> versionToken,
+        Optional<C1ObjectProviderSession.ExactPersistenceEvidence> persistenceEvidence) {
+    public ProviderObjectResult(ProviderObjectOutcome outcome, Optional<CanonicalBytes> versionToken) {
+        this(outcome, versionToken, Optional.empty());
+    }
+
     public ProviderObjectResult {
         Objects.requireNonNull(outcome, "outcome");
         Objects.requireNonNull(versionToken, "versionToken");
+        Objects.requireNonNull(persistenceEvidence, "persistenceEvidence");
         versionToken = versionToken.map(value -> CanonicalBytes.copyOf(value.toByteArray()));
         if (versionToken.isPresent()
                 && outcome != ProviderObjectOutcome.APPLIED_EXACT
                 && outcome != ProviderObjectOutcome.EXISTING_EXACT) {
             throw new IllegalArgumentException("only exact success may carry a version token");
+        }
+        if (persistenceEvidence.isPresent()) {
+            var evidence = persistenceEvidence.orElseThrow();
+            if (evidence.outcome() != outcome || !evidence.versionToken().equals(versionToken)) {
+                throw new IllegalArgumentException("Provider result differs from its exact persistence evidence");
+            }
         }
     }
 

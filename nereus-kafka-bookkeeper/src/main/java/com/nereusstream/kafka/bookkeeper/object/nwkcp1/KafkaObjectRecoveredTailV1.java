@@ -29,6 +29,7 @@ public final class KafkaObjectRecoveredTailV1 {
     private final Sha256Digest physicalCheckpointHeadSha;
     private final KafkaObjectActiveTailStateV1 activeTail;
     private final Sha256Digest sourceProtectionDigest;
+    private Sha256Digest authorizedStateSha;
 
     KafkaObjectRecoveredTailV1(
             Sha256Digest walRunRootSha,
@@ -45,11 +46,6 @@ public final class KafkaObjectRecoveredTailV1 {
                 || physicalCheckpointHeadKey.indexOf('\0') >= 0) {
             throw new IllegalArgumentException("recovered Object tail authority is outside its exact domain");
         }
-        activeTail.locators().forEach(locator -> {
-            if (!locator.extent().walRunRootSha().equals(walRunRootSha)) {
-                throw new IllegalArgumentException("recovered Object locator belongs to another WalRun Root");
-            }
-        });
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         bytes.writeBytes("M3-KAFKA-OBJECT-SOURCE-PROTECTION-V1".getBytes(StandardCharsets.UTF_8));
         bytes.writeBytes(walRunRootSha.bytes().toByteArray());
@@ -57,6 +53,40 @@ public final class KafkaObjectRecoveredTailV1 {
         bytes.writeBytes(physicalCheckpointHeadSha.bytes().toByteArray());
         bytes.writeBytes(KafkaObjectStateCodecV1.activeTail(activeTail).toByteArray());
         this.sourceProtectionDigest = Sha256Digest.hash(CanonicalBytes.copyOf(bytes.toByteArray()));
+    }
+
+    /** Only a metadata-selected closed prefix can enable the new Object commit model. */
+    static KafkaObjectRecoveredTailV1 authorized(
+            com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectAuthorizationV1.ClosedHistory closed,
+            Sha256Digest emptyRootSha,
+            String headKey,
+            com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1 state) {
+        var head = closed.head();
+        var locators = head.grants().stream().map(g -> g.locator()).toList();
+        var tail = new KafkaObjectActiveTailStateV1(
+                com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectAuthorizationV1.binding(head.fence()),
+                head.startOffset(),
+                head.endOffset(),
+                locators);
+        var result = new KafkaObjectRecoveredTailV1(
+                locators.isEmpty() ? emptyRootSha : locators.get(0).extent().walRunRootSha(),
+                headKey,
+                closed.digest(),
+                tail);
+        result.authorizedStateSha = result.stateSha(state);
+        return result;
+    }
+
+    public void requireAuthorization(
+            com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1 state) {
+        if (authorizedStateSha == null || !authorizedStateSha.equals(stateSha(state))) {
+            throw new IllegalStateException("physical replay alone has no closed Binding authorization");
+        }
+    }
+
+    private Sha256Digest stateSha(com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1 state) {
+        return Nwkcp1CodecV1.encode("authorization", new Nwkcp1ObjectV1(walRunRootSha, java.util.List.of(state)))
+                .digest();
     }
 
     public Sha256Digest walRunRootSha() {

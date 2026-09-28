@@ -38,10 +38,29 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
     private static final long MAX_CONTROL_METADATA_BYTES = 1024L * 1024;
     private final WalRunObjectSession objectSession;
     private final CanonicalControlMetadataStore metadata;
+    private final String objectPrefix;
+    private final String controlHeadKey;
 
-    public StorageObjectNwkcp1BackendV1(WalRunObjectSession objectSession, CanonicalControlMetadataStore metadata) {
+    public StorageObjectNwkcp1BackendV1(
+            WalRunObjectSession objectSession, CanonicalControlMetadataStore metadata, String objectPrefix) {
         this.objectSession = Objects.requireNonNull(objectSession, "objectSession");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
+        Nwkcp1ObjectKeyV1.headKey(objectPrefix);
+        this.objectPrefix = objectPrefix;
+        var root = objectSession.rootRecord();
+        if (!objectPrefix.startsWith(root.providerConfiguration().exclusiveNamespacePrefix() + "/")) {
+            throw new IllegalArgumentException("NWKCP1 Object prefix escapes its Root namespace");
+        }
+        String rootKey = WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch());
+        controlHeadKey = rootKey.substring(0, rootKey.length() - "/root".length()) + "/protocol/kafka/nwkcp1-v1/head";
+    }
+
+    @Override
+    public String protocolHeadKey(String prefix) {
+        if (!objectPrefix.equals(prefix)) {
+            throw new IllegalArgumentException("NWKCP1 prefix differs from configured Root context");
+        }
+        return controlHeadKey;
     }
 
     @Override
@@ -110,8 +129,8 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
             String headKey, CanonicalBytes exactHeadValue, Sha256Digest exactHeadValueSha256) {
         Objects.requireNonNull(exactHeadValue, "exactHeadValue");
         Objects.requireNonNull(exactHeadValueSha256, "exactHeadValueSha256");
-        String prefix = headPrefix(headKey);
-        if (!Nwkcp1ObjectKeyV1.headKey(prefix).equals(headKey)
+        String prefix = objectPrefix;
+        if (!controlHeadKey.equals(headKey)
                 || !Sha256Digest.hash(exactHeadValue).equals(exactHeadValueSha256)) {
             throw new KafkaObjectCheckpointException("NWKCP1 selected-object token differs from the exact Head value");
         }
@@ -143,6 +162,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
     @Override
     public CompletionStage<Optional<CanonicalBytes>> readHead(String key) {
         try {
+            requireControlHead(key);
             Optional<CanonicalBytes> value = metadata.get(key);
             return CompletableFuture.completedFuture(value);
         } catch (RuntimeException failure) {
@@ -169,6 +189,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
     public CompletionStage<CasDisposition> compareAndSetHead(
             String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes replacement) {
         try {
+            requireControlHead(key);
             ControlMutationOutcome outcome = metadata.compareAndSet(key, exactExpected, replacement);
             return CompletableFuture.completedFuture(
                     switch (outcome) {
@@ -233,6 +254,12 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
                         != com.nereusstream.domain.protocol.ProtocolKindV1.KAFKA) {
             throw new KafkaObjectCheckpointException(
                     "final Kafka vector is incompatible with the exact physical closure context");
+        }
+    }
+
+    private void requireControlHead(String key) {
+        if (!controlHeadKey.equals(key)) {
+            throw new IllegalArgumentException("NWKCP1 Head escapes its exact Root authority");
         }
     }
 

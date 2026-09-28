@@ -32,6 +32,31 @@ public final class KafkaPartitionPublicationCellV1 {
         return state.get();
     }
 
+    /** Same-owner run replacement preserves every protocol component and every logical frontier. */
+    public KafkaPartitionPublicationResultV1 switchBookKeeperRun(
+            KafkaPartitionProtocolStateV1 expected, KafkaPartitionStateReferencesV1 references) {
+        KafkaPartitionProtocolStateV1 current = state.get();
+        KafkaPartitionPublicationResultV1 mismatch =
+                exactPredecessor(current, expected.fence(), expected.stateVersion());
+        if (mismatch != null) {
+            return mismatch;
+        }
+        var before = current.references();
+        if (current.frontiers().allocatedEndOffset() != current.frontiers().durableEndOffset()
+                || !references.doesNotRegress(before)
+                || !references.committedProducerState().equals(before.committedProducerState())
+                || !references.speculativeProducerQueue().equals(before.speculativeProducerQueue())
+                || !references.transactionIndex().equals(before.transactionIndex())
+                || !references.leaderEpochIndex().equals(before.leaderEpochIndex())) {
+            return result(KafkaPartitionPublicationOutcomeV1.INVALID_COMMIT_REPLACEMENT, current);
+        }
+        return replace(
+                current,
+                new KafkaPartitionProtocolStateV1(
+                        current.fence(), Math.incrementExact(current.stateVersion()), current.frontiers(), references),
+                KafkaPartitionPublicationKindV1.BOOKKEEPER_RUN_SWITCH);
+    }
+
     public KafkaPartitionReadSnapshotV1 captureReadSnapshot() {
         return state.get();
     }
@@ -223,8 +248,7 @@ public final class KafkaPartitionPublicationCellV1 {
         KafkaPartitionFrontiersV1 after = slot.replacementFrontiers();
         return after.noRegressionFrom(before)
                 && after.trimStartOffset() == before.trimStartOffset()
-                && after.highWatermark() == before.highWatermark()
-                && after.lastStableOffset() == before.lastStableOffset()
+                && after.highWatermark() == slot.commitEndOffset()
                 && slot.replacementReferences().doesNotRegress(current.references())
                 && slot.replacementReferences().activeTail().generation()
                         > current.references().activeTail().generation();

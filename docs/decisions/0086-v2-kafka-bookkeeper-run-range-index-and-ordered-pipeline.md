@@ -8,7 +8,10 @@ index granularity, ACK/publication order, and recovery shape. The accepted
 `NBKE2`/run/index wire and hard parser/admission caps must land before a writer. Their production constants/codecs are
 M2 implementation; checkpoint cadence, memory, pipeline, rollover, and 10k/100k admission defaults remain M2-K9
 evidence outputs. ADR 0087 refines Kafka protocol frontiers, producer/transaction state, ISR/HW, and Fetch semantics
-on this physical layout. Implementation and executable evidence have not started.
+on this physical layout. The current NSIP-1 BK slice implements Owner admission closure, shared commit and
+closed-history recovery; focused unit and actual BK/Oxia cases have passed. Native Controller assignment relocation
+has focused controller tests. The native Broker runtime port and the real Controller/Broker acceptance remain open;
+these results do not close M5/M6 or establish performance.
 
 ## Context
 
@@ -57,7 +60,10 @@ a contiguous Kafka Offset Range. Its lifecycle is `ACTIVE -> SEALED -> RETIRED`.
 stops/reconciles the old run and opens a new one; Owner Epoch is not a substitute:
 
 - ACTIVE admits ordered append groups and has an open logical end;
-- SEALED has a final logical end, complete index directory, footer, and immutable physical bounds;
+- normally SEALED has a final logical end, complete index directory, footer, and immutable physical bounds;
+- a crash-terminated run instead carries an immutable closed-Owner recovery cut: closure digest, actual fenced LAC,
+  independently verified final Kafka end and optional inert-suffix start. It does not invent a footer or complete
+  persisted index directory; the focused cold-history reader rebuilds its exact locators;
 - RETIRED has passed manifest/source-protection/read-pin/retention conditions and no longer serves reads.
 
 BookKeeper journal and entry-log files remain physically shared by many ledgers; logical per-partition chains do not
@@ -162,23 +168,35 @@ remain recovery authority.
 
 ### Bounded recovery
 
-After owner fencing/takeover, recovery opens the old ACTIVE ledger, validates the latest complete range-index checkpoint,
-and scans only the unchecked tail. It interprets DATA/control type explicitly, validates append-group descriptors, and
-finds the greatest gap-free committed Kafka offset. It then writes/finalizes the footer, publishes the sealed run, and
-opens a new run before new admission.
+Takeover first closes the old Owner's same-key run admission and discovers its complete immutable membership,
+including preceding closed Owners. It opens and fences every admitted ledger before replaying any run. Ordered replay
+validates exact headers, continuous run boundaries, complete DATA append-group descriptors and Kafka bytes. It adopts
+the greatest gap-free legal prefix, including complete groups whose response was lost. No election-adoptable offset,
+Follower Applied boundary or maximum physical offset cuts the shared committed prefix.
 
-Range-index coverage alone is insufficient to restore Kafka visibility. ADR 0087 requires one compatible range-index /
-producer-state / transaction-index / leader-epoch checkpoint vector and bounded suffix replay. The scan yields a
-physical candidate end plus producer/transaction/first-unstable/leader-epoch state; the elected replica's native
-`electionAdoptableEndOffset` caps new-leader LEO, native recovery supplies HW, and only then is LSO derived. Shared
-physical residue beyond the elected boundary is never auto-adopted.
+Range-index coverage alone is insufficient to restore Kafka visibility. A checkpoint must align the range, producer,
+transaction and leader-epoch vector. Otherwise recovery rebuilds protocol state from the preceding verified run/prefix.
+HW equals the legal shared committed end; LSO also accounts for ongoing transactions. An incomplete/conflicting
+terminal group leaves an inert physical suffix and contributes no visible Kafka range.
 
-Takeover does not rewrite the old run's creator Owner Epoch or reuse its admission authority. The footer records the
-qualified recovery/seal fence separately while preserving the run identity; only the new run admits under the new
-Owner Epoch. Physical entries after the recovered logical terminal are inert residue and never enter run coverage.
+Takeover preserves each old run's creator Owner and Kafka leader epochs. An ACTIVE crash run is sealed with a
+persisted recovery cut only after independent actual native metadata/prefix validation; the fenced old ledger receives
+no fabricated footer. A new Owner admits a distinct successor run after the recovered terminal. The current
+`KafkaBookKeeperPartitionV1` composes that path with the existing ordered pipeline and targeted reader, retaining exact
+old-run indexes and one coherent current commit snapshot. A later takeover rechecks each persisted recovery cut
+against its original closed Owner digest and freshly fenced native LAC, and discovers checkpoint/footer metadata
+within the accepted prefix before any inert suffix. The cut does not hide a checkpoint or existing footer from
+selection. DATA discovery probes contribute entry/byte debt only for the selected unchecked tail; all history
+remains fenced and elapsed-time bounded.
 
-The unchecked tail is bounded simultaneously by entry count, encoded bytes, and recovery time. Crossing any hard
-envelope backpressures or rolls the run before ACKed recovery work becomes unbounded. Candidate values such as 1,024
+Unchecked recovery debt is bounded simultaneously by entry count, encoded bytes, and recovery time. The current
+BK-only native slice persists an aligned producer/transaction/leader/source checkpoint at same-Owner rollover.
+Checkpoint, index, exact close/seal, read reopen, successor attachment and publication must all complete before
+covered entry/byte debt is released; failures stop new offset admission. Cold recovery fences every legal unretired
+ledger, then uses normal footer directories or protected checkpoint locators and replays only the uncovered tail.
+Discovery/fencing still consumes the time bound and Owner/run metadata remains bounded at 1,024. Native create
+qualification retains one current-run scope and fences its predecessor before replacement; there is no fixed
+256-Owner preallocation or native epoch limit. Complete M4/M5 retirement remains outside this slice. Candidate values such as 1,024
 RecordBatches or 1 MiB per checkpoint, 16--64 KiB blocks, 4,096--16,384 active locators, 8--32 in-flight groups, and a
 4--32 MiB recovery tail are benchmark inputs, not frozen format/default values.
 

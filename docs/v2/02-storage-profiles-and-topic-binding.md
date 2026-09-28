@@ -9,6 +9,15 @@ sourceTuple: v2-m1
 
 # Topic Protocol Binding, Storage Epochs, and profiles
 
+Kafka RF=1/minISR=1 applies to user and supported internal topics; BK quorum remains a separate physical setting.
+BK-primary ACK requires a complete continuous commit in legal admitted Owner history and coherent state/HW/LSO
+publication. Run admission and closure are low-frequency control operations before ledger fencing/recovery.
+NSIP-1 T4's Object core uses exact Provider persistence followed by a per-partition Binding/Owner Head CAS grant.
+Closing selects an immutable finite prefix on that same key; physical durability or an async checkpoint alone
+cannot grant a commit. The bounded authorization index and NWKCP1 common state survive Owner changes. The first native NSIP-1 slice accepts BOOKKEEPER_WAL_ONLY and requires an exact BK
+capability descriptor; no Object bucket, old ledger-prefix reservation or Broker-readiness assertion is required for
+that profile. Object profiles remain fail-closed in the native Broker selector; the core grant/publication path is independently implemented. Native cold-relocation evidence does not extend historical receipts.
+
 ## Immutable protocol binding
 
 A Topic Incarnation is created with one durable protocol binding:
@@ -199,9 +208,10 @@ its own explicit mapping is frozen; later async-Object selection requires a new 
 ### `OBJECT_WAL`
 
 The Object group is the primary durable WAL. ACK waits for verified provider durability of the complete typed Protocol
-Coverage plus owner-local locator and Kafka producer/transaction/leader-epoch publication. The WalRun Root/key/LIST
-contract makes the immutable group recoverable; no per-commit-set manifest mutation or async checkpoint page is added
-to the ACK cut.
+Coverage plus the legal commit authorization and coherent Kafka producer/transaction/leader-epoch publication.
+NSIP-1 T4 implements the grant and closure on one per-Binding/partition Head CAS, ordered against the exact Owner and
+continuous predecessor. WalRun Root/key/LIST and async checkpoint pages alone are not authorization; this synchronous
+authorization persistence is charged to ACK. Native Broker selection of this profile remains fail-closed.
 The profile accepts batching latency in exchange for lower storage and request cost. Post-ack materialization remains
 asynchronous and cannot weaken readability of acknowledged WAL ranges.
 

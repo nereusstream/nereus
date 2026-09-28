@@ -33,6 +33,10 @@ public final class Nwg1ObjectReaderV1 {
             }
             return List.copyOf(copies);
         }
+
+        void eraseOwnedFrames() {
+            decodedFrames.forEach(frame -> Arrays.fill(frame, (byte) 0));
+        }
     }
 
     public record AuthenticatedPrefix(
@@ -669,6 +673,78 @@ public final class Nwg1ObjectReaderV1 {
         if (value != null) {
             Arrays.fill(value, (byte) 0);
         }
+    }
+
+    /** Reuses the writer's complete wire check; current Binding/native policy and the consumer remain independent. */
+    public static VerifiedAppendUnit readSelfCheckedAppendUnit(
+            Nwg1SealedObjectV1 sealed,
+            long selectedFrameOrdinal,
+            Nwg1VerificationContextV1 context,
+            VerifiedFrameConsumer consumer)
+            throws IOException {
+        Objects.requireNonNull(consumer, "consumer");
+        var plan = sealed.requireSelfCheckedPlan(context);
+        var prefix = sealed.selfCheckedPrefix(context).orElseThrow();
+        var ranges = selectedAppendUnitRanges(prefix, selectedFrameOrdinal);
+        var directory = prefix.directory();
+        int unitOrdinal = Math.toIntExact(
+                directory.frames().get(Math.toIntExact(selectedFrameOrdinal)).appendUnitOrdinal());
+        var unit = directory.appendUnits().get(unitOrdinal);
+        int contextOrdinal = Math.toIntExact(unit.contextOrdinal());
+        validateSelectedBinding(directory.bindings().get(contextOrdinal), directory.protocolKind(), context);
+        var kafka = unit instanceof Nwg1DirectoryV1.KafkaAppendUnit value ? value : null;
+        var pulsar = unit instanceof Nwg1DirectoryV1.PulsarAppendUnit value ? value : null;
+        long decodedTotal = 0;
+        int first = Math.toIntExact(unit.firstFrameOrdinal());
+        for (int index = 0; index < ranges.size(); index++) {
+            int ordinal = Math.addExact(first, index);
+            var frame = directory.frames().get(ordinal);
+            byte[] payload = plan.frames().get(ordinal).decodedPayload();
+            try {
+                if (kafka != null) {
+                    byte[] nativeInput = payload.clone();
+                    Nwg1VerificationContextV1.NativeCoverage coverage;
+                    try {
+                        coverage = context.nativePayloadVerifier()
+                                .validateKafka(
+                                        nativeInput,
+                                        kafka.partitionId(),
+                                        kafka.kafkaLeaderEpoch(),
+                                        frame.coverage0(),
+                                        frame.coverage1());
+                    } finally {
+                        erase(nativeInput);
+                    }
+                    if (coverage == null
+                            || coverage.startInclusive() != frame.coverage0()
+                            || coverage.endExclusive() != frame.coverage1()) {
+                        failAt(
+                                Nwg1RejectionV1.COVERAGE_MISMATCH,
+                                Nwg1ValidationStageV1.NATIVE_FRAME,
+                                Nwg1IsolationScopeV1.APPEND_UNIT,
+                                "self-checked Kafka native coverage result");
+                    }
+                }
+                decodedTotal = Math.addExact(decodedTotal, payload.length);
+                consumer.accept(
+                        new VerifiedFrame(ordinal, index, frame.coverage0(), frame.coverage1(), payload.length),
+                        ByteBuffer.wrap(payload).asReadOnlyBuffer());
+            } finally {
+                erase(payload);
+            }
+        }
+        return new VerifiedAppendUnit(
+                directory.protocolKind(),
+                unitOrdinal,
+                contextOrdinal,
+                unit.firstFrameOrdinal(),
+                unit.frameCount(),
+                decodedTotal,
+                kafka == null ? pulsar.virtualLedgerId() : kafka.startOffset(),
+                kafka == null ? pulsar.entryId() : kafka.endOffsetExclusive(),
+                unit.appendCommitSetId(),
+                unit.storageAttemptId(),
+                unit.assignedPayloadSha256());
     }
 
     private static byte[] decodeFramePayload(Nwg1DirectoryV1.Frame row, byte[] preAead) {

@@ -16,6 +16,9 @@ package com.nereusstream.storage.object.control;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +111,102 @@ class WalCheckpointPublisherTest {
         assertThatThrownBy(publisher::publishNext)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("same-ordinal");
+    }
+
+    @Test
+    void prePositionPhysicalBodyChargeIncludesSharedMembersUntilExactCoverage() {
+        var store = new TestControlMetadataStore();
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var publisher = publisher(store, root);
+        publisher.initializeHead();
+        var reservation =
+                publisher.reserveBeforePosition(root.checkpointPolicy().maxUncheckpointedBytes());
+        var first = reservation.attach();
+        var second = reservation.attach();
+        assertThat(publisher.uncoveredExtentCount()).isOne();
+        assertThat(publisher.uncoveredBodyBytes())
+                .isEqualTo(root.checkpointPolicy().maxUncheckpointedBytes());
+        assertThatThrownBy(() -> publisher.reserveBeforePosition(512)).hasMessageContaining("capacity");
+        assertThat(publisher.queueDepth()).isZero();
+        assertThatThrownBy(() -> publisher.requiresAgeForcing(Long.MIN_VALUE)).hasMessageContaining("clock regressed");
+        publisher.bindPlan(List.of(first, second), ObjectWalControlTestFixtures.digest(10), 512);
+        publisher.sequenceStarted(reservation);
+        assertThatThrownBy(
+                        () -> publisher.bindPlan(List.of(first, second), ObjectWalControlTestFixtures.digest(10), 256))
+                .hasMessageContaining("physical sequence effect");
+        assertThat(publisher.uncoveredBodyBytes()).isEqualTo(512);
+        publisher.enqueue(reservation, descriptor(root, WalLaneId.OBJECT_LATENCY, 0, 10, 0));
+        first.close();
+        first.close();
+        second.close();
+        assertThat(publisher.uncoveredExtentCount()).isOne();
+        assertThat(publisher.uncoveredBodyBytes()).isEqualTo(512);
+        publisher.flush();
+        assertThat(publisher.uncoveredExtentCount()).isZero();
+        assertThat(publisher.uncoveredBodyBytes()).isZero();
+        publisher.close();
+        publisher.flush(); // A repeated terminal flush checks existing coverage without reopening work.
+        assertThatThrownBy(() -> publisher.reserveBeforePosition(512)).hasMessageContaining("closed");
+    }
+
+    @Test
+    void uncertainPageWithFailedReadRetainsOriginalRowsAndBytesAcrossEnqueue() {
+        var delegate = new TestControlMetadataStore();
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var pages = new ArrayList<CanonicalBytes>();
+        CanonicalControlMetadataStore store = new CanonicalControlMetadataStore() {
+            private boolean losePageReply = true;
+            private String failedReadKey;
+
+            @Override
+            public Optional<CanonicalBytes> get(String key) {
+                if (key.equals(failedReadKey)) {
+                    failedReadKey = null;
+                    throw new IllegalStateException("checkpoint page read unavailable");
+                }
+                return delegate.get(key);
+            }
+
+            @Override
+            public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes value) {
+                var outcome = delegate.putIfAbsent(key, value);
+                if (key.contains("/checkpoint/pages/")) {
+                    pages.add(value);
+                    if (losePageReply) {
+                        losePageReply = false;
+                        failedReadKey = key;
+                        return ControlMutationOutcome.RESPONSE_UNKNOWN;
+                    }
+                }
+                return outcome;
+            }
+
+            @Override
+            public ControlMutationOutcome compareAndSet(
+                    String key, Optional<CanonicalBytes> expected, CanonicalBytes candidate) {
+                return delegate.compareAndSet(key, expected, candidate);
+            }
+        };
+        var publisher = new WalCheckpointPublisher(
+                store,
+                WalRunControlKeys.checkpointHeadKey(7, 1),
+                WalRunControlKeys.checkpointPagePrefix(7, 1),
+                root,
+                WalCheckpointHeadV1.empty(WalRunControlCodec.rootSha256(root), 1, 10));
+        publisher.initializeHead();
+        publisher.enqueue(descriptor(root, WalLaneId.OBJECT_LATENCY, 0, 10, 0));
+        assertThatThrownBy(publisher::publishNext).hasMessageContaining("page read unavailable");
+        var original = pages.get(0);
+        publisher.enqueue(descriptor(root, WalLaneId.OBJECT_LATENCY, 1, 11, 0));
+        var page = publisher.publishNext().orElseThrow();
+        assertThat(WalRunControlCodec.encodeCheckpointPage(page)).isEqualTo(original);
+        assertThat(pages).containsExactly(original);
+        assertThat(publisher.head().coveredThrough()).isEqualTo(LaneSequenceVector.of(0, -1, -1));
+        assertThat(publisher.uncoveredExtentCount()).isOne();
+        publisher.flush();
+        assertThat(pages).hasSize(2);
+        assertThat(publisher.uncoveredExtentCount()).isZero();
+        publisher.requireFinalCoverage(LaneSequenceVector.of(1, -1, -1));
     }
 
     private static WalCheckpointPublisher publisher(TestControlMetadataStore store, WalRunRootRecord root) {

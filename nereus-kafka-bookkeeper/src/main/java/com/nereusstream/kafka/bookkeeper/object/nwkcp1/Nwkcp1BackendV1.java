@@ -69,6 +69,11 @@ public interface Nwkcp1BackendV1 {
         }
     }
 
+    /** Control authority keys are independent of the Object Provider namespace. */
+    default String protocolHeadKey(String walRunPrefix) {
+        return Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+    }
+
     CompletionStage<CreateResult> conditionalCreateObject(String key, CanonicalBytes body, Sha256Digest bodyDigest);
 
     CompletionStage<Optional<CanonicalBytes>> readCreatedObject(CreatedObjectToken token);

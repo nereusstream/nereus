@@ -36,6 +36,12 @@ public interface ObjectProviderTransport {
 
     ConditionalCreateResult putIfAbsent(ObjectIdentity identity, InputStream body) throws IOException;
 
+    /** A legacy/unqualified success carries no exact creation identity and must be remotely verified. */
+    default ConditionalCreateResponse putIfAbsentWithEvidence(ObjectIdentity identity, InputStream body)
+            throws IOException {
+        return ConditionalCreateResponse.outcome(putIfAbsent(identity, body));
+    }
+
     StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException;
 
     StreamingObject getRange(String key, long inclusiveStart, long exclusiveEnd, Optional<CanonicalBytes> versionToken)
@@ -88,6 +94,27 @@ public interface ObjectProviderTransport {
         ALREADY_EXISTS,
         DEFINITIVE_CONFLICT,
         RESPONSE_UNKNOWN
+    }
+
+    /** Adapter response to this exact conditional PUT; an ETag is never an immutable version token. */
+    record ConditionalCreateResponse(
+            ConditionalCreateResult outcome,
+            Optional<ObjectIdentity> createdIdentity,
+            Optional<CanonicalBytes> immutableVersionToken) {
+        public ConditionalCreateResponse {
+            java.util.Objects.requireNonNull(outcome, "outcome");
+            java.util.Objects.requireNonNull(createdIdentity, "createdIdentity");
+            java.util.Objects.requireNonNull(immutableVersionToken, "immutableVersionToken");
+            immutableVersionToken = immutableVersionToken.map(v -> CanonicalBytes.copyOf(v.toByteArray()));
+            if (outcome != ConditionalCreateResult.CREATED && createdIdentity.isPresent()
+                    || immutableVersionToken.isPresent() && createdIdentity.isEmpty()) {
+                throw new IllegalArgumentException("only an exact CREATED response may carry creation evidence");
+            }
+        }
+
+        public static ConditionalCreateResponse outcome(ConditionalCreateResult outcome) {
+            return new ConditionalCreateResponse(outcome, Optional.empty(), Optional.empty());
+        }
     }
 
     enum ConditionalDeleteResult {

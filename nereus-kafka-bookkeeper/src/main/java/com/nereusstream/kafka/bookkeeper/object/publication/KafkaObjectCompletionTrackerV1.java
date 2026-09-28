@@ -68,12 +68,14 @@ public final class KafkaObjectCompletionTrackerV1 {
             AssignedTicket assigned,
             KafkaSpeculativeCommitV1 commitSet,
             KafkaObjectExtentLocatorV1 locator,
-            KafkaObjectNativeStateV1 nativeState) {
+            KafkaObjectNativeStateV1 nativeState,
+            KafkaObjectAuthorizationV1.Proof authorization) {
         public ReadyCompletion {
             Objects.requireNonNull(assigned, "assigned");
             Objects.requireNonNull(commitSet, "commitSet");
             Objects.requireNonNull(locator, "locator");
             Objects.requireNonNull(nativeState, "nativeState");
+            Objects.requireNonNull(authorization, "authorization").require(commitSet, locator);
         }
     }
 
@@ -113,9 +115,6 @@ public final class KafkaObjectCompletionTrackerV1 {
         this(capacity, maxLocatorBytes, ownerEpoch, initialTicket);
         Objects.requireNonNull(recoveredTail, "recoveredTail");
         for (KafkaObjectExtentLocatorV1 locator : recoveredTail.activeTail().locators()) {
-            if (!locator.extent().walRunRootSha().equals(recoveredTail.walRunRootSha())) {
-                throw new IllegalArgumentException("recovered retained locator differs from its authenticated Root");
-            }
             int charge = KafkaObjectStateCodecV1.locator(locator).length();
             if (retainedLocators.putIfAbsent(locator, charge) != null) {
                 throw new IllegalArgumentException("authenticated recovery repeats a retained locator");
@@ -127,8 +126,86 @@ public final class KafkaObjectCompletionTrackerV1 {
         }
     }
 
+    private KafkaObjectAuthorizationV1 authorization;
+    private com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1 authorizationFence;
+    private long maxCandidateBodyBytes;
+    private com.nereusstream.storage.object.control.WalCheckpointPublisher checkpointPublisher;
+    private long maxPhysicalBodyBytes;
+
+    public synchronized void bindCheckpointPublisher(
+            com.nereusstream.storage.object.control.WalCheckpointPublisher publisher) {
+        bindCheckpointPublisher(publisher, maxCandidateBodyBytes);
+    }
+
+    public synchronized void bindCheckpointPublisher(
+            com.nereusstream.storage.object.control.WalCheckpointPublisher publisher, long physicalBodyCap) {
+        Objects.requireNonNull(publisher, "publisher");
+        if (checkpointPublisher == publisher) {
+            return;
+        }
+        if (pendingUnits() != 0 || checkpointPublisher != null && checkpointPublisher.uncoveredExtentCount() != 0) {
+            throw new IllegalStateException("Object tracker cannot replace an uncovered checkpoint publisher");
+        }
+        checkpointPublisher = publisher;
+        maxPhysicalBodyBytes = physicalBodyCap;
+    }
+
+    /** Exact opaque pre-position membership for the physical planner; the tracker still owns its release. */
+    public synchronized com.nereusstream.storage.object.control.WalCheckpointPublisher.Attachment checkpointAttachment(
+            AssignedTicket assigned, com.nereusstream.storage.object.control.WalCheckpointPublisher publisher) {
+        var slot = requireAssigned(assigned);
+        if (checkpointPublisher != publisher || slot.checkpointAttachment == null) {
+            throw new IllegalArgumentException("Object ticket has no exact pre-position checkpoint reservation");
+        }
+        return slot.checkpointAttachment;
+    }
+
+    public synchronized void bindAuthorization(
+            KafkaObjectAuthorizationV1 authority,
+            com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1 fence,
+            long candidateBodyCap) {
+        if (authorization != null || pendingUnits() != 0 || candidateBodyCap <= 0 || fence.ownerEpoch() != ownerEpoch) {
+            throw new IllegalStateException("Object tracker cannot replace its Owner grant authority");
+        }
+        authorization = Objects.requireNonNull(authority, "authority");
+        authorizationFence = Objects.requireNonNull(fence, "fence");
+        maxCandidateBodyBytes = candidateBodyCap;
+    }
+
+    synchronized void requireAuthorization(
+            KafkaObjectAuthorizationV1 authority,
+            com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1 fence) {
+        if (authorization != authority || !fence.equals(authorizationFence)) {
+            throw new IllegalArgumentException("Object tracker has no exact Binding authorization admission");
+        }
+    }
+
+    synchronized void requireCandidateBodyCharge(long bytes) {
+        if (authorization == null || bytes <= 0 || bytes > maxCandidateBodyBytes) {
+            throw new IllegalArgumentException("Object candidate exceeds its pre-position body charge");
+        }
+    }
+
     /** Atomically reserves one tracker slot and the exact fixed locator wire charge before offset assignment. */
     public synchronized Reservation reserveBeforePosition() {
+        if (checkpointPublisher == null) {
+            return reserveBeforePosition(null);
+        }
+        var physical = checkpointPublisher.reserveBeforePosition(maxPhysicalBodyBytes);
+        try {
+            return reserveBeforePosition(physical);
+        } catch (RuntimeException failure) {
+            physical.cancelUnused();
+            throw failure;
+        }
+    }
+
+    /** Shared packing reserves one physical descriptor/body before any member's separate protocol allocation. */
+    public synchronized Reservation reserveBeforePosition(
+            com.nereusstream.storage.object.control.WalCheckpointPublisher.Reservation physical) {
+        if (checkpointPublisher != null && physical == null) {
+            throw new IllegalArgumentException("Object tracker requires pre-position physical capacity");
+        }
         int locatorBytes = KafkaObjectStateCodecV1.exactLocatorBytes();
         if (Math.addExact(Math.addExact(pendingLocatorBytes, retainedLocatorBytes), locatorBytes) > maxLocatorBytes) {
             throw new IllegalStateException("combined tracker/locator pre-position capacity is exhausted");
@@ -143,8 +220,21 @@ public final class KafkaObjectCompletionTrackerV1 {
         if (slot < 0 || nextReservationId == Long.MAX_VALUE) {
             throw new IllegalStateException("combined tracker/locator reservation ring is exhausted");
         }
+        var attachment = physical == null ? null : checkpointPublisher.attach(physical);
+        KafkaObjectAuthorizationV1.Reservation authorityReservation;
+        try {
+            authorityReservation =
+                    authorization == null ? null : authorization.reserve(authorizationFence, maxCandidateBodyBytes);
+        } catch (RuntimeException failure) {
+            if (attachment != null) {
+                attachment.close();
+            }
+            throw failure;
+        }
         Reservation reservation = new Reservation(ownerEpoch, nextReservationId++, slot, locatorBytes);
         slots[slot] = Slot.reserved(reservation);
+        slots[slot].authorityReservation = authorityReservation;
+        slots[slot].checkpointAttachment = attachment;
         pendingLocatorBytes = Math.addExact(pendingLocatorBytes, locatorBytes);
         return reservation;
     }
@@ -288,9 +378,14 @@ public final class KafkaObjectCompletionTrackerV1 {
                 < locator.extent().laneSequence()) {
             throw new IllegalArgumentException("provider-resolved locator is ahead of the physical frontier");
         }
+        verifiedCommit.authorization().require(slot.commitSet, locator);
+        slot.authorization = verifiedCommit.authorization();
         slot.locator = locator;
         slot.nativeState = nativeState;
         slot.stage = LifecycleStage.PROVIDER_RESOLVED;
+        if (slot.authorityReservation != null) {
+            slot.authorityReservation.close();
+        }
     }
 
     /** No-effect validation used before a shared Object makes its sole physical resolution terminal. */
@@ -352,6 +447,9 @@ public final class KafkaObjectCompletionTrackerV1 {
             throw new IllegalStateException("binding rejection requires an exact provider-resolved physical extent");
         }
         slot.stage = LifecycleStage.BINDING_REJECTED;
+        if (slot.authorityReservation != null) {
+            slot.authorityReservation.close();
+        }
     }
 
     public synchronized Optional<ReadyCompletion> readyAt(long bindingDurableFrontier) {
@@ -367,7 +465,8 @@ public final class KafkaObjectCompletionTrackerV1 {
                 if (found != null) {
                     throw new IllegalStateException("multiple completion slots claim the same Kafka predecessor");
                 }
-                found = new ReadyCompletion(slot.assigned, slot.commitSet, slot.locator, slot.nativeState);
+                found = new ReadyCompletion(
+                        slot.assigned, slot.commitSet, slot.locator, slot.nativeState, slot.authorization);
             }
         }
         return Optional.ofNullable(found);
@@ -495,7 +594,15 @@ public final class KafkaObjectCompletionTrackerV1 {
                         "Kafka Object takeover cannot discard an assigned position; recover or roll back it exactly");
             }
         }
+        for (int index = 0; index < slots.length; index++) {
+            if (slots[index] != null) {
+                releasePendingSlot(index);
+            }
+        }
         Arrays.fill(slots, null);
+        authorization = null;
+        authorizationFence = null;
+        maxCandidateBodyBytes = 0;
         pendingLocatorBytes = 0;
         issuedRollbackPlans.clear();
         ownerEpoch = newOwnerEpoch;
@@ -576,6 +683,12 @@ public final class KafkaObjectCompletionTrackerV1 {
 
     private void releasePendingSlot(int index) {
         Slot slot = slots[index];
+        if (slot.authorityReservation != null) {
+            slot.authorityReservation.close();
+        }
+        if (slot.checkpointAttachment != null) {
+            slot.checkpointAttachment.close();
+        }
         pendingLocatorBytes = Math.subtractExact(pendingLocatorBytes, slot.reservation.locatorBytes());
         slots[index] = null;
     }
@@ -608,11 +721,14 @@ public final class KafkaObjectCompletionTrackerV1 {
     }
 
     private static final class Slot {
+        private com.nereusstream.storage.object.control.WalCheckpointPublisher.Attachment checkpointAttachment;
         private final Reservation reservation;
         private AssignedTicket assigned;
         private KafkaSpeculativeCommitV1 commitSet;
         private KafkaObjectExtentLocatorV1 locator;
         private KafkaObjectNativeStateV1 nativeState;
+        private KafkaObjectAuthorizationV1.Proof authorization;
+        private KafkaObjectAuthorizationV1.Reservation authorityReservation;
         private RollbackPlan rollbackPlan;
         private SequenceClaim sequenceClaim;
         private LifecycleStage stage;

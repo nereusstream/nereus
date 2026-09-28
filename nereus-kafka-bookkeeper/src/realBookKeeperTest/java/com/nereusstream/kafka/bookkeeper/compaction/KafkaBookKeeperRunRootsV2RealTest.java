@@ -84,11 +84,675 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
-/** Native run-root transport and NBKE2 bytes; protocol-owner admission and GC eligibility remain fixtures. */
+/** Real BK/Oxia admission and replay; Controller identity and GC eligibility are fixtures. */
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
 class KafkaBookKeeperRunRootsV2RealTest {
     private static final List<String> TOPICS = List.of("__consumer_offsets", "__transaction_state");
+
+    @Test
+    void brokerPartitionCompositionContinuesSharedCommitAndFetchAcrossTwoColdOwners() throws Exception {
+        try (var f = new Fixture(1594, "broker-composition", null)) {
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            var current = new java.util.concurrent.atomic.AtomicInteger(1);
+            var first = await(openBrokerPartition(f, 1, Optional.empty(), envelope, global, current));
+            var data = nativeTransactional(0, 71, 0, "transaction before cold takeover");
+            try (var admission = first.admit(List.of(data.length()))) {
+                assertThat(await(first.appendAssigned(admission, List.of(assigned(data))))
+                                .outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                        .COMMITTED_ORDERED);
+            }
+            assertThat(first.capture().root().frontiers().highWatermark()).isEqualTo(1);
+            assertThat(first.capture().root().frontiers().lastStableOffset()).isZero();
+            await(first.resign());
+            var closed = await(f.roots.readClosedOwner(1)).orElseThrow();
+            current.set(2);
+            var second = await(openBrokerPartition(f, 2, Optional.of(closed), envelope, global, current));
+            assertThat(second.capture().root().frontiers().highWatermark()).isEqualTo(1);
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isZero();
+            assertThat(second.capture()
+                            .committedProducerState()
+                            .findDuplicate(new com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1(
+                                    71, (short) 0, 0, 0)))
+                    .get()
+                    .extracting(com.nereusstream.kafka.bookkeeper.commit.KafkaProducerBatchResultV1::startOffset)
+                    .isEqualTo(0L);
+            var marker = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                    1,
+                    100,
+                    2,
+                    71,
+                    (short) 0,
+                    new org.apache.kafka.common.record.EndTransactionMarker(
+                            org.apache.kafka.common.record.ControlRecordType.COMMIT, 3)));
+            try (var admission = second.admit(List.of(marker.length()))) {
+                assertThat(await(second.appendAssigned(admission, List.of(assigned(marker))))
+                                .outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                        .COMMITTED_ORDERED);
+            }
+            assertThat(second.capture().root().frontiers().highWatermark()).isEqualTo(2);
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isEqualTo(2);
+            var request = new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                    0,
+                    com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1.READ_COMMITTED,
+                    10_000,
+                    Optional.empty());
+            assertThat(await(second.read(request)).batches())
+                    .extracting(
+                            com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadBatchV1::rawAssignedRecordBatch)
+                    .containsExactly(data, marker);
+            await(second.resign());
+            var closed2 = await(f.roots.readClosedOwner(2)).orElseThrow();
+            current.set(3);
+            var third = await(openBrokerPartition(f, 3, Optional.of(closed2), envelope, global, current));
+            assertThat(third.capture().root().frontiers().highWatermark()).isEqualTo(2);
+            assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(2);
+            assertThat(await(third.read(request)).batches())
+                    .extracting(
+                            com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadBatchV1::rawAssignedRecordBatch)
+                    .containsExactly(data, marker);
+            await(third.resign());
+        }
+    }
+
+    @Test
+    void smallRunBudgetRollsRepeatedlyAndRestoresCheckpointTailWithCrossRunTransactions() throws Exception {
+        try (var f = new Fixture(System.currentTimeMillis(), "checkpoint-rollover", null)) {
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    8, 8_192, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            var current = new java.util.concurrent.atomic.AtomicInteger(1);
+            var first = await(openBrokerPartition(f, 1, Optional.empty(), envelope, global, current));
+            for (int offset = 0; offset < 40; offset++) {
+                var data = nativeTransactional(offset, 71, offset, "transaction across checkpoint " + offset);
+                try (var admission = first.admit(List.of(data.length()))) {
+                    assertThat(await(first.appendAssigned(admission, List.of(assigned(data))))
+                                    .outcome())
+                            .isEqualTo(
+                                    com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                            .COMMITTED_ORDERED);
+                }
+            }
+            assertThat(first.capture().root().frontiers().highWatermark()).isEqualTo(40);
+            assertThat(first.capture().root().frontiers().lastStableOffset()).isZero();
+            var admitted = await(f.roots.readOwnerAdmission()).orElseThrow();
+            assertThat(admitted.runs().size()).isGreaterThan(10);
+            assertThat(f.source.spec().configurations()).hasSize(1);
+            var request = new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                    0,
+                    com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1.READ_UNCOMMITTED,
+                    50_000,
+                    Optional.empty());
+            var firstRead = await(first.read(request));
+            assertThat(firstRead.outcome())
+                    .as(firstRead.detail())
+                    .isEqualTo(com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadOutcomeV1.FOUND);
+            assertThat(firstRead.batches()).hasSize(40);
+            await(first.resign());
+            var closed = await(f.roots.readClosedOwner(1)).orElseThrow();
+            var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                    f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), 2, 2);
+            var recovered = await(new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
+                            f.admitting,
+                            f.roots,
+                            new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
+                            System::nanoTime)
+                    .recover(closed, fence, 0, envelope));
+            assertThat(recovered.selectedCheckpointEndOffset()).hasValue(39);
+            assertThat(recovered.progress().entries()).isEqualTo(3);
+            assertThat(recovered.runs()).hasSize(1);
+            current.set(2);
+            var second = await(openBrokerPartition(f, 2, Optional.of(closed), envelope, global, current));
+            assertThat(second.capture()
+                            .committedProducerState()
+                            .findDuplicate(new com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1(
+                                    71, (short) 0, 39, 39)))
+                    .get()
+                    .extracting(com.nereusstream.kafka.bookkeeper.commit.KafkaProducerBatchResultV1::startOffset)
+                    .isEqualTo(39L);
+            var marker = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                    40,
+                    100,
+                    2,
+                    71,
+                    (short) 0,
+                    new org.apache.kafka.common.record.EndTransactionMarker(
+                            org.apache.kafka.common.record.ControlRecordType.COMMIT, 3)));
+            try (var admission = second.admit(List.of(marker.length()))) {
+                await(second.appendAssigned(admission, List.of(assigned(marker))));
+            }
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isEqualTo(41);
+            for (int offset = 41; offset < 60; offset++) {
+                var data = nativeTransactional(offset, 72, offset - 41, "later transaction " + offset, 2);
+                try (var admission = second.admit(List.of(data.length()))) {
+                    await(second.appendAssigned(admission, List.of(assigned(data))));
+                }
+            }
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isEqualTo(41);
+            await(second.resign());
+            current.set(3);
+            var third = await(openBrokerPartition(f, 3, await(f.roots.readClosedOwner(2)), envelope, global, current));
+            assertThat(third.capture().root().frontiers().highWatermark()).isEqualTo(60);
+            assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(41);
+            var abort = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                    60,
+                    100,
+                    3,
+                    72,
+                    (short) 0,
+                    new org.apache.kafka.common.record.EndTransactionMarker(
+                            org.apache.kafka.common.record.ControlRecordType.ABORT, 4)));
+            try (var admission = third.admit(List.of(abort.length()))) {
+                await(third.appendAssigned(admission, List.of(assigned(abort))));
+            }
+            assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(61);
+            assertThat(await(third.read(request)).batches()).hasSize(61);
+            await(third.resign());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void unknownCheckpointAndCloseStopAllocationAndPreserveAckedPrefix(boolean closeFault) throws Exception {
+        try (var f = new Fixture(System.currentTimeMillis(), "checkpoint-unknown-" + closeFault, null)) {
+            var expected = new java.util.ArrayList<CanonicalBytes>();
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    8, 8_192, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            var current = new java.util.concurrent.atomic.AtomicInteger(1);
+            var first = await(openBrokerPartition(f, 1, Optional.empty(), envelope, global, current));
+            for (int offset = 0; offset < 3; offset++) {
+                var data = nativeTransactional(offset, 81, offset, "acked-" + offset);
+                expected.add(data);
+                try (var admission = first.admit(List.of(data.length()))) {
+                    assertThat(await(first.appendAssigned(admission, List.of(assigned(data))))
+                                    .outcome())
+                            .isEqualTo(
+                                    com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                            .COMMITTED_ORDERED);
+                }
+            }
+            f.loseCheckpoint = !closeFault;
+            f.loseClose = closeFault;
+            var next = nativeTransactional(3, 81, 3, "not allocated");
+            assertThatThrownBy(() -> first.admit(List.of(next.length()))).hasMessageContaining("rollover");
+            assertThat(first.capture().root().frontiers().allocatedEndOffset()).isEqualTo(3);
+            assertThat(await(f.roots.readOwnerAdmission()).orElseThrow().runs()).hasSize(1);
+            assertThatThrownBy(() -> first.admit(List.of(next.length()))).hasMessageContaining("fenced");
+            assertThat(await(f.roots.closeOwner(first.owner())).exactProof()).isPresent();
+            current.set(2);
+            var second = await(openBrokerPartition(f, 2, await(f.roots.readClosedOwner(1)), envelope, global, current));
+            assertThat(second.capture().root().frontiers().highWatermark()).isEqualTo(3);
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isZero();
+            var marker = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                    3,
+                    100,
+                    2,
+                    81,
+                    (short) 0,
+                    new org.apache.kafka.common.record.EndTransactionMarker(
+                            org.apache.kafka.common.record.ControlRecordType.COMMIT, 3)));
+            expected.add(marker);
+            try (var admission = second.admit(List.of(marker.length()))) {
+                assertThat(await(second.appendAssigned(admission, List.of(assigned(marker))))
+                                .outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                        .COMMITTED_ORDERED);
+            }
+            assertThat(second.capture().root().frontiers().lastStableOffset()).isEqualTo(4);
+            var request = new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                    0,
+                    com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1.READ_COMMITTED,
+                    50_000,
+                    Optional.empty());
+            assertThat(await(second.read(request)).batches()).hasSize(4);
+            await(second.resign());
+            var closed = await(f.roots.readClosedOwner(2)).orElseThrow();
+            var firstRoot = await(f.roots.readAdmittedRun(await(f.roots.readClosedOwner(1))
+                            .orElseThrow()
+                            .runs()
+                            .get(0)))
+                    .orElseThrow();
+            assertThat(firstRoot.recoveryCut()).isPresent();
+            current.set(3);
+            var third = await(openBrokerPartition(f, 3, Optional.of(closed), envelope, global, current));
+            assertThat(third.capture().root().frontiers().highWatermark()).isEqualTo(4);
+            assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(4);
+            var recovered = await(new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
+                            f.admitting,
+                            f.roots,
+                            new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
+                            System::nanoTime)
+                    .recover(
+                            closed,
+                            new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                                    f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), 3, 3),
+                            0,
+                            envelope));
+            assertThat(recovered.selectedCheckpointEndOffset()).hasValue(3);
+            assertThat(recovered.progress().entries()).isEqualTo(3);
+            assertThat(recovered.endOffset()).isEqualTo(4);
+            var retry = nativeTransactional(2, 81, 2, "acked-2", 3);
+            try (var admission = third.admit(List.of(retry.length()))) {
+                var duplicate = await(third.appendAssigned(admission, List.of(assigned(retry))));
+                assertThat(duplicate.outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                        .COMMITTED_ORDERED);
+                assertThat(duplicate.startOffset()).hasValue(2);
+                assertThat(duplicate.endOffsetExclusive()).hasValue(3);
+            }
+            assertThat(third.capture().root().frontiers().allocatedEndOffset()).isEqualTo(4);
+            assertThat(await(third.read(request)).batches())
+                    .extracting(
+                            com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadBatchV1::rawAssignedRecordBatch)
+                    .containsExactlyElementsOf(expected);
+            var later = nativeTransactional(4, 81, 3, "after repeated takeover", 3);
+            try (var admission = third.admit(List.of(later.length()))) {
+                var appended = await(third.appendAssigned(admission, List.of(assigned(later))));
+                assertThat(appended.outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                        .COMMITTED_ORDERED);
+                assertThat(appended.startOffset()).hasValue(4);
+                assertThat(appended.endOffsetExclusive()).hasValue(5);
+            }
+            assertThat(third.capture().root().frontiers().highWatermark()).isEqualTo(5);
+            assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(4);
+            assertThat(await(third.read(request)).batches()).hasSize(4);
+            expected.add(later);
+            assertThat(await(third.read(
+                                    new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                                            0,
+                                            com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1
+                                                    .READ_UNCOMMITTED,
+                                            50_000,
+                                            Optional.empty())))
+                            .batches())
+                    .extracting(
+                            com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadBatchV1::rawAssignedRecordBatch)
+                    .containsExactlyElementsOf(expected);
+            await(third.resign());
+        }
+    }
+
+    @Test
+    void unknownSuccessorAttachmentRemainsInClosedMembershipAndCannotAllocate() throws Exception {
+        try (var f = new Fixture(System.currentTimeMillis(), "rollover-attach-unknown", null)) {
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    8, 8_192, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            var current = new java.util.concurrent.atomic.AtomicInteger(1);
+            var faults = new Faults(f.nativeClient);
+            var roots = f.faulted(faults);
+            var first = await(openBrokerPartition(f, roots, 1, Optional.empty(), envelope, global, current));
+            for (int offset = 0; offset < 3; offset++) {
+                var data = nativeTransactional(offset, 91, offset, "before lost attach " + offset);
+                try (var admission = first.admit(List.of(data.length()))) {
+                    assertThat(await(first.appendAssigned(admission, List.of(assigned(data))))
+                                    .outcome())
+                            .isEqualTo(
+                                    com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedAppendOutcomeV1
+                                            .COMMITTED_ORDERED);
+                }
+            }
+            faults.loseAdmission = true;
+            assertThatThrownBy(() -> first.admit(List.of(
+                            nativeTransactional(3, 91, 3, "not allocated").length())))
+                    .hasMessageContaining("rollover");
+            assertThat(first.capture().root().frontiers().allocatedEndOffset()).isEqualTo(3);
+            faults.blocked = false;
+            var closure = await(f.roots.closeOwner(first.owner())).exactProof().orElseThrow();
+            assertThat(closure.runs()).hasSize(2);
+            current.set(2);
+            var second = await(openBrokerPartition(f, 2, Optional.of(closure), envelope, global, current));
+            assertThat(second.capture().root().frontiers().highWatermark()).isEqualTo(3);
+            var request = new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                    0,
+                    com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1.READ_UNCOMMITTED,
+                    50_000,
+                    Optional.empty());
+            assertThat(await(second.read(request)).batches()).hasSize(3);
+            await(second.resign());
+        }
+    }
+
+    private static CompletionStage<com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1>
+            openBrokerPartition(
+                    Fixture f,
+                    int epoch,
+                    Optional<com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1> closed,
+                    com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1 envelope,
+                    com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1 global,
+                    java.util.concurrent.atomic.AtomicInteger current) {
+        return openBrokerPartition(f, f.roots, epoch, closed, envelope, global, current);
+    }
+
+    private static CompletionStage<com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1>
+            openBrokerPartition(
+                    Fixture f,
+                    OxiaKafkaRunRootAuthorityV2 roots,
+                    int epoch,
+                    Optional<com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1> closed,
+                    com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1 envelope,
+                    com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1 global,
+                    java.util.concurrent.atomic.AtomicInteger current) {
+        var original = f.runBinding(epoch - 1);
+        var binding = new Nbke2RunBindingV1(
+                original.bindingId(),
+                original.topicIncarnation(),
+                original.partitionId(),
+                original.storageEpochId(),
+                epoch,
+                epoch,
+                original.providerScopeId(),
+                original.runId());
+        var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), epoch, epoch);
+        return com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.open(
+                f.admitting,
+                roots,
+                roots,
+                new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(epoch, epoch, epoch, epoch, epoch),
+                binding,
+                fence,
+                closed,
+                new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                        new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000)),
+                global,
+                envelope,
+                10_000,
+                ignored -> {},
+                () -> current.get() == epoch);
+    }
+
+    private static com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1 assigned(
+            CanonicalBytes bytes) {
+        return com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1.validate(
+                com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1.parse(bytes));
+    }
+
+    @Test
+    void crashRunCutPermitsANewNativeWriterAndRecoveryOfATransactionAcrossOwners() throws Exception {
+        try (var f = new Fixture(1593, "crash-successor", null)) {
+            var old = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            writeNative(f, old, 0, nativeTransactional(0, 71, 0, "transaction before failure"));
+            // The next multi-member append reached BK only for its first entry. Its offset is not adoptable.
+            var partial = old.reserveDataGroup(2);
+            f.append(
+                    old.snapshot().handle(),
+                    partial.firstEntryId(),
+                    Nbke2CodecV1.encode(
+                            old.snapshot().handle().ledgerIdentity().ledgerId(),
+                            partial.firstEntryId(),
+                            new Nbke2DataV1(
+                                    old.snapshot().runBinding(),
+                                    1,
+                                    0,
+                                    0,
+                                    2,
+                                    new Id128(1593, 991),
+                                    new Id128(1593, 992),
+                                    Optional.empty(),
+                                    nativeTransactional(1, 71, 1, "incomplete append"))));
+            var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
+            var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+            var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                    f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), 2, 2);
+            var reads = f.source.newSession();
+            try {
+                var recovery = new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
+                        reads,
+                        f.roots,
+                        new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
+                        System::nanoTime);
+                var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                        100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
+                var recovered = await(recovery.recover(closed, fence, 0, envelope));
+                var exact = recovered.runs().get(0);
+                assertThat(exact.recovery().outcome())
+                        .isEqualTo(
+                                com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRecoveryOutcomeV1
+                                        .RECOVERED_WITH_INERT_RESIDUE);
+                assertThat(exact.recovery().conflictEntryId()).hasValue(partial.firstEntryId());
+                var oldPayload = ImmutableRetainedStoragePayload.copyOf(new byte[] {1});
+                try {
+                    assertThat(await(f.session.appendExplicitEntry(new RunLedgerAppendRequestV1(
+                                            old.snapshot().handle(), partial.firstEntryId() + 1, oldPayload)))
+                                    .outcome())
+                            .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+                } finally {
+                    assertThat(oldPayload.release()).isTrue();
+                }
+                assertThat(await(f.roots.sealRecoveredRun(
+                                        exact.root().root(), closed, exact.fenceProof(), 2, OptionalLong.empty()))
+                                .outcome())
+                        .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+                var sealed = await(f.roots.sealRecoveredRun(
+                                exact.root().root(),
+                                closed,
+                                exact.fenceProof(),
+                                1,
+                                OptionalLong.of(partial.firstEntryId())))
+                        .exactProof()
+                        .orElseThrow();
+                var stored = f.stored(sealed);
+                assertThat(stored.recoveryCut()).isPresent();
+                assertThat(KafkaRunRootRecordV2.decode(stored.encode())).isEqualTo(stored);
+                assertThat(await(f.roots.sealRecoveredRun(
+                                        exact.root().root(),
+                                        closed,
+                                        exact.fenceProof(),
+                                        1,
+                                        OptionalLong.of(partial.firstEntryId())))
+                                .exactProof())
+                        .contains(sealed);
+                var owner2 = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(2, 2, 2, 2, 2);
+                assertThat(await(f.roots.openOwner(owner2, Optional.of(closed))).exactProof())
+                        .isPresent();
+                var b = f.runBinding(1);
+                var nextBinding = new Nbke2RunBindingV1(
+                        b.bindingId(),
+                        b.topicIncarnation(),
+                        b.partitionId(),
+                        b.storageEpochId(),
+                        2,
+                        2,
+                        b.providerScopeId(),
+                        b.runId());
+                var next = await(
+                        KafkaBookKeeperRunLifecycleV1.createAfterRecovery(f.admitting, f.roots, sealed, nextBinding));
+                var marker = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                        1,
+                        100,
+                        2,
+                        71,
+                        (short) 0,
+                        new org.apache.kafka.common.record.EndTransactionMarker(
+                                org.apache.kafka.common.record.ControlRecordType.COMMIT, 3)));
+                writeNative(f, next, 1, marker);
+                var closed2 = await(f.roots.closeOwner(owner2)).exactProof().orElseThrow();
+                var fence3 = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                        f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), 3, 3);
+                var repeated = await(recovery.recover(closed2, fence3, 0, envelope));
+                assertThat(repeated.endOffset()).isEqualTo(2);
+                assertThat(repeated.protocolState()
+                                .orElseThrow()
+                                .transactionState()
+                                .firstUnstableOffset(2))
+                        .isEmpty();
+                assertThat(repeated.protocolState()
+                                .orElseThrow()
+                                .transactionState()
+                                .completedTransactions())
+                        .singleElement()
+                        .satisfies(transaction -> {
+                            assertThat(transaction.firstOffset()).isZero();
+                            assertThat(transaction.markerEndOffsetExclusive()).isEqualTo(2);
+                            assertThat(transaction.aborted()).isFalse();
+                        });
+                assertThat(repeated.runs().get(0).root())
+                        .isEqualTo(stored.select(f.stored(next.snapshot().root())));
+                assertThat(f.stored(sealed).initialLink())
+                        .isEqualTo(exact.root().initialLink());
+            } finally {
+                await(reads.closeAsync());
+            }
+        }
+    }
+
+    @Test
+    void closedMultiRunHistoryRecoversNativeTransactionsAndTheSameOffsetsTwice() throws Exception {
+        try (var f = new Fixture(1592, "cold-history", null)) {
+            var first = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+            var firstData = nativeTransactional(0, 71, 0, "first transaction");
+            writeNative(f, first, 0, firstData);
+            await(first.drain());
+            await(first.seal(
+                    f.footer(first.snapshot().runBinding(), 1, first.snapshot().nextEntryId())));
+            var second = await(first.createSuccessor(f.runBinding(1)));
+            var marker = canonical(org.apache.kafka.common.record.MemoryRecords.withEndTransactionMarker(
+                    1,
+                    100,
+                    1,
+                    71,
+                    (short) 0,
+                    new org.apache.kafka.common.record.EndTransactionMarker(
+                            org.apache.kafka.common.record.ControlRecordType.ABORT, 3)));
+            writeNative(f, second, 1, marker);
+            var openData = nativeTransactional(2, 72, 0, "ongoing transaction");
+            writeNative(f, second, 2, openData);
+
+            var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
+            var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+            assertThat(closed.runs()).hasSize(2);
+            var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                    f.scope.bindingId(), f.scope.topic(), f.scope.partition(), 1, f.scope.storageEpoch(), 2, 2);
+            var nativeAdapter = new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1();
+            var reads = f.source.newSession();
+            try {
+                var recovery = new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
+                        reads,
+                        f.roots,
+                        batch -> {
+                            // The first replayed batch is reached only after every legal ledger is closed natively.
+                            for (var handle : f.handles.values()) {
+                                assertThat(f.source
+                                                .captureExactTarget(handle)
+                                                .toCompletableFuture()
+                                                .join()
+                                                .exactTarget())
+                                        .isPresent();
+                            }
+                            return nativeAdapter.protocolDelta(batch);
+                        },
+                        System::nanoTime);
+                var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                        100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
+                var recovered = await(recovery.recover(closed, fence, 0, envelope));
+                assertThat(recovered.endOffset()).isEqualTo(3);
+                var state = recovered.protocolState().orElseThrow();
+                assertThat(state.producerState()
+                                .findDuplicate(
+                                        new com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1(
+                                                71, (short) 0, 0, 0)))
+                        .get()
+                        .satisfies(result -> {
+                            assertThat(result.startOffset()).isZero();
+                            assertThat(result.endOffsetExclusive()).isEqualTo(1);
+                        });
+                assertThat(state.producerState().producers().get(71L).lastSequence())
+                        .isZero();
+                assertThat(state.producerState().producers().get(71L).coordinatorEpoch())
+                        .isEqualTo(3);
+                assertThat(state.transactionState().abortedTransactions())
+                        .singleElement()
+                        .satisfies(aborted -> {
+                            assertThat(aborted.firstOffset()).isZero();
+                            assertThat(aborted.markerEndOffsetExclusive()).isEqualTo(2);
+                        });
+                assertThat(state.transactionState().firstUnstableOffset(3)).hasValue(2);
+                assertThat(recovered.readTable(1).runs()).hasSize(2);
+                assertThat(recovered
+                                .readTable(1)
+                                .floorOrSuccessor(2)
+                                .orElseThrow()
+                                .activeIndex()
+                                .orElseThrow()
+                                .floorOrSuccessor(2)
+                                .orElseThrow()
+                                .entryId())
+                        .isEqualTo(2);
+
+                // A failed takeover with no admitted new run still links the identical immutable prior history.
+                var owner2 = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(2, 2, 2, 2, 2);
+                assertThat(await(f.roots.openOwner(owner2, Optional.of(closed))).exactProof())
+                        .isPresent();
+                var closed2 = await(f.roots.closeOwner(owner2)).exactProof().orElseThrow();
+                var fence3 = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                        f.scope.bindingId(), f.scope.topic(), f.scope.partition(), 1, f.scope.storageEpoch(), 3, 3);
+                var repeated = await(recovery.recover(closed2, fence3, 0, envelope));
+                assertThat(repeated.endOffset()).isEqualTo(recovered.endOffset());
+                assertThat(repeated.protocolState()).isEqualTo(recovered.protocolState());
+                assertThat(repeated.runs().stream()
+                                .map(run -> run.root().initialLink())
+                                .toList())
+                        .containsExactlyElementsOf(closed.runs());
+            } finally {
+                await(reads.closeAsync());
+            }
+        }
+    }
+
+    private static CanonicalBytes nativeTransactional(long offset, long producerId, int sequence, String value) {
+        return nativeTransactional(offset, producerId, sequence, value, 1);
+    }
+
+    private static CanonicalBytes nativeTransactional(
+            long offset, long producerId, int sequence, String value, int epoch) {
+        return canonical(org.apache.kafka.common.record.MemoryRecords.withTransactionalRecords(
+                org.apache.kafka.common.record.RecordBatch.MAGIC_VALUE_V2,
+                offset,
+                org.apache.kafka.common.compress.Compression.NONE,
+                producerId,
+                (short) 0,
+                sequence,
+                epoch,
+                new org.apache.kafka.common.record.SimpleRecord(
+                        value.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+    }
+
+    private static byte[] canonicalBuffer(java.nio.ByteBuffer source) {
+        byte[] bytes = new byte[source.remaining()];
+        source.get(bytes);
+        return bytes;
+    }
+
+    private static CanonicalBytes canonical(org.apache.kafka.common.record.MemoryRecords records) {
+        byte[] bytes = new byte[records.sizeInBytes()];
+        records.buffer().duplicate().get(bytes);
+        return CanonicalBytes.copyOf(bytes);
+    }
+
+    private static void writeNative(
+            Fixture fixture, KafkaBookKeeperRunLifecycleV1 run, long offset, CanonicalBytes body) throws Exception {
+        var reservation = run.reserveDataGroup(1);
+        fixture.data(run.snapshot().handle(), run.snapshot().runBinding(), reservation.firstEntryId(), offset, body);
+        run.completeDataGroup(reservation);
+    }
 
     @Test
     void nativeLifecyclePublishesSealedRootsAndDataForBothInternalTopics() throws Exception {
@@ -160,6 +824,49 @@ class KafkaBookKeeperRunRootsV2RealTest {
     }
 
     @Test
+    void nativeOwnerClosureFencesLateRolloverAndRepeatsTheSameLegalRunSet() throws Exception {
+        try (var f = new Fixture(1591, "orders", null)) {
+            var faults = new Faults(f.nativeClient);
+            var roots = f.faulted(faults);
+            var run = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, roots, f.runBinding(0), 0));
+            f.writeData(run);
+            await(run.drain());
+            var sealed = await(run.seal(f.footer(
+                            run.snapshot().runBinding(), 2, run.snapshot().nextEntryId())))
+                    .root();
+            faults.holdKey = roots.nativeOwnerKey();
+            var late = run.createSuccessor(f.runBinding(1)).toCompletableFuture();
+            try {
+                faults.held.get(30, TimeUnit.SECONDS);
+                var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
+                var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+                assertThat(closed.runs()).containsExactly(f.record(sealed).initialLink());
+                var proof = await(f.session.fenceAndRecoverRunLedger(
+                                run.snapshot().handle()))
+                        .exactProof()
+                        .orElseThrow();
+                assertThat(proof.fenced()).isTrue();
+                faults.release.run();
+                assertThatThrownBy(() -> late.get(30, TimeUnit.SECONDS))
+                        .hasRootCauseMessage("run-root mutation was not established exactly");
+                assertThat(await(f.roots.openRoot(f.runBinding(1).runId()))).isEmpty();
+                assertThat(await(f.roots.closeOwner(owner)).exactProof()).contains(closed);
+                assertThat(await(f.roots.readClosedOwner(1))).contains(closed);
+                assertThat(await(f.roots.openOwner(
+                                        new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(2, 2, 2, 2, 2),
+                                        Optional.of(closed)))
+                                .exactProof())
+                        .isPresent();
+                assertThat(await(f.roots.closeOwner(owner)).exactProof()).contains(closed);
+            } finally {
+                if (faults.release != null) {
+                    faults.release.run();
+                }
+            }
+        }
+    }
+
+    @Test
     void nativeSuccessorRaceKeepsOneChildAndTheWinningMetadataVersion() throws Exception {
         try (var f = new Fixture(1504, "orders", null)) {
             var faults = new Faults(f.nativeClient);
@@ -170,7 +877,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
             var sealed = await(run.seal(f.footer(
                             run.snapshot().runBinding(), 2, run.snapshot().nextEntryId())))
                     .root();
-            faults.holdKey = roots.nativeRootKey(sealed.runId());
+            faults.holdKey = roots.nativeOwnerKey();
             var older = run.createSuccessor(f.runBinding(1)).toCompletableFuture();
             try {
                 faults.held.get(30, TimeUnit.SECONDS);
@@ -220,7 +927,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     .isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
             assertThat(await(f.nativeClient.read(f.roots.nativeRootKey(root.runId()))))
                     .isEmpty();
-            assertThat(await(f.nativeClient.read(f.roots.nativeGenesisKey()))).isEmpty();
+            assertThat(await(f.roots.readOwnerAdmission()).orElseThrow().runs()).isEmpty();
         }
     }
 
@@ -302,14 +1009,14 @@ class KafkaBookKeeperRunRootsV2RealTest {
             try (var f = new Fixture(1510 + i, TOPICS.get(i), null)) {
                 var root = f.prepareSealedSource();
                 var faults = new Faults(f.nativeClient);
-                faults.loseGenesis = true;
+                faults.loseAdmission = true;
                 assertThat(await(f.faulted(faults).createRoot(root)).outcome())
                         .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
                 assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
                 var rootValue = await(f.nativeClient.read(f.roots.nativeRootKey(root.runId())))
                         .orElseThrow();
                 var genesis =
-                        await(f.nativeClient.read(f.roots.nativeGenesisKey())).orElseThrow();
+                        await(f.nativeClient.read(f.roots.nativeOwnerKey())).orElseThrow();
                 var authority = await(f.route.read(f.record(root).resource().authorityKey()))
                         .orElseThrow();
                 Files.write(
@@ -372,7 +1079,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 var rootValue =
                         await(f.nativeClient.read(f.roots.nativeRootKey(runId))).orElseThrow();
                 var genesis =
-                        await(f.nativeClient.read(f.roots.nativeGenesisKey())).orElseThrow();
+                        await(f.nativeClient.read(f.roots.nativeOwnerKey())).orElseThrow();
                 assertThat(identity(rootValue)).isEqualTo(lines.get(3));
                 assertThat(identity(genesis)).isEqualTo(lines.get(4));
                 var actual = await(f.roots.openRoot(runId)).orElseThrow();
@@ -387,8 +1094,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 assertThat(f.tickets(actual.ledgerIdentity())).isZero();
                 assertThat(await(f.nativeClient.read(f.roots.nativeRootKey(runId))))
                         .contains(rootValue);
-                assertThat(await(f.nativeClient.read(f.roots.nativeGenesisKey())))
-                        .contains(genesis);
+                assertThat(await(f.nativeClient.read(f.roots.nativeOwnerKey()))).contains(genesis);
                 var sealed = sealed(actual, 2);
                 assertThat(await(f.roots.sealRoot(actual, sealed)).exactProof()).contains(sealed);
                 assertThat(await(f.roots.openRoot(runId))).contains(sealed);
@@ -487,11 +1193,15 @@ class KafkaBookKeeperRunRootsV2RealTest {
         final PhysicalNamespaceAuthorityBindingV2 binding;
         final M5BookKeeperNativeCreateClientV2 source;
         final RealBookKeeperCellSessionV1 session;
+        final List<RunLedgerConfigurationV1> configurations;
         final KafkaBookKeeperNativeRootVerifierV2 verifier;
         final OxiaQuotaTargetDeleteStoreV2 route;
         final BookKeeperCellSession admitting;
         final OxiaKafkaRunRootAuthorityV2 roots;
         final Map<StorageRunId, RunLedgerHandleV1> handles = new ConcurrentHashMap<>();
+        volatile boolean loseCheckpoint;
+        volatile boolean loseClose;
+        volatile RunLedgerAppendRequestV1 lostCheckpoint;
 
         Fixture(long attempt, String topic, List<String> restore) throws Exception {
             this.attempt = attempt;
@@ -544,6 +1254,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                                     .toList())
                     : M5BookKeeperNativeCreateSpecV2.decode(
                             CanonicalBytes.copyOf(java.util.HexFormat.of().parseHex(restore.get(0))));
+            configurations = spec.configurations();
             source = M5BookKeeperNativeCreateClientV2.connect(uri, capability, spec, binding);
             session = source.newSession();
             verifier = new KafkaBookKeeperNativeRootVerifierV2(source);
@@ -555,6 +1266,13 @@ class KafkaBookKeeperRunRootsV2RealTest {
             roots = await(namespace.openKafkaRunRoots(
                     backend, new Oxia09ExactMetadataTransactionStoreV1(oxia), scope, verifier));
             admitting = new AdmittingSession(this);
+            if (restore == null) {
+                assertThat(await(roots.openOwner(
+                                        new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1),
+                                        Optional.empty()))
+                                .exactProof())
+                        .isPresent();
+            }
         }
 
         OxiaKafkaRunRootAuthorityV2 faulted(OxiaConditionalClient client) {
@@ -575,7 +1293,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     1,
                     1,
                     scope.providerScope(),
-                    source.spec().configurations().get(ordinal).runId());
+                    configurations.get(ordinal).runId());
         }
 
         KafkaRunRootRecordV2 record(KafkaRunRootSnapshotV1 root) {
@@ -596,8 +1314,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
         CompletionStage<Void> admit(RunLedgerHandleV1 handle) {
             var resource = new PhysicalResourceIdV2.BookKeeperLedger(
                     binding.physicalNamespace(), handle.ledgerIdentity().ledgerId());
-            return route.quota()
-                    .reserve(resource)
+            return reserve(resource, 32)
                     .thenCompose(reservation -> {
                         assertThat(reservation).isEqualTo(M5GcQuotaCoordinatorV2.Result.GRANTED);
                         return route.compareAndSet(
@@ -614,6 +1331,14 @@ class KafkaBookKeeperRunRootsV2RealTest {
                                                 .MutationOutcome.APPLIED_EXACT);
                         handles.put(handle.runId(), handle);
                     });
+        }
+
+        CompletionStage<M5GcQuotaCoordinatorV2.Result> reserve(PhysicalResourceIdV2 resource, int attempts) {
+            return route.quota()
+                    .reserve(resource)
+                    .thenCompose(result -> result == M5GcQuotaCoordinatorV2.Result.RETRY && attempts > 1
+                            ? reserve(resource, attempts - 1)
+                            : CompletableFuture.completedFuture(result));
         }
 
         int tickets(BookKeeperLedgerIdentity ledger) throws Exception {
@@ -763,6 +1488,13 @@ class KafkaBookKeeperRunRootsV2RealTest {
 
         public CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createRunLedger(
                 RunLedgerConfigurationV1 configuration) {
+            if (!f.source.spec().configurations().contains(configuration)) {
+                try {
+                    f.source.admitCreateConfiguration(configuration);
+                } catch (Exception failure) {
+                    return CompletableFuture.failedFuture(failure);
+                }
+            }
             return f.session
                     .createRunLedger(configuration)
                     .thenCompose(result -> result.exactProof().isPresent()
@@ -777,11 +1509,32 @@ class KafkaBookKeeperRunRootsV2RealTest {
 
         public CompletionStage<ProviderMutationResultV1<com.nereusstream.storage.api.bookkeeper.AppendQuorumProofV1>>
                 appendExplicitEntry(RunLedgerAppendRequestV1 request) {
+            if (f.loseCheckpoint
+                    && Nbke2CodecV1.decode(
+                                    canonicalBuffer(request.payload().readOnlyBuffer()),
+                                    request.handle().ledgerIdentity().ledgerId(),
+                                    request.expectedEntryId())
+                            instanceof com.nereusstream.kafka.bookkeeper.nbke2.Nbke2ProtocolCheckpointV1) {
+                f.loseCheckpoint = false;
+                f.lostCheckpoint = request;
+                return f.session.appendExplicitEntry(request).thenApply(result -> {
+                    assertThat(result.exactProof()).isPresent();
+                    return ProviderMutationResultV1.outcomeUnknown();
+                });
+            }
             return f.session.appendExplicitEntry(request);
         }
 
         public CompletionStage<com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1> readExactEntry(
                 RunLedgerHandleV1 handle, long entry) {
+            if (f.lostCheckpoint != null
+                    && f.lostCheckpoint.handle().equals(handle)
+                    && f.lostCheckpoint.expectedEntryId() == entry) {
+                f.lostCheckpoint = null;
+                return CompletableFuture.completedFuture(
+                        com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1.withoutEntry(
+                                com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1.PROVIDER_FAILURE));
+            }
             return f.session.readExactEntry(handle, entry);
         }
 
@@ -793,6 +1546,13 @@ class KafkaBookKeeperRunRootsV2RealTest {
 
         public CompletionStage<ProviderMutationResultV1<com.nereusstream.storage.api.bookkeeper.RunLedgerCloseProofV1>>
                 closeRunLedger(RunLedgerHandleV1 handle) {
+            if (f.loseClose) {
+                f.loseClose = false;
+                return f.session.closeRunLedger(handle).thenApply(result -> {
+                    assertThat(result.exactProof()).isPresent();
+                    return ProviderMutationResultV1.outcomeUnknown();
+                });
+            }
             return f.session.closeRunLedger(handle);
         }
 
@@ -809,7 +1569,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
         final OxiaConditionalClient nativeClient;
         final CompletableFuture<Void> held = new CompletableFuture<>();
         volatile String holdKey;
-        volatile boolean loseGenesis;
+        volatile boolean loseAdmission;
         volatile boolean blocked;
         Runnable release;
 
@@ -824,15 +1584,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
         }
 
         public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes bytes) {
-            return nativeClient.createIfAbsent(key, bytes).thenCompose(ignored -> {
-                if (loseGenesis && key.endsWith("/genesis-v2")) {
-                    loseGenesis = false;
-                    blocked = true;
-                    return CompletableFuture.failedFuture(
-                            new IllegalStateException("native genesis applied response loss"));
-                }
-                return CompletableFuture.completedFuture(null);
-            });
+            return nativeClient.createIfAbsent(key, bytes);
         }
 
         public CompletionStage<Void> compareAndSet(String key, CanonicalBytes bytes, long version) {
@@ -854,7 +1606,15 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 held.complete(null);
                 return result;
             }
-            return nativeClient.compareAndSet(key, bytes, version);
+            return nativeClient.compareAndSet(key, bytes, version).thenCompose(ignored -> {
+                if (loseAdmission && key.endsWith("/owner-admission-v1")) {
+                    loseAdmission = false;
+                    blocked = true;
+                    return CompletableFuture.failedFuture(
+                            new IllegalStateException("native admission applied response loss"));
+                }
+                return CompletableFuture.completedFuture(null);
+            });
         }
     }
 

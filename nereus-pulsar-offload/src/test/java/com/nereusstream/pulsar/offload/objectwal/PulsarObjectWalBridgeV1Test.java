@@ -557,9 +557,9 @@ class PulsarObjectWalBridgeV1Test {
         assertThat(published.outcome()).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
         assertThat(published.resolvedDescriptor().orElseThrow().row().providerProof())
                 .isEqualTo(ProviderVersionProof.none());
-        // C1 EXISTING_EXACT reconciliation performs one identity GET; publication then performs its sole shared
-        // full-body authentication GET and every selected member verifies from that token with zero further I/O.
-        assertThat(transport.fullGetCalls).isEqualTo(2);
+        // C1 EXISTING_EXACT reconciliation performs one length/SHA identity GET. Publication reuses that exact
+        // persistence result and writer self-check; selected member validation requires no second full GET.
+        assertThat(transport.fullGetCalls).isEqualTo(1);
         assertThat(session.runtimeRecoveryState().resolvedExtentCount()).isOne();
         String checkpointHeadKey = WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch());
         var recoveredCheckpoint = store.verifyPhysicalCheckpoint(
@@ -987,6 +987,35 @@ class PulsarObjectWalBridgeV1Test {
         } finally {
             eventLoop.shutdownNow();
         }
+    }
+
+    @Test
+    void m4PulsarPhysicalRouteOrdinalCannotBeReusedAcrossReadCells() {
+        Fixture fixture = fixture(START);
+        fixture.activate(BINDING_A, START);
+        AppendAck ack = verifiedAck(fixture.bridge
+                .appendShared(List.of(input(BINDING_A, "m4-ordinal-value")))
+                .toCompletableFuture()
+                .join()
+                .get(0));
+        var view = fixture.bridge.captureReadView(BINDING_A);
+        var first =
+                (PulsarObjectBindingReadAdapterV1.ReadCell) PulsarObjectBindingReadAdapterV1.publish(view, m4Selector())
+                        .publicationCell()
+                        .protocolStateReference();
+        var second =
+                (PulsarObjectBindingReadAdapterV1.ReadCell) PulsarObjectBindingReadAdapterV1.publish(view, m4Selector())
+                        .publicationCell()
+                        .protocolStateReference();
+
+        assertThat(first.routes().route(0)).isEqualTo(second.routes().route(0));
+        assertThat(first.requirePhysical(0, first.routes().route(0)).source()).isEqualTo(ReadSource.ACTIVE_TAIL);
+        assertThatThrownBy(() -> first.requirePhysical(0, second.routes().route(0)))
+                .hasMessageContaining("captured read cell");
+        assertThatThrownBy(() -> first.requirePhysical(1, first.routes().route(0)))
+                .hasMessageContaining("captured read cell");
+        assertThat(first.routes().route(0).virtualLedgerId())
+                .isEqualTo(ack.position().virtualLedgerId());
     }
 
     @Test

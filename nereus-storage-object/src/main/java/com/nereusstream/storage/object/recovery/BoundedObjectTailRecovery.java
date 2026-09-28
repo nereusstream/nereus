@@ -58,9 +58,10 @@ public final class BoundedObjectTailRecovery {
     private final CumulativeRecoveryBudget budget;
     private final WalRunRootRecord root;
     private final int exactExtentKeyBytes;
-    private boolean compositeWorkingSetActive;
+    private volatile boolean compositeWorkingSetActive;
     private final Set<ObjectIdentity> reconciliationAttempts = new HashSet<>();
-    private final Map<ObjectIdentity, CumulativeRecoveryBudget.ListReservation> pendingExtentListReservations =
+    private final Set<ObjectIdentity> reconciliationInFlight = new HashSet<>();
+    private final Map<ObjectIdentity, CumulativeRecoveryBudget.ListReservation> pendingListReservations =
             new LinkedHashMap<>();
 
     BoundedObjectTailRecovery(C1ObjectProviderSession provider, CumulativeRecoveryBudget budget) {
@@ -587,21 +588,12 @@ public final class BoundedObjectTailRecovery {
     /** Reconciles one unresolved NWG1 candidate with LIST/full-GET work charged before Provider I/O. */
     public ProviderObjectResult reconcileUnknownExtent(ObjectIdentity identity) throws IOException {
         requireRootBound();
-        chargeRetryIfRepeated(identity);
         ObjectWalLeafKeyV1 leaf = requireExactExtentIdentity(identity);
-        String lanePrefix = root.providerConfiguration().exclusiveNamespacePrefix()
-                + "/"
-                + leaf.laneId().leafToken()
-                + "/";
-        CumulativeRecoveryBudget.ListReservation reservation = pendingExtentListReservations.remove(identity);
-        if (reservation == null) {
-            reservation = budget.reserveRemainingList();
-        }
-        CumulativeRecoveryBudget.ListReservation exactReservation = reservation;
-        budget.acquireWorkingSet(reservation.maximumCanonicalKeyBytes());
+        String lanePrefix = root.providerConfiguration().exclusiveNamespacePrefix() + "/"
+                + leaf.laneId().leafToken() + "/";
+        var reservation = claimReconciliation(identity, true, exactExtentKeyBytes);
         boolean settled = false;
         try {
-            budget.chargeFullGet(identity.bodyLength());
             ProviderReconciliationResult reconciliation = provider.reconcileUnknown(
                     identity,
                     lanePrefix,
@@ -609,19 +601,16 @@ public final class BoundedObjectTailRecovery {
                     reservation.maximumKeys(),
                     reservation.maximumCanonicalKeyBytes(),
                     exactExtentKeyBytes);
-            reconciliation.inventory().ifPresent(inventory -> {
-                exactReservation.settle(
-                        inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
+            if (reconciliation.inventory().isPresent()) {
+                var inventory = reconciliation.inventory().orElseThrow();
+                reservation.settle(inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
+                settled = true;
                 validateExtentInventory(leaf.laneId(), inventory);
-            });
-            settled = reconciliation.inventory().isPresent();
+            }
             budget.checkWallTime();
             return reconciliation.objectResult();
         } finally {
-            if (!settled) {
-                pendingExtentListReservations.put(identity, reservation);
-            }
-            budget.releaseWorkingSet(reservation.maximumCanonicalKeyBytes());
+            finishReconciliation(identity, reservation, settled);
         }
     }
 
@@ -629,7 +618,6 @@ public final class BoundedObjectTailRecovery {
     public ProviderObjectResult reconcileUnknownProtocolObject(ObjectIdentity identity) throws IOException {
         requireRootBound();
         Objects.requireNonNull(identity, "identity");
-        chargeRetryIfRepeated(identity);
         String rootPrefix = root.providerConfiguration().exclusiveNamespacePrefix() + "/";
         if (!identity.key().startsWith(rootPrefix)) {
             throw new IllegalArgumentException("protocol Object identity lies outside the exact WalRun prefix");
@@ -639,12 +627,16 @@ public final class BoundedObjectTailRecovery {
             throw new IllegalArgumentException("protocol Object identity has no Root-bound family prefix");
         }
         int exactKeyBytes = identity.key().getBytes(StandardCharsets.UTF_8).length;
-        CumulativeRecoveryBudget.ListReservation reservation = budget.reserveList(1, 1, exactKeyBytes);
-        budget.acquireWorkingSet(reservation.maximumCanonicalKeyBytes());
-        ProviderReconciliationResult reconciliation;
+        var reservation = claimReconciliation(identity, false, exactKeyBytes);
+        boolean settled = false;
         try {
-            budget.chargeFullGet(identity.bodyLength());
-            reconciliation = provider.reconcileUnknown(identity, identity.key(), 1, 1, exactKeyBytes, exactKeyBytes);
+            ProviderReconciliationResult reconciliation = provider.reconcileUnknown(
+                    identity,
+                    identity.key(),
+                    reservation.maximumPages(),
+                    reservation.maximumKeys(),
+                    reservation.maximumCanonicalKeyBytes(),
+                    exactKeyBytes);
             if (reconciliation.inventory().isEmpty()) {
                 if (reconciliation.objectResult().outcome() == ProviderObjectOutcome.DEFINITIVE_CONFLICT) {
                     return reconciliation.objectResult();
@@ -652,16 +644,67 @@ public final class BoundedObjectTailRecovery {
                 throw new IllegalStateException("protocol reconciliation performed no exact-key Provider work");
             }
             StrongListResult inventory = reconciliation.inventory().orElseThrow();
+            reservation.settle(inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
+            settled = true;
             if (inventory.objects().stream().anyMatch(object -> !object.key().equals(identity.key()))) {
                 throw new IllegalStateException(
                         "protocol reconciliation expanded beyond the exact content-addressed key");
             }
-            reservation.settle(inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
             budget.checkWallTime();
             return reconciliation.objectResult();
         } finally {
-            budget.releaseWorkingSet(reservation.maximumCanonicalKeyBytes());
+            finishReconciliation(identity, reservation, settled);
         }
+    }
+
+    /** One short ownership cut; temporary working-set rejection cannot consume or remove a LIST reservation. */
+    private synchronized CumulativeRecoveryBudget.ListReservation claimReconciliation(
+            ObjectIdentity identity, boolean extent, int exactKeyBytes) {
+        if (reconciliationInFlight.contains(identity)) {
+            throw new IllegalStateException("exact Object reconciliation already has in-flight I/O");
+        }
+        var reservation = pendingListReservations.get(identity);
+        synchronized (budget) {
+            long workingBytes = reservation != null
+                    ? reservation.maximumCanonicalKeyBytes()
+                    : extent
+                            ? Math.subtractExact(
+                                    root.recoveryEnvelope().maxListedKeyBytes(),
+                                    budget.snapshot().listedKeyBytes())
+                            : Math.min(
+                                    exactKeyBytes,
+                                    Math.subtractExact(
+                                            root.recoveryEnvelope().maxListedKeyBytes(),
+                                            budget.snapshot().listedKeyBytes()));
+            budget.acquireWorkingSet(workingBytes);
+            try {
+                if (reservation == null) {
+                    reservation = extent ? budget.reserveRemainingList() : budget.reserveList(1, 1, exactKeyBytes);
+                }
+                chargeRetryIfRepeated(identity);
+                budget.chargeFullGet(identity.bodyLength());
+            } catch (RuntimeException failure) {
+                if (reservation != null) {
+                    pendingListReservations.put(identity, reservation);
+                }
+                budget.releaseWorkingSet(workingBytes);
+                throw failure;
+            }
+        }
+        pendingListReservations.remove(identity);
+        reconciliationInFlight.add(identity);
+        return reservation;
+    }
+
+    private synchronized void finishReconciliation(
+            ObjectIdentity identity, CumulativeRecoveryBudget.ListReservation reservation, boolean settled) {
+        // Without a complete inventory, the exact candidate retains its original, fully charged LIST reservation.
+        // Only known complete inventory settles it; retry/full-GET charges remain cumulative across failures.
+        if (!settled) {
+            pendingListReservations.put(identity, reservation);
+        }
+        reconciliationInFlight.remove(identity);
+        budget.releaseWorkingSet(reservation.maximumCanonicalKeyBytes());
     }
 
     /** Charges one Root-persisted retry slot before a frozen same-candidate PUT2 dispatch. */
@@ -747,7 +790,8 @@ public final class BoundedObjectTailRecovery {
                 || bytes > root.providerConfiguration().maxSingleRangeReadBytes()) {
             throw new IllegalArgumentException("selected frame range lies outside the exact Root/Object bounds");
         }
-        if (!compositeWorkingSetActive) {
+        boolean ownsWorkingSet = !compositeWorkingSetActive;
+        if (ownsWorkingSet) {
             budget.acquireWorkingSet(bytes);
         }
         try {
@@ -756,7 +800,7 @@ public final class BoundedObjectTailRecovery {
             budget.checkWallTime();
             return result;
         } finally {
-            if (!compositeWorkingSetActive) {
+            if (ownsWorkingSet) {
                 budget.releaseWorkingSet(bytes);
             }
         }

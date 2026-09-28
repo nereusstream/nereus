@@ -22,6 +22,7 @@ public final class KafkaVerifiedNwg1CommitV1 {
     private final KafkaObjectExtentLocatorV1 locator;
     private final Sha256Digest assignedPayloadSha;
     private final int verifiedFrameCount;
+    private KafkaObjectAuthorizationV1.Proof authorization;
 
     KafkaVerifiedNwg1CommitV1(
             KafkaObjectExtentLocatorV1 locator, Sha256Digest assignedPayloadSha, int verifiedFrameCount) {
@@ -31,6 +32,20 @@ public final class KafkaVerifiedNwg1CommitV1 {
             throw new IllegalArgumentException("verified NWG1 commit result is outside its exact domain");
         }
         this.verifiedFrameCount = verifiedFrameCount;
+    }
+
+    void authorize(
+            KafkaObjectAuthorizationV1 authority,
+            com.nereusstream.storage.object.provider.ObjectIdentity object,
+            com.nereusstream.kafka.bookkeeper.commit.KafkaSpeculativeCommitV1 commit) {
+        authorization = authority.authorize(object, this, commit);
+    }
+
+    public KafkaObjectAuthorizationV1.Proof authorization() {
+        if (authorization == null) {
+            throw new IllegalStateException("Provider durability has no Binding grant");
+        }
+        return authorization;
     }
 
     public KafkaObjectExtentLocatorV1 locator() {

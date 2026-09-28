@@ -23,6 +23,12 @@ class KafkaBookKeeperRecoveryEnvelopeV1Test {
             new KafkaBookKeeperRecoveryEnvelopeV1(10, 100, 1_000);
 
     @Test
+    void nativeDefaultRetainsSelectedRecoveryCeiling() {
+        assertThat(KafkaBookKeeperRecoveryEnvelopeV1.selectedDefault())
+                .isEqualTo(new KafkaBookKeeperRecoveryEnvelopeV1(4_096, 8_388_608, 30_000_000_000L));
+    }
+
+    @Test
     void entryCountIsInclusiveAndProvenOneBeforeAtAndOneAfter() {
         assertThat(classify(9, 0, 0)).isEqualTo(KafkaBookKeeperRecoveryStatusV1.WITHIN_ENVELOPE);
         assertThat(classify(10, 0, 0)).isEqualTo(KafkaBookKeeperRecoveryStatusV1.WITHIN_ENVELOPE);

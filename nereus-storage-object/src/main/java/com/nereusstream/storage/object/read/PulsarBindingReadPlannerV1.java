@@ -41,18 +41,16 @@ public final class PulsarBindingReadPlannerV1 {
             return BindingReadPlannerV1.Outcome.EMPTY;
         }
         long cursor = requestedStartEntryIdInclusive;
-        for (int index = 0; index < table.size() && cursor < boundedEnd; index++) {
+        for (int index = table.firstIntersecting(virtualLedgerId, cursor);
+                index < table.size() && cursor < boundedEnd;
+                index++) {
             PulsarBindingReadRouteV1 route = table.route(index);
-            if (route.virtualLedgerId() < virtualLedgerId
-                    || route.virtualLedgerId() == virtualLedgerId && route.endEntryIdExclusive() <= cursor) {
-                continue;
-            }
             if (route.virtualLedgerId() > virtualLedgerId || route.startEntryIdInclusive() > cursor) {
                 output.reset();
                 return BindingReadPlannerV1.Outcome.SAFE_FAILURE_GAP_OR_AMBIGUITY;
             }
             long intervalEnd = Math.min(route.endEntryIdExclusive(), boundedEnd);
-            if (!output.append(cursor, intervalEnd, route)) {
+            if (!output.append(cursor, intervalEnd, route, index)) {
                 output.reset();
                 return BindingReadPlannerV1.Outcome.SAFE_FAILURE_CAPACITY;
             }

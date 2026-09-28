@@ -56,12 +56,12 @@ public final class KafkaObjectCheckpointRecoveryV1 {
         if (rootSha.isZero()) {
             throw new IllegalArgumentException("Kafka checkpoint recovery Root SHA is zero");
         }
-        Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        backend.protocolHeadKey(walRunPrefix);
     }
 
     public CompletionStage<Result> recover() {
         backend.chargeControlMetadata(Nwkcp1ConstantsV1.FORMAT_MAX_HEAD_BYTES);
-        return backend.readHead(Nwkcp1ObjectKeyV1.headKey(walRunPrefix)).thenCompose(value -> {
+        return backend.readHead(backend.protocolHeadKey(walRunPrefix)).thenCompose(value -> {
             if (value.isEmpty()) {
                 return fallback();
             }
@@ -74,7 +74,7 @@ public final class KafkaObjectCheckpointRecoveryV1 {
             Nwkcp1BackendV1.SelectedObjectToken selectedToken;
             try {
                 selectedToken = backend.selectObjectFromHead(
-                        Nwkcp1ObjectKeyV1.headKey(walRunPrefix), value.get(), Sha256Digest.hash(value.get()));
+                        backend.protocolHeadKey(walRunPrefix), value.get(), Sha256Digest.hash(value.get()));
             } catch (RuntimeException failure) {
                 return fallback();
             }

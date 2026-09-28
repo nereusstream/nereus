@@ -4,20 +4,90 @@ package com.nereusstream.storage.object.nwg1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.github.luben.zstd.ZstdInputStream;
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.object.control.WalLaneId;
+import com.nereusstream.storage.object.kms.KmsCellSession;
+import com.nereusstream.storage.object.kms.KmsTransport;
+import com.nereusstream.storage.object.kms.RunKeyCacheIdentity;
+import com.nereusstream.storage.object.kms.WrappedRunKeyEnvelope;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class Nwg1WireGoldenV1Test {
+    @Test
+    void selfCheckedUnitsMatchGoldenBytesAndEraseBorrowedPayloadOnFailure() throws IOException {
+        for (var vector : Nwg1GoldenCorpusV1.vectors()) {
+            for (var unit : vector.sealed().directory().appendUnits()) {
+                var verified = Nwg1ObjectReaderV1.readSelfCheckedAppendUnit(
+                        vector.sealed(), unit.firstFrameOrdinal(), vector.verificationContext(), (frame, payload) -> {
+                            assertThat(payload.isReadOnly()).isTrue();
+                            byte[] copy = new byte[payload.remaining()];
+                            payload.get(copy);
+                            assertThat(copy)
+                                    .isEqualTo(vector.plan()
+                                            .frames()
+                                            .get(Math.toIntExact(frame.absoluteFrameOrdinal()))
+                                            .decodedPayload());
+                        });
+                assertThat(verified.assignedPayloadSha256()).isEqualTo(unit.assignedPayloadSha256());
+                assertThat(verified.frameCount()).isEqualTo(unit.frameCount());
+            }
+        }
+        var vector = Nwg1GoldenCorpusV1.vectors().get(0);
+        byte[] original = vector.plan().frames().get(0).decodedPayload();
+        AtomicReference<ByteBuffer> borrowed = new AtomicReference<>();
+        assertThatThrownBy(() -> Nwg1ObjectReaderV1.readSelfCheckedAppendUnit(
+                        vector.sealed(), 0, vector.verificationContext(), (frame, payload) -> {
+                            borrowed.set(payload.duplicate());
+                            throw new IOException("consumer failed");
+                        }))
+                .isInstanceOf(IOException.class)
+                .hasMessage("consumer failed");
+        byte[] erased = new byte[borrowed.get().remaining()];
+        borrowed.get().get(erased);
+        assertThat(erased).containsOnly((byte) 0);
+        assertThat(vector.plan().frames().get(0).decodedPayload()).isEqualTo(original);
+
+        var unchecked = Nwg1ObjectWriterV1.sealEncodedPlan(vector.plan(), 0, vector.walRunKey());
+        assertThatThrownBy(() -> Nwg1ObjectReaderV1.readSelfCheckedAppendUnit(
+                        unchecked, 0, vector.verificationContext(), (frame, payload) -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact context");
+        var context = vector.verificationContext();
+        var equivalent = new Nwg1VerificationContextV1(
+                context.protocolCell(),
+                context.cellProviderScopeId(),
+                context.walRunRootSha256(),
+                context.envelope(),
+                context.ownerWitnessProvider(),
+                context.nativePayloadVerifier(),
+                0,
+                0);
+        assertThatThrownBy(() -> Nwg1ObjectReaderV1.readSelfCheckedAppendUnit(
+                        vector.sealed(), 0, equivalent, (frame, payload) -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact context");
+    }
+
     @Test
     void exactCorpusHasClosedCountsAndRoundTrips() {
         var vectors = Nwg1GoldenCorpusV1.vectors();
@@ -694,6 +764,105 @@ final class Nwg1WireGoldenV1Test {
                         body),
                 Nwg1RejectionV1.DIGEST_MISMATCH,
                 Nwg1ValidationStageV1.OBJECT_BODY_DIGEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void cellKeyOperationProtectsActualSealAndFullVerificationWithoutBlockingSibling(boolean verify) throws Exception {
+        var vector = Nwg1GoldenCorpusV1.vectors().getFirst();
+        var context = vector.verificationContext();
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var blockOnce = new AtomicBoolean(true);
+        var blockedContext = new Nwg1VerificationContextV1(
+                context.protocolCell(),
+                context.cellProviderScopeId(),
+                context.walRunRootSha256(),
+                context.envelope(),
+                context.ownerWitnessProvider(),
+                (bytes, partition, epoch, start, end) -> {
+                    if (blockOnce.getAndSet(false)) {
+                        entered.countDown();
+                        try {
+                            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                        } catch (InterruptedException failure) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(failure);
+                        }
+                    }
+                    return context.nativePayloadVerifier().validateKafka(bytes, partition, epoch, start, end);
+                },
+                0,
+                0);
+        var envelope = WrappedRunKeyEnvelope.decodeFramed(
+                CanonicalBytes.copyOf(context.envelope().framedBytes()));
+        var cell = new KmsCellSession(
+                new KmsTransport() {
+                    @Override
+                    public WrappedRunKeyEnvelope wrap(String identity, byte[] key) {
+                        throw new AssertionError();
+                    }
+
+                    @Override
+                    public byte[] unwrap(WrappedRunKeyEnvelope value) {
+                        return vector.walRunKey().clone();
+                    }
+                },
+                new CellProviderScopeId(Sha256Digest.copyOf(context.cellProviderScopeId())),
+                envelope.wrappingKeyId(),
+                2,
+                new SecureRandom());
+        var run = new RunKeyCacheIdentity(
+                Math.toIntExact(vector.plan().shardId()), vector.plan().shardRunEpoch());
+        var sibling = new RunKeyCacheIdentity(run.shardId(), run.shardRunEpoch() + 1);
+        var sha = Sha256Digest.copyOf(context.walRunRootSha256());
+        cell.deriveObjectKey(sibling, envelope, sha, WalLaneId.OBJECT_LATENCY, 0);
+        var authority = new Nwg1RootAuthorityV1(
+                context.exactNpc1(),
+                Nwg1CommitmentsV1.protocolCell(context.exactNpc1()),
+                context.cellProviderScopeId(),
+                context.walRunRootSha256(),
+                context.envelope().framedBytes(),
+                Nwg1CommitmentsV1.wrappedEnvelope(context.envelope()));
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var work = executor.submit(() -> verify
+                    ? cell.verifyNwg1(
+                            run,
+                            envelope,
+                            Nwg1VerificationPathV1.FULL_BODY_RECONCILIATION,
+                            authority,
+                            blockedContext,
+                            vector.sealed().leafUtf8().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                            CanonicalBytes.copyOf(vector.sealed().body()),
+                            0)
+                    : cell.sealNwg1(
+                            run,
+                            envelope,
+                            vector.plan(),
+                            vector.sealed().header().laneSequence(),
+                            blockedContext));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var ready =
+                    executor.submit(() -> cell.deriveObjectKey(sibling, envelope, sha, WalLaneId.OBJECT_LATENCY, 1));
+            assertThat(ready.get(1, TimeUnit.SECONDS).length()).isEqualTo(32);
+            assertThatThrownBy(() -> cell.evict(run)).hasMessageContaining("actual key operations");
+            assertThatThrownBy(cell::close).hasMessageContaining("actual key operations");
+            release.countDown();
+            var result = work.get(10, TimeUnit.SECONDS);
+            if (result instanceof Nwg1SealedObjectV1 sealed) {
+                assertThat(sealed.body()).isEqualTo(vector.sealed().body());
+            } else {
+                assertThat(((Nwg1ObjectReaderV1.DecodedObject) result).decodedFrames())
+                        .hasSameSizeAs(vector.plan().frames());
+            }
+            cell.evict(run);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            cell.close();
+        }
     }
 
     private record StreamingFixture(

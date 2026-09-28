@@ -89,6 +89,7 @@ tasks.register<Test>("realBookKeeperTest") {
     classpath = realBookKeeperTest.runtimeClasspath
     useJUnitPlatform()
     maxParallelForks = 1
+    filter { excludeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.KafkaObjectAuthorizationRealTest") }
     outputs.upToDateWhen { false }
     jvmArgumentProviders.add(
         objects.newInstance<KafkaBookKeeperMetadataServiceUriArgumentProvider>().apply {
@@ -579,5 +580,23 @@ mapOf(
                     providers.gradleProperty("v2M5BoundDeleteRestartCheckpoint").orNull ?: error("bound GC checkpoint is required"))
             }
         }
+    }
+}
+
+// NSIP-1 T4 core: real S3-compatible Object and real Oxia grant authority.
+dependencies {
+    add(realBookKeeperTest.implementationConfigurationName, project(":nereus-storage-object-s3"))
+}
+tasks.register<Test>("nsip1ObjectAuthorizationRealTest") {
+    group = "verification"
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.KafkaObjectAuthorizationRealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.nsip1.object.endpoint", providers.gradleProperty("nsip1ObjectEndpoint").get())
+        systemProperty("nereus.nsip1.object.oxia", providers.gradleProperty("nsip1ObjectOxia").get())
     }
 }

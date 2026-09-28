@@ -119,6 +119,26 @@ public final class KafkaPackedBatchLocatorIndexV1 {
                 checksums);
     }
 
+    public static KafkaPackedBatchLocatorIndexV1 fromCheckpoint(
+            com.nereusstream.kafka.bookkeeper.checkpoint.KafkaCheckpointReadIndexV1 source) {
+        int count = source.rows().size();
+        long[] starts = new long[count];
+        long[] ends = new long[count];
+        long[] entries = new long[count];
+        long[] groups = new long[count];
+        long[] bytes = new long[count];
+        for (int i = 0; i < count; i++) {
+            var row = source.rows().get(i);
+            starts[i] = row.startOffset();
+            ends[i] = row.endOffsetExclusive();
+            entries[i] = row.entryId();
+            groups[i] = row.groupOrdinal();
+            bytes[i] = row.payloadBytes();
+        }
+        return new KafkaPackedBatchLocatorIndexV1(
+                KafkaLocatorSourceKindV1.ACTIVE_TAIL, -1, starts, ends, entries, groups, bytes, new long[count]);
+    }
+
     public int size() {
         return startOffsets.length;
     }

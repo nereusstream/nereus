@@ -1,11 +1,10 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: Verified
-evidenceStatus: CurrentSourceReceipt
+implementationStatus: InProgress
+evidenceStatus: DocumentationOnly
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
-receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka Produce/Fetch frontiers and protocol recovery design
@@ -20,13 +19,19 @@ M3 implements the Object-WAL `NWKCP1` carrier while keeping physical checkpoint/
 immutable read generations and source retirement. Existing V1 partition storage, reservation,
 producer-recovery, and leader-epoch code is evidence only and is replaced rather than wrapped or dual-written.
 
-Implementation has started with the pure K1 frontier/reference root, read snapshot, commit slot, and fenced coherent
-publication cell. The remaining coherent slices include:
+The current normative contract is amended by [NSIP-1](../../NSIP/nsip-1.md) and remains `InProgress`.
+`DocumentationOnly` means this revised contract has no current-source full acceptance receipt; the focused implementation
+results below do not promote it. The [historical M2 Final receipt](../../evidence/v2-m2/kafka/k10/kafka-final.json)
+binds the earlier contract and source and does not certify NSIP-1 changes.
+The NSIP-1 BK first batch implements coherent shared commit, closed-history recovery and the native Controller/Broker
+activation path. Native transaction, disconnected-response retry, group-offset and superseded-recovery evidence is
+focused; the normal final-source real-cluster task passes. The component contracts below cover both this implemented BK
+slice and later profile/checkpoint/read-generation work:
 
 1. partition frontier state and one coherent publication cell;
 2. pre-offset admission plus speculative producer/transaction deltas;
 3. profile durability resolution and ordered multi-state commit;
-4. compact descriptor transport plus Observed/Applied replica-progress and election-adoption seam;
+4. shared BK commit plus closed Owner admission, exact run discovery and cold takeover;
 5. profile-neutral producer, transaction, range-index, and leader-epoch checkpoint vector;
 6. immutable Fetch capture, isolation bounds, delayed-wakeup seam, and compaction-gap lookup;
 7. random targeted reads, sequential cursor validation, and source-generation pinning;
@@ -191,76 +196,32 @@ blocked under a hard age/count/bytes deadline until exact reconciliation or run 
 
 The ordered queue consumes a closed `ProfileDurabilityProof` whose type is fixed by the Storage Epoch:
 
-- `OBJECT_WAL`: exact provider-resolved immutable Object/group identity under WalRun Root/key/LIST recovery plus
-  complete commit-set membership;
+- `OBJECT_WAL`: exact provider-resolved immutable Object/group identity plus complete commit-set membership and the
+  selected per-Binding/partition durable authorization receipt;
 - `BOOKKEEPER_WAL_ONLY`: every DATA member and terminal descriptor at BookKeeper quorum;
 - `BOOKKEEPER_WAL_ASYNC_OBJECT`: the same BookKeeper proof; Object materialization is not in the Produce ACK cut.
 
-The resolver performs no per-append Oxia/KRaft mutation. For Object WAL, asynchronous physical checkpoint pages and
-long-lived manifest handoff remain outside the group ACK cut. The local readable publication is still mandatory.
+BK resolution performs no per-append Oxia/KRaft mutation. Object performs the synchronous authorization Head CAS
+after exact upload; asynchronous physical checkpoint pages and long-lived manifest handoff cannot substitute for it.
+The local readable publication is still mandatory.
 
-## Acknowledgement and replica observation seam
+## Acknowledgement and shared commit
 
-The append result owns one `appendEndOffset` and native `acks` policy:
+Kafka RF=1/minISR=1 is the current contract. `acks=0` sends no response; `acks=1` and `acks=all` wait for
+complete profile durability, legal qualification and coherent protocol publication. BK ordered commit advances
+Durable/Readable/HW to the same continuous commit end, with LSO calculated from the transaction state in that root.
+Allocated remains separate while successors wait. UNKNOWN/failed predecessors fence later publication; a later
+physical completion cannot cross the unresolved gap. The implemented BK in-flight duplicate path shares the original
+assigned commit/result; recovery reconstructs the bounded completed duplicate results.
 
-| Mode | Completion condition |
-| --- | --- |
-| `acks=0` | no response; internal work remains live through the same correctness path |
-| `acks=1` | coherent state has `readableEndOffset >= appendEndOffset` |
-| `acks=all` | native pre-admission ISR/minISR passed and Kafka HW reaches `appendEndOffset` |
-
-M2 provides a validated compact commit-descriptor stream, local observation journal, and follower apply kernel. M6
-carries descriptors over the native leader-to-follower replica Fetch/fetcher channel and connects progress to
-ReplicaManager/Partition. It never emits per-append KRaft/Oxia metadata and does not retransmit raw payload bytes from
-the leader. A follower first validates exact Binding, incarnation, leader/owner/storage epochs, run/Object identity,
-range, integrity/durability proof, and source accessibility, then durably records the compact descriptor before
-reporting:
-
-```text
-ReplicaObservedProgress
-  replicaId
-  kafkaLeaderEpoch
-  observedEndOffset
-  validatedStateVersion
-  descriptorDigest
-```
-
-It later reads the referenced source and applies raw producer/transaction/leader-epoch state before reporting:
-
-```text
-ReplicaAppliedProgress
-  replicaId
-  kafkaLeaderEpoch
-  appliedEndOffset
-  appliedStateVersion
-```
-
-`appliedEndOffset <= observedEndOffset`. Observed is eligible for native ISR/HW; Applied is required for leader
-admission through `electionAdoptableEndOffset`. If a provider/profile cannot validate a qualified descriptor without
-raw payload read, it sets Observed only with Applied and M6 evidence must expose the extra cost. The observation journal
-is bounded local protocol evidence, not an Oxia/KRaft authority. Descriptor bytes use Kafka replication quota; shared-
-provider reads/decode use Cell/provider replica-read budgets. Native Kafka owns ISR membership, minISR, HW, timeouts,
-and errors. Shared storage eliminates duplicate payload writes, not logical replica validation.
-
-The follower kernel exposes one closed eligibility decision:
-
-```text
-isrObservationEligible =
-    observationJournalDurableThrough(observedEndOffset)
-    && observedEndOffset - appliedEndOffset <= maxApplyLagOffsets
-    && unappliedBytes <= maxApplyLagBytes
-    && unappliedAge <= maxApplyLagTime
-    && recoverableSourceCovers([appliedEndOffset, observedEndOffset))
-```
-
-It evaluates the complete tuple before reporting new Observed progress and whenever lag age/bytes, journal health, or
-Source Map generation changes. Reaching a bound stops Observed advancement, removes native ISR/HW eligibility, or
-backpressures publication; it never silently leaves an indefinitely unapplied replica in ISR. A source-generation
-replacement is valid only with exact Kafka coverage/content and compatible producer/transaction/leader/checkpoint
-proof. Original BK protection may drain only after that replacement is installed for the unapplied range. Journal
-loss/corruption/truncation rolls eligible Observed back to the highest contiguous surviving journal/Applied proof and
-requires bounded catch-up before re-entry. M2/M6 evidence selects numeric bounds and measures ISR shrink, catch-up,
-source-retention cost, and failure availability; no Topic flag can disable or enlarge them.
+`OxiaKafkaRunRootAuthorityV2` now uses one native Owner head to order run attachment and closure. The old mandatory
+Observation Journal/Applied eligibility does not qualify BK commit or cold takeover. GC/native physical tickets,
+reader/source protection and compatible checkpoint/tail recovery retain their separate duties. Ordinary BK append
+has no per-batch remote control mutation. Object uses NSIP-1 section 6.4's synchronous per-Binding/partition Head CAS
+after exact authenticated upload; the same key orders grant, common checkpoint selection and Owner closure. Tracker
+and coherent publication require its exact grant receipt. Physical existence/LIST cannot extend the closed prefix.
+Object tests establish recovered producer duplicate state and exact authorization-candidate retry reuse. The native
+Object Produce duplicate-return path is not implemented or validated in this core batch.
 
 ## Transaction and leader-epoch state
 
@@ -306,29 +267,24 @@ mapping are M3 outputs; this lifecycle authority does not enter append ACK and n
 
 ## Takeover recovery
 
-Recovery performs:
+The current BK request binds a closed `KafkaOwnerAdmissionV1`, the exact selected `KafkaRunRootRecordV2`, the
+ledger handle and a new native fence. It validates scope/membership/identity before I/O. The caller validates the
+current Controller assignment, closes old run admission, discovers the entire fixed legal set, then fences every
+ledger that can still accept old writes. Attachment and closure use the same Owner-head CAS; response loss cannot
+hide a legally admitted root. Immutable closure archives preserve the set across repeated takeover.
 
-1. invalidate old admission and fence/open the prior physical run;
-2. validate the run header and latest mutually compatible checkpoint vector;
-3. scan the bounded suffix in physical order;
-4. validate each complete commit-set descriptor and raw RecordBatch;
-5. replay producer, transaction/control-marker, and leader-epoch deltas in Kafka offset order;
-6. stop at the first definitive gap/conflict and derive `physicalRecoveredEndOffset`;
-7. obtain the native election's `electionAdoptableEndOffset` and catch `replicaAppliedEndOffset` up to it;
-8. install `newLeaderLEO = min(physicalRecoveredEndOffset,electionAdoptableEndOffset)` and quarantine later residue;
-9. reconstruct producer state, ongoing/completed/aborted transactions, first unstable offset, and leader-epoch index;
-10. let native Kafka recovery supply/recompute HW, derive `LSO = min(HW,firstUnstableOffset)`, and publish both
-    coherently;
-11. complete index/checkpoint/footer state, seal the old run, and open a new leader-epoch/fence-bound run.
+`KafkaBookKeeperTakeoverRecoveryV1` uses the recovered ledger's LAC, validates compatible compound checkpoint or
+RUN_HEADER, and scans the complete suffix in physical order within the cumulative entries/bytes/time envelope.
+It accepts only complete contiguous commit sets with exact member identity/digest and reconstructable protocol
+state. Partial groups/gaps stop adoption. Sealed root/end conflicts fail closed. Complete unacknowledged batches
+inside the legal history are adopted, preserving original duplicate results after response loss. A predecessor
+protocol state may seed the next run at the same covered boundary; it is rebound to that run without changing
+producer/transaction/leader-epoch state. Metadata closure alone is not BK fencing.
 
-The election cases remain distinct: same-replica restart needs its durable local observation/old-epoch evidence; clean
-transfer requires target Applied through the transfer frontier; another ISR leader adopts at most its own native
-election boundary; unclean election preserves native truncation/data-loss semantics and does not salvage extra shared
-bytes. Physical existence alone never authorizes protocol adoption.
-
-Response loss is resolved by exact identity/bytes. A conclusively uncommitted speculative range may be reassigned only
-after this recovery cut proves no visible/HW state and discards all coupled speculative deltas. The recovery envelope
-is cumulative; falling back between checkpoint components cannot reset entry/byte/time counters.
+The installed BK HW equals the recovered legal prefix end; LSO is derived from recovered transaction state.
+There is no Follower Applied/election-adoptable cap. Fresh run qualification and native generation revalidation
+must precede ready. Recovery locators, full multi-run composition, obsolete callback rejection, and native
+Controller/Broker acceptance are still being integrated; the local kernel alone is not that acceptance.
 
 ## Fetch capture
 
@@ -445,20 +401,21 @@ These cuts start only after non-promotable `v2M2KafkaInputsCheck` proves the K0 
 4. transaction/leader-epoch indexes plus checkpoint vector and bounded recovery;
 5. Fetch snapshot/isolation, coverage-aware floor+successor, and targeted/sequential reader;
 6. lost-wakeup-safe delayed-Fetch seam;
-7. compact replica-descriptor transport, observation journal, Observed/Applied progress, and election-adoption harness;
+7. closed native Owner admission, complete legal run discovery, shared HW/LSO and cold takeover;
 8. real BookKeeper plus native Kafka Produce/Fetch/transaction/failover integration;
-9. performance/scale receipts and separate mechanical V1 removal.
+9. performance/scale receipts and remaining obsolete library removal. The native runtime/checkpoint sources replaced
+   by the first BK slice are already removed; unconnected historical replication fixtures do not provide a product mode.
 
-No cut adds per-append control metadata, dual-write compatibility, a second offset authority, or a storage-native ISR
-shortcut.
+BK append adds no per-append control metadata; Object requires durable grant metadata after upload. Neither profile
+adds dual-write compatibility, a second offset authority, or a second assignment authority.
 
 ## Evidence gates
 
 `V2-KAF-DATA-001..022` are mandatory. M2 receipts measure at least Produce p50/p99, pipeline depth, allocation bytes,
 duplicate-join cost, active-tail/index bytes, recovery entries/bytes/time, targeted/random and sequential read
-amplification, descriptor bytes, Observed/Applied lag, waiter registration/wakeup cost, and zero normal-path metadata
+amplification, admission/closure cost, waiter registration/wakeup cost, and zero normal-path metadata
 calls. M6 receipts add native Kafka error
-codes, ISR/minISR/HW behavior, transaction coordinator/control-marker flows, full client retries, broker restart,
+codes, RF=1/minISR=1/HW behavior, transaction coordinator/control-marker flows, full client retries, broker restart,
 leader transfer, Fetch purgatory, and comparison with the pinned Kafka baseline.
 
 An M2 receipt may promote only rows whose milestone is exactly M2. Mixed M2/M3/M4/M5/M6 rows remain `PLANNED` until

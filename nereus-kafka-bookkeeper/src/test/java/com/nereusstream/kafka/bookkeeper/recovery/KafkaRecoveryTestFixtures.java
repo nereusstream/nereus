@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.bookkeeper.recovery;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1;
@@ -33,6 +34,12 @@ import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaRunTestFixtures;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1;
+import com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1;
+import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
+import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
+import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -146,30 +153,51 @@ final class KafkaRecoveryTestFixtures {
         session.entries.put(entryId, CanonicalBytes.copyOf(Nbke2CodecV1.encode(LEDGER_ID, entryId, state.toNbke2())));
     }
 
-    static KafkaBookKeeperRecoveryRequestV1 request(
-            long observed, long applied, long adoptable, OptionalLong checkpointHint) {
-        return request(
-                observed,
-                applied,
-                adoptable,
-                checkpointHint,
-                new KafkaBookKeeperRecoveryEnvelopeV1(100, 1_000_000, 1_000_000));
+    static KafkaBookKeeperRecoveryRequestV1 request(OptionalLong checkpointHint) {
+        return request(checkpointHint, new KafkaBookKeeperRecoveryEnvelopeV1(100, 1_000_000, 1_000_000));
     }
 
     static KafkaBookKeeperRecoveryRequestV1 request(
-            long observed,
-            long applied,
-            long adoptable,
-            OptionalLong checkpointHint,
-            KafkaBookKeeperRecoveryEnvelopeV1 envelope) {
-        return new KafkaBookKeeperRecoveryRequestV1(
-                binding(),
-                handle(),
+            OptionalLong checkpointHint, KafkaBookKeeperRecoveryEnvelopeV1 envelope) {
+        return request(checkpointHint, envelope, OptionalLong.empty());
+    }
+
+    static KafkaBookKeeperRecoveryRequestV1 requestSealed(long end, OptionalLong checkpointHint) {
+        return request(
+                checkpointHint, new KafkaBookKeeperRecoveryEnvelopeV1(100, 1_000_000, 1_000_000), OptionalLong.of(end));
+    }
+
+    private static KafkaBookKeeperRecoveryRequestV1 request(
+            OptionalLong checkpointHint, KafkaBookKeeperRecoveryEnvelopeV1 envelope, OptionalLong sealedEnd) {
+        var b = binding();
+        var root = new KafkaRunRootSnapshotV1(
+                b.bindingId(),
+                b.topicIncarnation(),
+                b.partitionId(),
+                b.storageEpochId(),
+                b.creatorOwnerEpoch(),
+                b.kafkaLeaderEpoch(),
+                b.providerScopeId(),
+                b.runId(),
+                handle().ledgerIdentity(),
                 100,
-                checkpointHint,
-                envelope,
-                new KafkaElectionRecoveryBoundaryV1(KafkaElectionKindV1.ISR_ELECTION, observed, applied, adoptable),
-                recoveredFence());
+                sealedEnd,
+                sealedEnd.isPresent() ? KafkaRunRootStateV1.SEALED : KafkaRunRootStateV1.ACTIVE,
+                Optional.empty());
+        var namespace = new PhysicalResourceIdV2.Namespace(
+                PhysicalResourceIdV2.ProviderKind.BOOKKEEPER,
+                CanonicalUtf8.fromString("recovery-fixture"),
+                CanonicalUtf8.fromString("ledger-id-space"));
+        var record = new KafkaRunRootRecordV2(
+                new PhysicalResourceIdV2.BookKeeperLedger(namespace, LEDGER_ID), root, true, Optional.empty());
+        var closed = new KafkaOwnerAdmissionV1(
+                Sha256Digest.hash(KafkaRunRootRecordV2.Scope.of(root).encode()),
+                new KafkaOwnerIdentityV1(b.creatorOwnerEpoch(), b.kafkaLeaderEpoch(), 1, 1, 1),
+                true,
+                Optional.empty(),
+                List.of(record.initialLink()));
+        return new KafkaBookKeeperRecoveryRequestV1(
+                b, handle(), 100, checkpointHint, envelope, closed, record, recoveredFence(), Optional.empty());
     }
 
     static KafkaBookKeeperTakeoverRecoveryV1 engine(KafkaRunTestFixtures.FakeSession session) {

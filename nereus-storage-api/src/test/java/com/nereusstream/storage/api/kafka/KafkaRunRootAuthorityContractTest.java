@@ -76,12 +76,19 @@ class KafkaRunRootAuthorityContractTest {
     }
 
     @Test
-    void authoritySurfaceIsClosedToFourLowFrequencyOperations() {
+    void authoritySurfaceContainsOnlyRunLifecycleAndPermanentRetirementOperations() {
         Set<String> methods = Arrays.stream(KafkaRunRootAuthority.class.getDeclaredMethods())
                 .map(method -> method.getName())
                 .collect(Collectors.toSet());
 
-        assertThat(methods).containsExactlyInAnyOrder("createRoot", "openRoot", "sealRoot", "createSuccessor");
+        assertThat(methods)
+                .containsExactlyInAnyOrder(
+                        "createRoot",
+                        "openRoot",
+                        "sealRoot",
+                        "createSuccessor",
+                        "isDurablyRetired",
+                        "retireDeletedRoot");
     }
 
     private static KafkaRunRootSnapshotV1 root(

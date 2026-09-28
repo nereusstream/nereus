@@ -36,8 +36,50 @@ class KafkaProtocolCheckpointCodecV1Test {
         assertThat(decoded.transactionState().abortedTransactions()).hasSize(1);
         assertThat(decoded.producerState()
                         .findDuplicate(new com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1(
-                                71, (short) 0, 1, 1)))
+                                71, (short) 0, 0, 0)))
                 .isPresent();
+        assertThat(decoded.producerState().producers().get(71L).lastSequence()).isZero();
+        assertThat(decoded.producerState().producers().get(71L).coordinatorEpoch())
+                .isEqualTo(3);
+    }
+
+    @Test
+    void roundTripsNativeTimestampsAndProtectedCrashLocators() {
+        var old = KafkaCheckpointTestFixtures.richState();
+        var producer = old.producerState().producers().get(71L);
+        var batches = producer.recentBatches().stream()
+                .map(batch -> new com.nereusstream.kafka.bookkeeper.commit.KafkaProducerBatchResultV1(
+                        batch.identity(), batch.startOffset(), batch.endOffsetExclusive(), 1234))
+                .toList();
+        var state = new KafkaProtocolCheckpointStateV1(
+                old.vector(),
+                new KafkaCommittedProducerStateV1(new java.util.TreeMap<>(java.util.Map.of(
+                        71L,
+                        new com.nereusstream.kafka.bookkeeper.commit.KafkaProducerSessionStateV1(
+                                71,
+                                producer.producerEpoch(),
+                                producer.lastSequence(),
+                                producer.lastOffset(),
+                                batches,
+                                producer.coordinatorEpoch(),
+                                producer.lastMarkerOffset(),
+                                2345)))),
+                old.transactionState(),
+                old.leaderEpochIndex(),
+                java.util.List.of(new KafkaCheckpointReadIndexV1(
+                        KafkaRunTestFixtures.binding(6, 11, 5).runId(),
+                        java.util.List.of(new KafkaCheckpointReadIndexV1.Row(100, 101, 1, 0, 100)))));
+        var decoded = KafkaProtocolCheckpointStateV1.fromNbke2(state.toNbke2());
+        assertThat(decoded).isEqualTo(state);
+        assertThat(decoded.producerState().producers().get(71L).lastTimestamp()).isEqualTo(2345);
+        assertThat(decoded.producerState()
+                        .producers()
+                        .get(71L)
+                        .recentBatches()
+                        .get(0)
+                        .maxTimestamp())
+                .isEqualTo(1234);
+        assertThat(decoded.readIndexes().get(0).rows().get(0).entryId()).isEqualTo(1);
     }
 
     @Test

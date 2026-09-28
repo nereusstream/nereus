@@ -17,9 +17,11 @@ package com.nereusstream.kafka.bookkeeper.commit;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionStateReferenceV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionStateReferencesV1;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Owner-local immutable component repository; K1 roots expose objects only by exact generation/content identity. */
 final class KafkaProtocolStateRepositoryV1 {
@@ -44,6 +46,22 @@ final class KafkaProtocolStateRepositoryV1 {
             throw new IllegalStateException("coherent root names an unavailable or wrongly typed protocol component");
         }
         return type.cast(stored.value());
+    }
+
+    /** Resolved snapshots hold their own immutable objects; only the current root needs repository lookup. */
+    synchronized void retainCurrent(KafkaPartitionStateReferencesV1 references) {
+        var retained = Set.of(
+                references.activeTail(),
+                references.committedProducerState(),
+                references.speculativeProducerQueue(),
+                references.transactionIndex(),
+                references.leaderEpochIndex(),
+                references.checkpointVector());
+        values.keySet().retainAll(retained);
+    }
+
+    synchronized int retainedComponents() {
+        return values.size();
     }
 
     private record Stored(CanonicalBytes canonical, Object value) {}

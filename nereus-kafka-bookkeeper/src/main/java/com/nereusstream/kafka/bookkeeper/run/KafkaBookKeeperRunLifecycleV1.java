@@ -17,6 +17,7 @@ package com.nereusstream.kafka.bookkeeper.run;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2ProtocolCheckpointV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
@@ -103,6 +104,31 @@ public final class KafkaBookKeeperRunLifecycleV1 {
                 candidate -> rootAuthority.createSuccessor(expectedSealed, candidate));
     }
 
+    public static CompletionStage<KafkaBookKeeperRunLifecycleV1> createAfterRecovery(
+            BookKeeperCellSession session,
+            KafkaRunRootAuthority authority,
+            KafkaRunRootSnapshotV1 sealedPredecessor,
+            Nbke2RunBindingV1 binding) {
+        if (sealedPredecessor.state() != KafkaRunRootStateV1.SEALED
+                || !sealedPredecessor.bindingId().equals(binding.bindingId())
+                || !sealedPredecessor.topicIncarnation().equals(binding.topicIncarnation())
+                || sealedPredecessor.partitionId() != binding.partitionId()
+                || !sealedPredecessor.storageEpochId().equals(binding.storageEpochId())
+                || !sealedPredecessor.providerScopeId().equals(binding.providerScopeId())
+                || binding.creatorOwnerEpoch() <= sealedPredecessor.creatorOwnerEpoch()
+                || binding.kafkaLeaderEpoch() <= sealedPredecessor.kafkaLeaderEpoch()) {
+            throw new IllegalArgumentException(
+                    "recovery successor must preserve partition identity and advance owner/leader epochs");
+        }
+        return create(
+                session,
+                authority,
+                binding,
+                sealedPredecessor.kafkaEndOffsetExclusive().orElseThrow(),
+                Optional.of(sealedPredecessor.runId()),
+                candidate -> authority.createSuccessor(sealedPredecessor, candidate));
+    }
+
     public synchronized KafkaBookKeeperEntryReservationV1 reserveDataGroup(int memberCount) {
         requireState(KafkaBookKeeperRunStateV1.ACTIVE);
         return entrySequencer.reserveDataGroup(memberCount);
@@ -152,6 +178,34 @@ public final class KafkaBookKeeperRunLifecycleV1 {
             throw new IllegalStateException("only an ACTIVE or already draining run can drain");
         }
         return drained;
+    }
+
+    /** Persists the immutable locator block between complete DATA groups, using the same entry sequencer. */
+    public CompletionStage<Long> appendRangeIndexBlock(Nbke2RangeIndexBlockV1 block) {
+        long entryId;
+        synchronized (this) {
+            requireState(KafkaBookKeeperRunStateV1.ACTIVE);
+            if (!block.runBinding().equals(runBinding)) {
+                throw new IllegalArgumentException("index block belongs to another run");
+            }
+            entryId = entrySequencer.reserveControl().firstEntryId();
+            pendingOperations++;
+        }
+        return appendExact(
+                        session,
+                        handle,
+                        entryId,
+                        Nbke2CodecV1.encode(handle.ledgerIdentity().ledgerId(), entryId, block))
+                .thenApply(ignored -> entryId)
+                .whenComplete((ignored, failure) -> {
+                    synchronized (KafkaBookKeeperRunLifecycleV1.this) {
+                        pendingOperations--;
+                        if (failure != null) {
+                            failRun(failure);
+                        }
+                        completeDrainIfReady();
+                    }
+                });
     }
 
     public CompletionStage<KafkaBookKeeperRunSnapshotV1> seal(Nbke2RunFooterV1 footer) {

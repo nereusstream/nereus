@@ -22,6 +22,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootVerifierV2;
@@ -48,10 +49,13 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
 
     @Override
     public CompletionStage<Void> requireNative(KafkaRunRootRecordV2 record) {
+        if (record.recoveryCut().isPresent()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("crash run requires its exact closed-owner prefix verification"));
+        }
         var root = record.root();
         var configuration = RunLedgerConfigurationV1.from(reads.capabilitySnapshot(), root.runId());
         if (!record.resource().namespace().equals(client.spec().namespace())
-                || !client.spec().configurations().contains(configuration)
                 || !root.providerScopeId().equals(reads.providerScopeId())) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("root is outside its native BK scope"));
         }
@@ -105,6 +109,92 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
                                     }
                                 });
                     });
+                });
+    }
+
+    @Override
+    public CompletionStage<Void> requireRecovered(KafkaRunRootRecordV2 record, KafkaOwnerAdmissionV1 closed) {
+        var root = record.root();
+        var cut = record.recoveryCut().orElseThrow(() -> new IllegalArgumentException("crash recovery cut is absent"));
+        if (!closed.closed()
+                || !cut.closedOwnerSha256().equals(Sha256Digest.hash(closed.encode()))
+                || !closed.runs().contains(record.initialLink())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("crash cut differs from immutable owner closure"));
+        }
+        var active = new com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1(
+                root.bindingId(),
+                root.topicIncarnation(),
+                root.partitionId(),
+                root.storageEpochId(),
+                root.creatorOwnerEpoch(),
+                root.kafkaLeaderEpoch(),
+                root.providerScopeId(),
+                root.runId(),
+                root.ledgerIdentity(),
+                root.kafkaStartOffset(),
+                java.util.OptionalLong.empty(),
+                KafkaRunRootStateV1.ACTIVE,
+                root.predecessorRunId());
+        var handle =
+                new RunLedgerHandleV1(root.providerScopeId(), root.runId(), root.ledgerIdentity(), capabilitySha256());
+        var binding = new Nbke2RunBindingV1(
+                root.bindingId(),
+                root.topicIncarnation(),
+                root.partitionId(),
+                root.storageEpochId(),
+                root.creatorOwnerEpoch(),
+                root.kafkaLeaderEpoch(),
+                root.providerScopeId(),
+                root.runId());
+        var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                root.bindingId(),
+                root.topicIncarnation(),
+                root.partitionId(),
+                1,
+                root.storageEpochId(),
+                root.creatorOwnerEpoch(),
+                root.kafkaLeaderEpoch());
+        var envelope = com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1.selectedDefault();
+        var request = new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRecoveryRequestV1(
+                binding,
+                handle,
+                root.kafkaStartOffset(),
+                java.util.OptionalLong.empty(),
+                envelope,
+                closed,
+                record,
+                fence,
+                java.util.Optional.empty());
+        // Validate physical commit sets independently. Full producer/transaction replay is composed across all runs by
+        // ClosedHistoryRecovery, because a marker may end a transaction begun in a preceding run.
+        var nativeAdapter = new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1();
+        var physicalRecovery = new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperTakeoverRecoveryV1(
+                reads,
+                batch -> {
+                    nativeAdapter.protocolDelta(batch);
+                    return com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolBatchDeltaV1.nonIdempotent(
+                            batch.endOffsetExclusive() - batch.baseOffset());
+                },
+                System::nanoTime);
+        return requireNative(KafkaRunRootRecordV2.pending(record.resource().namespace(), active))
+                .thenCompose(ignored -> client.captureExactTarget(handle))
+                .thenCompose(captured -> {
+                    var seal = captured.exactTarget()
+                            .orElseThrow(() -> new IllegalStateException("crash cut ledger is not natively closed"));
+                    if (seal.sealedLastEntryId() != cut.recoveredLastAddConfirmed()) {
+                        throw new IllegalStateException("crash cut LAC differs from exact native closed metadata");
+                    }
+                    return physicalRecovery.recover(request);
+                })
+                .thenAccept(result -> {
+                    if (!result.recovered()
+                            || result.newLeaderLeo().orElseThrow()
+                                    != root.kafkaEndOffsetExclusive().orElseThrow()
+                            || !result.conflictEntryId().equals(cut.inertFromEntryId())) {
+                        throw new IllegalStateException(
+                                "crash cut differs from the independently verified physical prefix");
+                    }
                 });
     }
 

@@ -54,7 +54,7 @@ class KafkaCoherentCommitCoordinatorV1Test {
         KafkaCoherentProtocolSnapshotV1 snapshot = context.coordinator.capture();
 
         assertThat(result.outcome()).isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
-        assertThat(snapshot.root().frontiers()).isEqualTo(new KafkaPartitionFrontiersV1(100, 102, 102, 102, 100, 100));
+        assertThat(snapshot.root().frontiers()).isEqualTo(new KafkaPartitionFrontiersV1(100, 102, 102, 102, 102, 102));
         assertThat(snapshot.activeTail().locators()).singleElement().satisfies(locator -> {
             assertThat(locator.startOffset()).isEqualTo(100);
             assertThat(locator.endOffsetExclusive()).isEqualTo(102);
@@ -188,6 +188,65 @@ class KafkaCoherentCommitCoordinatorV1Test {
     }
 
     @Test
+    void inFlightRetryJoinsOriginalOffsetsEvenAtCapacityAndAfterObserverCancellation() {
+        Context context = context(event -> {}, new ArrayList<>(), 1);
+        context.session.delayedEntryId = 1;
+        var storage = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
+        var protocol = plan(context.fence, batch(7, 0, KafkaTransactionBatchKindV1.NONE, -1));
+        var original = context.pipeline.submit(
+                storage.request(), storage::assignment, context.coordinator.protocolHooks(protocol));
+        assertThat(context.partition.snapshot().groups()).isEqualTo(1);
+        var retry = context.pipeline.submit(
+                storage.request(),
+                () -> {
+                    throw new AssertionError("duplicate allocated a second offset range");
+                },
+                context.coordinator.protocolHooks(protocol));
+        assertThat(original.toCompletableFuture().cancel(false)).isTrue();
+        assertThat(retry.toCompletableFuture()).isNotDone();
+        assertThat(context.coordinator.capture().root().frontiers().allocatedEndOffset())
+                .isEqualTo(101);
+        context.session.completeDelayedAppend();
+        assertThat(retry.toCompletableFuture().join().outcome())
+                .isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+        assertThat(retry.toCompletableFuture().join().startOffset()).hasValue(100);
+        assertThat(context.pipeline
+                        .submit(
+                                storage.request(),
+                                () -> {
+                                    throw new AssertionError("completed duplicate allocated a second offset range");
+                                },
+                                context.coordinator.protocolHooks(protocol))
+                        .toCompletableFuture()
+                        .join()
+                        .startOffset())
+                .hasValue(100);
+        assertThat(context.coordinator.capture().activeTail().locators()).hasSize(1);
+    }
+
+    @Test
+    void oldResolvedSnapshotSurvivesWhileRepositoryReleasesSupersededGenerations() {
+        Context context = context();
+        var old = context.coordinator.capture();
+        for (int sequence = 0; sequence < 100; sequence++) {
+            var storage = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100 + sequence);
+            var protocol = plan(context.fence, batch(7, sequence, KafkaTransactionBatchKindV1.NONE, -1));
+            assertThat(context.pipeline
+                            .submit(storage.request(), storage::assignment, context.coordinator.protocolHooks(protocol))
+                            .toCompletableFuture()
+                            .join()
+                            .outcome())
+                    .isEqualTo(KafkaOrderedAppendOutcomeV1.COMMITTED_ORDERED);
+        }
+        assertThat(context.coordinator.retainedProtocolComponents()).isEqualTo(5);
+        assertThat(old.root().frontiers().readableEndOffset()).isEqualTo(100);
+        assertThat(old.activeTail().locators()).isEmpty();
+        assertThat(old.committedProducerState().producers()).isEmpty();
+        assertThat(context.coordinator.capture().root().frontiers().highWatermark())
+                .isEqualTo(200);
+    }
+
+    @Test
     void transactionAbortAndFirstUnstableStateShareTheReadablePublicationCut() {
         Context context = context();
         KafkaPipelineTestFixtures.Plan dataStorage = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
@@ -204,6 +263,8 @@ class KafkaCoherentCommitCoordinatorV1Test {
         KafkaCoherentProtocolSnapshotV1 open = context.coordinator.capture();
         assertThat(open.firstUnstableOffset()).hasValue(100);
         assertThat(open.root().frontiers().readableEndOffset()).isEqualTo(101);
+        assertThat(open.root().frontiers().highWatermark()).isEqualTo(101);
+        assertThat(open.root().frontiers().lastStableOffset()).isEqualTo(100);
 
         context.pipeline
                 .submit(
@@ -214,14 +275,14 @@ class KafkaCoherentCommitCoordinatorV1Test {
                 .toCompletableFuture()
                 .join();
         KafkaCoherentProtocolSnapshotV1 aborted = context.coordinator.capture();
-        assertThat(aborted.firstUnstableOffset()).hasValue(100);
+        assertThat(aborted.firstUnstableOffset()).isEmpty();
         assertThat(aborted.transactionState().abortedTransactions())
                 .singleElement()
                 .satisfies(transaction -> {
                     assertThat(transaction.firstOffset()).isEqualTo(100);
                     assertThat(transaction.markerEndOffsetExclusive()).isEqualTo(102);
                 });
-        assertThat(aborted.root().frontiers().lastStableOffset()).isEqualTo(100);
+        assertThat(aborted.root().frontiers().lastStableOffset()).isEqualTo(102);
         assertThat(aborted.root().frontiers().readableEndOffset()).isEqualTo(102);
     }
 
@@ -323,6 +384,11 @@ class KafkaCoherentCommitCoordinatorV1Test {
 
     private static Context context(
             KafkaPartitionPublicationObserver observer, List<KafkaPartitionPublicationEventV1> events) {
+        return context(observer, events, 5);
+    }
+
+    private static Context context(
+            KafkaPartitionPublicationObserver observer, List<KafkaPartitionPublicationEventV1> events, long groups) {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         KafkaBookKeeperRunLifecycleV1 lifecycle =
                 KafkaPipelineTestFixtures.lifecycle(session, new KafkaRunTestFixtures.FakeRootAuthority());
@@ -330,9 +396,9 @@ class KafkaCoherentCommitCoordinatorV1Test {
         KafkaCoherentCommitCoordinatorV1 coordinator = KafkaCoherentCommitCoordinatorV1.bootstrap(
                 fence, 100, lifecycle.snapshot().handle(), observer);
         KafkaAppendCapacityControllerV1 partition =
-                new KafkaAppendCapacityControllerV1(new KafkaAppendCapacityBudgetV1(5, 20, 100_000));
+                new KafkaAppendCapacityControllerV1(new KafkaAppendCapacityBudgetV1(groups, 20, 100_000));
         KafkaAppendCapacityControllerV1 global =
-                new KafkaAppendCapacityControllerV1(new KafkaAppendCapacityBudgetV1(5, 20, 100_000));
+                new KafkaAppendCapacityControllerV1(new KafkaAppendCapacityBudgetV1(groups, 20, 100_000));
         KafkaBookKeeperOrderedPipelineV1 pipeline =
                 new KafkaBookKeeperOrderedPipelineV1(session, lifecycle, partition, global, coordinator);
         return new Context(session, lifecycle, fence, coordinator, partition, events, pipeline);
@@ -366,6 +432,9 @@ class KafkaCoherentCommitCoordinatorV1Test {
 
     private static KafkaProtocolBatchDeltaV1 batch(
             long producerId, int sequence, KafkaTransactionBatchKindV1 kind, int coordinatorEpoch) {
+        if (kind == KafkaTransactionBatchKindV1.COMMIT_MARKER || kind == KafkaTransactionBatchKindV1.ABORT_MARKER) {
+            return KafkaProtocolBatchDeltaV1.marker(kind, producerId, (short) 0, coordinatorEpoch);
+        }
         return new KafkaProtocolBatchDeltaV1(
                 1,
                 Optional.of(new KafkaBatchDuplicateIdentityV1(producerId, (short) 0, sequence, sequence)),

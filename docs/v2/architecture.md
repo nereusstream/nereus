@@ -9,6 +9,17 @@ sourceTuple: v2-m1
 
 # Nereus V2 overall architecture
 
+Kafka now uses RF=1/minISR=1 and one Controller-selected Owner. BK ACK/HW derives from the complete continuous
+legal shared commit published with producer/transaction/locator state; LSO derives from that HW and first unstable
+transaction. Cold takeover closes run admission, fences/replays the admitted history, changes native assignment,
+and activates only the still-current generation. NSIP-1 has actual native Broker/Controller evidence for transactions,
+disconnected-response retry, persistent group offsets, superseded recovery and two cold relocations. The final-source
+normal native real-cluster task passes. The first native slice supports only BOOKKEEPER_WAL_ONLY. NSIP-1 T4's Object
+core now separates exact upload from a per-partition Binding/Owner Head CAS grant, closes legal history on that same
+key, and restores common checkpoint plus the explicitly authorized tail. Real MinIO/Oxia covers shared-member closure,
+response loss and two fresh partition-state takeovers. Native Object Broker profiles remain fail-closed; full M4/M5
+retirement, Kafka compatibility and performance qualification are separate work.
+
 ## 1. Product objective
 
 Nereus V2 is a multi-protocol Storage Fabric with topic-level storage choices:
@@ -165,7 +176,7 @@ The append sequence is:
 
 Kafka further separates Allocated, profile-Durable, Readable/LEO, HW, and LSO. The ordered publication cut includes
 locator, producer, transaction/aborted, and Kafka leader-epoch state; `acks=1` waits for LEO and `acks=all` waits for
-native ISR-derived HW. BookKeeper/Object durability never silently replaces ISR or transaction visibility.
+the same legal shared commit HW under RF=1/minISR=1. Complete legal history and transaction state remain required.
 
 Control metadata is not the append linearization point. A timeout is an uncertain outcome resolved from deterministic
 identity, binding/incarnation, Storage Epoch, Owner Epoch, typed coverage, length, checksum, and durable predecessor
@@ -319,8 +330,8 @@ most one stale candidate. Installed-range use does not wait for allocator clear,
 unblock the next Cell grant. These constraints do not select RANGE_LEASED.
 
 ADR 0086 is authoritative for the Kafka BookKeeper run/range-index and ordered-pipeline direction. ADR 0087 owns the
-Kafka frontier, fenced publication, native duplicate semantics, transaction/HW/LSO recovery, compact follower
-descriptor transport, Observed/Applied and election-adoption boundaries, shared-storage ISR/HW, delayed-Fetch,
+Kafka frontier, fenced publication, native duplicate semantics, transaction/HW/LSO recovery, closed legal-history
+admission and cold takeover boundaries, shared commit HW, delayed-Fetch,
 compaction, and profile-neutral bounded protocol-checkpoint/recovery semantics layered over it.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
@@ -390,7 +401,8 @@ epoch-scoped profiles, physical generation overlap, no synchronous BK/Object dou
 ## 11. Status and historical boundary
 
 M0 remains the documentation/source-lock baseline. The M1.1a-A domain/SPI foundation is implemented and locally gated,
-but V2 runtime activation and current-source promotion evidence are not started. Existing V1 implementation contracts,
+and the NSIP-1 BK-only native runtime now exercises actual RF=1 Controller/Broker cold activation. That focused
+first-batch evidence does not promote the remaining V2 profiles or complete M5/M6. Existing V1 implementation contracts,
 including [BookKeeper primary WAL](../v1/phase-bk-bookkeeper-primary-wal/README.md), remain historical evidence until
 their
 code slices are replaced. Their exact archive is

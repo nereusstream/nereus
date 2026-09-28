@@ -27,6 +27,7 @@ import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
 import com.nereusstream.storage.object.provider.ObjectProviderCapabilities;
 import com.nereusstream.storage.object.provider.ObjectProviderTransport;
+import com.nereusstream.storage.object.provider.ProviderObjectOutcome;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +38,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class BoundedObjectTailRecoveryTest {
     @Test
@@ -184,6 +190,216 @@ class BoundedObjectTailRecoveryTest {
         assertThat(budget.snapshot().canonicalBodyBytes()).isZero();
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void temporaryWorkingSetRejectionDoesNotSpendListOrPreventExactCandidateRetry(boolean protocol) throws Exception {
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var transport = new FakeTransport();
+        byte[] body = new byte[512];
+        var sha = Sha256Digest.hash(CanonicalBytes.copyOf(body));
+        String key = protocol
+                ? root.providerConfiguration().exclusiveNamespacePrefix()
+                        + "/protocol/kafka/nwkcp1-v1/objects/sha256-v1-" + sha.toHex() + ".nwkcp1"
+                : new ObjectWalLeafKeyV1(WalLaneId.OBJECT_LATENCY, 0, 256, body.length, sha)
+                        .fullKey(root.providerConfiguration());
+        var identity = transport.store(key, body);
+        var recovery = new BoundedObjectTailRecovery(rootSession(transport, root), root, () -> 0);
+        recovery.acquireWorkingSet(root.recoveryEnvelope().maxWorkingMemoryBytes());
+        var before = recovery.snapshot();
+        assertThatThrownBy(() -> {
+                    if (protocol) {
+                        recovery.reconcileUnknownProtocolObject(identity);
+                    } else {
+                        recovery.reconcileUnknownExtent(identity);
+                    }
+                })
+                .hasMessageContaining("working memory bytes");
+        assertThat(transport.listCalls).isZero();
+        assertThat(transport.fullGetCalls).isZero();
+        recovery.releaseWorkingSet(root.recoveryEnvelope().maxWorkingMemoryBytes());
+        var result = protocol
+                ? recovery.reconcileUnknownProtocolObject(identity)
+                : recovery.reconcileUnknownExtent(identity);
+        assertThat(result.outcome())
+                .isEqualTo(com.nereusstream.storage.object.provider.ProviderObjectOutcome.EXISTING_EXACT);
+        assertThat(recovery.snapshot().listPages()).isEqualTo(before.listPages() + 1);
+        assertThat(recovery.snapshot().listedKeys()).isEqualTo(before.listedKeys() + 1);
+        assertThat(recovery.snapshot().listedKeyBytes()).isEqualTo(before.listedKeyBytes() + key.length());
+        assertThat(recovery.snapshot().fullGetRequests()).isEqualTo(before.fullGetRequests() + 1);
+        assertThat(recovery.snapshot().currentConcurrency()).isZero();
+        assertThat(recovery.snapshot().workingMemoryBytes()).isZero();
+        assertThat(transport.listCalls).isOne();
+        assertThat(transport.fullGetCalls).isOne();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void concurrentReconciliationOwnsExactIdentityWithoutLosingOtherCandidate(boolean protocol) throws Exception {
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var transport = new FakeTransport();
+        var first = reconciliationIdentity(transport, root, protocol, 0);
+        var second = reconciliationIdentity(transport, root, protocol, 1);
+        var recovery = new BoundedObjectTailRecovery(rootSession(transport, root), root, () -> 0);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        transport.beforeFullGet = () -> {
+            entered.countDown();
+            try {
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(failure);
+            }
+        };
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var firstCall = executor.submit(() -> reconcile(recovery, first, protocol));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var inFlight = recovery.snapshot();
+            assertThatThrownBy(() -> reconcile(recovery, first, protocol)).hasMessageContaining("in-flight I/O");
+            assertThat(recovery.snapshot()).isEqualTo(inFlight);
+            long held = root.recoveryEnvelope().maxWorkingMemoryBytes() - inFlight.workingMemoryBytes();
+            recovery.acquireWorkingSet(held);
+            var occupied = recovery.snapshot();
+            try {
+                assertThatThrownBy(() -> reconcile(recovery, second, protocol))
+                        .isInstanceOf(RecoveryEnvelopeExceededException.class);
+                assertThat(recovery.snapshot()).isEqualTo(occupied);
+                assertThat(transport.listCalls).isOne();
+                assertThat(transport.fullGetCalls).isOne();
+            } finally {
+                recovery.releaseWorkingSet(held);
+            }
+            release.countDown();
+            assertThat(firstCall.get(10, TimeUnit.SECONDS)).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
+            assertThat(reconcile(recovery, second, protocol)).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
+            assertThat(recovery.snapshot().listPages()).isEqualTo(2);
+            assertThat(recovery.snapshot().fullGetRequests()).isEqualTo(2);
+            assertThat(recovery.snapshot().retryAttempts()).isZero();
+            assertThat(recovery.snapshot().currentConcurrency()).isZero();
+            assertThat(recovery.snapshot().workingMemoryBytes()).isZero();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void failedListKeepsOriginalReservationAcrossTemporaryRejectionAndExactRetry(boolean protocol) throws Exception {
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var transport = new FakeTransport();
+        var identity = reconciliationIdentity(transport, root, protocol, 0);
+        var recovery = new BoundedObjectTailRecovery(rootSession(transport, root), root, () -> 0);
+        transport.failNextList = true;
+        assertThatThrownBy(() -> reconcile(recovery, identity, protocol))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("injected LIST failure");
+        var failed = recovery.snapshot();
+        assertThat(failed.listPages())
+                .isEqualTo(protocol ? 1 : root.recoveryEnvelope().maxListPages());
+        assertThat(failed.listedKeys())
+                .isEqualTo(protocol ? 1 : root.recoveryEnvelope().maxListedKeys());
+        assertThat(failed.listedKeyBytes())
+                .isEqualTo(
+                        protocol
+                                ? identity.key().length()
+                                : root.recoveryEnvelope().maxListedKeyBytes());
+        assertThat(failed.fullGetRequests()).isOne();
+        assertThat(failed.currentConcurrency()).isZero();
+        assertThat(failed.workingMemoryBytes()).isZero();
+        recovery.acquireWorkingSet(root.recoveryEnvelope().maxWorkingMemoryBytes());
+        var occupied = recovery.snapshot();
+        try {
+            assertThatThrownBy(() -> reconcile(recovery, identity, protocol))
+                    .hasMessageContaining("working memory bytes");
+            assertThat(recovery.snapshot()).isEqualTo(occupied);
+            assertThat(transport.listCalls).isOne();
+            assertThat(transport.fullGetCalls).isZero();
+        } finally {
+            recovery.releaseWorkingSet(root.recoveryEnvelope().maxWorkingMemoryBytes());
+        }
+        assertThat(reconcile(recovery, identity, protocol)).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
+        assertThat(recovery.snapshot().listPages()).isOne();
+        assertThat(recovery.snapshot().listedKeys()).isOne();
+        assertThat(recovery.snapshot().listedKeyBytes())
+                .isEqualTo(identity.key().length());
+        assertThat(recovery.snapshot().fullGetRequests()).isEqualTo(2);
+        assertThat(recovery.snapshot().retryAttempts()).isOne();
+        assertThat(recovery.snapshot().currentConcurrency()).isZero();
+        assertThat(recovery.snapshot().workingMemoryBytes()).isZero();
+        assertThat(transport.listCalls).isEqualTo(2);
+        assertThat(transport.fullGetCalls).isOne();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void unknownFullGetKeepsKnownListChargeAndRetriesWithFreshBudget(boolean protocol) throws Exception {
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var transport = new FakeTransport();
+        var identity = reconciliationIdentity(transport, root, protocol, 0);
+        var recovery = new BoundedObjectTailRecovery(rootSession(transport, root), root, () -> 0);
+        transport.failNextFullGet = true;
+        assertThat(reconcile(recovery, identity, protocol)).isEqualTo(ProviderObjectOutcome.OUTCOME_UNKNOWN);
+        assertThat(recovery.snapshot().listPages()).isOne();
+        assertThat(recovery.snapshot().fullGetRequests()).isOne();
+        assertThat(reconcile(recovery, identity, protocol)).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
+        assertThat(recovery.snapshot().listPages()).isEqualTo(2);
+        assertThat(recovery.snapshot().listedKeys()).isEqualTo(2);
+        assertThat(recovery.snapshot().listedKeyBytes())
+                .isEqualTo(2L * identity.key().length());
+        assertThat(recovery.snapshot().fullGetRequests()).isEqualTo(2);
+        assertThat(recovery.snapshot().retryAttempts()).isOne();
+        assertThat(recovery.snapshot().currentConcurrency()).isZero();
+        assertThat(recovery.snapshot().workingMemoryBytes()).isZero();
+        assertThat(transport.listCalls).isEqualTo(2);
+        assertThat(transport.fullGetCalls).isEqualTo(2);
+    }
+
+    @Test
+    void invalidSettledInventoryIsNotReturnedAsAnUnsettledReservation() {
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var transport = new FakeTransport();
+        var identity = reconciliationIdentity(transport, root, false, 0);
+        transport.store(root.providerConfiguration().exclusiveNamespacePrefix() + "/0/invalid-leaf", 1);
+        var recovery = new BoundedObjectTailRecovery(rootSession(transport, root), root, () -> 0);
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            assertThatThrownBy(() -> recovery.reconcileUnknownExtent(identity))
+                    .hasMessageContaining("expanded outside");
+            assertThat(recovery.snapshot().listPages()).isEqualTo(attempt * 2);
+            assertThat(recovery.snapshot().listedKeys()).isEqualTo(attempt * 2);
+            assertThat(recovery.snapshot().fullGetRequests()).isEqualTo(attempt);
+            assertThat(recovery.snapshot().currentConcurrency()).isZero();
+        }
+    }
+
+    private static ObjectIdentity reconciliationIdentity(
+            FakeTransport transport, WalRunRootRecord root, boolean protocol, int seed) {
+        byte[] body = new byte[512];
+        Arrays.fill(body, (byte) seed);
+        var sha = Sha256Digest.hash(CanonicalBytes.copyOf(body));
+        String key = protocol
+                ? root.providerConfiguration().exclusiveNamespacePrefix()
+                        + "/protocol/kafka/nwkcp1-v1/objects/sha256-v1-" + sha.toHex() + ".nwkcp1"
+                : new ObjectWalLeafKeyV1(
+                                seed == 0 ? WalLaneId.OBJECT_LATENCY : WalLaneId.OBJECT_BALANCED,
+                                0,
+                                256,
+                                body.length,
+                                sha)
+                        .fullKey(root.providerConfiguration());
+        return transport.store(key, body);
+    }
+
+    private static ProviderObjectOutcome reconcile(
+            BoundedObjectTailRecovery recovery, ObjectIdentity identity, boolean protocol) throws IOException {
+        return (protocol
+                        ? recovery.reconcileUnknownProtocolObject(identity)
+                        : recovery.reconcileUnknownExtent(identity))
+                .outcome();
+    }
+
     private static C1ObjectProviderSession session(FakeTransport transport) {
         byte[] scope = new byte[Sha256Digest.LENGTH];
         Arrays.fill(scope, (byte) 1);
@@ -229,12 +445,22 @@ class BoundedObjectTailRecoveryTest {
     }
 
     private static final class FakeTransport implements ObjectProviderTransport {
+        @Override
+        public FailureKind classifyFailure(IOException failure) {
+            return failure.getMessage().equals("injected full GET failure")
+                    ? FailureKind.OUTCOME_UNKNOWN
+                    : FailureKind.FATAL;
+        }
+
         private final Map<String, byte[]> objects = new LinkedHashMap<>();
         private int listCalls;
         private int lastListMaximumKeys;
         private int rangeGetCalls;
         private int fullGetCalls;
         private boolean failNextRange;
+        private boolean failNextList;
+        private boolean failNextFullGet;
+        private volatile Runnable beforeFullGet;
 
         private ObjectIdentity store(String key, int... values) {
             byte[] bytes = new byte[values.length];
@@ -264,6 +490,15 @@ class BoundedObjectTailRecoveryTest {
         @Override
         public StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException {
             fullGetCalls++;
+            var hook = beforeFullGet;
+            beforeFullGet = null;
+            if (hook != null) {
+                hook.run();
+            }
+            if (failNextFullGet) {
+                failNextFullGet = false;
+                throw new IOException("injected full GET failure");
+            }
             byte[] value = required(key);
             return new StreamingObject(
                     value.length, 0, value.length, Optional.empty(), new ByteArrayInputStream(value));
@@ -285,8 +520,13 @@ class BoundedObjectTailRecoveryTest {
         }
 
         @Override
-        public ListPage list(String prefix, Optional<CanonicalBytes> continuationToken, int maximumKeys) {
+        public ListPage list(String prefix, Optional<CanonicalBytes> continuationToken, int maximumKeys)
+                throws IOException {
             listCalls++;
+            if (failNextList) {
+                failNextList = false;
+                throw new IOException("injected LIST failure");
+            }
             lastListMaximumKeys = maximumKeys;
             List<String> keys = objects.keySet().stream()
                     .filter(key -> key.startsWith(prefix))

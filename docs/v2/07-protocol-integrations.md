@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: Normative
 sourceTuple: v2-m1
@@ -33,7 +33,7 @@ infrastructure is an optional deployment topology for stronger SLO, compliance, 
 
 The Kafka fork retains stock Kafka protocol and state-machine semantics around a Nereus-backed log:
 
-- KRaft topic/partition identity, controller epochs, leader changes, ISR/minISR, and reassignment;
+- KRaft topic/partition identity, controller epochs, leader changes, and reassignment of the sole RF=1/minISR=1 replica;
 - `UnifiedLog` append/fetch/list-offset/delete-records behavior;
 - producer ID/epoch/sequence and duplicate handling;
 - transaction visibility, markers, high watermark, and last stable offset;
@@ -55,27 +55,20 @@ run/block floor lookup plus a targeted entry read. Offset/entry admission remain
 futures overlap; the committed/ACK frontier never advances around a gap. Consumer-group offsets remain Kafka cursors,
 not BookKeeper coordinates.
 
-ADR 0087 completes the protocol layer over this mapping. Kafka partitions expose distinct Allocated, profile-Durable,
+ADR 0087, as revised by NSIP-1, defines the protocol layer over this mapping. Kafka partitions expose distinct Allocated, profile-Durable,
 Readable/LEO, HW, and LSO boundaries; Object materialization and checkpoint coverage are not visibility frontiers.
 Offset admission validates PID/epoch/sequence against committed plus speculative state before allocation. Ordered
 publication installs locators, producer state, transaction/aborted state, and leader-epoch state atomically before LEO
-or success ACK. `acks=1` waits for LEO, while `acks=all` preserves native ISR/minISR admission and waits for HW.
+or success ACK. Under RF=1/minISR=1, both `acks=1` and `acks=all` await complete profile durability, legal shared
+commit qualification, and coherent publication; `acks=0` follows the same admitted write path without a success reply.
 
-Shared storage carries one physical payload copy. The leader sends compact ordered commit descriptors through the
-native replica-Fetch/fetcher channel; followers validate and durably journal them before advancing Observed, then read
-shared payload and apply producer/transaction/leader state through Applied. HW uses eligible Observed progress, while
-leader admission requires Applied through the native election-adoptable frontier. BookKeeper quorum never silently
-substitutes for ISR/HW. Kafka replication factor controls logical broker replicas/leader candidates/ISR, not the count
-of independent external-storage copies; BookKeeper quorum or Object durability controls physical redundancy, and a
-shared provider remains a correlated failure domain.
-
-Observed is ISR/HW-eligible only while the journal is durable through that boundary, offset/byte/age Applied lag stays
-within hard evidence-derived limits, and a verifiable source covers the whole unapplied interval. A limit crossing
-stops Observed, shrinks native ISR eligibility, or backpressures the leader. Source generations may replace the
-original BK extent only with identical Kafka coverage/content and compatible producer/transaction/leader/checkpoint
-proof; protection cannot drain first. Journal loss/corruption/truncation rolls eligible Observed back to the highest
-contiguous surviving journal/Applied proof. These checks add no normal per-append control-metadata I/O and cannot be
-disabled or enlarged by a Topic.
+One Controller-selected Owner allocates offsets and runs the Kafka state machine. BK HW advances only with a complete,
+continuous, legal shared commit whose locator and recoverable producer/transaction/leader-epoch state are coherently
+published. LSO derives from that HW and the first unstable transaction. BookKeeper quorum supplies physical durability,
+not another logical replica or a substitute ISR. On failure, native Controller reassignment selects an eligible new
+Broker, which closes old admission, fences and recovers the legal checkpoint plus tail, then activates only its current
+generation. The current native request path supports `BOOKKEEPER_WAL_ONLY`; the Object core has its own persisted grant
+and closed-history recovery, while native Object Broker/process integration remains M6 work.
 
 Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
 compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO

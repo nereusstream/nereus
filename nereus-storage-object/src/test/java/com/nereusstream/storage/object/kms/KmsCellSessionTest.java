@@ -38,7 +38,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class KmsCellSessionTest {
     @Test
@@ -197,31 +202,24 @@ class KmsCellSessionTest {
     }
 
     @Test
-    void closedRunTombstoneBoundsTransferHistoryUntilQuiescentCellIsRecreated() {
-        FakeKmsTransport transport = new FakeKmsTransport();
-        WalRunRootRecord rootA = ObjectWalControlTestFixtures.root(1, Optional.empty());
-        WalRunRootRecord rootB = ObjectWalControlTestFixtures.root(2, Optional.empty());
-        KmsCellSession exhausted = session(transport, 1, "kms/cell-a", 1);
-        WalRunObjectSession ownerA =
-                ObjectWalControlTestFixtures.openIsolatedSession(rootA, provider(rootA), exhausted, () -> 0);
+    void admissionSuccessorRetainsOldRawFacadeFenceWithoutIncreasingCapacity() {
+        var transport = new FakeKmsTransport();
+        var rootA = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var rootB = ObjectWalControlTestFixtures.root(2, Optional.empty());
+        var original = session(transport, 1, "kms/cell-a", 1);
+        var ownerA = ObjectWalControlTestFixtures.openIsolatedSession(rootA, provider(rootA), original, () -> 0);
         ownerA.close();
-        C1ObjectProviderSession providerB = provider(rootB);
-
-        assertThatThrownBy(() -> ObjectWalControlTestFixtures.openIsolatedSession(rootB, providerB, exhausted, () -> 0))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("history capacity");
-        assertThat(providerB.state()).isEqualTo(C1ObjectProviderSession.State.OPEN);
-        assertThat(exhausted.state()).isEqualTo(KmsCellSession.State.OPEN);
-        assertThat(exhausted.cachedRunKeyCount()).isZero();
-        assertThat(transport.unwrapCalls).isZero();
-
-        exhausted.close();
-        KmsCellSession replacement = session(transport, 1, "kms/cell-a", 1);
-        WalRunObjectSession ownerB =
-                ObjectWalControlTestFixtures.openIsolatedSession(rootB, providerB, replacement, () -> 0);
+        var ownerB = ObjectWalControlTestFixtures.openIsolatedSession(rootB, provider(rootB), original, () -> 0);
+        assertThat(original.state()).isEqualTo(KmsCellSession.State.CLOSED);
+        assertThatThrownBy(() -> original.deriveObjectKey(
+                        new RunKeyCacheIdentity(7, 1), rootA.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0))
+                .hasMessageContaining("no longer accepts operations");
+        assertThatThrownBy(original::close).hasMessageContaining("lease is live");
+        assertThat(original.resourceSnapshot().runSlots()).isOne();
+        assertThat(original.resourceSnapshot().generations()).isOne();
         ownerB.close();
-        replacement.close();
-        assertThat(replacement.state()).isEqualTo(KmsCellSession.State.CLOSED);
+        original.close();
+        assertThat(original.resourceSnapshot().runSlots()).isZero();
     }
 
     @Test
@@ -248,6 +246,383 @@ class KmsCellSessionTest {
         assertThat(Arrays.stream(Nwg1ObjectReaderV1.VerifiedAppendUnit.class.getRecordComponents())
                         .map(RecordComponent::getType))
                 .doesNotContain(List.class, Nwg1ObjectReaderV1.DecodedObject.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void blockedKmsCallDoesNotBlockReadySibling(boolean wrap) throws Exception {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 3);
+        var ready = new RunKeyCacheIdentity(7, 1);
+        var readyEnvelope = cell.createRunKey(ready);
+        var pending = new RunKeyCacheIdentity(7, 2);
+        var envelope = ObjectWalControlTestFixtures.root(2, Optional.empty()).wrappedRunKey();
+        transport.register(envelope, 22);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        Runnable block = () -> {
+            entered.countDown();
+            await(release);
+        };
+        if (wrap) {
+            transport.beforeWrap = block;
+        } else {
+            transport.beforeUnwrap = block;
+        }
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var blocked = executor.submit(() -> wrap
+                    ? cell.createRunKey(pending)
+                    : cell.deriveObjectKey(pending, envelope, digest(3), WalLaneId.OBJECT_COST, 0));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var sibling = executor.submit(
+                    () -> cell.deriveObjectKey(ready, readyEnvelope, digest(3), WalLaneId.OBJECT_COST, 0));
+            assertThat(sibling.get(1, TimeUnit.SECONDS).length()).isEqualTo(32);
+            release.countDown();
+            assertThat(blocked.get(10, TimeUnit.SECONDS)).isNotNull();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            cell.close();
+        }
+    }
+
+    @Test
+    void longLivedRunDoesNotPreventContinuousRunRotation() {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 2);
+        var longRoot = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        transport.register(longRoot.wrappedRunKey(), 11);
+        var longIdentity = new RunKeyCacheIdentity(longRoot.shardId(), longRoot.shardRunEpoch());
+        cell.deriveObjectKey(longIdentity, longRoot.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0);
+        var longOwner = ObjectWalControlTestFixtures.openIsolatedSession(longRoot, provider(longRoot), cell, () -> 0);
+        try {
+            for (int epoch = 2; epoch <= 12; epoch++) {
+                var root = ObjectWalControlTestFixtures.root(epoch, Optional.empty());
+                var owner = ObjectWalControlTestFixtures.openIsolatedSession(root, provider(root), cell, () -> 0);
+                owner.close();
+                assertThat(longOwner.state()).isEqualTo(WalRunObjectSession.State.OPEN);
+                var resources = cell.resourceSnapshot();
+                assertThat(resources.runSlots()).isOne();
+                assertThat(resources.activeOperations()).isZero();
+                assertThat(resources.pendingLoads()).isZero();
+                assertThat(resources.generations()).isLessThanOrEqualTo(3);
+                assertThat(resources.history()).isLessThanOrEqualTo(6);
+                assertThatThrownBy(() -> cell.deriveObjectKey(
+                                longIdentity, longRoot.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0))
+                        .isInstanceOf(IllegalStateException.class);
+            }
+        } finally {
+            longOwner.close();
+            cell.close();
+        }
+    }
+
+    @Test
+    void admissionGenerationsShareTheOriginalActiveRunCapacity() {
+        var cell = session(new FakeKmsTransport(), 1, "kms/cell-a", 2);
+        var firstRoot = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var secondRoot = ObjectWalControlTestFixtures.root(2, Optional.empty());
+        var thirdRoot = ObjectWalControlTestFixtures.root(3, Optional.empty());
+        var first = ObjectWalControlTestFixtures.openIsolatedSession(firstRoot, provider(firstRoot), cell, () -> 0);
+        var second = ObjectWalControlTestFixtures.openIsolatedSession(secondRoot, provider(secondRoot), cell, () -> 0);
+        var rejectedProvider = provider(thirdRoot);
+        assertThatThrownBy(() ->
+                        ObjectWalControlTestFixtures.openIsolatedSession(thirdRoot, rejectedProvider, cell, () -> 0))
+                .hasMessageContaining("cache capacity");
+        rejectedProvider.close();
+        assertThat(cell.resourceSnapshot().runSlots()).isEqualTo(2);
+        assertThat(cell.resourceSnapshot().generations()).isEqualTo(2);
+        first.close();
+        var third = ObjectWalControlTestFixtures.openIsolatedSession(thirdRoot, provider(thirdRoot), cell, () -> 0);
+        assertThat(second.state()).isEqualTo(WalRunObjectSession.State.OPEN);
+        assertThat(cell.resourceSnapshot().runSlots()).isEqualTo(2);
+        second.close();
+        third.close();
+        assertThat(cell.resourceSnapshot().runSlots()).isZero();
+        cell.close();
+    }
+
+    @Test
+    void retiredRawCellCannotCreateTheNextRootKeyDespiteAnAvailableSharedSlot() {
+        var cell = session(new FakeKmsTransport(), 1, "kms/cell-a", 2);
+        var firstRoot = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var secondRoot = ObjectWalControlTestFixtures.root(2, Optional.empty());
+        var thirdRoot = ObjectWalControlTestFixtures.root(3, Optional.empty());
+        var first = ObjectWalControlTestFixtures.openIsolatedSession(firstRoot, provider(firstRoot), cell, () -> 0);
+        try {
+            ObjectWalControlTestFixtures.openIsolatedSession(secondRoot, provider(secondRoot), cell, () -> 0)
+                    .close();
+            ObjectWalControlTestFixtures.openIsolatedSession(thirdRoot, provider(thirdRoot), cell, () -> 0)
+                    .close();
+            assertThat(cell.state()).isEqualTo(KmsCellSession.State.DRAINING);
+            assertThat(cell.resourceSnapshot().runSlots()).isOne();
+            assertThatThrownBy(() -> cell.createRunKey(new RunKeyCacheIdentity(7, 4)))
+                    .hasMessageContaining("no longer accepts operations");
+            try (var creation = cell.beginNewRunKey(new RunKeyCacheIdentity(7, 4))) {
+                assertThat(creation.wrappedRunKey().wrappingKeyId()).isEqualTo("kms/cell-a");
+                assertThat(cell.resourceSnapshot().runSlots()).isEqualTo(2);
+                assertThatThrownBy(cell::close).hasMessageContaining("lease is live");
+            }
+            assertThat(cell.resourceSnapshot().runSlots()).isOne();
+        } finally {
+            first.close();
+            cell.close();
+        }
+    }
+
+    @Test
+    void newRootWrapFailureAndUnpublishedCancellationReleaseTheExactSlot() {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 1);
+        var identity = new RunKeyCacheIdentity(7, 1);
+        transport.beforeWrap = () -> {
+            throw new IllegalStateException("wrap unavailable");
+        };
+        assertThatThrownBy(() -> cell.beginNewRunKey(identity)).hasMessageContaining("wrap unavailable");
+        assertThat(transport.lastWrapRequest).containsOnly((byte) 0);
+        assertThat(cell.resourceSnapshot().runSlots()).isZero();
+        assertThat(cell.resourceSnapshot().pendingLoads()).isZero();
+        assertThat(cell.resourceSnapshot().activeOperations()).isZero();
+        try (var cancelled = cell.beginNewRunKey(identity)) {
+            assertThat(cancelled.wrappedRunKey()).isNotNull();
+            assertThat(cell.resourceSnapshot().runSlots()).isOne();
+        }
+        assertThat(cell.resourceSnapshot().runSlots()).isZero();
+        assertThat(cell.resourceSnapshot().history()).isZero();
+        try (var retry = cell.beginNewRunKey(identity)) {
+            assertThat(retry.wrappedRunKey()).isNotNull();
+        }
+        cell.close();
+    }
+
+    @Test
+    void newRootCreationCannotReplaceAnExistingRawKeyForTheSameRun() {
+        var cell = session(new FakeKmsTransport(), 1, "kms/cell-a", 1);
+        var identity = new RunKeyCacheIdentity(7, 1);
+        var rawEnvelope = cell.createRunKey(identity);
+        assertThatThrownBy(() -> cell.beginNewRunKey(identity)).hasMessageContaining("pristine run identity");
+        assertThat(cell.cachedRunKeyCount()).isOne();
+        assertThat(cell.resourceSnapshot().runSlots()).isOne();
+        assertThat(cell.deriveObjectKey(identity, rawEnvelope, digest(3), WalLaneId.OBJECT_COST, 0)
+                        .length())
+                .isEqualTo(32);
+        cell.close();
+    }
+
+    @Test
+    void acceptedPreRootWrapSurvivesAdmissionRetirement() throws Exception {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 3);
+        var firstRoot = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var secondRoot = ObjectWalControlTestFixtures.root(2, Optional.empty());
+        var fourthRoot = ObjectWalControlTestFixtures.root(4, Optional.empty());
+        var first = ObjectWalControlTestFixtures.openIsolatedSession(firstRoot, provider(firstRoot), cell, () -> 0);
+        ObjectWalControlTestFixtures.openIsolatedSession(secondRoot, provider(secondRoot), cell, () -> 0)
+                .close();
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        transport.beforeWrap = () -> {
+            entered.countDown();
+            await(release);
+        };
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var pending = executor.submit(() -> cell.beginNewRunKey(new RunKeyCacheIdentity(7, 3)));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(cell.resourceSnapshot().pendingLoads()).isOne();
+            assertThat(cell.resourceSnapshot().activeOperations()).isOne();
+            var fourth =
+                    ObjectWalControlTestFixtures.openIsolatedSession(fourthRoot, provider(fourthRoot), cell, () -> 0);
+            assertThat(cell.state()).isEqualTo(KmsCellSession.State.DRAINING);
+            assertThat(cell.resourceSnapshot().runSlots()).isEqualTo(3);
+            assertThatThrownBy(cell::close).hasMessageContaining("actual key operations");
+            release.countDown();
+            try (var created = pending.get(10, TimeUnit.SECONDS)) {
+                assertThat(created.wrappedRunKey().wrappingKeyId()).isEqualTo("kms/cell-a");
+                assertThat(cell.resourceSnapshot().pendingLoads()).isZero();
+                assertThat(cell.resourceSnapshot().activeOperations()).isZero();
+                assertThat(transport.lastWrapRequest).containsOnly((byte) 0);
+                assertThatThrownBy(cell::close).hasMessageContaining("lease is live");
+            }
+            fourth.close();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            first.close();
+            cell.close();
+        }
+    }
+
+    @Test
+    void concurrentMissSharesUnwrapAndInterruptedWaiterCannotReleaseItsActualWork() throws Exception {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 3);
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var identity = new RunKeyCacheIdentity(7, 1);
+        transport.register(root.wrappedRunKey(), 11);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        transport.beforeUnwrap = () -> {
+            entered.countDown();
+            await(release);
+        };
+        var executor = Executors.newFixedThreadPool(3);
+        try {
+            var first = executor.submit(
+                    () -> cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var waiter = executor.submit(
+                    () -> cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0));
+            var otherWaiter = executor.submit(
+                    () -> cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0));
+            awaitOperations(cell, 3);
+            assertThatThrownBy(() -> cell.deriveObjectKey(
+                            new RunKeyCacheIdentity(7, 2), root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0))
+                    .hasMessageContaining("active operation capacity");
+            assertThat(cell.resourceSnapshot().pendingLoads()).isOne();
+            assertThat(transport.unwrapCalls).isOne();
+            assertThatThrownBy(() -> cell.evict(identity)).hasMessageContaining("actual key operations");
+            assertThatThrownBy(cell::drain).hasMessageContaining("actual key operations");
+            waiter.cancel(true);
+            awaitOperations(cell, 2);
+            assertThat(cell.resourceSnapshot().runSlots()).isOne();
+            assertThat(cell.resourceSnapshot().pendingLoads()).isOne();
+            assertThatThrownBy(cell::close).hasMessageContaining("actual key operations");
+            release.countDown();
+            var key = first.get(10, TimeUnit.SECONDS);
+            assertThat(otherWaiter.get(10, TimeUnit.SECONDS)).isEqualTo(key);
+            assertThat(cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0))
+                    .isEqualTo(key);
+            assertThat(transport.unwrapCalls).isOne();
+            assertThat(transport.lastUnwrapped).containsOnly((byte) 0);
+            assertThat(cell.resourceSnapshot().activeOperations()).isZero();
+            assertThat(cell.resourceSnapshot().pendingLoads()).isZero();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            cell.close();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void failedKeyLoadReleasesPendingSlotAndAllowsExactRetry(boolean wrap) {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 1);
+        var identity = new RunKeyCacheIdentity(7, 1);
+        var envelope = ObjectWalControlTestFixtures.root(1, Optional.empty()).wrappedRunKey();
+        transport.register(envelope, 11);
+        Runnable fail = () -> {
+            throw new IllegalStateException("KMS unavailable");
+        };
+        if (wrap) {
+            transport.beforeWrap = fail;
+        } else {
+            transport.beforeUnwrap = fail;
+        }
+        assertThatThrownBy(() -> {
+                    if (wrap) {
+                        cell.createRunKey(identity);
+                    } else {
+                        cell.deriveObjectKey(identity, envelope, digest(3), WalLaneId.OBJECT_COST, 0);
+                    }
+                })
+                .hasMessageContaining("KMS unavailable");
+        assertThat(cell.resourceSnapshot().runSlots()).isZero();
+        assertThat(cell.resourceSnapshot().pendingLoads()).isZero();
+        assertThat(cell.resourceSnapshot().activeOperations()).isZero();
+        if (wrap) {
+            assertThat(transport.lastWrapRequest).containsOnly((byte) 0);
+            assertThat(cell.createRunKey(identity)).isNotNull();
+            assertThat(cell.wrapCalls()).isEqualTo(2);
+        } else {
+            assertThat(cell.deriveObjectKey(identity, envelope, digest(3), WalLaneId.OBJECT_COST, 0)
+                            .length())
+                    .isEqualTo(32);
+            assertThat(transport.lastUnwrapped).containsOnly((byte) 0);
+            assertThat(cell.unwrapCalls()).isEqualTo(2);
+        }
+        cell.evict(identity);
+        cell.close();
+    }
+
+    @Test
+    void cancellingUnwrapCallerDoesNotReleaseActualTransportOrAllowTransfer() throws Exception {
+        var transport = new FakeKmsTransport();
+        var cell = session(transport, 1, "kms/cell-a", 1);
+        var root = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var identity = new RunKeyCacheIdentity(7, 1);
+        transport.register(root.wrappedRunKey(), 11);
+        var entered = new CountDownLatch(1);
+        var interrupted = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var finished = new CountDownLatch(1);
+        transport.beforeUnwrap = () -> {
+            entered.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException failure) {
+                interrupted.countDown();
+                // A transport may finish its actual call after the caller has stopped waiting.
+                await(release);
+            }
+        };
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var caller = executor.submit(() -> {
+                try {
+                    return cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0);
+                } finally {
+                    finished.countDown();
+                }
+            });
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(caller.cancel(true)).isTrue();
+            assertThat(interrupted.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(cell.resourceSnapshot().activeOperations()).isOne();
+            assertThat(cell.resourceSnapshot().pendingLoads()).isOne();
+            assertThat(cell.resourceSnapshot().runSlots()).isOne();
+            assertThatThrownBy(() -> cell.evict(identity)).hasMessageContaining("actual key operations");
+            assertThatThrownBy(cell::close).hasMessageContaining("actual key operations");
+            assertThatThrownBy(
+                            () -> ObjectWalControlTestFixtures.openIsolatedSession(root, provider(root), cell, () -> 0))
+                    .hasMessageContaining("actual key operations");
+            release.countDown();
+            assertThat(finished.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(cell.resourceSnapshot().activeOperations()).isZero();
+            assertThat(cell.resourceSnapshot().pendingLoads()).isZero();
+            assertThat(transport.lastUnwrapped).containsOnly((byte) 0);
+            assertThat(cell.deriveObjectKey(identity, root.wrappedRunKey(), digest(3), WalLaneId.OBJECT_COST, 0)
+                            .length())
+                    .isEqualTo(32);
+            assertThat(transport.unwrapCalls).isOne();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            cell.close();
+        }
+    }
+
+    private static void awaitOperations(KmsCellSession cell, int count) throws InterruptedException {
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (cell.resourceSnapshot().activeOperations() != count && System.nanoTime() < end) {
+            Thread.sleep(10);
+        }
+        assertThat(cell.resourceSnapshot().activeOperations()).isEqualTo(count);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(15, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(failure);
+        }
     }
 
     private static C1ObjectProviderSession provider(WalRunRootRecord root) {
@@ -286,10 +661,20 @@ class KmsCellSessionTest {
         private final Map<CanonicalBytes, byte[]> registeredPlaintexts = new LinkedHashMap<>();
         private int wrapCalls;
         private int unwrapCalls;
+        private volatile Runnable beforeWrap;
+        private volatile Runnable beforeUnwrap;
+        private byte[] lastWrapRequest;
+        private byte[] lastUnwrapped;
 
         @Override
         public WrappedRunKeyEnvelope wrap(String keyIdentity, byte[] plaintextRunKey) {
             wrapCalls++;
+            lastWrapRequest = plaintextRunKey;
+            var hook = beforeWrap;
+            beforeWrap = null;
+            if (hook != null) {
+                hook.run();
+            }
             byte[] wrapped = plaintextRunKey.clone();
             for (int index = 0; index < wrapped.length; index++) {
                 wrapped[index] ^= (byte) 0xa5;
@@ -302,18 +687,25 @@ class KmsCellSessionTest {
         @Override
         public byte[] unwrap(WrappedRunKeyEnvelope envelope) {
             unwrapCalls++;
+            var hook = beforeUnwrap;
+            beforeUnwrap = null;
+            if (hook != null) {
+                hook.run();
+            }
             String storedKeyIdentity = keys.get(envelope.wrappedKey());
             if (storedKeyIdentity == null || !storedKeyIdentity.equals(envelope.wrappingKeyId())) {
                 throw new IllegalArgumentException("KMS envelope identity mismatch");
             }
             byte[] registered = registeredPlaintexts.get(envelope.wrappedKey());
             if (registered != null) {
-                return registered.clone();
+                lastUnwrapped = registered.clone();
+                return lastUnwrapped;
             }
             byte[] plaintext = envelope.wrappedKey().toByteArray();
             for (int index = 0; index < plaintext.length; index++) {
                 plaintext[index] ^= (byte) 0xa5;
             }
+            lastUnwrapped = plaintext;
             return plaintext;
         }
 

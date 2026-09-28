@@ -10,6 +10,12 @@ receipt: docs/v2/evidence/v2-m2/final/m2-final.json
 
 # M2 detailed-design index
 
+The table below records the original source-bound M2 implementation and Final. [NSIP-1](../../NSIP/nsip-1.md)
+supersedes its mandatory logical Follower/Observed/Applied and election-adoption path with RF=1/minISR=1, a
+complete shared commit, and cold Owner takeover. The old K8 kernel, journal, eligibility defaults and tests have
+been removed from current production source; the frozen K8 design, K9 wire projection and K10/Final receipts still
+describe only their original tested source. Current limited-scope NSIP validation is tracked separately.
+
 M2 designs are written before their production slice starts. Acceptance of a semantic direction does not close exact
 wire, numeric admission, provider capability, fault-cut, or scale evidence.
 
@@ -28,7 +34,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K5 | [Coherent producer/transaction/locator publication](kafka-m2-k5-coherent-protocol-publication.md) | pre-offset protocol validation plus one fenced K1 root replacement; ACK/HW/runtime excluded |
 | M2-K6 | [Packed targeted and sequential reader](kafka-m2-k6-targeted-reader.md) | entry-local NBKE2/Kafka validation and captured isolation bounds; runtime/recovery/real BK excluded |
 | M2-K7 | [Checkpoint kernel and election-bounded recovery](kafka-m2-k7-checkpoint-recovery.md) | aligned KPC1/NBKE2 state, cumulative suffix envelope, and native adoption cut; HW/runtime/real BK excluded |
-| M2-K8 | [Replica descriptor, journal, and eligibility kernel](kafka-m2-k8-replica-observation.md) | fixed KRD1/KRO1, exact sync seam, Observed/Applied bounds, source replacement, and election harness; runtime excluded |
+| M2-K8 | [Historical replica descriptor, journal, and eligibility kernel](kafka-m2-k8-replica-observation.md) | verified only at original M2 source; superseded and removed from current single-Owner code |
 | M2-K9 | [Real BookKeeper fault and scale evidence](kafka-m2-k9-real-bookkeeper-evidence.md) | current-source exact-image receipt: 110k actual partitions, 110,256 ledgers, 239 local plus 9 real tests, selected defaults; non-promotable alone and consumed by K10 |
 | M2-K10 | [Kafka Final evidence](kafka-m2-k10-final-evidence.md) | current-source canonical Kafka Final receipt; 10 exact-M2 scenarios, 40 named suite references, and 7 bound attachments |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | verified K0-K10 implementation and selected-default evidence; native broker activation remains M6 |

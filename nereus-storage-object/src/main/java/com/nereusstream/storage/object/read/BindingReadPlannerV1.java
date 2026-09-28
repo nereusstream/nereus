@@ -50,17 +50,14 @@ public final class BindingReadPlannerV1 {
 
         long cursor = requestedStartInclusive;
         BindingReadRouteTableV1 table = cell.routes();
-        for (int index = 0; index < table.size() && cursor < boundedEnd; index++) {
+        for (int index = table.firstIntersecting(cursor); index < table.size() && cursor < boundedEnd; index++) {
             BindingReadRouteV1 route = table.route(index);
-            if (route.endExclusive() <= cursor) {
-                continue;
-            }
             if (route.startInclusive() > cursor) {
                 output.reset();
                 return Outcome.SAFE_FAILURE_GAP_OR_AMBIGUITY;
             }
             long intervalEnd = Math.min(route.endExclusive(), boundedEnd);
-            if (!output.append(cursor, intervalEnd, route)) {
+            if (!output.append(cursor, intervalEnd, route, index)) {
                 output.reset();
                 return Outcome.SAFE_FAILURE_CAPACITY;
             }
