@@ -10,6 +10,7 @@ import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
+import tempfile
 from types import ModuleType
 from typing import Callable
 
@@ -111,7 +112,12 @@ def validate(root: Path, receipt_path: PurePosixPath = FINAL_PATH) -> str:
     try:
         value = contract.load_canonical(raw, str(receipt_path))
         tested = contract.validate_final_value(root, value, TESTED)
-        contract.validate_scenarios(root, receipt_path)
+        with tempfile.TemporaryDirectory(prefix="nereus-m5-historical-m4-") as directory:
+            historical = Path(directory)
+            registry = historical / contract.SCENARIO_PATH
+            registry.parent.mkdir(parents=True)
+            registry.write_bytes(git(root, "show", f"{CLOSURE}:{contract.SCENARIO_PATH}"))
+            contract.validate_scenarios(historical, receipt_path)
     except contract.EvidenceError as error:
         raise DependencyError(f"canonical M4 validation failed: {error}") from error
     if tested != TESTED:

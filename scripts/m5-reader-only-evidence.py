@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 
 SCHEMA = 'NEREUS_V2_M5_EB_READER_INPUT_EQUIVALENCE_V1'
@@ -34,7 +35,113 @@ SOURCE_HASHES = {
 }
 
 
+C06_SCHEMA = 'NEREUS_V2_M5_C06_CHECK_INPUT_EQUIVALENCE_V1'
+C06_ROOT = 'c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9'
+C06_CANDIDATE_SHA = '3b429bef00636776c8a0b15a8cf155d35740987c6d3763281cf0d90c3e543b28'
+C06_BASE_COMMITS = {
+    'nereus': '4cd7ee8917a351bf73ca90775a557f6d398d0b82',
+    'kafka': '020f33902566ec10f42aaa824d49b40424cee964',
+    'pulsar': 'a14e0e6f4e49be0677318b4ceefc7b85b445823b',
+}
+C06_SOURCE_COMMITS = {
+    'nereus': 'e8c12b4308dffa9357961994dc4f0395de48c825',
+    'kafka': '6221e3955f4eeeda0ba05a995df3918e6eca7667',
+    'pulsar': 'd52ab36ba099ba114f27d5842b9064f428dac5e8',
+}
+C06_RECORDS = {
+    'BOOKKEEPER_OXIA': (502088, 'a3132e603214f503f766d2debedc5d3ecb79e43d2e020bae44978957c8964627'),
+    'OBJECT': (77731, 'abe7835757c10edb60f3f0739b953998306285eb841b1c783ec068912c243f8b'),
+    'NATIVE_KAFKA': (111884, '6f3a771afb694589d2c55b3863adc635884aca9771585dfa004c2dfaa71758f4'),
+    'NATIVE_PULSAR': (103177, '5096c4c6ca359b19cc49825ca28143ef95f034495144cd27c5d950d7d392ce4f'),
+}
+C06_SELF_BEFORE = '2a5f1a0b1f58be007928fe9df4837893eea9d5edf1ed7e9d679a2c686c1a6848'
+C06_SOURCE_HASHES = {'.github/workflows/build.yml': ('c5cf8a1d70348ab3ee2eb5d9008ce7524cb2c1789bf54c83047e554994232451',
+                                 'f13be6b35defe87d1d13077fa824ff59e6ae05b720eeecf4965592a25352bb12'),
+ 'scripts/check-v2-documentation.sh': ('15402e99fbee8c17d41dc11f25ba46613077e406a178e2a162e52e9000c84ee0',
+                                       '7a49318150f54b8e9f6f78bf2c331ede829fd722b27c41edf9996a3665597f92'),
+ 'scripts/check-v2-m5-evidence-tests.py': ('4e0b56f52cb0ed42aaf0d55cb3693f62f91b56f51cdc7d31d152c7c906cf3f3e',
+                                           '0691768ce96c3ab7f98b74bf8f0e19d4924fd59182f6b136ed7c0ef7721c225d'),
+ 'scripts/check-v2-m5-historical-m4-tests.py': ('85ce83acf95e42c4fa2b0b68f23b922fc9c34d2fe4c551955d04deab00f4f016',
+                                                '72c614eddf69b672960617f8f326bb12d3d0ae38b4818cfac57c52206404e2d5'),
+ 'scripts/check-v2-m5-historical-m4.py': ('4618832c71d9e3b18cac94ab07394b05d23f317383b17e80669590aec59c618b',
+                                          '470c5a5b7cd5528e0f36be761b8f5ce2fe15669c3bbf245f15f208ddb549a367'),
+ 'scripts/continue-v2-m5-evidence.py': ('42e2a006f6c896f9919f3e3e3ede98dadeade0a36536ca5080ef9ce54ca5732a',
+                                        '0212ac504d28167fd88261be7711b09918b34df2610f522b2c5a78d4346828f6'),
+ 'scripts/m5-stage-input-equivalence.py': ('f78999390e62c0995311179685138f0128a3d05e22797aa583a7f19450223a2a',
+                                           '5d599d5eb6d0b7fae36ba4e66e37b7c61169f4cb4debf3fa3a1f8890eae063ba')}
+
+
+def check_c06_inputs(prior, final, C):
+    C.INPUTS.validate_value(prior)
+    C.INPUTS.validate_value(final)
+    C.require(prior['inputRootSha256'] == C06_ROOT and final['inputRootSha256'] != C06_ROOT,
+              'c06 handoff requires the exact complete c06 input and one successor')
+    C.require(prior['extraInputs'] == final['extraInputs'] and prior['inputManifests'] == final['inputManifests'],
+              'c06 handoff changed a runtime, tool, dependency or input manifest')
+    for name in C.INPUTS.REPOSITORIES:
+        old, new = prior['repositories'][name], final['repositories'][name]
+        C.require(old['sourceRoot'] == new['sourceRoot'] and old['baseCommit'] == C06_BASE_COMMITS[name]
+                  and new['baseCommit'] == C06_SOURCE_COMMITS[name], 'c06 handoff changed a source/base identity')
+    delta = C.EQUIVALENCE.differences(prior, final)
+    C.require({(row['repository'], row['path']) for row in delta} ==
+              {('nereus', path) for path in C06_SOURCE_HASHES.keys() | {SCRIPT}},
+              'c06 handoff changed a product/fixture/build/driver source or omitted a correction')
+    for row in delta:
+        before, after = row['before'], row['after']
+        expected = (C06_SELF_BEFORE, hashlib.sha256(Path(__file__).read_bytes()).hexdigest()) \
+            if row['path'] == SCRIPT else C06_SOURCE_HASHES[row['path']]
+        C.require(before is not None and after is not None
+                  and before.get('mode') == after.get('mode') in ('100644', '100755')
+                  and (before['sha256'], after['sha256']) == expected,
+                  'c06 handoff source is not the exact reviewed correction: ' + row['path'])
+        C.require(str(Path(prior['repositories']['nereus']['sourceRoot']) / row['path']) not in prior['extraInputs'],
+                  'c06 handoff changed an executed runtime dependency')
+    for path in C.EQUIVALENCE.CALL_PATHS | {row[0] for row in C.STAGES.values()}:
+        C.require(C.source_node(prior, 'nereus', path) == C.source_node(final, 'nereus', path),
+                  'c06 handoff changed an actual driver, nested recipe or build input: ' + path)
+    return delta
+
+
+def check_c06_boundaries(before, after, C):
+    path = 'scripts/m5-stage-input-equivalence.py'
+    old, new = ast.parse(before[path]), ast.parse(after[path])
+    validate = next(node for node in new.body if isinstance(node, ast.FunctionDef) and node.name == 'validate')
+    dispatch = ast.parse("if proof.get('schema') == '" + C06_SCHEMA + "':\n"
+        "    return C.module('m5_c06_check_equivalence', 'm5-reader-only-evidence.py').validate(root, reference, final, C)\n").body[0]
+    C.require(ast.dump(validate.body[3]) == ast.dump(dispatch), 'c06 dispatcher differs')
+    validate.body.pop(3)
+    C.require(ast.dump(old) == ast.dump(new), 'c06 handoff changed the old v5/eb continuation')
+    workflow = '.github/workflows/build.yml'
+    marker = b'  documentation:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5\n'
+    C.require(before[workflow].count(marker) == 1 and after[workflow] ==
+              before[workflow].replace(marker, marker + b'        with:\n          fetch-depth: 0\n', 1),
+              'c06 workflow changed outside documentation source-history checkout')
+    return {path: hashlib.sha256(ast.dump(old).encode()).hexdigest(),
+            workflow: hashlib.sha256(before[workflow]).hexdigest()}
+
+
+def c06_governance_executions(root, C):
+    tasks = ('v2DocumentationCheck', 'v2M5HistoricalM4DependencyCheck', 'v2M5HistoricalM4DependencyContractTest')
+    result = {}
+    for stage in C06_RECORDS:
+        record = C.load(C.read(root, f'executions/{stage}/record.json'))
+        observed = {}
+        for item in record['attachments']:
+            if not item['path'].endswith('.log'):
+                continue
+            raw = C.resource(root, item).decode('utf-8')
+            names = [task for task in tasks if '> Task :' + task + '\n' in raw]
+            if names:
+                observed[item['path']] = names
+        result[stage] = observed
+    C.require(result['BOOKKEEPER_OXIA'] and all(not result[stage] for stage in C06_RECORDS if stage != 'BOOKKEEPER_OXIA'),
+              'c06 governance execution boundary differs')
+    return result
+
+
 def check_inputs(prior, final, C):
+    if prior['inputRootSha256'] == C06_ROOT:
+        return check_c06_inputs(prior, final, C)
     C.INPUTS.validate_value(prior)
     C.INPUTS.validate_value(final)
     C.require(prior['inputRootSha256'] == PRIOR_ROOT and final['inputRootSha256'] != PRIOR_ROOT,
@@ -65,6 +172,8 @@ def check_inputs(prior, final, C):
 
 
 def check_boundaries(before, after, C):
+    if SCRIPT in before:
+        return check_c06_boundaries(before, after, C)
     def boundary(raw, functions=(), classes=(), assignments=()):
         tree = ast.parse(raw)
         tree.body = [node for node in tree.body if not (
@@ -103,9 +212,9 @@ def check_boundaries(before, after, C):
     return checks
 
 
-def check_record_identity(stage, reference, C):
-    C.require(stage in RECORDS and reference['path'] == f'executions/{stage}/record.json'
-              and (reference['bytes'], reference['sha256']) == RECORDS[stage],
+def check_record_identity(stage, reference, C, records=RECORDS):
+    C.require(stage in records and reference['path'] == f'executions/{stage}/record.json'
+              and (reference['bytes'], reference['sha256']) == records[stage],
               'reader handoff original record identity differs: ' + stage)
 
 
@@ -148,12 +257,15 @@ def source_lineage(root, prior, final, C):
 
 def validate(root, reference, final, C):
     proof = C.load(C.resource(root, reference, 'source-continuation'))
+    c06 = proof.get('schema') == C06_SCHEMA
+    schema, prior_root, records = (C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS)
+    extra = ('originalCandidate', 'governanceExecutions', 'governanceVerification') if c06 else ()
     C.exact(proof, ('schema', 'kind', 'promotionEligible', 'executionEvidence', 'oldInputRootSha256',
         'finalInputRootSha256', 'priorInputs', 'differences', 'priorSourceObjects', 'finalSourceObjects',
-        'boundaryAstSha256', 'originalExecutions', 'components', 'nativeSourceDirectory'), 'eb reader handoff')
-    C.require(proof['schema'] == SCHEMA and proof['kind'] == 'INPUT_EQUIVALENCE_ONLY'
+        'boundaryAstSha256', 'originalExecutions', 'components', 'nativeSourceDirectory') + extra, 'reader handoff')
+    C.require(proof['schema'] == schema and proof['kind'] == 'INPUT_EQUIVALENCE_ONLY'
               and proof['promotionEligible'] is False and proof['executionEvidence'] is False
-              and proof['oldInputRootSha256'] == PRIOR_ROOT
+              and proof['oldInputRootSha256'] == prior_root
               and proof['finalInputRootSha256'] == final['inputRootSha256'], 'reader handoff scope differs')
     prior = C.load(C.resource(root, proof['priorInputs'], 'source-continuation'))
     delta = check_inputs(prior, final, C)
@@ -173,14 +285,14 @@ def validate(root, reference, final, C):
             registered.add(item['object']['path'])
         sources.append(objects)
     C.require(proof['boundaryAstSha256'] == check_boundaries(*sources, C), 'reader AST proof differs')
-    C.require([row.get('stage') for row in proof['originalExecutions']] == list(RECORDS),
+    C.require([row.get('stage') for row in proof['originalExecutions']] == list(records),
               'reader handoff must preserve exactly four original backend stages')
     finishes = []
     for item in proof['originalExecutions']:
         C.exact(item, ('stage', 'record'), 'reader original execution')
-        check_record_identity(item['stage'], item['record'], C)
+        check_record_identity(item['stage'], item['record'], C, records)
         record = C.load(C.resource(root, item['record']))
-        C.require(record['stage'] == item['stage'] and record['inputRootSha256'] == PRIOR_ROOT,
+        C.require(record['stage'] == item['stage'] and record['inputRootSha256'] == prior_root,
                   'reader handoff relabeled an original execution')
         C.validate_execution(root, record, prior)
         check_runtime(record, final, C)
@@ -192,12 +304,47 @@ def validate(root, reference, final, C):
     C.validate_execution(root, components, final)
     log = C.read(root, 'executions/COMPONENTS/raw/gradle.log').decode()
     for task in ('v2M5EvidenceContractTest', 'v2M5CandidateInputsContractTest',
-                 'v2M5EvidenceJUnitContractTest', 'v2DocumentationCheck'):
+                 'v2M5EvidenceJUnitContractTest', 'v2DocumentationCheck') + (
+                     ('v2M5HistoricalM4DependencyCheck',) if c06 else ()):
         C.require('> Task :' + task + '\n' in log, 'new reader verification did not execute: ' + task)
     source = source_lineage(root, prior, final, C)
     C.require(proof['nativeSourceDirectory'] == source, 'reader handoff changed the actual Source directory')
+    if c06:
+        verification = proof['governanceVerification']
+        C.exact(verification, ('command', 'workingDirectory', 'inputBeforeSha256', 'inputAfterSha256',
+                              'startedAtMicros', 'finishedAtMicros', 'exitCode', 'log'), 'c06 governance verification')
+        C.require(verification['command'] == ['./gradlew', '--offline', '--no-daemon',
+                    '--no-configuration-cache', '--max-workers=2', 'v2M5HistoricalM4DependencyContractTest']
+                  and verification['workingDirectory'] == components['workingDirectory']
+                  and verification['inputBeforeSha256'] == verification['inputAfterSha256'] == final['inputRootSha256']
+                  and verification['startedAtMicros'] > components['finishedAtMicros']
+                  and verification['finishedAtMicros'] > verification['startedAtMicros']
+                  and type(verification['exitCode']) is int and verification['exitCode'] == 0,
+                  'c06 historical governance verification differs')
+        C.require(verification['log']['path'] == 'source-continuation/historical-contract.log',
+                  'c06 historical governance log path differs')
+        checked = C.resource(root, verification['log'], 'source-continuation').decode('utf-8')
+        C.require('> Task :v2M5HistoricalM4DependencyContractTest\n' in checked
+                  and 'Ran 6 tests in ' in checked and '\nOK\n' in checked
+                  and 'BUILD SUCCESSFUL' in checked and 'C06_GOVERNANCE_EXIT=0' in checked,
+                  'c06 historical six-contract verification did not complete')
+        registered.add(verification['log']['path'])
+        C.require(proof['originalCandidate']['path'] == 'source-continuation/original-complete/candidate.json'
+                  and proof['originalCandidate']['sha256'] == C06_CANDIDATE_SHA,
+                  'c06 original complete candidate identity differs')
+        original = root / 'source-continuation/original-complete'
+        value = C.load(C.resource(root, proof['originalCandidate']))
+        C.require(C.read(original, 'input-closure.json') == C.canonical(prior), 'c06 original complete input differs')
+        C.validate_package(original, value, prior)
+        C.require(proof['governanceExecutions'] == c06_governance_executions(root, C),
+                  'c06 governance executions were omitted or relabeled')
+        registered.update('source-continuation/original-complete/' + path for path in C.inventory(original, ''))
+        expected = {path: row for path, row in prior['repositories']['nereus']['files'].items() if row != {'deleted': True}}
+        C.require(C.INPUTS.committed_tree(C.ROOT, C06_SOURCE_COMMITS['nereus']) == expected,
+                  'c06 original Root source commit differs from its complete tree')
+        C.HISTORICAL_M4.require_ancestor(C.ROOT, C06_BASE_COMMITS['nereus'], C06_SOURCE_COMMITS['nereus'])
     C.require(C.inventory(root, 'source-continuation') == registered, 'reader handoff has unregistered files')
-    return {'prior': prior, 'stages': tuple(RECORDS), 'origins': dict.fromkeys(RECORDS, prior),
+    return {'prior': prior, 'stages': tuple(records), 'origins': dict.fromkeys(records, prior),
             'nativeSourceDirectory': source, 'paths': registered, 'proof': proof}
 
 
@@ -216,11 +363,15 @@ def main():
     C = R.C
     prior_prepared, old_package = args.prior_input_closure.resolve(strict=True), args.prior_package.resolve(strict=True)
     prior = C.INPUTS.verify(prior_prepared)
-    C.require(prior['inputRootSha256'] == PRIOR_ROOT, 'reader handoff requires the exact original eb cohort')
+    c06 = prior['inputRootSha256'] == C06_ROOT
+    schema, prior_root, records = (C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS)
+    C.require(prior['inputRootSha256'] == prior_root, 'reader handoff requires its exact original cohort')
+    if c06:
+        C.validate_candidate(old_package, prior_prepared, prior_prepared / 'workspace' / C.INPUTS.LAYOUT['nereus'])
     prepared = args.input_closure.resolve()
     if not prepared.exists():
         continuation = C.module('m5_reader_input_copy', 'continue-v2-m5-evidence.py')
-        continuation.prepare_postprocessing_source(prior_prepared, prepared, reader_only_eb=True)
+        continuation.prepare_postprocessing_source(prior_prepared, prepared, reader_only_eb=not c06, reader_only_c06=c06)
     target_root = prepared / 'workspace' / C.INPUTS.LAYOUT['nereus']
     if root != target_root:
         command = [sys.executable, '-u', '-B', str(target_root / SCRIPT), *sys.argv[1:]]
@@ -235,14 +386,18 @@ def main():
     package = args.output.resolve()
     package.mkdir(parents=True, exist_ok=False)
     executions, originals = {}, []
-    for stage, (size, digest) in RECORDS.items():
+    for stage, (size, digest) in records.items():
         reference = {'path': f'executions/{stage}/record.json', 'bytes': size, 'sha256': digest}
-        check_record_identity(stage, reference, C)
+        check_record_identity(stage, reference, C, records)
         record = C.load(C.resource(old_package, reference))
         executions[stage] = C.validate_execution(old_package, record, prior)
         check_runtime(record, final, C)
         shutil.copytree(old_package / 'executions' / stage, package / 'executions' / stage)
         originals.append({'stage': stage, 'record': reference})
+    if c06:
+        C.require(hashlib.sha256(C.read(old_package, 'candidate.json')).hexdigest() == C06_CANDIDATE_SHA,
+                  'c06 original complete candidate differs')
+        shutil.copytree(old_package, package / 'source-continuation/original-complete')
     before_sources, after_sources = {}, {}
     lists = {'before': [], 'after': []}
     for row in delta:
@@ -261,12 +416,31 @@ def main():
     source = source_lineage(package, prior, final, C)
     executions['COMPONENTS'] = R.execute_stage('COMPONENTS', package, prepared, final,
         args.kafka_java_home.resolve(strict=True), target_root / 'build/m5-evidence-ant-repository', None)
+    governance = None
+    if c06:
+        command = ['./gradlew', '--offline', '--no-daemon', '--no-configuration-cache', '--max-workers=2',
+                   'v2M5HistoricalM4DependencyContractTest']
+        path = 'source-continuation/historical-contract.log'
+        C.require(C.INPUTS.verify(prepared) == final, 'c06 inputs changed before historical governance verification')
+        started = time.time_ns() // 1000
+        with (package / path).open('x') as log:
+            code = subprocess.run(command, cwd=target_root, env=os.environ.copy(),
+                                  stdout=log, stderr=subprocess.STDOUT).returncode
+            log.write(f'\nC06_GOVERNANCE_EXIT={code}\n')
+        finished = time.time_ns() // 1000
+        C.require(code == 0 and C.INPUTS.verify(prepared) == final, 'c06 historical governance verification failed')
+        governance = {'command': command, 'workingDirectory': str(target_root),
+            'inputBeforeSha256': final['inputRootSha256'], 'inputAfterSha256': final['inputRootSha256'],
+            'startedAtMicros': started, 'finishedAtMicros': finished, 'exitCode': code, 'log': R.reference(package, path)}
     prior_ref = R.write(package, 'source-continuation/prior-input-closure.json', prior)
-    proof = {'schema': SCHEMA, 'kind': 'INPUT_EQUIVALENCE_ONLY', 'promotionEligible': False,
-        'executionEvidence': False, 'oldInputRootSha256': PRIOR_ROOT, 'finalInputRootSha256': final['inputRootSha256'],
+    proof = {'schema': schema, 'kind': 'INPUT_EQUIVALENCE_ONLY', 'promotionEligible': False,
+        'executionEvidence': False, 'oldInputRootSha256': prior_root, 'finalInputRootSha256': final['inputRootSha256'],
         'priorInputs': prior_ref, 'differences': delta, 'priorSourceObjects': lists['before'],
         'finalSourceObjects': lists['after'], 'boundaryAstSha256': boundaries, 'originalExecutions': originals,
         'components': R.reference(package, 'executions/COMPONENTS/record.json'), 'nativeSourceDirectory': source}
+    if c06:
+        proof.update(originalCandidate=R.reference(package, 'source-continuation/original-complete/candidate.json'),
+                     governanceExecutions=c06_governance_executions(package, C), governanceVerification=governance)
     proof_ref = R.write(package, 'source-continuation/binding.json', proof)
     validate(package, proof_ref, final, C)
     R.assemble(package, final, executions)

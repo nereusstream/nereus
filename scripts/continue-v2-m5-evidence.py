@@ -20,7 +20,7 @@ C = R.C
 PREPARATION = C.module('m5_continuation_preparation', 'm5-native-build-preparation.py')
 
 
-def prepare_postprocessing_source(prior_prepared, output, reader_only_eb=False):
+def prepare_postprocessing_source(prior_prepared, output, reader_only_eb=False, reader_only_c06=False):
     """Capture new postprocessing source with the original, byte-identical execution dependencies."""
     I = C.INPUTS
     prior = I.verify(prior_prepared)
@@ -30,12 +30,14 @@ def prepare_postprocessing_source(prior_prepared, output, reader_only_eb=False):
     value['repositories'] = current
     value['inputRootSha256'] = I.digest(I.canonical({key: value[key] for key in
         ('repositories', 'extraInputs', 'inputManifests')}))
-    if reader_only_eb:
+    if reader_only_c06:
+        C.module('m5_c06_check_preparation', 'm5-reader-only-evidence.py').check_c06_inputs(prior, value, C)
+    elif reader_only_eb:
         C.module('m5_reader_only_preparation', 'm5-reader-only-evidence.py').check_inputs(prior, value, C)
     else:
         C.EQUIVALENCE.check_native_postprocessing(prior, value, C)
     output = output.resolve()
-    if reader_only_eb:
+    if reader_only_eb or reader_only_c06:
         C.require(output.parent == prior_prepared.resolve().parent and 'build' not in output.parts
                   and not output.exists() and not output.is_symlink()
                   and all(not output.is_relative_to(source) for source in roots.values()),

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path, PurePosixPath
 import unittest
 from unittest import mock
@@ -54,12 +55,32 @@ class HistoricalM4DependencyTest(unittest.TestCase):
             with self.assertRaisesRegex(M5.DependencyError, "M4 evidence path is dirty"):
                 M5.require_clean_m4_evidence(ROOT)
 
-    def test_historical_rule_reuses_validator_without_current_source_recategorization(self) -> None:
-        source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("contract.validate_final_value(root, value, TESTED)", source)
-        self.assertIn("contract.validate_scenarios(root, receipt_path)", source)
-        self.assertNotIn("contract.validate_descendants", source)
-        self.assertNotIn("contract.validate_final(root", source)
+    def test_rejects_changed_scenarios_in_the_fixed_historical_closure(self) -> None:
+        contract = M5.load_m4_contract(ROOT)
+        registry = f"{M5.CLOSURE}:{contract.SCENARIO_PATH}"
+        original_git = M5.git
+        raw = original_git(ROOT, "show", registry)
+        for identity, status, receipt in (
+            ("V2-READ-002", "PASSED_CURRENT_SOURCE", str(M5.FINAL_PATH)),
+            (contract.PROMOTED_SCENARIOS[0], "PLANNED", None),
+        ):
+            with self.subTest(identity=identity):
+                value = json.loads(raw)
+                row = next(row for row in value["scenarios"] if row["id"] == identity)
+                row.update(status=status, evidenceReceipt=receipt)
+                changed = json.dumps(value).encode()
+                requested = []
+
+                def read_changed_registry(root, *args):
+                    if args == ("show", registry):
+                        requested.append(args)
+                        return changed
+                    return original_git(root, *args)
+
+                with mock.patch.object(M5, "git", side_effect=read_changed_registry):
+                    with self.assertRaisesRegex(M5.DependencyError, "canonical M4 validation failed"):
+                        M5.validate(ROOT)
+                self.assertEqual([("show", registry)], requested)
 
 
 if __name__ == "__main__":

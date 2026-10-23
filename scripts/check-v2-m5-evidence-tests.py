@@ -819,6 +819,107 @@ class CurrentM4InventoryContracts(unittest.TestCase):
                     self.validate()
 
 
+class C06CheckEquivalenceContracts(unittest.TestCase):
+    def setUp(self):
+        self.reader = C.module('m5_c06_check_contract', 'm5-reader-only-evidence.py')
+
+    def freeze(self, value):
+        value['inputRootSha256'] = sha(C.canonical({key: value[key] for key in
+            ('repositories', 'extraInputs', 'inputManifests')}))
+        return value
+
+    def test_only_exact_c06_correction_and_committed_bases_can_continue(self):
+        fixture = INPUT_TESTS.Fixture()
+        self.addCleanup(fixture.temporary.cleanup)
+        prior = fixture.prepare()
+        files = prior['repositories']['nereus']['files']
+        calls = C.EQUIVALENCE.CALL_PATHS | {row[0] for row in C.STAGES.values()}
+        for path in calls:
+            files[path] = {'mode': '100644', 'bytes': 1, 'sha256': sha(path.encode())}
+        for path, (before, _) in self.reader.C06_SOURCE_HASHES.items():
+            files[path] = {'mode': '100644', 'bytes': 1, 'sha256': before}
+        files[self.reader.SCRIPT] = {'mode': '100644', 'bytes': 1, 'sha256': self.reader.C06_SELF_BEFORE}
+        prior = self.freeze(prior)
+        final = copy.deepcopy(prior)
+        for name, commit in self.reader.C06_SOURCE_COMMITS.items():
+            final['repositories'][name]['baseCommit'] = commit
+        for path, (_, after) in self.reader.C06_SOURCE_HASHES.items():
+            final['repositories']['nereus']['files'][path]['sha256'] = after
+        raw = Path(self.reader.__file__).read_bytes()
+        final['repositories']['nereus']['files'][self.reader.SCRIPT] = {
+            'mode': '100644', 'bytes': len(raw), 'sha256': sha(raw)}
+        final = self.freeze(final)
+        bases = {name: repo['baseCommit'] for name, repo in prior['repositories'].items()}
+        with patch.object(self.reader, 'C06_ROOT', prior['inputRootSha256']), \
+                patch.object(self.reader, 'C06_BASE_COMMITS', bases):
+            self.assertEqual(8, len(self.reader.check_c06_inputs(prior, final, C)))
+            for mutation in ('old-root', 'runtime', 'base', 'source-root', 'product', 'build', 'driver',
+                             'missing-difference', 'unreviewed-correction'):
+                with self.subTest(mutation=mutation):
+                    old, new = copy.deepcopy(prior), copy.deepcopy(final)
+                    if mutation == 'old-root':
+                        old['repositories']['nereus']['files']['source.txt']['sha256'] = sha(b'foreign cohort')
+                    elif mutation == 'runtime':
+                        new['extraInputs'][str(fixture.jar)]['sha256'] = sha(b'changed runtime')
+                    elif mutation == 'base':
+                        new['repositories']['kafka']['baseCommit'] = 'a' * 40
+                    elif mutation == 'source-root':
+                        new['repositories']['nereus']['sourceRoot'] += '-foreign'
+                    else:
+                        path = {'product': 'src/main/java/Foreign.java', 'build': 'build.gradle.kts',
+                                'driver': C.STAGES['NATIVE_KAFKA'][0],
+                                'missing-difference': 'scripts/check-v2-documentation.sh',
+                                'unreviewed-correction': 'scripts/check-v2-m5-historical-m4.py'}[mutation]
+                        new['repositories']['nereus']['files'][path] = copy.deepcopy(files[path]) \
+                            if mutation == 'missing-difference' else {
+                                'mode': '100644', 'bytes': 3, 'sha256': sha(b'new')}
+                    with self.assertRaises(C.EvidenceError):
+                        self.reader.check_c06_inputs(self.freeze(old), self.freeze(new), C)
+
+    def test_original_c06_record_identity_and_origin_cannot_be_changed(self):
+        stage = 'NATIVE_PULSAR'
+        size, digest = self.reader.C06_RECORDS[stage]
+        reference = {'path': f'executions/{stage}/record.json', 'bytes': size, 'sha256': digest}
+        self.reader.check_record_identity(stage, reference, C, self.reader.C06_RECORDS)
+        with self.assertRaisesRegex(C.EvidenceError, 'original record identity'):
+            self.reader.check_record_identity(stage, reference | {'sha256': '0' * 64}, C, self.reader.C06_RECORDS)
+        f = Fixture()
+        self.addCleanup(f.temp.cleanup)
+        f.record['inputRootSha256'] = '0' * 64
+        with self.assertRaisesRegex(C.EvidenceError, 'execution input cohort differs'):
+            f.validate()
+
+    def test_incomplete_proof_and_old_dispatch_change_are_rejected(self):
+        before = {'scripts/m5-stage-input-equivalence.py': (
+            "def validate(root, reference, final, C):\n"
+            "    C.require(True, 'fixture')\n    proof = {}\n"
+            "    if proof.get('schema') == 'EB':\n        return 'original-eb'\n"
+            "    return 'original-v5'\n").encode()}
+        dispatch = ("    if proof.get('schema') == '" + self.reader.C06_SCHEMA + "':\n"
+            "        return C.module('m5_c06_check_equivalence', 'm5-reader-only-evidence.py').validate(root, reference, final, C)\n")
+        path = next(iter(before))
+        raw = before[path].decode().replace("    return 'original-v5'", dispatch + "    return 'original-v5'")
+        workflow = '.github/workflows/build.yml'
+        yaml = b'  documentation:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5\n'
+        before[workflow] = yaml + b'  other-job: unchanged\n'
+        after = {path: raw.encode(), workflow: yaml + b'        with:\n          fetch-depth: 0\n  other-job: unchanged\n'}
+        self.reader.check_c06_boundaries(before, after, C)
+        with self.assertRaisesRegex(C.EvidenceError, 'old v5/eb continuation'):
+            self.reader.check_c06_boundaries(before, after | {path: raw.replace('original-eb', 'weakened-eb').encode()}, C)
+        with self.assertRaisesRegex(C.EvidenceError, 'workflow changed outside'):
+            self.reader.check_c06_boundaries(before, after | {workflow: after[workflow].replace(b'unchanged', b'foreign')}, C)
+        with tempfile.TemporaryDirectory(prefix='c06-proof-negative-') as directory:
+            root = Path(directory)
+            # Exact-key validation rejects omitted proof fields before any old result can be borrowed.
+            ref = {'path': 'source-continuation/binding.json'}
+            target = root / ref['path']
+            target.parent.mkdir(parents=True)
+            target.write_bytes(C.canonical({'schema': self.reader.C06_SCHEMA}))
+            ref.update(bytes=target.stat().st_size, sha256=sha(target.read_bytes()))
+            with self.assertRaises(C.EvidenceError):
+                self.reader.validate(root, ref, {}, C)
+
+
 class ReaderOnlyEquivalenceContracts(unittest.TestCase):
     def setUp(self):
         self.reader = C.module('m5_reader_only_contract', 'm5-reader-only-evidence.py')

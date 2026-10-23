@@ -313,6 +313,8 @@ def validate(root, reference, final, C):
     proof = C.load(C.resource(root, reference, 'source-continuation'))
     if proof.get('schema') == 'NEREUS_V2_M5_EB_READER_INPUT_EQUIVALENCE_V1':
         return C.module('m5_eb_reader_equivalence', 'm5-reader-only-evidence.py').validate(root, reference, final, C)
+    if proof.get('schema') == 'NEREUS_V2_M5_C06_CHECK_INPUT_EQUIVALENCE_V1':
+        return C.module('m5_c06_check_equivalence', 'm5-reader-only-evidence.py').validate(root, reference, final, C)
     native = proof.get('schema') == 'NEREUS_V2_M5_STAGE_INPUT_EQUIVALENCE_V4'
     keys = ('schema', 'kind', 'promotionEligible', 'executionEvidence', 'oldInputRootSha256',
                     'finalInputRootSha256', 'priorInputs', 'differences', 'priorSourceObjects',
