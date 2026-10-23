@@ -204,15 +204,48 @@ public final class M5MultipartCleanupSessionV1 {
                         : CleanupKindV1.EXACT_OWNED_RESIDUE_REMAINS);
     }
 
+    /** Complete read-only exact-key inventory for the READ_FENCED identity and later INTENT revalidation. */
+    public CleanupResultV1 observeOwned(
+            Sha256Digest persistedInventoryRoot,
+            Set<ObjectProviderTransport.MultipartUploadIdentity> exactOwnedInventory)
+            throws IOException {
+        Objects.requireNonNull(persistedInventoryRoot, "persistedInventoryRoot");
+        List<ObjectProviderTransport.MultipartUploadIdentity> ownedList = validateOwnedInventory(exactOwnedInventory);
+        Set<ObjectProviderTransport.MultipartUploadIdentity> owned = Set.copyOf(ownedList);
+        if (!inventoryRoot(owned).equals(persistedInventoryRoot)) {
+            throw new IllegalArgumentException("multipart inventory differs from its exact persisted root");
+        }
+        Counters counters = new Counters();
+        ListSnapshot observed = completeInventoryList(owned, counters);
+        return counters.result(
+                containsForeign(observed.uploads, owned)
+                        ? CleanupKindV1.DIFFERENT_OR_FOREIGN_IDENTITY
+                        : observed.uploads.isEmpty()
+                                ? CleanupKindV1.AUTHORITATIVELY_ABSENT
+                                : CleanupKindV1.EXACT_OWNED_RESIDUE_REMAINS);
+    }
+
     private List<ObjectProviderTransport.MultipartUploadIdentity> validateOwnedInventory(
             Set<ObjectProviderTransport.MultipartUploadIdentity> exactOwnedInventory) {
         Objects.requireNonNull(exactOwnedInventory, "exactOwnedInventory");
         if (exactOwnedInventory.isEmpty()) {
             throw new IllegalArgumentException("exact owned multipart inventory must be non-empty");
         }
+        if (exactOwnedInventory.size() > maximumListUploads) {
+            throw new IllegalArgumentException("exact owned multipart inventory exceeds the upload cap");
+        }
         List<ObjectProviderTransport.MultipartUploadIdentity> owned = new ArrayList<>(exactOwnedInventory.size());
+        long identityBytes = 0;
         for (ObjectProviderTransport.MultipartUploadIdentity identity : exactOwnedInventory) {
             validateIdentity(identity);
+            identityBytes = Math.addExact(
+                    identityBytes,
+                    Math.addExact(
+                            identity.key().getBytes(StandardCharsets.UTF_8).length,
+                            identity.uploadId().length()));
+            if (identityBytes > maximumListIdentityBytes) {
+                throw new IllegalArgumentException("exact owned multipart inventory exceeds the byte cap");
+            }
             owned.add(identity);
         }
         owned.sort(IDENTITY_ORDER);
@@ -225,53 +258,56 @@ public final class M5MultipartCleanupSessionV1 {
         owned.forEach(identity -> exactKeys.add(identity.key()));
         Set<ObjectProviderTransport.MultipartUploadIdentity> uploads = new HashSet<>();
         int pages = 0;
+        long scannedUploads = 0;
         long identityBytes = 0;
         for (String exactKey : exactKeys) {
-            ListSnapshot keySnapshot = completeListForExactKey(exactKey);
-            pages = Math.addExact(pages, keySnapshot.pages);
-            if (pages > maximumListPages) {
+            if (pages >= maximumListPages) {
                 throw new IOException("multipart reconciliation exceeded its aggregate LIST page cap");
             }
+            ListSnapshot keySnapshot = completeListForExactKey(
+                    exactKey,
+                    maximumListPages - pages,
+                    maximumListUploads - scannedUploads,
+                    maximumListIdentityBytes - identityBytes);
+            pages = Math.addExact(pages, keySnapshot.pages);
+            scannedUploads = Math.addExact(scannedUploads, keySnapshot.scannedUploads);
+            identityBytes = Math.addExact(identityBytes, keySnapshot.scannedIdentityBytes);
             for (ObjectProviderTransport.MultipartUploadIdentity identity : keySnapshot.uploads) {
                 if (!uploads.add(identity)) {
                     throw new IOException("multipart reconciliation LIST returned a duplicate identity");
-                }
-                identityBytes = Math.addExact(
-                        identityBytes,
-                        Math.addExact(
-                                identity.key().getBytes(StandardCharsets.UTF_8).length,
-                                identity.uploadId().length()));
-                if (uploads.size() > maximumListUploads || identityBytes > maximumListIdentityBytes) {
-                    throw new IOException("multipart reconciliation exceeded its aggregate upload/byte cap");
                 }
             }
         }
         counters.listPasses++;
         counters.listPages = Math.addExact(counters.listPages, pages);
-        counters.listedUploads = Math.addExact(counters.listedUploads, uploads.size());
-        return new ListSnapshot(Set.copyOf(uploads), pages);
+        counters.listedUploads = Math.addExact(counters.listedUploads, scannedUploads);
+        return new ListSnapshot(Set.copyOf(uploads), pages, scannedUploads, identityBytes);
     }
 
-    private ListSnapshot completeListForExactKey(String exactKey) throws IOException {
+    private ListSnapshot completeListForExactKey(
+            String exactKey, int remainingPages, long remainingUploads, long remainingIdentityBytes)
+            throws IOException {
         Optional<CanonicalBytes> continuation = Optional.empty();
         Set<CanonicalBytes> seenTokens = new HashSet<>();
         Set<ObjectProviderTransport.MultipartUploadIdentity> uploads = new HashSet<>();
+        Set<ObjectProviderTransport.MultipartUploadIdentity> scanned = new HashSet<>();
         int pages = 0;
         long identityBytes = 0;
         do {
-            if (++pages > maximumListPages) {
-                throw new IOException("multipart reconciliation exceeded its LIST page cap");
+            if (pages >= remainingPages) {
+                throw new IOException("multipart reconciliation exceeded its aggregate LIST page cap");
             }
+            pages++;
             ObjectProviderTransport.MultipartListPage page = transport.listMultipartUploads(
                     exactKey,
                     continuation,
                     transport.multipartCleanupCapabilities().maximumListPageUploads());
             for (ObjectProviderTransport.MultipartUploadIdentity identity : page.uploads()) {
                 validateIdentity(identity);
-                if (!identity.key().equals(exactKey)) {
-                    throw new IOException("multipart exact-key LIST returned a different key");
+                if (!identity.key().startsWith(exactKey)) {
+                    throw new IOException("multipart LIST returned a key outside the requested prefix");
                 }
-                if (!uploads.add(identity)) {
+                if (!scanned.add(identity)) {
                     throw new IOException("multipart reconciliation LIST returned a duplicate identity");
                 }
                 identityBytes = Math.addExact(
@@ -279,8 +315,11 @@ public final class M5MultipartCleanupSessionV1 {
                         Math.addExact(
                                 identity.key().getBytes(StandardCharsets.UTF_8).length,
                                 identity.uploadId().length()));
-                if (uploads.size() > maximumListUploads || identityBytes > maximumListIdentityBytes) {
-                    throw new IOException("multipart reconciliation exceeded its upload/byte cap");
+                if (scanned.size() > remainingUploads || identityBytes > remainingIdentityBytes) {
+                    throw new IOException("multipart reconciliation exceeded its aggregate upload/byte cap");
+                }
+                if (identity.key().equals(exactKey)) {
+                    uploads.add(identity);
                 }
             }
             Optional<CanonicalBytes> next = page.nextContinuationToken();
@@ -294,7 +333,7 @@ public final class M5MultipartCleanupSessionV1 {
             }
             continuation = next;
         } while (continuation.isPresent());
-        return new ListSnapshot(Set.copyOf(uploads), pages);
+        return new ListSnapshot(Set.copyOf(uploads), pages, scanned.size(), identityBytes);
     }
 
     private void validateIdentity(ObjectProviderTransport.MultipartUploadIdentity identity) {
@@ -323,7 +362,11 @@ public final class M5MultipartCleanupSessionV1 {
         out.write(value);
     }
 
-    private record ListSnapshot(Set<ObjectProviderTransport.MultipartUploadIdentity> uploads, int pages) {}
+    private record ListSnapshot(
+            Set<ObjectProviderTransport.MultipartUploadIdentity> uploads,
+            int pages,
+            long scannedUploads,
+            long scannedIdentityBytes) {}
 
     private static final class Counters {
         private int listPasses;

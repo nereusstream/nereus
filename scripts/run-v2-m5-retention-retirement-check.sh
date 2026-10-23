@@ -11,7 +11,9 @@ m5_expected_server_source="37a17bef17202d5fd6e23282da5fd26d94865484"
 m5_expected_client_jar_sha="0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5"
 m5_client_jar="$m5_repo_root/gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.jar"
 
-"$m5_repo_root/scripts/build-v2-m3-allocator-oxia-image.sh" "$m5_oxia_checkout" >/dev/null
+if ! docker image inspect "$m5_image" >/dev/null 2>&1; then
+  "$m5_repo_root/scripts/build-v2-m3-allocator-oxia-image.sh" "$m5_oxia_checkout" >/dev/null
+fi
 test "$(docker image inspect "$m5_image" --format '{{.Id}}')" = "$m5_expected_image_id"
 test "$(docker image inspect "$m5_image" --format '{{.Os}}/{{.Architecture}}')" = "linux/arm64"
 test "$(docker image inspect "$m5_image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = \

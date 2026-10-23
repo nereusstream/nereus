@@ -27,6 +27,7 @@ import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Entry;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Head;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Layout;
+import com.nereusstream.storage.object.gc.M5ObjectBirthCreditV3;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteDoneV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteStoredValueV2;
@@ -50,6 +51,7 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
     private final OxiaTargetDeleteAuthorityStoreV2 authorities;
     private final Accounting accounting;
     private final M5GcQuotaCoordinatorV2 quota;
+    private final OxiaPhysicalMemberInventoryV2 members;
     private final java.util.function.Supplier<CompletionStage<PhysicalNamespaceAuthorityBindingV2>> bindingAuthority;
 
     public OxiaQuotaTargetDeleteStoreV2(
@@ -85,6 +87,12 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
                 conditional, layout.nativeRoot(), layout.namespace(), authoritativeFacts);
         accounting = new Accounting(Objects.requireNonNull(conditional, "conditional"));
         quota = new M5GcQuotaCoordinatorV2(layout, accounting, authorities);
+        members = new OxiaPhysicalMemberInventoryV2(
+                conditional,
+                this,
+                new com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2(
+                        new com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1(this)),
+                layout.nativeRoot());
     }
 
     @Override
@@ -127,8 +135,145 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
         });
     }
 
+    Layout memberScanLayout() {
+        members();
+        return layout;
+    }
+
+    CompletionStage<PhysicalNamespaceAuthorityBindingV2> requireMemberScanRoute() {
+        members();
+        return currentRouteBinding();
+    }
+
+    /** Full registered permanent families; the caller retains its admitted workspace through observation use. */
+    CompletionStage<java.util.Map<String, VersionedValue>> scanMemberNamespace(int maximumRows, long maximumBytes) {
+        var captured = new java.util.TreeMap<String, VersionedValue>();
+        var bytes = new long[1];
+        CompletionStage<Void> stage = CompletableFuture.completedFuture(null);
+        for (var range : permanentRecordRanges(memberScanLayout())) {
+            stage = stage.thenCompose(ignored -> {
+                var done = new CompletableFuture<Void>();
+                scans.rangeScan(range.start(), range.end(), new RangeScanConsumer() {
+                    private Throwable failure;
+
+                    public boolean onNext(GetResult value) {
+                        try {
+                            String prefix = layout.nativeRoot() + "/";
+                            if (!value.key().startsWith(prefix)) {
+                                throw new IllegalArgumentException("physical namespace scan returned a foreign key");
+                            }
+                            layout.nativeKey(value.key().substring(prefix.length()));
+                            if (captured.size() >= maximumRows
+                                    || (bytes[0] = Math.addExact(bytes[0], value.value().length)) > maximumBytes) {
+                                throw new IllegalArgumentException(
+                                        "physical namespace scan exceeds its admitted bound");
+                            }
+                            var fact = VersionedValue.of(
+                                    value.key(),
+                                    CanonicalBytes.copyOf(value.value()),
+                                    com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper.fromOxia(
+                                            value.version().versionId()));
+                            if (captured.putIfAbsent(fact.key(), fact) != null) {
+                                throw new IllegalStateException("physical namespace scan repeated a native key");
+                            }
+                            return true;
+                        } catch (Throwable error) {
+                            failure = error;
+                            return false;
+                        }
+                    }
+
+                    public void onError(Throwable error) {
+                        done.completeExceptionally(error);
+                    }
+
+                    public void onCompleted() {
+                        if (failure == null) {
+                            done.complete(null);
+                        } else {
+                            done.completeExceptionally(failure);
+                        }
+                    }
+                });
+                return done;
+            });
+        }
+        return stage.thenApply(ignored -> java.util.Map.copyOf(captured));
+    }
+
     public M5GcQuotaCoordinatorV2 quota() {
         return quota;
+    }
+
+    public OxiaPhysicalMemberInventoryV2 members() {
+        if (layout.profile() != M5GcQuotaRecordsV2.RecordProfile.GC_AND_PHYSICAL_MEMBERS_V2) {
+            throw new IllegalStateException("physical member accounting profile is not installed");
+        }
+        return members;
+    }
+
+    /** Actual same-resource predecessor facts. The mutable authority is not an eligibility freshness row. */
+    public record ResourceFact(
+            PhysicalResourceIdV2 resource,
+            PhysicalNamespaceAuthorityBindingV2 binding,
+            VersionedValue reservation,
+            VersionedValue authority) {
+        public ResourceFact {
+            Objects.requireNonNull(resource, "resource");
+            Objects.requireNonNull(binding, "binding");
+            Objects.requireNonNull(reservation, "reservation");
+            Objects.requireNonNull(authority, "authority");
+            var layout = Layout.withPhysicalMembers(binding.authorityRoot(), binding.physicalNamespace());
+            layout.requireResource(resource);
+            var grant = Entry.decode(reservation.canonicalStoredBytes());
+            layout.verify(grant);
+            var stored = M5TargetDeleteStoredValueV2.decode(authority);
+            if (!reservation.key().equals(M5GcQuotaRecordsV2.entryKey(resource.sha256()))
+                    || !grant.resource().equals(resource.sha256())
+                    || grant.settled()
+                    || !authority.key().equals(resource.authorityKey())
+                    || !stored.resource().equals(resource)
+                    || stored.state()
+                            == com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1
+                                    .TargetDeleteAuthorityStateV1.DELETE_DONE_V1) {
+                throw new IllegalArgumentException("native physical resource facts differ or are terminal");
+            }
+        }
+    }
+
+    /** Reads the actual reservation/authority versions under the admitted native namespace, then rereads exactly. */
+    public CompletionStage<ResourceFact> readResourceFact(PhysicalResourceIdV2 resource) {
+        layout.requireResource(resource);
+        String entryKey = M5GcQuotaRecordsV2.entryKey(resource.sha256());
+        return requireActiveResource(resource)
+                .thenCompose(binding -> accounting.read(entryKey).thenCompose(reservation -> authorities
+                        .read(resource.authorityKey())
+                        .thenApply(authority -> new ResourceFact(
+                                resource,
+                                binding,
+                                reservation.orElseThrow(
+                                        () -> new IllegalStateException("native reservation fact is missing")),
+                                authority.orElseThrow(
+                                        () -> new IllegalStateException("native authority fact is missing"))))))
+                .thenCompose(fact -> accounting.read(entryKey).thenCompose(reservation -> {
+                    if (!reservation.equals(Optional.of(fact.reservation()))) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalStateException("native physical reservation changed during fact capture"));
+                    }
+                    return authorities.read(resource.authorityKey()).thenCompose(authority -> {
+                        if (!authority.equals(Optional.of(fact.authority()))) {
+                            return CompletableFuture.failedFuture(
+                                    new IllegalStateException("native physical authority changed during fact capture"));
+                        }
+                        return requireActiveResource(resource).thenApply(binding -> {
+                            if (!binding.equals(fact.binding())) {
+                                throw new IllegalStateException(
+                                        "native physical namespace changed during fact capture");
+                            }
+                            return fact;
+                        });
+                    });
+                }));
     }
 
     /** Initialize only empty typed families; never migrate old authority or implicitly expand capacity. */
@@ -203,10 +348,20 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
     static List<KeyRange> permanentRecordRanges(Layout layout) {
         String authority = layout.nativeRoot() + "/v2/physical-delete-m5-v2/";
         String entries = layout.nativeRoot() + "/" + M5GcQuotaRecordsV2.ENTRY_PREFIX;
-        return List.of(
-                new KeyRange(
-                        authority + "0".repeat(64) + "/authority-v2", authority + "g".repeat(64) + "/authority-v2"),
-                new KeyRange(entries + "0".repeat(64), entries + "g".repeat(64)));
+        String births = layout.nativeRoot() + "/" + M5ObjectBirthCreditV3.PREFIX;
+        var ranges = new java.util.ArrayList<KeyRange>();
+        ranges.add(new KeyRange(
+                authority + "0".repeat(64) + "/authority-v2", authority + "g".repeat(64) + "/authority-v2"));
+        ranges.add(new KeyRange(entries + "0".repeat(64), entries + "g".repeat(64)));
+        if (layout.namespace().providerKind() == PhysicalResourceIdV2.ProviderKind.OBJECT_PROVIDER) {
+            ranges.add(new KeyRange(births + "0".repeat(64), births + "g".repeat(64)));
+        }
+        if (layout.profile() == M5GcQuotaRecordsV2.RecordProfile.GC_AND_PHYSICAL_MEMBERS_V2) {
+            String members = layout.nativeRoot() + "/" + M5GcQuotaRecordsV2.PHYSICAL_MEMBER_PREFIX;
+            ranges.add(new KeyRange(
+                    members + "0".repeat(64) + "/inventory-v2", members + "g".repeat(64) + "/inventory-v2"));
+        }
+        return List.copyOf(ranges);
     }
 
     record KeyRange(String start, String end) {}
@@ -217,8 +372,12 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
             if (head.isPresent()) {
                 return CompletableFuture.completedFuture(false);
             }
-            return emptyRange(ranges.get(0))
-                    .thenCompose(empty -> empty ? emptyRange(ranges.get(1)) : CompletableFuture.completedFuture(false));
+            CompletionStage<Boolean> empty = CompletableFuture.completedFuture(true);
+            for (var range : ranges) {
+                empty = empty.thenCompose(
+                        current -> current ? emptyRange(range) : CompletableFuture.completedFuture(false));
+            }
+            return empty;
         });
     }
 
@@ -287,7 +446,9 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
             });
             var admissible = key.equals(M5GcQuotaRecordsV2.HEAD_KEY)
                     ? headTransition(predecessor, Head.decode(candidate))
-                    : entryTransition(predecessor, Entry.decode(candidate));
+                    : key.startsWith(M5ObjectBirthCreditV3.PREFIX)
+                            ? birthTransition(predecessor, M5ObjectBirthCreditV3.decode(candidate))
+                            : entryTransition(predecessor, Entry.decode(candidate));
             return admissible.thenCompose(allowed -> allowed
                     ? exact.compareAndSet(predecessor, key, candidate)
                     : CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT));
@@ -319,7 +480,31 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
                                 entry -> entry.canonicalStoredBytes().equals(pending.encode()))
                         .isPresent());
             }
-            if (before.pending().isEmpty() && next.pending().isPresent()) {
+            var originalBirth = before.births().flatMap(M5GcQuotaRecordsV2.Births::pending);
+            var pendingBirth = next.births().flatMap(M5GcQuotaRecordsV2.Births::pending);
+            if (before.pending().isEmpty() && originalBirth.isPresent() && next.equals(before.clearPendingBirth())) {
+                var credit = originalBirth.orElseThrow();
+                return read(credit.key()).thenCompose(value -> {
+                    if (value.filter(stored -> stored.canonicalStoredBytes().equals(credit.encode()))
+                            .isEmpty()) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                    if (credit.resource().isEmpty()) {
+                        return CompletableFuture.completedFuture(true);
+                    }
+                    return read(M5GcQuotaRecordsV2.entryKey(
+                                    credit.resource().orElseThrow().sha256()))
+                            .thenApply(entry -> entry.map(stored -> Entry.decode(stored.canonicalStoredBytes()))
+                                    .filter(stored -> !stored.settled())
+                                    .isPresent());
+                });
+            }
+            if (before.pending().isEmpty() && originalBirth.isEmpty() && pendingBirth.isPresent()) {
+                return birthHeadTransition(before, next, pendingBirth.orElseThrow());
+            }
+            if (before.pending().isEmpty()
+                    && originalBirth.isEmpty()
+                    && next.pending().isPresent()) {
                 var pending = next.pending().orElseThrow();
                 if (!pending.settled() && next.equals(before.reserve(layout, pending.resource()))) {
                     return read(pending.key()).thenCompose(value -> {
@@ -343,6 +528,56 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
                 }
             }
             throw new IllegalArgumentException("quota head does not follow a bounded exact transition");
+        }
+
+        private CompletionStage<Boolean> birthHeadTransition(Head before, Head next, M5ObjectBirthCreditV3 credit) {
+            if (credit.state() == M5ObjectBirthCreditV3.State.RESERVED) {
+                if (!next.equals(before.reserveBirth(layout, credit.worker(), credit.slot()))) {
+                    throw new IllegalArgumentException("birth quota grant changes the original bounded head");
+                }
+                return read(credit.key()).thenApply(Optional::isEmpty);
+            }
+            return read(credit.key()).thenCompose(original -> {
+                if (original.filter(value ->
+                                credit.isSuccessorOf(M5ObjectBirthCreditV3.decode(value.canonicalStoredBytes())))
+                        .isEmpty()) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                if (credit.resource().isEmpty()) {
+                    return CompletableFuture.completedFuture(next.equals(
+                            credit.state() == M5ObjectBirthCreditV3.State.WRITE_ARMED
+                                    ? before.armBirth(credit)
+                                    : before.finishBirth(credit, false)));
+                }
+                var resource = credit.resource().orElseThrow();
+                return read(M5GcQuotaRecordsV2.entryKey(resource.sha256())).thenCompose(entry -> {
+                    if (entry.map(value -> Entry.decode(value.canonicalStoredBytes())
+                                            .settled())
+                                    .orElse(false)
+                            || !next.equals(before.finishBirth(credit, entry.isEmpty()))) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                    return entry.isPresent()
+                            ? CompletableFuture.completedFuture(true)
+                            : authorities.read(resource.authorityKey()).thenApply(Optional::isEmpty);
+                });
+            });
+        }
+
+        private CompletionStage<Boolean> birthTransition(
+                Optional<VersionedValue> predecessor, M5ObjectBirthCreditV3 next) {
+            if (predecessor.isEmpty()
+                    ? next.state() != M5ObjectBirthCreditV3.State.RESERVED
+                    : !next.isSuccessorOf(M5ObjectBirthCreditV3.decode(
+                            predecessor.orElseThrow().canonicalStoredBytes()))) {
+                throw new IllegalArgumentException("birth credit requires its original permanent reserved predecessor");
+            }
+            return read(M5GcQuotaRecordsV2.HEAD_KEY)
+                    .thenApply(head -> head.map(value -> Head.decode(value.canonicalStoredBytes()))
+                            .filter(value -> value.pending().isEmpty())
+                            .flatMap(value -> value.births().flatMap(M5GcQuotaRecordsV2.Births::pending))
+                            .filter(next::equals)
+                            .isPresent());
         }
 
         private CompletionStage<Boolean> entryTransition(Optional<VersionedValue> predecessor, Entry next) {
@@ -379,6 +614,12 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
             requireKey(key);
             if (key.equals(M5GcQuotaRecordsV2.HEAD_KEY)) {
                 layout.verify(Head.decode(bytes));
+            } else if (key.startsWith(M5ObjectBirthCreditV3.PREFIX)) {
+                var credit = M5ObjectBirthCreditV3.decode(bytes);
+                if (!credit.key().equals(key) || !credit.scope().equals(layout.scope())) {
+                    throw new IllegalArgumentException("birth credit key/scope differs from its original namespace");
+                }
+                credit.resource().ifPresent(layout::requireResource);
             } else {
                 var entry = Entry.decode(bytes);
                 layout.verify(entry);
@@ -391,7 +632,9 @@ public final class OxiaQuotaTargetDeleteStoreV2 implements BoundPhysicalDeleteAu
         private void requireKey(String key) {
             Objects.requireNonNull(key, "key");
             if (!key.equals(M5GcQuotaRecordsV2.HEAD_KEY)
-                    && !key.matches(M5GcQuotaRecordsV2.ENTRY_PREFIX + "[0-9a-f]{64}")) {
+                    && !key.matches(M5GcQuotaRecordsV2.ENTRY_PREFIX + "[0-9a-f]{64}")
+                    && !(layout.namespace().providerKind() == PhysicalResourceIdV2.ProviderKind.OBJECT_PROVIDER
+                            && key.matches(M5ObjectBirthCreditV3.PREFIX + "[0-9a-f]{64}"))) {
                 throw new IllegalArgumentException("key is outside the quota accounting family");
             }
             layout.nativeKey(key);

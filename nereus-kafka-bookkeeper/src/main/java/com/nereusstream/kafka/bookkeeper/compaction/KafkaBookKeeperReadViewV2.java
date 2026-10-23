@@ -26,16 +26,33 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
 /** Verified immutable carrier caches. The caller still owns native protocol interpretation and M4 read admission. */
 public final class KafkaBookKeeperReadViewV2 {
+    /** One complete selected RecordBatch with the first actual BK chunk position that reconstructed it. */
+    public record SelectedBatch(
+            long startOffset, long endOffsetExclusive, int firstPart, int firstEntry, CanonicalBytes rawRecordBatch) {
+        public SelectedBatch {
+            Objects.requireNonNull(rawRecordBatch, "rawRecordBatch");
+            if (startOffset < 0
+                    || endOffsetExclusive <= startOffset
+                    || firstPart < 0
+                    || firstEntry < 0
+                    || rawRecordBatch.isEmpty()) {
+                throw new IllegalArgumentException("selected BK batch locator or coverage is invalid");
+            }
+        }
+    }
+
     private final KafkaSealedBookKeeperDescriptorV2 descriptor;
     private final KafkaBookKeeperArtifactAssemblerV2.Artifacts artifacts;
     private final List<ParsedBatch> batches;
     private final List<KafkaCompactionIndexV1> indexes;
     private final List<Gap> gaps;
+    private final Optional<KafkaCompactionRecoveryStateV1> recoveryState;
 
     KafkaBookKeeperReadViewV2(
             KafkaSealedBookKeeperDescriptorV2 descriptor, KafkaBookKeeperArtifactAssemblerV2.Artifacts artifacts) {
@@ -69,10 +86,13 @@ public final class KafkaBookKeeperReadViewV2 {
         this.indexes =
                 artifacts.indexes().stream().map(KafkaCompactionIndexV1::decode).toList();
         if (batches.size() != descriptor.batchCount()
-                || !artifacts.indexLocators().equals(descriptor.indexes())) {
+                || !artifacts.indexLocators().equals(descriptor.indexes())
+                || !artifacts.recoveryStateLocator().equals(descriptor.recoveryStateLocator())) {
             throw new IllegalStateException(
                     "recovered BK artifact count or physical index locators differ from descriptor");
         }
+        this.recoveryState = artifacts.recoveryState().map(KafkaCompactionRecoveryStateCodecV1::decode);
+        recoveryState.ifPresent(state -> state.requireSourceCut(descriptor.sourceCut()));
         var records = expectedRecords();
         this.gaps = gaps(records);
         requireProof();
@@ -81,6 +101,11 @@ public final class KafkaBookKeeperReadViewV2 {
 
     public KafkaSealedBookKeeperDescriptorV2 descriptor() {
         return descriptor;
+    }
+
+    /** Full selected-output state, independently stored in BK; the caller still owns native recovery admission. */
+    public Optional<KafkaCompactionRecoveryStateV1> recoveryState() {
+        return recoveryState;
     }
 
     public KafkaCompactionIndexV1 index(IndexKind kind) {
@@ -97,6 +122,37 @@ public final class KafkaBookKeeperReadViewV2 {
 
     public CanonicalBytes readBatch(int ordinal) {
         return artifacts.batches().get(ordinal);
+    }
+
+    /** The caller holds the exact selected M4 view and supplies its captured Kafka isolation frontier. */
+    public List<SelectedBatch> selectBatches(long requestedOffset, long upperBoundExclusive, long byteBudget) {
+        var coverage = descriptor.sourceCut().coverage();
+        if (requestedOffset < coverage.inclusiveStart()
+                || requestedOffset > coverage.exclusiveEnd()
+                || upperBoundExclusive < 0
+                || byteBudget <= 0) {
+            throw new IllegalArgumentException("selected BK read is outside its cut or byte budget");
+        }
+        List<SelectedBatch> selected = new ArrayList<>();
+        long usedBytes = 0;
+        for (int ordinal = 0; ordinal < batches.size(); ordinal++) {
+            ParsedBatch batch = batches.get(ordinal);
+            if (batch.endOffsetExclusive() <= requestedOffset) {
+                continue;
+            }
+            if (batch.baseOffset() >= upperBoundExclusive || batch.endOffsetExclusive() > upperBoundExclusive) {
+                break;
+            }
+            CanonicalBytes body = artifacts.batches().get(ordinal);
+            if (!selected.isEmpty() && body.length() > byteBudget - usedBytes) {
+                break;
+            }
+            var locator = artifacts.dataLocators().get(ordinal);
+            selected.add(new SelectedBatch(
+                    batch.baseOffset(), batch.endOffsetExclusive(), locator.firstPart(), locator.firstEntry(), body));
+            usedBytes = Math.addExact(usedBytes, body.length());
+        }
+        return List.copyOf(selected);
     }
 
     public List<Gap> gaps() {

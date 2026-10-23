@@ -13,8 +13,12 @@
  */
 
 dependencies {
+    api(project(":nereus-domain"))
     api(project(":nereus-storage-object"))
     api(project(":nereus-metadata-spi"))
+    api(project(":nereus-metadata-oxia"))
+    api(project(":nereus-storage-object-s3"))
+    api(project(":nereus-storage-bookkeeper"))
     implementation(libs.zstd.jni)
     api(platform(libs.aws.sdk.v2.bom))
     api(libs.aws.sdk.v2.s3)
@@ -24,6 +28,11 @@ dependencies {
     testImplementation(libs.assertj)
     testImplementation(libs.pulsar.managed.ledger)
     testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+// This current P1/NV consumer needs the current domain API. The BK Storage API retains its historical N1 edge.
+configurations.configureEach {
+    resolutionStrategy.preferProjectModules()
 }
 
 val p6ProviderTest by sourceSets.creating {
@@ -39,6 +48,8 @@ configurations[p6ProviderTest.runtimeOnlyConfigurationName]
 
 dependencies {
     add(p6ProviderTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(p6ProviderTest.implementationConfigurationName,
+        project(path = ":nereus-storage-bookkeeper", configuration = "m5NativeDeleteFaultFixtures"))
     add(p6ProviderTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
     add(p6ProviderTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
     add(p6ProviderTest.implementationConfigurationName, libs.testcontainers.localstack)
@@ -53,6 +64,187 @@ tasks.register<Test>("p6ProviderTest") {
     include("**/S3PulsarOffloadObjectStoreV1Test.class")
     maxParallelForks = 1
     outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5S3ProviderDrainRealTest") {
+    group = "verification"
+    description = "Verify Pulsar S3 provider shutdown against actual held native I/O."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5S3PulsarObjectStoreDrainTest.class")
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.m5.s3DrainEndpoint", providers.gradleProperty("v2M5S3DrainEndpoint").get())
+    }
+}
+
+tasks.register<Test>("v2M5NativeOffloadRealTest") {
+    group = "verification"
+    description = "Verify native ManagedLedger offload, byte admission and cold subscription reads."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5NativePulsarOffloadRealTest.class")
+    filter {
+        if (providers.gradleProperty("v2M5NativeM4RuntimeOutput").isPresent) {
+            includeTestsMatching("*.nativeBindingForM4Conformance")
+            includeTestsMatching("*.nativePreferredOnlySourceSurvivesMissingBookKeeperMetadata")
+        } else {
+            includeTestsMatching("*.nativeBindingCapturesExactP1OwnerAndObjectNamespace")
+        }
+        includeTestsMatching("*.nativeOffloadBoundsFallbackReadsAndColdSubscriptionKeepsBacklog")
+        includeTestsMatching("*.nativeTimedOutDataCreationRetainsActualSdkOwnership")
+        includeTestsMatching("*.nativeTimedOutCursorCreationRetainsActualSdkOwnership")
+    }
+    maxParallelForks = 1
+    maxHeapSize = "768m"
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.m5.nativeOffloadEndpoint", providers.gradleProperty("v2M5NativeOffloadEndpoint").get())
+        systemProperty("nereus.m5.nativeOffloadZk", providers.gradleProperty("v2M5NativeOffloadZk").get())
+        systemProperty("nereus.m5.nativeOffloadOxia", providers.gradleProperty("v2M5NativeOffloadOxia").get())
+        providers.gradleProperty("v2M5NativeM4RuntimeOutput").orNull?.let {
+            systemProperty("nereus.m5.nativeM4RuntimeOutput", it)
+        }
+        providers.gradleProperty("v2M5NativeOffloadRetentionClass").orNull?.let {
+            systemProperty("nereus.m5.nativeOffloadRetentionClass", it)
+        }
+    }
+}
+
+tasks.register<Test>("v2M5NativeBkDeleteSdkDrainRealTest") {
+    group = "verification"
+    description = "Verify the existing Native SDK drain recipe with explicit DELETE_AFTER_VERIFIED configuration."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5NativePulsarOffloadRealTest.class")
+    filter {
+        includeTestsMatching("*.nativeBindingForM4Conformance")
+        includeTestsMatching("*.nativePreferredOnlySourceSurvivesMissingBookKeeperMetadata")
+        includeTestsMatching("*.nativeOffloadBoundsFallbackReadsAndColdSubscriptionKeepsBacklog")
+        includeTestsMatching("*.nativeTimedOutDataCreationRetainsActualSdkOwnership")
+        includeTestsMatching("*.nativeTimedOutCursorCreationRetainsActualSdkOwnership")
+    }
+    maxParallelForks = 1
+    maxHeapSize = "768m"
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.m5.nativeOffloadEndpoint", providers.gradleProperty("v2M5NativeOffloadEndpoint").get())
+        systemProperty("nereus.m5.nativeOffloadZk", providers.gradleProperty("v2M5NativeOffloadZk").get())
+        systemProperty("nereus.m5.nativeOffloadOxia", providers.gradleProperty("v2M5NativeOffloadOxia").get())
+        systemProperty("nereus.m5.nativeM4RuntimeOutput", providers.gradleProperty("v2M5NativeM4RuntimeOutput").get())
+        systemProperty("nereus.m5.nativeOffloadRetentionClass", "DELETE_AFTER_VERIFIED")
+    }
+}
+
+tasks.register<Test>("v2M5NativeM4OwnerRealTest") {
+    group = "verification"
+    description = "Verify actual Native M4 selector/hazard admission from explicit current SDK drain conformance."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("*.nativeM4OwnerHoldsActualCleanupAndBorrowedAliases")
+        includeTestsMatching("*.nativeM4CleanupFailureRetainsHazard")
+        includeTestsMatching("*.nativeM4OrdinaryReadCannotFallbackAfterCutChanges")
+        includeTestsMatching("*.nativeM4PreferredOnlyOwnerRejectsBookKeeperFallback")
+        includeTestsMatching("*.nativeM4FallbackRetiresAfterActualGetAndAliasDrain")
+        includeTestsMatching("*.nativeM4FallbackUnknownRetainsProtectionAndRetriesExact")
+        includeTestsMatching("*.nativeM4SourceMapUnknownCannotPublishSelector")
+        includeTestsMatching("*.nativeM4ColdSourceUsesPublishedObjectVersions")
+        includeTestsMatching("*.nativeM4ColdOwnerRequiresActualDurableDrain")
+        includeTestsMatching("*.nativeM4ColdOwnerUnknownRetainsUniqueAttempt")
+        includeTestsMatching("*.nativeM4CellSharesRetainUnknownReaderAndHealthyBinding")
+        includeTestsMatching("*.nativeSourcePreparationRetainsHeldRootOpen")
+        includeTestsMatching("*.nativePreparedSourceRequiresGrantAndDrainsWithOwner")
+        includeTestsMatching("*.nativeM4VerificationUsesCachedVersionsAndPrivateDrain")
+        includeTestsMatching("*.nativeM4CancelledVerificationCannotClearSdkLease")
+        includeTestsMatching("*.nativeM4CompletedVerificationObserverCannotClearSdkLease")
+        includeTestsMatching("*.nativeCellAllocatorRejectsIndependentOwnerUntilActualDrain")
+        includeTestsMatching("*.nativeCellAllocatorUnknownDrainRetainsOriginalOwner")
+        includeTestsMatching("*.nativeCellReservationUnknownDoesNotDispatchSource")
+        includeTestsMatching("*.nativeCellReservationReleaseUnknownRetainsLocalCharge")
+        includeTestsMatching("*.nativeInitialOwnerUnknownRetainsExactCleanup")
+        includeTestsMatching("*.nativeSuccessorOwnerUnknownRetainsExactCleanup")
+        includeTestsMatching("*.nativeGuardedPulsarCreatesDurableBirthsAndMembers")
+        includeTestsMatching("*.nativeGuardedPulsarBirthUnknownCannotCreatePhysicalLedger")
+        includeTestsMatching("*.nativeMetadataCleanupUnknownRetainsOriginalSdkCapacity")
+        includeTestsMatching("*.nativeMetadataTicketUnknownRetainsOriginalNoDispatchCleanup")
+        includeTestsMatching("*.nativeMetadataWriteUnknownUsesActualVersionFence")
+        includeTestsMatching("*.nativeMetadataWriteUnknownKeepsOriginalProofAcrossCleanupLoss")
+        includeTestsMatching("*.nativeMetadataWriteUnknownRejectsChangedCreationIdentity")
+        includeTestsMatching("*.nativeMetadataCreateUnknownReconcilesOriginalCreatedIdentity")
+        includeTestsMatching("*.nativeMetadataCreateFencedAbsenceExcludesLateCreation")
+        includeTestsMatching("*.nativeMetadataCreateUnknownRejectsForeignCreator")
+        includeTestsMatching("*.nativeMetadataCreatePreDispatchReadFailureReconcilesOriginalTicket")
+        includeTestsMatching("*.nativeMaterializationSourceUsesActualChainAndEveryEntry")
+        includeTestsMatching("*.nativeMaterializationSourceClosesFromOriginalDeliveryCallback")
+        includeTestsMatching("*.nativeMaterializationQualificationGetRetainsWorkspaceThroughClose")
+        includeTestsMatching("*.nativeMaterializationConnectionRetainsOriginalSdkUntilActualGetDrain")
+        includeTestsMatching("*.nativeMaterializationInputPersistsExactP1ViewAndRecoveryReferences")
+        includeTestsMatching("*.nativeMaterializationInputUnknownRetainsOriginalCellChargeUntilExactRecovery")
+        includeTestsMatching("*.nativeMaterializationProviderScopeUsesOriginalSdkAndFrozenCellPrefix")
+        includeTestsMatching("*.nativeMaterializationProviderScopeUnknownRetainsOriginalSourceAndCellCharge")
+        includeTestsMatching("*.nativeMaterializationTaskBindsOriginalPlanScopeOwnerAndSharedCellCharge")
+        includeTestsMatching("*.nativeMaterializationTaskPlanUnknownRetainsOriginalSourceAndCellCharge")
+        includeTestsMatching("*.nativeMaterializationTaskCapacityRejectsBeforePlanAndOutput")
+        includeTestsMatching("*.nativeMaterializationTaskCurrentReadRetainsOriginalSourceUntilDrain")
+        includeTestsMatching("*.nativeMaterializationTaskUnknownRetainsExclusiveSourceThenAdvancesOriginalWorker")
+        includeTestsMatching("*.nativeMaterializationPendingInventoryUnknownRetainsOriginalKeysAndCharge")
+        includeTestsMatching("*.nativeMaterializationBirthCreditUnknownRetainsOriginalCapacityUntilNoDispatchDrain")
+        includeTestsMatching("*.nativeMaterializationBirthCapacityRejectsBeforeAnyProviderOutput")
+        includeTestsMatching("*.nativeMaterializationWritesRealVersionsAndIndependentlyVerifiesEveryEntry")
+        includeTestsMatching("*.nativeMaterializationWriteIntentUnknownCannotDispatchProviderOutput")
+        includeTestsMatching("*.nativeMaterializationCancelledOutputObserverRetainsActualPutUntilDrain")
+        includeTestsMatching("*.nativeMaterializationActualPutReplyLossUsesOriginalImmutableVersion")
+        includeTestsMatching("*.nativeMaterializationPartialCutRetainsOutsideEntryAndActiveTailRoutes")
+        includeTestsMatching("*.nativePartialMaterializationColdFactoryRetainsOriginalSourceDependencies")
+        includeTestsMatching("*.nativeMaterializationMappedGetObserverCancelRetainsSdkHazardAndCellUntilDrain")
+        includeTestsMatching("*.nativeMaterializationPublishesActualManifestAfterOriginalOwnerDrain")
+        includeTestsMatching("*.nativeMaterializationAppliedPublicationUnknownRetainsOriginalCandidateUntilHandoff")
+        includeTestsMatching("*.nativeMaterializationStopBeforeSelectorDrainsOriginalPhysicalTickets")
+        includeTestsMatching("*.nativeRecoveryAddReplyLossRetainsOriginalSdkReferencesAfterFence")
+        includeTestsMatching("*.nativeExplicitLacReplyLossRetainsOriginalSdkReferencesAfterFence")
+        includeTestsMatching("*.nativeCursorResetReplyLossRetainsOriginalCAndDReferences")
+        includeTestsMatching("*.nativeCursorResetRejectsCommittedTrimBeforeOriginalSdkDispatch")
+        includeTestsMatching("*.nativeReadOwnerPinsCommittedTrimThroughOriginalEntryDrain")
+        includeTestsMatching("*.nativeCursorFloorScansActualCheckpointInsideSingleAuthorityFence")
+        includeTestsMatching("*.nativeOnlyFirstAdmissionPersistsPolicyAndFencesKafkaFloors")
+        includeTestsMatching("*.nativeOnlyTaskTerminalReferencesRequireOriginalCellDrain")
+        includeTestsMatching("*.nativeBookKeeperReplacementRequiresExactReleaseAndReconcilesUnknown")
+        includeTestsMatching("*.nativeBookKeeperExpiryRequiresTypedTrimAndRetainsActiveBacklog")
+        includeTestsMatching("*.nativeCursorTrimColdCommitRecoversDurableSnapshotAfterAppliedReplyLoss")
+        includeTestsMatching("*.nativeEnrolledReadOwnerRejectsMissingControlWriterBeforeGrant")
+        includeTestsMatching("*.nativeEnrolledColdOwnerKeepsActualP1ReadTicketUntilEntryDrain")
+        includeTestsMatching("*.nativeEnrolledColdOwnerUnknownKeepsOriginalGrantAndCell")
+        includeTestsMatching("*.nativeObjectOnlyCursorAndGenerationFloorsSurviveMissingOriginalBookKeeper")
+        includeTestsMatching("*.nativeCancelledInitialOwnerRetainsOriginalGrantCleanup")
+        includeTestsMatching("*.nativeCompletedInitialOwnerRetainsOriginalGrantCleanup")
+        includeTestsMatching("*.nativeInitialGrantUnknownWithoutActorRetainsQuarantine")
+        includeTestsMatching("*.nativeInitialClaimRejectsConcurrentInvocation")
+        includeTestsMatching("*.nativeInitialClaimUnknownAndAbortUnknownKeepOriginalCharge")
+        includeTestsMatching("*.nativeInitialClaimMissingHeadCannotReinitialize")
+        includeTestsMatching("*.nativeActorlessGrantReconcilesActualDrainAndColdOwner")
+    }
+    maxParallelForks = 1
+    maxHeapSize = "768m"
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.m5.nativeOffloadEndpoint", providers.gradleProperty("v2M5NativeOffloadEndpoint").get())
+        systemProperty("nereus.m5.nativeOffloadZk", providers.gradleProperty("v2M5NativeOffloadZk").get())
+        systemProperty("nereus.m5.nativeOffloadOxia", providers.gradleProperty("v2M5NativeOffloadOxia").get())
+        systemProperty("nereus.m5.nativeM4AdmissionFile", providers.gradleProperty("v2M5NativeM4AdmissionFile").get())
+        systemProperty("nereus.m5.nativeM4AdmissionSha256", providers.gradleProperty("v2M5NativeM4AdmissionSha256").get())
+        providers.gradleProperty("v2M5NativeBkGcAdmissionFile").orNull?.let {
+            systemProperty("nereus.m5.nativeBkGcAdmissionFile", it)
+        }
+        providers.gradleProperty("v2M5NativeBkGcAdmissionSha256").orNull?.let {
+            systemProperty("nereus.m5.nativeBkGcAdmissionSha256", it)
+        }
+    }
 }
 
 tasks.register<Test>("p6EvidenceTest") {

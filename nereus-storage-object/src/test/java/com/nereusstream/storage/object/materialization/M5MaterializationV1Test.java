@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.materialization.M5MaterializationPlannerV1.PlanningPolicy;
@@ -38,7 +39,10 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.MaterializationDataReader;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.ValidatedGeneration;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.VerifiedObjectRead;
+import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
+import com.nereusstream.storage.object.provider.ObjectProviderCapabilities;
+import com.nereusstream.storage.object.provider.ObjectProviderTransport;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
@@ -52,6 +56,9 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Prote
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -61,6 +68,133 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class M5MaterializationV1Test {
+    @Test
+    void cellProviderReaderBindsScopeAndValidatesReusedSourceThroughFullGet() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
+        MaterializationPlan plan = fixture.plan(false, List.of());
+        Output output = fixture.output(plan);
+        ReadOnlyObjectTransport transport =
+                new ReadOnlyObjectTransport(fixture.source.physicalKey(), fixture.sourceBody, bytes("provider-v1"));
+        C1ObjectProviderSession provider = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("provider-scope-a")), "cell-a", 1024 * 1024, 4096);
+        M5MaterializationObjectSessionV1 session = new M5MaterializationObjectSessionV1(provider, 2, 2, 4096, 1024);
+        MaterializationDataReader reader = session.dataReaderForReuse(plan);
+
+        assertThat(fixture.validator
+                        .validate(
+                                plan,
+                                fixture.selector,
+                                List.of(fixture.protection),
+                                output.payloadObjects(),
+                                output.indexObjects(),
+                                reader)
+                        .generation()
+                        .payloadObjects())
+                .containsExactlyElementsOf(output.payloadObjects());
+        assertThat(transport.getCalls).isEqualTo(1);
+        assertThatThrownBy(() -> reader.readObject(new ObjectIdentity(
+                        "cell-a/unplanned", fixture.sourceBody.length(), Sha256Digest.hash(fixture.sourceBody))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outside the frozen plan");
+
+        C1ObjectProviderSession wrongScope = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("wrong-scope")), "cell-a", 1024 * 1024, 4096);
+        assertThatThrownBy(() ->
+                        new M5MaterializationObjectSessionV1(wrongScope, 2, 2, 4096, 1024).dataReaderForReuse(plan))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Provider scope");
+        provider.close();
+        wrongScope.close();
+    }
+
+    @Test
+    void cellProviderReuseReaderRejectsVersionChangeAndRewritePlans() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
+        MaterializationPlan plan = fixture.plan(false, List.of());
+        Output output = fixture.output(plan);
+        ReadOnlyObjectTransport transport =
+                new ReadOnlyObjectTransport(fixture.source.physicalKey(), fixture.sourceBody, bytes("changed-version"));
+        C1ObjectProviderSession provider = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("provider-scope-a")), "cell-a", 1024 * 1024, 4096);
+        M5MaterializationObjectSessionV1 session = new M5MaterializationObjectSessionV1(provider, 2, 2, 4096, 1024);
+        MaterializationDataReader reader = session.dataReaderForReuse(plan);
+        assertThatThrownBy(() -> fixture.validator.validate(
+                        plan,
+                        fixture.selector,
+                        List.of(fixture.protection),
+                        output.payloadObjects(),
+                        output.indexObjects(),
+                        reader))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reused source Provider version");
+        assertThatThrownBy(() -> reader.readSource(fixture.source))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("native decoder");
+        assertThatThrownBy(() -> session.dataReaderForReuse(fixture.plan(true, List.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reference plan");
+        provider.close();
+
+        Fixture bookKeeper = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        MaterializationPlan bookKeeperPlan = bookKeeper.plan(true, List.of());
+        C1ObjectProviderSession anotherProvider = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("provider-scope-a")), "cell-a", 1024 * 1024, 4096);
+        assertThatThrownBy(() -> new M5MaterializationObjectSessionV1(anotherProvider, 2, 2, 4096, 1024)
+                        .dataReaderForReuse(bookKeeperPlan))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reference plan");
+        anotherProvider.close();
+    }
+
+    @Test
+    void objectCreationRejectsWrongScopeAndUnplannedOutputBeforeProviderIo() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        MaterializationPlan plan = fixture.plan(true, List.of());
+        M5MaterializationObjectSessionV1.Candidate candidate = new M5BytePreservingMaterializerV1()
+                .build(plan, source -> fixture.sourceBody)
+                .payloadCandidates()
+                .get(0);
+        ReadOnlyObjectTransport transport =
+                new ReadOnlyObjectTransport(fixture.source.physicalKey(), fixture.sourceBody, bytes("provider-v1"));
+        C1ObjectProviderSession wrongScope = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("wrong-scope")), "cell-a", 1024 * 1024, 4096);
+        assertThatThrownBy(() -> new M5MaterializationObjectSessionV1(wrongScope, 2, 2, 4096, 1024)
+                        .createExact(plan, List.of(candidate)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Provider scope");
+        wrongScope.close();
+
+        C1ObjectProviderSession provider = new C1ObjectProviderSession(
+                transport, new CellProviderScopeId(digest("provider-scope-a")), "cell-a", 1024 * 1024, 4096);
+        GenerationObject output = candidate.descriptor();
+        GenerationObject unplanned = new GenerationObject(
+                output.ordinal(),
+                output.indexKind(),
+                output.coverage(),
+                new ObjectIdentity(
+                        "cell-a/unplanned-output",
+                        output.identity().bodyLength(),
+                        output.identity().bodySha256()),
+                output.immutableProviderVersionToken());
+        M5MaterializationObjectSessionV1.Candidate wrongKey =
+                new M5MaterializationObjectSessionV1.Candidate(unplanned, candidate.canonicalBody());
+        assertThatThrownBy(() -> new M5MaterializationObjectSessionV1(provider, 2, 2, 4096, 1024)
+                        .createExact(plan, List.of(wrongKey)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("frozen plan");
+        assertThat(transport.putCalls).isZero();
+        transport.allowCreate = true;
+        var created =
+                new M5MaterializationObjectSessionV1(provider, 2, 2, 4096, 1024).createExact(plan, List.of(candidate));
+        assertThat(created.exactObjects()).singleElement().satisfies(exact -> {
+            assertThat(exact.ordinal()).isEqualTo(output.ordinal());
+            assertThat(exact.identity()).isEqualTo(output.identity());
+        });
+        assertThat(transport.putCalls).isEqualTo(1);
+        assertThat(transport.createdBody).isEqualTo(candidate.canonicalBody());
+        provider.close();
+    }
+
     @Test
     void deterministicPlannerSelectsReuseIndexOnlyAndRewriteWithoutCopyingHealthyObjectWal() {
         Fixture fixture = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
@@ -127,14 +261,204 @@ class M5MaterializationV1Test {
                 .containsExactly(IndexKind.OFFSET_OR_POSITION, IndexKind.TIMESTAMP);
 
         Fixture reused = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
-        M5BytePreservingMaterializerV1.BuildOutput reuse =
-                new M5BytePreservingMaterializerV1().build(reused.plan(false, List.of()), source -> reused.sourceBody);
+        M5BytePreservingMaterializerV1.BuildOutput reuse = new M5BytePreservingMaterializerV1()
+                .build(reused.plan(false, List.of()), source -> {
+                    throw new AssertionError("reference builder must not read the source");
+                });
         assertThat(reuse.payloadCandidates()).isEmpty();
         assertThat(reuse.indexCandidates()).isEmpty();
         assertThat(reuse.payloadObjects()).singleElement().satisfies(object -> {
             assertThat(object.identity().key()).isEqualTo(reused.source.physicalKey());
             assertThat(object.identity().bodySha256()).isEqualTo(reused.source.bodySha256());
         });
+
+        Fixture indexed = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, false);
+        M5BytePreservingMaterializerV1.BuildOutput indexOnly = new M5BytePreservingMaterializerV1()
+                .build(indexed.plan(false, List.of(IndexKind.OFFSET_OR_POSITION)), source -> {
+                    throw new AssertionError("index-only builder must not read the source");
+                });
+        assertThat(indexOnly.payloadCandidates()).isEmpty();
+        assertThat(indexOnly.indexCandidates()).hasSize(1);
+    }
+
+    @Test
+    void independentValidationReadsReusedPayloadOnceAndStillChecksProviderVersion() throws Exception {
+        Fixture reused = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
+        MaterializationPlan plan = reused.plan(false, List.of());
+        Output output = reused.output(plan);
+        reused.validate(plan, output);
+        assertThat(output.reader.objectReads).isOne();
+        assertThat(output.reader.sourceReads).isZero();
+
+        Fixture indexed = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, false);
+        MaterializationPlan indexPlan = indexed.plan(false, List.of(IndexKind.OFFSET_OR_POSITION));
+        Output indexedOutput = indexed.output(indexPlan);
+        indexed.validate(indexPlan, indexedOutput);
+        assertThat(indexedOutput.reader.objectReads).isEqualTo(2);
+        assertThat(indexedOutput.reader.sourceReads).isZero();
+
+        DataReader wrongVersion =
+                new DataReader(
+                        Map.of(reused.source.physicalKey(), reused.sourceBody), reused.sourceBody, reused.source) {
+                    @Override
+                    public VerifiedObjectRead readObject(ObjectIdentity identity) {
+                        return new VerifiedObjectRead(reused.sourceBody, Optional.of(bytes("wrong-provider-version")));
+                    }
+                };
+        assertThatThrownBy(() -> reused.validator.validate(
+                        plan,
+                        reused.selector,
+                        List.of(reused.protection),
+                        output.payloadObjects,
+                        output.indexObjects,
+                        wrongVersion))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Provider version");
+    }
+
+    @Test
+    void independentValidationReusesOnePhysicalReadAcrossDistinctSourceSlices() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
+        SourceExtent first = slice(fixture.source, digest("first-slice"), 10, 15);
+        SourceExtent second = slice(fixture.source, digest("second-slice"), 15, 20);
+        List<SourceExtent> slices = List.of(first, second);
+        MaterializationSourceCut cut = cutWithSources(fixture, slices);
+        MaterializationPlan plan = new M5MaterializationPlannerV1()
+                .plan(
+                        cut,
+                        new PlanningPolicy(
+                                PayloadKind.KAFKA_BATCH_PRESERVING_V1,
+                                false,
+                                digest("encryption-generation"),
+                                digest("compression"),
+                                digest("checksum"),
+                                List.of(),
+                                "cell-a"));
+        var built = new M5BytePreservingMaterializerV1().build(plan, source -> {
+            throw new AssertionError("reuse builder must not read either slice");
+        });
+        DataReader reader = new DataReader(
+                Map.of(fixture.source.physicalKey(), fixture.sourceBody),
+                fixture.sourceBody,
+                fixture.source,
+                fixture.source.immutableProviderVersionToken());
+        List<SourceProtectionIdentity> protections = List.of(
+                        new SourceProtectionIdentity(first.sourceIdentitySha256(), 1, 2, 7, fixture.capability),
+                        new SourceProtectionIdentity(second.sourceIdentitySha256(), 1, 2, 7, fixture.capability))
+                .stream()
+                .sorted(java.util.Comparator.comparing(
+                        value -> value.sourceIdentitySha256().toHex()))
+                .toList();
+        fixture.validator.validate(
+                plan, fixture.selector, protections, built.payloadObjects(), built.indexObjects(), reader);
+        assertThat(reader.objectReads).isOne();
+        assertThat(reader.sourceReads).isZero();
+    }
+
+    @Test
+    void independentValidationRejectsAPlanWhoseSourceOmitsTheBinding() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.OBJECT_WAL_NWG1, true, true);
+        MaterializationPlan ordinary = fixture.plan(false, List.of());
+        SourceExtent foreign = slice(
+                fixture.source, fixture.source.sourceIdentitySha256(), 10, 20, List.of(digest("foreign-binding")));
+        MaterializationSourceCut cut = cutWithSources(fixture, List.of(foreign));
+        Sha256Digest taskId = M5MaterializationCodecV1.calculateTaskId(cut);
+        Sha256Digest outputId = M5MaterializationCodecV1.calculateOutputIdentity(
+                cut,
+                ordinary.representationMode(),
+                ordinary.payloadKind(),
+                taskId,
+                ordinary.encryptionGenerationSha256(),
+                ordinary.compressionPolicySha256(),
+                ordinary.checksumPolicySha256(),
+                ordinary.outputParts(),
+                ordinary.indexes());
+        MaterializationPlan forged = new MaterializationPlan(
+                cut,
+                ordinary.representationMode(),
+                ordinary.payloadKind(),
+                taskId,
+                outputId,
+                ordinary.encryptionGenerationSha256(),
+                ordinary.compressionPolicySha256(),
+                ordinary.checksumPolicySha256(),
+                ordinary.outputParts(),
+                ordinary.indexes());
+        Output output = fixture.output(ordinary);
+        assertThatThrownBy(() -> fixture.validator.validate(
+                        forged,
+                        fixture.selector,
+                        List.of(fixture.protection),
+                        output.payloadObjects(),
+                        output.indexObjects(),
+                        output.reader()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("membership");
+    }
+
+    @Test
+    void semanticBodyRootKeepsTheConcatenatedByteDomainAcrossPartBoundaries() {
+        assertThat(M5MaterializationValidatorV1.semanticPayloadBodiesRoot(List.of(bytes("ab"), bytes("c"))))
+                .isEqualTo(M5MaterializationValidatorV1.semanticPayloadBodiesRoot(List.of(bytes("a"), bytes("bc"))))
+                .isNotEqualTo(M5MaterializationValidatorV1.semanticPayloadBodiesRoot(List.of(bytes("ac"), bytes("b"))));
+    }
+
+    @Test
+    void lookupBoundaryRootRetainsTheOriginalHexEncodingDomain() throws Exception {
+        Fixture fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        MaterializationPlan plan = fixture.plan(true, List.of(IndexKind.OFFSET_OR_POSITION));
+        Output output = fixture.output(plan);
+        CanonicalBytes index =
+                output.reader.objects.get(output.indexObjects.get(0).identity().key());
+        String preimage = "M5-A-LOOKUP-BOUNDARIES-V1\0" + index.toHex();
+        Sha256Digest expected = Sha256Digest.hash(CanonicalBytes.copyOf(preimage.getBytes(StandardCharsets.UTF_8)));
+        assertThat(fixture.validate(plan, output).validationRoot().lookupBoundaryRootSha256())
+                .isEqualTo(expected);
+    }
+
+    private static SourceExtent slice(SourceExtent source, Sha256Digest identity, long start, long end) {
+        return slice(source, identity, start, end, source.memberBindingIds());
+    }
+
+    private static SourceExtent slice(
+            SourceExtent source, Sha256Digest identity, long start, long end, List<Sha256Digest> memberBindingIds) {
+        return new SourceExtent(
+                source.kind(),
+                identity,
+                new ProtocolCoverage(source.coverage().domain(), start, end),
+                source.physicalKey(),
+                source.canonicalLength(),
+                source.recordCount(),
+                source.minimumTimestamp(),
+                source.maximumTimestamp(),
+                source.bodySha256(),
+                source.immutableProviderVersionToken(),
+                source.ledgerIdentitySha256(),
+                source.formatRootSha256(),
+                source.encryptionPolicySha256(),
+                source.payloadLongLivedReadable(),
+                source.requiredIndexesPresent(),
+                memberBindingIds);
+    }
+
+    private static MaterializationSourceCut cutWithSources(Fixture fixture, List<SourceExtent> sources) {
+        return new MaterializationSourceCut(
+                fixture.envelope,
+                fixture.selector,
+                fixture.cut.predecessorSelectorValueSha256(),
+                fixture.cut.predecessorViewSha256(),
+                fixture.coverage,
+                fixture.cut.durableFrontier(),
+                fixture.cut.logEndFrontier(),
+                fixture.cut.highWatermark(),
+                fixture.cut.lastStableFrontier(),
+                fixture.cut.trimFrontier(),
+                fixture.cut.protocolStateRootSha256(),
+                fixture.cut.recoveryCheckpointRootSha256(),
+                fixture.cut.materializationPolicySha256(),
+                fixture.cut.outputFormatPolicySha256(),
+                M5MaterializationCodecV1.calculateSourceSetSha256(sources),
+                sources);
     }
 
     @Test
@@ -189,6 +513,29 @@ class M5MaterializationV1Test {
         assertThat(admission.release(plan.taskIdSha256()))
                 .isEqualTo(M5MaterializationAdmissionV1.Outcome.APPLIED_EXACT);
         assertThat(admission.read().orElseThrow().reservations()).isEmpty();
+    }
+
+    @Test
+    void completePlanSurvivesCoordinatorRestartAndRejectsChangedOutputPlan() throws Exception {
+        var fixture = new Fixture(SourceKind.BOOKKEEPER_LEDGER, false, false);
+        fixture.installM4();
+        var plan = fixture.plan(true, List.of(IndexKind.OFFSET_OR_POSITION));
+        var coordinator = new M5MaterializationCoordinatorV1(fixture.store, 7, fixture.binding);
+        fixture.store.applyButUnknownOn("/read-m5/", "/plans/");
+        assertThat(coordinator.register(plan)).isEqualTo(PublicationOutcome.APPLIED_EXACT);
+        var restarted = new M5MaterializationCoordinatorV1(fixture.store, 7, fixture.binding);
+        assertThat(restarted.readPlan(plan.taskIdSha256())).contains(plan);
+        var changed = fixture.plan(true, List.of(IndexKind.CHECKSUM_COVERAGE));
+        assertThat(changed.taskIdSha256()).isEqualTo(plan.taskIdSha256());
+        assertThat(changed.outputIdentitySha256()).isNotEqualTo(plan.outputIdentitySha256());
+        assertThat(restarted.register(changed)).isEqualTo(PublicationOutcome.CONFLICT);
+        assertThat(restarted.publish(
+                        changed, fixture.validate(changed, fixture.output(changed)), List.of(fixture.protection)))
+                .isEqualTo(PublicationOutcome.CONFLICT);
+        assertThat(restarted.readPlan(plan.taskIdSha256())).contains(plan);
+        assertThat(restarted.readTask(plan.taskIdSha256()).orElseThrow().state())
+                .isEqualTo(TaskState.PLANNED);
+        assertThat(fixture.m4.readSelector()).contains(plan.sourceCut().predecessorSelector());
     }
 
     @Test
@@ -551,7 +898,9 @@ class M5MaterializationV1Test {
                     coverage,
                     new ObjectIdentity(
                             plan.outputParts().get(0).objectKey(), payload.length(), Sha256Digest.hash(payload)),
-                    Optional.of(bytes("provider-v2")));
+                    plan.representationMode() == RepresentationMode.REWRITE_GENERATION
+                            ? Optional.of(bytes("provider-v2"))
+                            : source.immutableProviderVersionToken());
             Map<String, CanonicalBytes> objects = new LinkedHashMap<>();
             objects.put(payloadObject.identity().key(), payload);
             List<GenerationObject> indexObjects;
@@ -576,7 +925,16 @@ class M5MaterializationV1Test {
                 objects.put(indexObject.identity().key(), indexBytes);
                 indexObjects = List.of(indexObject);
             }
-            return new Output(List.of(payloadObject), indexObjects, new DataReader(objects, sourceBody, source));
+            return new Output(
+                    List.of(payloadObject),
+                    indexObjects,
+                    new DataReader(
+                            objects,
+                            sourceBody,
+                            source,
+                            plan.representationMode() == RepresentationMode.REWRITE_GENERATION
+                                    ? Optional.of(bytes("provider-v2"))
+                                    : source.immutableProviderVersionToken()));
         }
 
         private ValidatedGeneration validate(MaterializationPlan plan, Output output) throws Exception {
@@ -596,28 +954,102 @@ class M5MaterializationV1Test {
     private record Output(
             List<GenerationObject> payloadObjects, List<GenerationObject> indexObjects, DataReader reader) {}
 
-    private static final class DataReader implements MaterializationDataReader {
+    private static final class ReadOnlyObjectTransport implements ObjectProviderTransport {
+        private final String key;
+        private final CanonicalBytes body;
+        private final CanonicalBytes version;
+        private boolean allowCreate;
+        private int getCalls;
+        private int putCalls;
+        private CanonicalBytes createdBody;
+
+        private ReadOnlyObjectTransport(String key, CanonicalBytes body, CanonicalBytes version) {
+            this.key = key;
+            this.body = body;
+            this.version = version;
+        }
+
+        @Override
+        public ObjectProviderCapabilities capabilities() {
+            return new ObjectProviderCapabilities("test-provider", true, true, true, true, true, 1024 * 1024, 4096, 2);
+        }
+
+        @Override
+        public ConditionalCreateResult putIfAbsent(ObjectIdentity identity, InputStream value) throws IOException {
+            if (!allowCreate) {
+                throw new UnsupportedOperationException("read-only test transport");
+            }
+            putCalls++;
+            createdBody = CanonicalBytes.copyOf(value.readAllBytes());
+            return ConditionalCreateResult.CREATED;
+        }
+
+        @Override
+        public StreamingObject get(String requestedKey, Optional<CanonicalBytes> exactVersionToken) throws IOException {
+            getCalls++;
+            if (!key.equals(requestedKey)) {
+                throw new IOException("Object key is absent");
+            }
+            return new StreamingObject(
+                    body.length(),
+                    0,
+                    body.length(),
+                    Optional.of(version),
+                    new ByteArrayInputStream(body.toByteArray()));
+        }
+
+        @Override
+        public StreamingObject getRange(
+                String requestedKey,
+                long inclusiveStart,
+                long exclusiveEnd,
+                Optional<CanonicalBytes> exactVersionToken) {
+            throw new UnsupportedOperationException("read-only test transport");
+        }
+
+        @Override
+        public ListPage list(String prefix, Optional<CanonicalBytes> continuationToken, int maximumKeys) {
+            throw new UnsupportedOperationException("read-only test transport");
+        }
+    }
+
+    private static class DataReader implements MaterializationDataReader {
         private final Map<String, CanonicalBytes> objects;
         private final CanonicalBytes sourceBody;
         private final SourceExtent source;
+        private final Optional<CanonicalBytes> version;
+        private int objectReads;
+        private int sourceReads;
 
         private DataReader(Map<String, CanonicalBytes> objects, CanonicalBytes sourceBody, SourceExtent source) {
+            this(objects, sourceBody, source, Optional.of(bytes("provider-v2")));
+        }
+
+        private DataReader(
+                Map<String, CanonicalBytes> objects,
+                CanonicalBytes sourceBody,
+                SourceExtent source,
+                Optional<CanonicalBytes> version) {
             this.objects = Map.copyOf(objects);
             this.sourceBody = sourceBody;
             this.source = source;
+            this.version = version;
         }
 
         @Override
         public VerifiedObjectRead readObject(ObjectIdentity identity) {
+            objectReads++;
             CanonicalBytes body = objects.get(identity.key());
             if (body == null) {
                 throw new IllegalStateException("missing test Object");
             }
-            return new VerifiedObjectRead(body, Optional.of(bytes("provider-v2")));
+            return new VerifiedObjectRead(
+                    body, identity.key().equals(source.physicalKey()) ? version : Optional.of(bytes("provider-v2")));
         }
 
         @Override
         public CanonicalBytes readSource(SourceExtent expected) {
+            sourceReads++;
             assertThat(expected).isEqualTo(source);
             return sourceBody;
         }

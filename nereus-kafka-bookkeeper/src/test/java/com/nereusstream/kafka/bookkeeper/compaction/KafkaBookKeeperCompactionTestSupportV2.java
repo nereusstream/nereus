@@ -17,6 +17,22 @@ package com.nereusstream.kafka.bookkeeper.compaction;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaRecoveryCheckpointVectorV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaAssignedProtocolBatchV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentCommitCoordinatorV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaCommittedProducerStateV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaLeaderEpochIndexV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaProducerBatchResultV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaProducerSessionStateV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolBatchDeltaV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaSpeculativeCommitV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionBatchKindV1;
+import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionStateV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
+import com.nereusstream.kafka.bookkeeper.run.KafkaRunTestFixtures;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCapabilitySnapshotV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperDigestTypeV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperProtocolModeV1;
@@ -27,6 +43,7 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.ProviderKind;
 import com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -53,6 +70,14 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                     capabilityEvidence) {}
 
     static Input input(boolean empty, long attempt) {
+        return input(empty, attempt, Optional.empty());
+    }
+
+    static Input inputWithRecovery(KafkaCompactionRecoveryStateV1 state, long attempt) {
+        return input(false, attempt, Optional.of(state));
+    }
+
+    private static Input input(boolean empty, long attempt, Optional<KafkaCompactionRecoveryStateV1> state) {
         var bodies = empty
                 ? List.of(KafkaSemanticCompactorV1Test.emptyBatch(0, 1))
                 : List.of(
@@ -64,7 +89,7 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                 ? List.<KafkaCompactionRecordsV1.LatestKeyProof>of()
                 : List.of(new KafkaCompactionRecordsV1.LatestKeyProof(
                         CanonicalBytes.copyOf(new byte[] {1}), 1, true, true, false, 100));
-        return input(bodies, 0, empty ? 1 : 2, proofs, List.of(), attempt);
+        return input(bodies, 0, empty ? 1 : 2, proofs, List.of(), attempt, state);
     }
 
     static Input input(
@@ -74,7 +99,24 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
             List<KafkaCompactionRecordsV1.LatestKeyProof> proofs,
             List<KafkaCompactionRecordsV1.TransactionRange> transactions,
             long attempt) {
-        var fixture = new KafkaSemanticCompactorV1Test.Fixture(bodies, start, end);
+        return input(bodies, start, end, proofs, transactions, attempt, Optional.empty());
+    }
+
+    private static Input input(
+            List<CanonicalBytes> bodies,
+            long start,
+            long end,
+            List<KafkaCompactionRecordsV1.LatestKeyProof> proofs,
+            List<KafkaCompactionRecordsV1.TransactionRange> transactions,
+            long attempt,
+            Optional<KafkaCompactionRecoveryStateV1> state) {
+        var fixture = fixture(
+                bodies,
+                start,
+                end,
+                new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding(
+                        1, digest("capability")),
+                state);
         var initial = fixture.plan(proofs, transactions, List.of(), 100, CompressionType.NONE);
         var capabilityEvidence =
                 new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityEvidence(
@@ -98,21 +140,82 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                 1,
                 com.nereusstream.storage.object.read.control.M4ReadControlCodecV1.capabilityEvidenceSha256(
                         capabilityEvidence));
-        var plan = new KafkaSemanticCompactorV1Test.Fixture(bodies, start, end, admitted)
+        var plan = fixture(bodies, start, end, admitted, state)
                 .plan(proofs, transactions, List.of(), 100, CompressionType.NONE);
         var semantic = new KafkaSemanticCompactorV1().compileSemantic(plan);
-        var layout = KafkaBookKeeperCompactionLayoutV2.plan(
-                plan,
-                semantic,
-                new Namespace(
-                        ProviderKind.BOOKKEEPER,
-                        CanonicalUtf8.fromString("test-bk-incarnation"),
-                        CanonicalUtf8.fromString("test-ledgers-generation")),
-                capability(plan.sourceCut().identity().providerScopeSha256()),
-                attempt,
-                512,
-                1024);
+        var namespace = new Namespace(
+                ProviderKind.BOOKKEEPER,
+                CanonicalUtf8.fromString("test-bk-incarnation"),
+                CanonicalUtf8.fromString("test-ledgers-generation"));
+        var cap = capability(plan.sourceCut().identity().providerScopeSha256());
+        var layout = state.isPresent()
+                ? KafkaBookKeeperCompactionLayoutV2.plan(
+                        plan, semantic, state.orElseThrow(), namespace, cap, attempt, 64 * 1024, 256 * 1024)
+                : KafkaBookKeeperCompactionLayoutV2.plan(plan, semantic, namespace, cap, attempt, 512, 1024);
         return new Input(plan, semantic, layout, capabilityEvidence);
+    }
+
+    private static KafkaSemanticCompactorV1Test.Fixture fixture(
+            List<CanonicalBytes> bodies,
+            long start,
+            long end,
+            com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding capability,
+            Optional<KafkaCompactionRecoveryStateV1> state) {
+        if (state.isEmpty()) {
+            return new KafkaSemanticCompactorV1Test.Fixture(bodies, start, end, capability);
+        }
+        var fence = state.orElseThrow().sourceFence();
+        var binding = new BindingIdentity(
+                fence.bindingId(),
+                Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(fence.topicIncarnation())),
+                fence.storageEpochId().digest());
+        return new KafkaSemanticCompactorV1Test.Fixture(
+                bodies, start, end, capability, binding, state.orElseThrow().sourceCheckpointSha256());
+    }
+
+    /** Synthetic full-state fixture; no native source/owner qualification is implied by this data. */
+    static KafkaCompactionRecoveryStateV1 recoveryState(boolean large) {
+        var binding = KafkaRunTestFixtures.binding(6, 1, 1);
+        var fence = new KafkaPartitionFenceV1(
+                binding.bindingId(),
+                binding.topicIncarnation(),
+                binding.partitionId(),
+                1,
+                binding.storageEpochId(),
+                1,
+                1);
+        var data = new KafkaProtocolBatchDeltaV1(
+                1,
+                Optional.of(new KafkaBatchDuplicateIdentityV1(71, (short) 0, 0, 0)),
+                KafkaTransactionBatchKindV1.TRANSACTIONAL_DATA,
+                71,
+                -1);
+        var marker = KafkaProtocolBatchDeltaV1.marker(KafkaTransactionBatchKindV1.ABORT_MARKER, 71, (short) 0, 3);
+        var commit = new KafkaSpeculativeCommitV1(
+                0,
+                2,
+                fence,
+                List.of(new KafkaAssignedProtocolBatchV1(0, 1, data), new KafkaAssignedProtocolBatchV1(1, 2, marker)));
+        var producers = new java.util.TreeMap<>(
+                KafkaCommittedProducerStateV1.empty().apply(commit).producers());
+        if (large) {
+            for (long producerId = 1_000; producerId < 21_000; producerId++) {
+                var result = new KafkaProducerBatchResultV1(
+                        new KafkaBatchDuplicateIdentityV1(producerId, (short) 0, 0, 0), 0, 1, 12);
+                producers.put(
+                        producerId, KafkaProducerSessionStateV1.first(result).marker((short) 0, 3, 1, 12));
+            }
+        }
+        var checkpoint = new KafkaProtocolCheckpointStateV1(
+                new KafkaRecoveryCheckpointVectorV1(binding, 2, 2, 2, 2),
+                new KafkaCommittedProducerStateV1(producers),
+                KafkaTransactionStateV1.empty().apply(commit),
+                KafkaLeaderEpochIndexV1.empty().observe(1, 0));
+        return new KafkaCompactionRecoveryStateV1(
+                fence,
+                2,
+                KafkaCoherentCommitCoordinatorV1.recoveryCheckpointContentDigest(checkpoint),
+                checkpoint.components());
     }
 
     static Sha256Digest digest(String value) {

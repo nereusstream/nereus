@@ -2179,26 +2179,35 @@ link_docs=(
     "$repo_root/docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
 )
 
-while IFS=: read -r source match; do
-    target="${match#*](}"
-    target="${target%)}"
+check_local_link() {
+    local source="$1"
+    local target="$2"
     target="${target#<}"
     target="${target%>}"
     case "$target" in
-        ""|\#*|*://*|mailto:*|app://*) continue ;;
+        ""|\#*|*://*|mailto:*|app://*) return ;;
     esac
     target="${target%%#*}"
     target="${target//%20/ }"
     if [[ "$target" =~ ^(.+):[0-9]+$ ]]; then
         target="${BASH_REMATCH[1]}"
     fi
-    if [[ "$target" = /* ]]; then
-        resolved="$target"
-    else
-        resolved="$(dirname "$source")/$target"
-    fi
+    [[ "$target" != /* ]] || fail "non-portable absolute Markdown link in ${source#"$repo_root/"}: $target"
+    local resolved="$(dirname "$source")/$target"
     [[ -e "$resolved" ]] || fail "broken local Markdown link in ${source#"$repo_root/"}: $target"
+}
+
+while IFS=: read -r source match; do
+    target="${match#*](}"
+    target="${target%)}"
+    check_local_link "$source" "$target"
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
+
+while IFS=: read -r source match; do
+    target="${match#*]:}"
+    target="${target#"${target%%[![:space:]]*}"}"
+    check_local_link "$source" "$target"
+done < <(rg --with-filename --no-heading --glob '*.md' '^\[[^]]+\]:[[:space:]]+[^[:space:]]+' "${link_docs[@]}")
 
 legacy_layout_paths=(
     "$repo_root/CONTEXT-MAP.md"

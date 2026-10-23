@@ -62,12 +62,32 @@ import org.junit.jupiter.api.Timeout;
 class KafkaBookKeeperOxiaControlV2RealTest {
     @Test
     void multiLedgerPublicationAndFreshClientsRecoverOnlySelectedBkWithAllEightIndexes() throws Exception {
-        var input = KafkaBookKeeperCompactionTestSupportV2.input(false, 801);
+        recoverMultiLedgerOutput(Optional.empty());
+        recoverMultiLedgerOutput(Optional.of(KafkaBookKeeperCompactionTestSupportV2.recoveryState(true)));
+    }
+
+    private void recoverMultiLedgerOutput(Optional<KafkaCompactionRecoveryStateV1> recoveryState) throws Exception {
+        var input = recoveryState.isPresent()
+                ? KafkaBookKeeperCompactionTestSupportV2.inputWithRecovery(recoveryState.orElseThrow(), 806)
+                : KafkaBookKeeperCompactionTestSupportV2.input(false, 801);
         String root = NativeContext.root();
         Sha256Digest selected;
         try (var context = new NativeContext(input.layout().task(), root)) {
-            var descriptor = context.write(input);
-            assertThat(context.publish(input, descriptor)).isEqualTo(PublicationOutcome.APPLIED_EXACT);
+            var descriptor = context.write(input, recoveryState);
+            if (recoveryState.isPresent()) {
+                var state = recoveryState.orElseThrow();
+                assertThat(state.encode().length()).isGreaterThan(KafkaSealedBookKeeperDescriptorV2.MAX_ENCODED_BYTES);
+                assertThat(descriptor.encode().length())
+                        .isLessThan(KafkaSealedBookKeeperDescriptorV2.MAX_ENCODED_BYTES);
+                var locator = descriptor.recoveryStateLocator().orElseThrow();
+                assertThat(descriptor.sealedParts().size()).isGreaterThan(locator.firstPart() + 1);
+                assertThat(locator.artifactSha256()).isEqualTo(state.sha256());
+                System.out.println(
+                        "KBSD3_STATE_ARTIFACT bytes=" + state.encode().length()
+                                + " descriptorBytes=" + descriptor.encode().length() + " chunks=" + locator.chunkCount()
+                                + " parts=" + descriptor.sealedParts().size());
+            }
+            assertThat(context.publish(input, descriptor, recoveryState)).isEqualTo(PublicationOutcome.APPLIED_EXACT);
             selected = descriptor.descriptorSha256();
             assertThat(context.faults.selectorCas.get()).isEqualTo(1);
             var authority = context.onOwner(() -> M5BindingAuthorityCodecV1.decodeAuthority(context.route
@@ -82,6 +102,33 @@ class KafkaBookKeeperOxiaControlV2RealTest {
         try (var context = new NativeContext(input.layout().task(), root)) {
             var view = context.recover();
             assertThat(view.descriptor().descriptorSha256()).isEqualTo(selected);
+            assertThat(view.recoveryState()).isEqualTo(recoveryState);
+            recoveryState.ifPresent(state -> {
+                var restored = view.recoveryState().orElseThrow();
+                assertThat(restored.components()
+                                .producerState()
+                                .findDuplicate(
+                                        new com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1(
+                                                71, (short) 0, 0, 0)))
+                        .hasValueSatisfying(
+                                batch -> assertThat(batch.startOffset()).isZero());
+                assertThat(restored.components()
+                                .producerState()
+                                .producers()
+                                .get(71L)
+                                .coordinatorEpoch())
+                        .isEqualTo(3);
+                assertThat(restored.components()
+                                .producerState()
+                                .producers()
+                                .get(71L)
+                                .lastMarkerOffset())
+                        .isEqualTo(1);
+                assertThat(restored.components().transactionState().abortedTransactions())
+                        .hasSize(1);
+                assertThat(restored.components().leaderEpochIndex())
+                        .isEqualTo(state.components().leaderEpochIndex());
+            });
             assertThat(view.lookup(0).orElseThrow().coverage().inclusiveStart()).isEqualTo(1);
             assertThat(view.listOffset(2)).hasValue(1);
             assertThat(view.allowsPredecessorOffset(0)).isFalse();
@@ -137,16 +184,26 @@ class KafkaBookKeeperOxiaControlV2RealTest {
 
     @Test
     void missingNativeLedgerOrDescriptorCannotRecreateOutputOrUseObsoleteInput() throws Exception {
-        var input = KafkaBookKeeperCompactionTestSupportV2.input(false, 804);
+        rejectMissingOutput(Optional.empty());
+        rejectMissingOutput(Optional.of(KafkaBookKeeperCompactionTestSupportV2.recoveryState(false)));
+    }
+
+    private void rejectMissingOutput(Optional<KafkaCompactionRecoveryStateV1> recoveryState) throws Exception {
+        var input = recoveryState.isPresent()
+                ? KafkaBookKeeperCompactionTestSupportV2.inputWithRecovery(recoveryState.orElseThrow(), 807)
+                : KafkaBookKeeperCompactionTestSupportV2.input(false, 804);
         try (var context = new NativeContext(input.layout().task(), NativeContext.root())) {
-            var descriptor = context.write(input);
-            context.publish(input, descriptor);
+            var descriptor = context.write(input, recoveryState);
+            context.publish(input, descriptor, recoveryState);
             // Fault injection is limited to resources created in this unique fixture; no M5-D authority is implied.
             context.bk
                     .newDeleteLedgerOp()
                     .withLedgerId(descriptor
                             .sealedParts()
-                            .get(0)
+                            .get(descriptor
+                                    .recoveryStateLocator()
+                                    .map(value -> value.firstPart())
+                                    .orElse(0))
                             .handle()
                             .ledgerIdentity()
                             .ledgerId())
@@ -274,6 +331,13 @@ class KafkaBookKeeperOxiaControlV2RealTest {
         }
 
         KafkaSealedBookKeeperDescriptorV2 write(KafkaBookKeeperCompactionTestSupportV2.Input input) throws Exception {
+            return write(input, Optional.empty());
+        }
+
+        KafkaSealedBookKeeperDescriptorV2 write(
+                KafkaBookKeeperCompactionTestSupportV2.Input input,
+                Optional<KafkaCompactionRecoveryStateV1> recoveryState)
+                throws Exception {
             protections = onOwner(() -> KafkaBookKeeperCompactionTestSupportV2.installReadAuthority(store, input));
             var inspector = new M5BookKeeperDeleteAdapterV1(bk, task.capability(), new byte[0]);
             var parts = onOwner(() -> new KafkaBookKeeperCompactionWriterV2(
@@ -284,7 +348,10 @@ class KafkaBookKeeperOxiaControlV2RealTest {
                             .write(input.layout()))
                     .toCompletableFuture()
                     .get(60, TimeUnit.SECONDS);
-            return KafkaSealedBookKeeperDescriptorV2.create(input.plan(), input.semantic(), input.layout(), parts);
+            return recoveryState.isPresent()
+                    ? KafkaSealedBookKeeperDescriptorV2.create(
+                            input.plan(), input.semantic(), input.layout(), parts, recoveryState.orElseThrow())
+                    : KafkaSealedBookKeeperDescriptorV2.create(input.plan(), input.semantic(), input.layout(), parts);
         }
 
         private static com.nereusstream.storage.object.control.CanonicalControlMetadataStore ownerOnly(
@@ -326,7 +393,12 @@ class KafkaBookKeeperOxiaControlV2RealTest {
                             throw failure.getCause();
                         }
                     });
-            return new KafkaSealedBookKeeperReaderV2(readOnly, inspector::captureExactTarget, 1_000_000);
+            int admittedBytes = Math.toIntExact(Math.max(
+                    1_000_000,
+                    task.parts().stream()
+                            .mapToLong(KafkaBookKeeperInventoryV2.PartPlan::length)
+                            .sum()));
+            return new KafkaSealedBookKeeperReaderV2(readOnly, inspector::captureExactTarget, admittedBytes);
         }
 
         KafkaBookKeeperCompactionPublicationV2 publication() {
@@ -343,6 +415,26 @@ class KafkaBookKeeperOxiaControlV2RealTest {
                                     descriptor,
                                     protections,
                                     () -> new KafkaCompactionPublicationFenceV1().expected(input.plan())))
+                    .toCompletableFuture()
+                    .get(60, TimeUnit.SECONDS);
+        }
+
+        PublicationOutcome publish(
+                KafkaBookKeeperCompactionTestSupportV2.Input input,
+                KafkaSealedBookKeeperDescriptorV2 descriptor,
+                Optional<KafkaCompactionRecoveryStateV1> recoveryState)
+                throws Exception {
+            if (recoveryState.isEmpty()) {
+                return publish(input, descriptor);
+            }
+            return onOwner(() -> publication()
+                            .publish(
+                                    input.plan(),
+                                    input.semantic(),
+                                    descriptor,
+                                    protections,
+                                    () -> new KafkaCompactionPublicationFenceV1().expected(input.plan()),
+                                    recoveryState.orElseThrow()))
                     .toCompletableFuture()
                     .get(60, TimeUnit.SECONDS);
         }

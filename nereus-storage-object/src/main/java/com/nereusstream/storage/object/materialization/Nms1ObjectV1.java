@@ -55,6 +55,12 @@ public record Nms1ObjectV1(
         requireDigest(taskIdSha256, "taskIdSha256");
         requireDigest(outputIdentitySha256, "outputIdentitySha256");
         Objects.requireNonNull(coverage, "coverage");
+        if (coverage.typedPulsar()
+                && (payloadKind != PayloadKind.PULSAR_ENTRY_PRESERVING_V1
+                        || !identity.binding()
+                                .equals(coverage.pulsarCoverage().orElseThrow().binding()))) {
+            throw new IllegalArgumentException("Pulsar NMS1 payload kind/Binding differs from its coverage");
+        }
         if (partOrdinal < 0 || partCount <= 0 || partOrdinal >= partCount || partCount > 256) {
             throw new IllegalArgumentException("NMS1 part identity is outside its cap");
         }
@@ -71,15 +77,29 @@ public record Nms1ObjectV1(
         }
         if (extents.isEmpty()
                 || extents.size() > MAX_EXTENT_ROWS
-                || (payload.isEmpty() && payloadKind != PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1)) {
+                || (payload.isEmpty()
+                        && payloadKind != PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1
+                        && !coverage.typedPulsar())) {
             throw new IllegalArgumentException("NMS1 extent/payload section is empty or oversized");
         }
         if (indexes.size() > MAX_INDEX_SECTIONS) {
             throw new IllegalArgumentException("NMS1 index count is outside its cap");
         }
         requireSortedUniqueSources(sources);
+        if (coverage.typedPulsar() && sources.stream().anyMatch(value -> !coverage.contains(value.coverage()))) {
+            throw new IllegalArgumentException("Pulsar contribution belongs to another coverage context");
+        }
         requireExtentCoverage(coverage, extents, payload.length());
         requireSortedUniqueIndexes(indexes, coverage);
+        if (coverage.typedPulsar()) {
+            for (var section : indexes) {
+                var body = M5LookupIndexV1.decode(section.body());
+                if (!body.taskIdSha256().equals(taskIdSha256)
+                        || !body.outputIdentitySha256().equals(outputIdentitySha256)) {
+                    throw new IllegalArgumentException("Pulsar embedded index task/output identity differs");
+                }
+            }
+        }
     }
 
     public record SourceContribution(
@@ -105,7 +125,11 @@ public record Nms1ObjectV1(
             if (payloadOffset < 0 || payloadLength < 0 || recordCount < 0) {
                 throw new IllegalArgumentException("NMS1 extent payload range/count is invalid");
             }
-            if ((payloadLength == 0) != (recordCount == 0)) {
+            if (coverage.typedPulsar()) {
+                if (coverage.entryCount() != 1 || recordCount != 1 || protocolFlags != 0) {
+                    throw new IllegalArgumentException("Pulsar extent must preserve exactly one original entry");
+                }
+            } else if ((payloadLength == 0) != (recordCount == 0)) {
                 throw new IllegalArgumentException("NMS1 gap extent must have zero bytes and zero records");
             }
             if (recordCount == 0 && (minimumTimestamp != -1 || maximumTimestamp != -1)) {
@@ -130,7 +154,7 @@ public record Nms1ObjectV1(
         public IndexSection {
             Objects.requireNonNull(kind, "kind");
             Objects.requireNonNull(coverage, "coverage");
-            if (parserVersion != 1) {
+            if (parserVersion != (coverage.typedPulsar() ? 2 : 1)) {
                 throw new IllegalArgumentException("NMS1 index parser version is unsupported");
             }
             body = CanonicalBytes.copyOf(Objects.requireNonNull(body, "body").toByteArray());
@@ -141,13 +165,21 @@ public record Nms1ObjectV1(
             if (!Sha256Digest.hash(body).equals(bodySha256)) {
                 throw new IllegalArgumentException("NMS1 index body digest differs");
             }
+            if (coverage.typedPulsar()) {
+                var decoded = M5LookupIndexV1.decode(body);
+                if (!decoded.coverage().typedPulsar()
+                        || decoded.kind() != kind
+                        || !decoded.coverage().equals(coverage)) {
+                    throw new IllegalArgumentException("Pulsar embedded index body version/kind/chain differs");
+                }
+            }
         }
     }
 
     private static void requireSortedUniqueSources(List<SourceContribution> values) {
         Comparator<SourceContribution> comparator = Comparator.comparing((SourceContribution value) ->
                         value.sourceIdentitySha256().toHex())
-                .thenComparingLong(value -> value.coverage().inclusiveStart());
+                .thenComparing((left, right) -> left.coverage().compareStart(right.coverage()));
         if (!values.equals(values.stream().sorted(comparator).toList())
                 || values.stream()
                                 .map(SourceContribution::sourceIdentitySha256)
@@ -159,8 +191,8 @@ public record Nms1ObjectV1(
     }
 
     private static void requireExtentCoverage(ProtocolCoverage coverage, List<ExtentRow> values, int payloadLength) {
-        if (values.get(0).coverage().inclusiveStart() != coverage.inclusiveStart()
-                || values.get(values.size() - 1).coverage().exclusiveEnd() != coverage.exclusiveEnd()) {
+        if (!values.get(0).coverage().sameStart(coverage)
+                || !values.get(values.size() - 1).coverage().sameEnd(coverage)) {
             throw new IllegalArgumentException("NMS1 extents do not cover the part");
         }
         int expectedOffset = 0;

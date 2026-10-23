@@ -76,6 +76,20 @@ public record M5BookKeeperNativeCreateSpecV2(
         return new M5BookKeeperNativeCreateSpecV2(nativeInstanceId, taskId, sorted);
     }
 
+    /** Derives one later run from the fixed initial owner scope, regardless of intermediate failed reservations. */
+    public static M5BookKeeperNativeCreateSpecV2 laterRun(
+            M5BookKeeperNativeCreateSpecV2 initial, RunLedgerConfigurationV1 configuration) {
+        Objects.requireNonNull(initial, "initial");
+        Objects.requireNonNull(configuration, "configuration");
+        return of(
+                initial.nativeInstanceId(),
+                Sha256Digest.hash(CanonicalBytes.copyOf(
+                        ("M5-NATIVE-RUN/" + initial.taskId().toHex() + "/"
+                                        + configuration.runId().value().toHex())
+                                .getBytes(java.nio.charset.StandardCharsets.US_ASCII))),
+                List.of(configuration));
+    }
+
     public Namespace namespace() {
         return namespace(nativeInstanceId);
     }

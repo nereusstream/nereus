@@ -28,11 +28,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
-/** Strict bounded KBSD2 descriptor codec; task and part identities use their existing independent domains. */
+/** Strict bounded KBSD2/KBSD3 codec; only KBSD3 carries an independent physical protocol-state locator. */
 public final class KafkaSealedBookKeeperDescriptorCodecV2 {
     private static final int MAGIC = 0x4b425344;
-    private static final byte[] KIND = KafkaSealedBookKeeperDescriptorV2.KIND.getBytes(StandardCharsets.US_ASCII);
 
     private KafkaSealedBookKeeperDescriptorCodecV2() {}
 
@@ -41,8 +41,8 @@ public final class KafkaSealedBookKeeperDescriptorCodecV2 {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             try (DataOutputStream output = new DataOutputStream(bytes)) {
                 output.writeInt(MAGIC);
-                output.writeShort(2);
-                output.write(KIND);
+                output.writeShort(descriptor.wireVersion());
+                output.write(descriptor.kind().getBytes(StandardCharsets.US_ASCII));
                 CanonicalBytes task = KafkaBookKeeperInventoryCodecV2.encodeTask(descriptor.task());
                 output.writeInt(task.length());
                 output.write(task.toByteArray());
@@ -74,11 +74,10 @@ public final class KafkaSealedBookKeeperDescriptorCodecV2 {
                 }
                 output.writeInt(descriptor.indexes().size());
                 for (var locator : descriptor.indexes()) {
-                    output.writeInt(locator.firstPart());
-                    output.writeInt(locator.firstEntry());
-                    output.writeInt(locator.chunkCount());
-                    output.writeInt(locator.artifactLength());
-                    digest(output, locator.artifactSha256());
+                    locator(output, locator);
+                }
+                if (descriptor.recoveryStateLocator().isPresent()) {
+                    locator(output, descriptor.recoveryStateLocator().orElseThrow());
                 }
             }
             if (bytes.size() > KafkaSealedBookKeeperDescriptorV2.MAX_ENCODED_BYTES) {
@@ -95,9 +94,17 @@ public final class KafkaSealedBookKeeperDescriptorCodecV2 {
             throw new IllegalArgumentException("sealed BK descriptor exceeds its encoded bound");
         }
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
-            if (input.readInt() != MAGIC
-                    || input.readUnsignedShort() != 2
-                    || !java.util.Arrays.equals(input.readNBytes(KIND.length), KIND)) {
+            if (input.readInt() != MAGIC) {
+                throw new IllegalArgumentException("sealed BK descriptor preamble or kind differs");
+            }
+            int version = input.readUnsignedShort();
+            byte[] kind =
+                    switch (version) {
+                        case 2 -> KafkaSealedBookKeeperDescriptorV2.KIND.getBytes(StandardCharsets.US_ASCII);
+                        case 3 -> KafkaSealedBookKeeperDescriptorV2.RECOVERY_KIND.getBytes(StandardCharsets.US_ASCII);
+                        default -> throw new IllegalArgumentException("sealed BK descriptor preamble or kind differs");
+                    };
+            if (!java.util.Arrays.equals(input.readNBytes(kind.length), kind)) {
                 throw new IllegalArgumentException("sealed BK descriptor preamble or kind differs");
             }
             int length = input.readInt();
@@ -154,11 +161,12 @@ public final class KafkaSealedBookKeeperDescriptorCodecV2 {
             }
             List<KafkaSealedBookKeeperDescriptorV2.IndexLocator> indexes = new ArrayList<>(8);
             for (int ordinal = 0; ordinal < 8; ordinal++) {
-                indexes.add(new KafkaSealedBookKeeperDescriptorV2.IndexLocator(
-                        input.readInt(), input.readInt(), input.readInt(), input.readInt(), digest(input)));
+                indexes.add(locator(input));
             }
+            Optional<KafkaSealedBookKeeperDescriptorV2.IndexLocator> recovery =
+                    version == 3 ? Optional.of(locator(input)) : Optional.empty();
             var descriptor = new KafkaSealedBookKeeperDescriptorV2(
-                    task, generation, batches, disposition, gaps, proof, seals, indexes);
+                    task, generation, batches, disposition, gaps, proof, seals, indexes, recovery);
             if (input.available() != 0 || !encode(descriptor).equals(bytes)) {
                 throw new IllegalArgumentException("sealed BK descriptor is noncanonical or has trailing bytes");
             }
@@ -171,6 +179,20 @@ public final class KafkaSealedBookKeeperDescriptorCodecV2 {
     private static void digest(DataOutputStream output, Sha256Digest value) throws IOException {
         KafkaBookKeeperInventoryV2.requireDigest(value);
         output.write(value.bytes().toByteArray());
+    }
+
+    private static void locator(DataOutputStream output, KafkaSealedBookKeeperDescriptorV2.IndexLocator locator)
+            throws IOException {
+        output.writeInt(locator.firstPart());
+        output.writeInt(locator.firstEntry());
+        output.writeInt(locator.chunkCount());
+        output.writeInt(locator.artifactLength());
+        digest(output, locator.artifactSha256());
+    }
+
+    private static KafkaSealedBookKeeperDescriptorV2.IndexLocator locator(DataInputStream input) throws IOException {
+        return new KafkaSealedBookKeeperDescriptorV2.IndexLocator(
+                input.readInt(), input.readInt(), input.readInt(), input.readInt(), digest(input));
     }
 
     private static Sha256Digest digest(DataInputStream input) throws IOException {

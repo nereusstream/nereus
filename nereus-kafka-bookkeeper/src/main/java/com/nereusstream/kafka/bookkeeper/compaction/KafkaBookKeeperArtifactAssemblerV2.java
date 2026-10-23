@@ -26,14 +26,28 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** Reassembles ordered BK chunks with exact artifact boundaries; used both before publication and after restart. */
 final class KafkaBookKeeperArtifactAssemblerV2 {
-    record Artifacts(List<CanonicalBytes> batches, List<CanonicalBytes> indexes, List<IndexLocator> indexLocators) {
+    record DataLocator(int firstPart, int firstEntry) {}
+
+    record Artifacts(
+            List<CanonicalBytes> batches,
+            List<CanonicalBytes> indexes,
+            List<DataLocator> dataLocators,
+            List<IndexLocator> indexLocators,
+            Optional<CanonicalBytes> recoveryState,
+            Optional<IndexLocator> recoveryStateLocator) {
         Artifacts {
             batches = List.copyOf(batches);
             indexes = List.copyOf(indexes);
+            dataLocators = List.copyOf(dataLocators);
             indexLocators = List.copyOf(indexLocators);
+            if (dataLocators.size() != batches.size()
+                    || recoveryState.isPresent() != recoveryStateLocator.isPresent()) {
+                throw new IllegalArgumentException("BK data locator count differs from recovered batches");
+            }
         }
     }
 
@@ -45,12 +59,15 @@ final class KafkaBookKeeperArtifactAssemblerV2 {
         }
         List<CanonicalBytes> batches = new ArrayList<>();
         List<CanonicalBytes> indexes = new ArrayList<>();
+        List<DataLocator> dataLocators = new ArrayList<>();
         List<IndexLocator> locators = new ArrayList<>();
+        List<CanonicalBytes> recovery = new ArrayList<>();
+        IndexLocator recoveryLocator = null;
         ByteArrayOutputStream body = null;
         Chunk first = null;
         IndexLocator locator = null;
         int nextChunk = 0;
-        boolean indexPhase = false;
+        int phase = 0;
         for (int ordinal = 0; ordinal < parts.size(); ordinal++) {
             PartBody part = parts.get(ordinal);
             for (int entry = 0; entry < part.entries().size(); entry++) {
@@ -59,12 +76,13 @@ final class KafkaBookKeeperArtifactAssemblerV2 {
                 if (chunk.kind() != part.kind() || !chunk.semanticOutputSha256().equals(task.semanticOutputSha256())) {
                     throw new IllegalArgumentException("BK artifact chunk differs from its exact task or part kind");
                 }
-                if (chunk.kind() == PartKind.INDEX) {
-                    indexPhase = true;
-                } else if (indexPhase) {
-                    throw new IllegalArgumentException("BK data artifacts follow index artifacts");
+                int chunkPhase = chunk.recoveryState() ? 2 : chunk.kind() == PartKind.INDEX ? 1 : 0;
+                if (chunkPhase < phase || (chunk.recoveryState() && indexes.size() != 8)) {
+                    throw new IllegalArgumentException("BK artifacts differ from data/index/recovery order");
                 }
-                List<CanonicalBytes> target = chunk.kind() == PartKind.DATA ? batches : indexes;
+                phase = chunkPhase;
+                List<CanonicalBytes> target =
+                        chunk.recoveryState() ? recovery : chunk.kind() == PartKind.DATA ? batches : indexes;
                 if (body == null) {
                     if (chunk.chunkOrdinal() != 0 || chunk.artifactOrdinal() != target.size()) {
                         throw new IllegalArgumentException(
@@ -77,8 +95,12 @@ final class KafkaBookKeeperArtifactAssemblerV2 {
                             ? new IndexLocator(
                                     ordinal, entry, chunk.chunkCount(), chunk.artifactLength(), chunk.artifactSha256())
                             : null;
+                    if (chunk.kind() == PartKind.DATA) {
+                        dataLocators.add(new DataLocator(ordinal, entry));
+                    }
                 }
                 if (chunk.kind() != first.kind()
+                        || chunk.recoveryState() != first.recoveryState()
                         || chunk.artifactOrdinal() != first.artifactOrdinal()
                         || chunk.chunkOrdinal() != nextChunk
                         || chunk.chunkCount() != first.chunkCount()
@@ -97,7 +119,11 @@ final class KafkaBookKeeperArtifactAssemblerV2 {
                     }
                     target.add(value);
                     if (locator != null) {
-                        locators.add(locator);
+                        if (first.recoveryState()) {
+                            recoveryLocator = locator;
+                        } else {
+                            locators.add(locator);
+                        }
                     }
                     body = null;
                 }
@@ -106,7 +132,13 @@ final class KafkaBookKeeperArtifactAssemblerV2 {
         if (body != null || indexes.size() != 8) {
             throw new IllegalArgumentException("BK artifacts end with incomplete chunks or indexes");
         }
-        return new Artifacts(batches, indexes, locators);
+        return new Artifacts(
+                batches,
+                indexes,
+                dataLocators,
+                locators,
+                recovery.stream().findFirst(),
+                Optional.ofNullable(recoveryLocator));
     }
 
     static Sha256Digest gapRoot(List<Gap> gaps) {

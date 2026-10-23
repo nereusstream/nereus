@@ -106,11 +106,135 @@ import java.util.zip.CRC32C;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class StorageObjectNwkcp1BackendV1Test {
+public class StorageObjectNwkcp1BackendV1Test {
     private static final String ROOT_PREFIX = "scope/cells/01/shards/0007/runs/0000000000000000001";
 
     @TempDir
     Path tempDirectory;
+
+    @Test
+    void originalHeadReadPinsSessionUntilNativeCallFinishes() throws Exception {
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var delegate = new ExactMetadata();
+        CanonicalControlMetadataStore held = new CanonicalControlMetadataStore() {
+            @Override
+            public Optional<CanonicalBytes> get(String key) {
+                if (key.endsWith("/protocol/kafka/nwkcp1-v1/head")) {
+                    entered.countDown();
+                    try {
+                        if (!release.await(15, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("held Head read timed out");
+                        }
+                    } catch (InterruptedException failure) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(failure);
+                    }
+                }
+                return delegate.get(key);
+            }
+
+            @Override
+            public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes value) {
+                return delegate.putIfAbsent(key, value);
+            }
+
+            @Override
+            public ControlMutationOutcome compareAndSet(
+                    String key, Optional<CanonicalBytes> expected, CanonicalBytes value) {
+                return delegate.compareAndSet(key, expected, value);
+            }
+        };
+        var session = metadataSession(held);
+        var backend = new StorageObjectNwkcp1BackendV1(session, held, ROOT_PREFIX);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var original = executor.submit(() -> backend.readHead(backend.protocolHeadKey(ROOT_PREFIX))
+                    .toCompletableFuture()
+                    .join());
+            assertThat(entered.await(15, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(session::close).hasMessageContaining("retains Provider operations");
+            release.countDown();
+            assertThat(original.get(15, TimeUnit.SECONDS)).isEmpty();
+            session.close();
+            assertThat(session.state()).isEqualTo(WalRunObjectSession.State.CLOSED);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+            session.close();
+        }
+    }
+
+    @Test
+    void unknownHeadCasRetainsExactCandidateAndSessionThroughFailedObservation() {
+        var metadata = new ExactMetadata();
+        var session = metadataSession(metadata);
+        var backend = new StorageObjectNwkcp1BackendV1(session, metadata, ROOT_PREFIX);
+        var context = new KafkaNwkcp1WalRunContextV1(session.rootSha256(), ObjectKafkaTestFixtures.runBinding());
+        var store = new ObjectKafkaProtocolCheckpointStoreV1(ROOT_PREFIX, context, 9, backend);
+        metadata.unknownNextCas = true;
+        metadata.failHeadReadAfterUnknown = true;
+        metadata.suppressNextCas = true;
+        assertThatThrownBy(() -> store.publish(ObjectKafkaTestFixtures.checkpoint(100))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("Head read unavailable after UNKNOWN");
+        assertThatThrownBy(session::close).hasMessageContaining("retains Provider operations");
+        assertThatThrownBy(() -> store.publish(ObjectKafkaTestFixtures.checkpoint(101)))
+                .hasMessageContaining("original unresolved Head CAS");
+        assertThat(store.currentHead().toCompletableFuture().join()).isEmpty();
+        assertThatThrownBy(session::close).hasMessageContaining("retains Provider operations");
+        assertThat(backend.reconcilePendingHeadCas().toCompletableFuture().join())
+                .isEqualTo(Nwkcp1BackendV1.CasDisposition.APPLIED);
+        assertThat(store.currentHead().toCompletableFuture().join()).isPresent();
+        assertThatThrownBy(() -> store.takeover(10)).hasMessageContaining("does not accept new work");
+        session.close();
+        assertThat(session.state()).isEqualTo(WalRunObjectSession.State.CLOSED);
+    }
+
+    @Test
+    void budgetRejectionBeforeFirstHeadDispatchDoesNotRetainUnknownPin() {
+        var metadata = new ExactMetadata();
+        var session = metadataSession(metadata);
+        var backend = new StorageObjectNwkcp1BackendV1(session, metadata, ROOT_PREFIX);
+        var state = ObjectKafkaTestFixtures.checkpoint(100);
+        var encoded = Nwkcp1CodecV1.encode(ROOT_PREFIX, new Nwkcp1ObjectV1(session.rootSha256(), List.of(state)));
+        var head = KafkaProtocolCheckpointHeadV1.open(
+                session.rootSha256(), 9, null, encoded, List.of(KafkaCheckpointCoverageV1.from(state.vector())));
+        var candidate = KafkaProtocolCheckpointHeadCodecV1.encode(ROOT_PREFIX, session.rootSha256(), head);
+        long remaining = session.rootRecord().recoveryEnvelope().maxCanonicalBodyBytes()
+                - session.recoverySnapshot().canonicalBodyBytes();
+        session.chargeRecoveryControlMetadata(remaining);
+        assertThatThrownBy(() -> backend.compareAndSetHead(
+                                backend.protocolHeadKey(ROOT_PREFIX), Optional.empty(), candidate)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(
+                        com.nereusstream.storage.object.recovery.RecoveryEnvelopeExceededException.class);
+        assertThat(metadata.get(backend.protocolHeadKey(ROOT_PREFIX))).isEmpty();
+        session.close();
+        assertThat(session.state()).isEqualTo(WalRunObjectSession.State.CLOSED);
+    }
+
+    private static WalRunObjectSession metadataSession(CanonicalControlMetadataStore metadata) {
+        var root = root();
+        var fresh = new WalRunLifecycleManager(metadata)
+                .createRootAndInitializePointer(WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch()), root);
+        return WalRunObjectSession.openNew(
+                fresh.ownerAuthority().orElseThrow(),
+                new C1ObjectProviderSession(
+                        new FakeTransport(),
+                        root.providerScopeId(),
+                        root.providerConfiguration().exclusiveNamespacePrefix(),
+                        root.providerConfiguration().maxObjectBodyBytes(),
+                        root.nwg1AdmissionCaps().maxDirectoryPrefixBytes()),
+                new KmsCellSession(
+                        new FakeKmsTransport(), root.providerScopeId(), "kms/cell-a", 2, new SecureRandom(new byte[] {
+                            1, 2, 3
+                        })),
+                () -> 0);
+    }
 
     @Test
     void rejectsSyntacticallyValidUnissuedCreatedAndHeadSelectedTokensBeforeProviderIo() {
@@ -307,10 +431,10 @@ class StorageObjectNwkcp1BackendV1Test {
         assertThatThrownBy(() -> store.publish(ObjectKafkaTestFixtures.checkpoint(101))
                         .toCompletableFuture()
                         .join())
-                .hasRootCauseMessage("checkpoint Head is terminal or publisher-fenced");
+                .hasMessageContaining("does not accept new work");
         assertThat(transport.objects).hasSize(objectsAtTerminal);
         assertThatThrownBy(() -> store.takeover(10).toCompletableFuture().join())
-                .hasRootCauseMessage("only an OPEN checkpoint Head permits an advancing takeover");
+                .hasMessageContaining("does not accept new work");
 
         String pointerKey = WalRunControlKeys.pointerKey(7);
         var currentPointer = new CurrentWalRunPointer(rootReference);
@@ -1616,7 +1740,7 @@ class StorageObjectNwkcp1BackendV1Test {
         }
     }
 
-    static WalRunRootRecord root() {
+    public static WalRunRootRecord root() {
         return root(new WalCheckpointPolicy(0, 16, 1024 * 1024, 5_000, 16, 8192));
     }
 
@@ -1714,10 +1838,17 @@ class StorageObjectNwkcp1BackendV1Test {
         private final Map<String, CanonicalBytes> values = new HashMap<>();
         private final Map<String, Integer> getCounts = new HashMap<>();
         private boolean unknownNextCas;
+        private boolean suppressNextCas;
+        private boolean failHeadReadAfterUnknown;
+        private boolean failNextHeadRead;
         private boolean failNextCas;
 
         @Override
         public synchronized Optional<CanonicalBytes> get(String key) {
+            if (failNextHeadRead && key.endsWith("/protocol/kafka/nwkcp1-v1/head")) {
+                failNextHeadRead = false;
+                throw new IllegalStateException("Head read unavailable after UNKNOWN");
+            }
             getCounts.merge(key, 1, Integer::sum);
             return Optional.ofNullable(values.get(key));
         }
@@ -1752,9 +1883,13 @@ class StorageObjectNwkcp1BackendV1Test {
             if (!matches) {
                 return ControlMutationOutcome.DEFINITIVE_CONFLICT;
             }
-            values.put(key, exactCandidate);
+            if (!suppressNextCas) {
+                values.put(key, exactCandidate);
+            }
+            suppressNextCas = false;
             if (unknownNextCas && !key.contains("/authorize/")) {
                 unknownNextCas = false;
+                failNextHeadRead = failHeadReadAfterUnknown;
                 return ControlMutationOutcome.RESPONSE_UNKNOWN;
             }
             return ControlMutationOutcome.APPLIED;

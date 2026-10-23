@@ -27,6 +27,7 @@ import com.nereusstream.storage.object.control.WalCheckpointHeadV1;
 import com.nereusstream.storage.object.control.WalRunControlCodec;
 import com.nereusstream.storage.object.control.WalRunControlKeys;
 import com.nereusstream.storage.object.control.WalRunPredecessor;
+import com.nereusstream.storage.object.control.WalRunRecoveryRetirementVerifierV1;
 import com.nereusstream.storage.object.control.WalRunReference;
 import com.nereusstream.storage.object.control.WalRunRootRecord;
 import com.nereusstream.storage.object.control.WalRunSealRecord;
@@ -45,6 +46,7 @@ public final class WalRunLineageRecovery {
     private static final int MAX_BOOTSTRAP_CONTROL_BYTES = 1024 * 1024;
 
     private final CanonicalControlMetadataStore metadata;
+    private final WalRunRecoveryRetirementVerifierV1 retirementVerifier;
     private final TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier;
     private final TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1
             protocolObjectReaderFactory;
@@ -68,7 +70,20 @@ public final class WalRunLineageRecovery {
             CanonicalControlMetadataStore metadata,
             TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier,
             TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1 protocolObjectReaderFactory) {
+        this(
+                metadata,
+                protocolCheckpointVerifier,
+                protocolObjectReaderFactory,
+                WalRunRecoveryRetirementVerifierV1.retainAll());
+    }
+
+    public WalRunLineageRecovery(
+            CanonicalControlMetadataStore metadata,
+            TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier,
+            TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1 protocolObjectReaderFactory,
+            WalRunRecoveryRetirementVerifierV1 retirementVerifier) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
+        this.retirementVerifier = Objects.requireNonNull(retirementVerifier, "retirementVerifier");
         this.protocolCheckpointVerifier =
                 Objects.requireNonNull(protocolCheckpointVerifier, "protocolCheckpointVerifier");
         this.protocolObjectReaderFactory =
@@ -136,7 +151,7 @@ public final class WalRunLineageRecovery {
             }
             lineage.add(new RecoveredRun(current, root, Optional.empty()));
             if (retirementFrontier.isPresent() && current.equals(retirementFrontier.orElseThrow())) {
-                return new RecoveredLineage(currentRoot, rootSha256(currentRoot), lineage, budget);
+                throw new IllegalStateException("retirement frontier lacks a verified persisted prefix certificate");
             }
             if (root.predecessor().isEmpty()) {
                 if (retirementFrontier.isPresent()) {
@@ -144,13 +159,20 @@ public final class WalRunLineageRecovery {
                 }
                 return new RecoveredLineage(currentRoot, rootSha256(currentRoot), lineage, budget);
             }
-            if (predecessorDepth >= rootBound) {
-                throw new RecoveryEnvelopeExceededException("Root maxRecoverablePredecessorRuns");
-            }
             WalRunPredecessor predecessor = root.predecessor().orElseThrow();
             if (predecessor.root().shardId() != pointer.current().shardId()
                     || predecessor.root().shardRunEpoch() >= current.shardRunEpoch()) {
                 throw new IllegalStateException("WalRun lineage fork or non-decreasing predecessor epoch");
+            }
+            if (retirementVerifier.isRetiredPrefix(predecessor, root, budget)) {
+                if (retirementFrontier.isPresent()
+                        && !retirementFrontier.orElseThrow().equals(predecessor.root())) {
+                    throw new IllegalStateException("retirement frontier differs from the verified prefix boundary");
+                }
+                return new RecoveredLineage(currentRoot, rootSha256(currentRoot), lineage, budget);
+            }
+            if (predecessorDepth >= rootBound) {
+                throw new RecoveryEnvelopeExceededException("Root maxRecoverablePredecessorRuns");
             }
             budget.chargeControlMetadata(MAX_BOOTSTRAP_CONTROL_BYTES);
             CanonicalBytes sealBytes = requiredCappedControl(predecessor.sealKey(), "WalRun Seal");

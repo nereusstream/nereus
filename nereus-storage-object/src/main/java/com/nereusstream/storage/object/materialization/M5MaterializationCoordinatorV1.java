@@ -48,7 +48,7 @@ public final class M5MaterializationCoordinatorV1 {
         this.m4 = new M4ReadControlCoordinatorV1(metadata, shardId, binding);
     }
 
-    /** Creates immutable source cut and PLANNED task. Unknown outcomes are reconciled by exact reread. */
+    /** Creates the immutable cut/full plan before the PLANNED task. UNKNOWN requires exact original reread. */
     public PublicationOutcome register(MaterializationPlan plan) {
         requireBinding(plan);
         CanonicalBytes cutBytes = M5MaterializationCodecV1.encodeSourceCut(plan.sourceCut());
@@ -65,6 +65,11 @@ public final class M5MaterializationCoordinatorV1 {
         if (cut != PublicationOutcome.APPLIED_EXACT && cut != PublicationOutcome.EXISTING_EXACT) {
             return cut;
         }
+        PublicationOutcome fullPlan =
+                reconcileCreate(keys.plan(plan.taskIdSha256()), M5MaterializationCodecV1.encodePlan(plan));
+        if (!success(fullPlan)) {
+            return fullPlan;
+        }
         return reconcileCreate(keys.task(plan.taskIdSha256()), M5MaterializationCodecV1.encodeTask(planned));
     }
 
@@ -79,6 +84,9 @@ public final class M5MaterializationCoordinatorV1 {
         requireBinding(plan);
         Objects.requireNonNull(validated, "validated");
         Objects.requireNonNull(exactFallbackSources, "exactFallbackSources");
+        if (!readPlan(plan.taskIdSha256()).filter(plan::equals).isPresent()) {
+            return PublicationOutcome.CONFLICT;
+        }
         Sha256Digest fallbackSet =
                 M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), exactFallbackSources);
         requireValidatedIdentity(plan, validated, fallbackSet);
@@ -162,6 +170,106 @@ public final class M5MaterializationCoordinatorV1 {
         return metadata.get(keys.task(taskId)).map(M5MaterializationCodecV1::decodeTask);
     }
 
+    public PublicationOutcome registerPendingOutputs(MaterializationPlan plan, M5PendingOutputInventoryV2 original) {
+        requirePendingPlan(plan, original);
+        if (original.state() != M5PendingOutputInventoryV2.State.PREPARED) {
+            throw new IllegalArgumentException("pending inventory installation requires the original prepared body");
+        }
+        return reconcileCreate(keys.pendingOutputs(plan.taskIdSha256()), original.encode());
+    }
+
+    public Optional<M5PendingOutputInventoryV2> readPendingOutputs(Sha256Digest taskId) {
+        return metadata.get(keys.pendingOutputs(taskId)).map(M5PendingOutputInventoryV2::decode);
+    }
+
+    /** Caller owns the stopped original actor and proves no create was dispatched. Never a physical absence proof. */
+    public PublicationOutcome cancelUnstartedOutputs(MaterializationPlan plan, M5PendingOutputInventoryV2 original) {
+        requirePendingPlan(plan, original);
+        return reconcileTransition(
+                keys.pendingOutputs(plan.taskIdSha256()),
+                original.encode(),
+                original.cancelUnstarted().encode());
+    }
+
+    private void requirePendingPlan(MaterializationPlan plan, M5PendingOutputInventoryV2 original) {
+        requireBinding(plan);
+        original.requirePlan(plan);
+        if (!readPlan(plan.taskIdSha256()).filter(plan::equals).isPresent()) {
+            throw new IllegalArgumentException("pending inventory requires its complete stored original plan");
+        }
+    }
+
+    /** Caller must have stopped its original unstarted actor. This terminal never proves output cleanup. */
+    public PublicationOutcome cancelUnstarted(MaterializationPlan plan) {
+        requireBinding(plan);
+        if (!readPlan(plan.taskIdSha256()).filter(plan::equals).isPresent()) {
+            return PublicationOutcome.CONFLICT;
+        }
+        var planned = new MaterializationTask(
+                plan.taskIdSha256(),
+                TaskState.PLANNED,
+                M5MaterializationCodecV1.sourceCutSha256(plan.sourceCut()),
+                plan.outputIdentitySha256(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
+        var cancelled = new MaterializationTask(
+                plan.taskIdSha256(),
+                TaskState.CANCELLED_STALE,
+                planned.sourceCutSha256(),
+                planned.outputIdentitySha256(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
+        return reconcileTaskTransition(planned, cancelled);
+    }
+
+    /** Caller resolves every original selector attempt before quarantining stopped, unselected output work. */
+    public PublicationOutcome quarantineUnpublished(MaterializationPlan plan) {
+        requireBinding(plan);
+        if (!readPlan(plan.taskIdSha256()).filter(plan::equals).isPresent()) {
+            return PublicationOutcome.CONFLICT;
+        }
+        var original = readTask(plan.taskIdSha256());
+        if (original.isEmpty()
+                || original.orElseThrow().state() != TaskState.PLANNED
+                        && original.orElseThrow().state() != TaskState.OUTPUT_VERIFIED
+                        && original.orElseThrow().state() != TaskState.QUARANTINED) {
+            return PublicationOutcome.CONFLICT;
+        }
+        var before = original.orElseThrow();
+        if (before.state() == TaskState.OUTPUT_VERIFIED) {
+            var selector = m4.readSelector();
+            if (selector.isEmpty()) {
+                return PublicationOutcome.OUTCOME_UNKNOWN;
+            }
+            if (before.manifestViewSha256()
+                    .equals(Optional.of(selector.orElseThrow().selectedViewSha256()))) {
+                return PublicationOutcome.CONFLICT;
+            }
+        }
+        var terminal = new MaterializationTask(
+                before.taskIdSha256(),
+                TaskState.QUARANTINED,
+                before.sourceCutSha256(),
+                before.outputIdentitySha256(),
+                before.validationRootSha256(),
+                before.generationSha256(),
+                before.manifestViewSha256());
+        return before.equals(terminal) ? PublicationOutcome.EXISTING_EXACT : reconcileTaskTransition(before, terminal);
+    }
+
+    public Optional<MaterializationPlan> readPlan(Sha256Digest taskId) {
+        var plan = metadata.get(keys.plan(taskId)).map(M5MaterializationCodecV1::decodePlan);
+        plan.ifPresent(value -> {
+            requireBinding(value);
+            if (!value.taskIdSha256().equals(taskId)) {
+                throw new IllegalStateException("Stored materialization plan belongs to a different task");
+            }
+        });
+        return plan;
+    }
+
     private PublicationOutcome publishSelector(
             MaterializationPlan plan,
             Sha256Digest manifestSha,
@@ -202,9 +310,14 @@ public final class M5MaterializationCoordinatorV1 {
     }
 
     private PublicationOutcome reconcileTaskTransition(MaterializationTask expected, MaterializationTask candidate) {
-        String key = keys.task(expected.taskIdSha256());
-        CanonicalBytes expectedBytes = M5MaterializationCodecV1.encodeTask(expected);
-        CanonicalBytes candidateBytes = M5MaterializationCodecV1.encodeTask(candidate);
+        return reconcileTransition(
+                keys.task(expected.taskIdSha256()),
+                M5MaterializationCodecV1.encodeTask(expected),
+                M5MaterializationCodecV1.encodeTask(candidate));
+    }
+
+    private PublicationOutcome reconcileTransition(
+            String key, CanonicalBytes expectedBytes, CanonicalBytes candidateBytes) {
         ControlMutationOutcome mutation = metadata.compareAndSet(key, Optional.of(expectedBytes), candidateBytes);
         Optional<CanonicalBytes> observed = metadata.get(key);
         if (observed.isPresent() && observed.orElseThrow().equals(candidateBytes)) {
@@ -238,6 +351,7 @@ public final class M5MaterializationCoordinatorV1 {
 
     private void requireBinding(MaterializationPlan plan) {
         Objects.requireNonNull(plan, "plan");
+        plan.sourceCut().coverage().requireCurrentPulsar();
         if (!binding.equals(plan.sourceCut().identity().binding())) {
             throw new IllegalArgumentException("M5 materialization plan belongs to another Binding");
         }

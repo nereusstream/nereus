@@ -69,6 +69,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Sourc
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.TerminalKind;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingAuthorityStateV1;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
 import com.nereusstream.storage.object.retention.M5BindingRetirementCoordinatorV1;
 import com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1;
 import com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1.WriterDeclarationV1;
@@ -81,6 +82,7 @@ import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.Exte
 import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.GuardOutcomeV1;
 import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.GuardedMutationRequestV1;
 import com.nereusstream.storage.object.retention.M5RetentionCodecV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BatchMetadataStateV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.FloorClassV1;
@@ -370,52 +372,239 @@ class M5RetentionOxiaIntegrationTest {
 
     @Test
     void unchangedLogicalTrimPositionPersistsNewFloorSnapshotAcrossReconnect() throws Exception {
-        String root = "/nereus/v2/m5/retention/trim-" + UUID.randomUUID();
-        String frontierKey = root + "/frontier";
-        CanonicalBytes persisted;
-        RetentionFloorSnapshotV1 oldSnapshot;
-
-        try (AsyncOxiaClient client = connect()) {
-            Oxia09ExactMetadataTransactionStoreV1 store = new Oxia09ExactMetadataTransactionStoreV1(client);
-            M5LogicalTrimCoordinatorV1 coordinator = new M5LogicalTrimCoordinatorV1(store);
-            oldSnapshot = floorSnapshot(store, root + "/first", 0, 100);
+        try (var fixture = M5RetiredHistoryOxiaIntegrationTest.Fixture.create(1)) {
+            var cell = digest(fixture.root + "/logical-trim-cell");
+            var route = new OxiaBindingLifecycleMetadataStoreV2(fixture.client, fixture.root, 7, fixture.binding, cell);
+            var keys = new com.nereusstream.storage.object.retention.M5RetentionKeysV1(7, fixture.binding);
+            var original = read(route, fixture.selectorKey);
+            var oldSnapshot = bindingFloorSnapshot(fixture.binding, cell, fact(original), 0, 100);
+            create(
+                    route,
+                    keys.floorSnapshot(oldSnapshot.snapshotRootSha256()),
+                    M5RetentionCodecV1.encodeSnapshot(oldSnapshot));
+            var coordinator = new M5LogicalTrimCoordinatorV1(route);
             assertThat(coordinator
-                            .advance(frontierKey, oldSnapshot)
+                            .advance(keys.trimFrontier(), oldSnapshot)
                             .toCompletableFuture()
                             .join()
                             .outcome())
                     .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
-
-            RetentionFloorSnapshotV1 successor = floorSnapshot(store, root + "/successor", 100, 100);
+            var current = read(route, fixture.selectorKey);
+            var successor = bindingFloorSnapshot(fixture.binding, cell, fact(current), 100, 100);
+            create(
+                    route,
+                    keys.floorSnapshot(successor.snapshotRootSha256()),
+                    M5RetentionCodecV1.encodeSnapshot(successor));
             var advanced = coordinator
-                    .advance(frontierKey, successor)
+                    .advance(keys.trimFrontier(), successor)
                     .toCompletableFuture()
                     .join();
             assertThat(advanced.outcome()).isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
-            assertThat(advanced.exactFrontier().orElseThrow().generation()).isEqualTo(2);
-            assertThat(advanced.exactFrontier().orElseThrow().floorSnapshotRootSha256())
-                    .isEqualTo(successor.snapshotRootSha256());
-            VersionedValue current = read(store, frontierKey);
-            persisted = current.canonicalStoredBytes();
-            assertThat(M5RetentionCodecV1.decodeTrimFrontier(persisted))
-                    .isEqualTo(advanced.exactFrontier().orElseThrow());
+            var frontier = advanced.exactFrontier().orElseThrow();
+            assertThat(frontier.generation()).isEqualTo(2);
+            assertThat(frontier.floorSnapshotRootSha256()).isEqualTo(successor.snapshotRootSha256());
+            var persisted = M5RetentionCodecV1.encodeTrimFrontier(frontier);
+            var exact = read(route, fixture.selectorKey);
             assertThat(coordinator
-                            .advance(frontierKey, successor)
+                            .advance(keys.trimFrontier(), successor)
                             .toCompletableFuture()
                             .join()
                             .outcome())
                     .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.EXISTING_EXACT);
-            assertThat(read(store, frontierKey)).isEqualTo(current);
-        }
-
-        try (AsyncOxiaClient restarted = connect()) {
-            Oxia09ExactMetadataTransactionStoreV1 store = new Oxia09ExactMetadataTransactionStoreV1(restarted);
-            assertThat(read(store, frontierKey).canonicalStoredBytes()).isEqualTo(persisted);
-            assertThatThrownBy(() -> new M5LogicalTrimCoordinatorV1(store)
-                            .advance(frontierKey, oldSnapshot)
+            assertThat(read(route, fixture.selectorKey)).isEqualTo(exact);
+            fixture.reconnect();
+            var reopened =
+                    new OxiaBindingLifecycleMetadataStoreV2(fixture.client, fixture.root, 7, fixture.binding, cell);
+            assertThat(M5RetentionCodecV1.encodeTrimFrontier(reopened.readLogicalTrimFrontier()
+                            .toCompletableFuture()
+                            .join()
+                            .orElseThrow()))
+                    .isEqualTo(persisted);
+            assertThatThrownBy(() -> new M5LogicalTrimCoordinatorV1(reopened)
+                            .advance(keys.trimFrontier(), oldSnapshot)
                             .toCompletableFuture()
                             .join())
                     .hasRootCauseMessage("floor snapshot trim predecessor differs from current authority");
+        }
+    }
+
+    private static RetentionFloorSnapshotV1 bindingFloorSnapshot(
+            BindingIdentity binding, Sha256Digest cell, AuthorityFactV1 fact, long prior, long minimum) {
+        var rows = java.util.Arrays.stream(FloorClassV1.values())
+                .map(kind ->
+                        new RetentionFloorObservationV1(kind, fact, PositionDomain.KAFKA_OFFSET, minimum, true, true))
+                .toList();
+        return M5RetentionCodecV1.finalizeSnapshot(new RetentionFloorSnapshotV1(
+                new IdentityEnvelope(cell, digest("binding-trim-provider"), binding, 11, 13, 17, CAPABILITY),
+                PositionDomain.KAFKA_OFFSET,
+                prior + 1,
+                prior,
+                digest("binding-trim-policy"),
+                fact,
+                fact,
+                1,
+                4096,
+                rows,
+                digest("placeholder")));
+    }
+
+    @Test
+    void pulsarLogicalTrimFenceSurvivesActualAppliedReplyLossAndReconnect() throws Exception {
+        String key = "/nereus/v2/m5/retention/pulsar-trim-" + UUID.randomUUID() + "/aggregate";
+        var cell = new PulsarProtocolCellIdentity(
+                new DeploymentId(new Id128(1, 2)),
+                new ReservationDomainId(new Id128(3, 4)),
+                new PulsarCellId(new Id128(5, 6)));
+        var incarnation = new PulsarTopicIncarnationIdentity(
+                PulsarPersistenceName.fromString("tenant/ns/persistent/m5-trim"),
+                PulsarTopicName.fromString("persistent://tenant/ns/m5-trim"),
+                new PulsarBindingGeneration(7));
+        var bindingId = DeterministicTopicIdsV1.deriveBindingId(cell, incarnation);
+        var epoch = DeterministicTopicIdsV1.deriveStorageEpochId(bindingId, 0);
+        var aggregate = new TopicBindingAggregateV1(
+                TopicBindingAggregateV1.SCHEMA_VERSION,
+                new TopicBindingV1(ProtocolKindV1.PULSAR, bindingId, cell, incarnation),
+                new InitialStorageEpochV1(
+                        epoch,
+                        0,
+                        StorageProfileV1.BOOKKEEPER_WAL_ONLY,
+                        ProfileOriginV1.TOPIC_EXPLICIT,
+                        new PolicyCatalogDigest(digest("trim-policy-catalog")),
+                        FrameEncodingPolicyValueV1.none()));
+        var binding = new BindingIdentity(
+                bindingId,
+                Sha256Digest.hash(com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1.encode(incarnation)),
+                epoch.digest());
+        VersionedValue fenced;
+        RetentionFloorSnapshotV1 snapshot;
+        var attempt = digest(key + "/attempt");
+        try (var client = connect()) {
+            var raw = new com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient(client);
+            var store = new Oxia09ExactMetadataTransactionStoreV1(raw);
+            var legacy = create(store, key, Nta1CodecV1.encode(aggregate));
+            var retirement = new M5PulsarAggregateRetirementCoordinatorV1(store);
+            retirement
+                    .migrateLegacy(
+                            new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(key, legacy, CAPABILITY))
+                    .toCompletableFuture()
+                    .get(30, TimeUnit.SECONDS);
+            retirement
+                    .enrollWriters(new M5PulsarAggregateRetirementCoordinatorV1.EnrollmentRequest(
+                            key, read(store, key), registry().enrollment()))
+                    .toCompletableFuture()
+                    .get(30, TimeUnit.SECONDS);
+            var open = read(store, key);
+            var fact = fact(open);
+            var coverage = com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.of(
+                    binding,
+                    digest("declared-trim-chain"),
+                    List.of(new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.ChainLedger(
+                            91, false, 4, digest("declared-trim-source"))),
+                    List.of(new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.EntryRange(
+                            91, 0, 4)));
+            var position = new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.Position(91, 3);
+            var rows = java.util.Arrays.stream(FloorClassV1.values())
+                    .map(kind -> new RetentionFloorObservationV1(
+                            kind, fact, PositionDomain.PULSAR_ENTRY, -1, true, true, Optional.of(position)))
+                    .toList();
+            snapshot = M5RetentionCodecV1.finalizeSnapshot(new RetentionFloorSnapshotV1(
+                    new IdentityEnvelope(digest("trim-cell"), digest("trim-provider"), binding, 1, 1, 1, CAPABILITY),
+                    PositionDomain.PULSAR_ENTRY,
+                    1,
+                    -1,
+                    digest("trim-policy"),
+                    fact,
+                    fact,
+                    1,
+                    4096,
+                    rows,
+                    digest("placeholder"),
+                    Optional.of(new M5RetentionRecordsV1.PulsarFloorContextV2(
+                            coverage,
+                            new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.Position(91, 0)))));
+            var readsLost = new java.util.concurrent.atomic.AtomicInteger();
+            var mutations = new java.util.concurrent.atomic.AtomicInteger();
+            var lossy = new com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient() {
+                public java.util.concurrent.CompletionStage<
+                                Optional<com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord>>
+                        read(String target) {
+                    if (target.equals(key) && readsLost.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
+                        return java.util.concurrent.CompletableFuture.failedFuture(
+                                new java.io.IOException("injected original fence reread loss"));
+                    }
+                    return raw.read(target);
+                }
+
+                public java.util.concurrent.CompletionStage<Void> createIfAbsent(String target, CanonicalBytes bytes) {
+                    return raw.createIfAbsent(target, bytes);
+                }
+
+                public java.util.concurrent.CompletionStage<Void> compareAndSet(
+                        String target, CanonicalBytes bytes, long expected) {
+                    mutations.incrementAndGet();
+                    return raw.compareAndSet(target, bytes, expected).thenCompose(ignored -> {
+                        readsLost.set(2);
+                        return java.util.concurrent.CompletableFuture.failedFuture(
+                                new java.io.IOException("injected reply loss after actual fence CAS"));
+                    });
+                }
+            };
+            var trim = new com.nereusstream.storage.object.retention.M5PulsarLogicalTrimCoordinatorV2(
+                    new Oxia09ExactMetadataTransactionStoreV1(lossy), key);
+            assertThat(trim.fence(open, snapshot, attempt)
+                            .toCompletableFuture()
+                            .get(30, TimeUnit.SECONDS)
+                            .outcome())
+                    .isEqualTo(
+                            com.nereusstream.storage.object.retention.M5PulsarLogicalTrimCoordinatorV2.Outcome
+                                    .RESPONSE_UNKNOWN);
+            assertThat(mutations.get()).isEqualTo(1);
+            fenced = read(store, key);
+            assertThat(M5PulsarAggregateAuthorityCodecV1.projectAggregate(fenced.canonicalStoredBytes()))
+                    .isEqualTo(legacy.canonicalStoredBytes());
+            var ticket = new ReferenceMutationTicketV1(
+                    ReferenceTargetKindV1.PULSAR_AGGREGATE,
+                    legacy.canonicalStoredSha256(),
+                    ReferenceKindV1.PULSAR_SUBSCRIPTION_OR_REPLICATION_CURSOR,
+                    CAPABILITY,
+                    digest("trim-cursor-mutation"),
+                    digest("trim-cursor-facts"));
+            assertThat(retirement
+                            .acquireTicket(
+                                    new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(key, fenced, ticket))
+                            .toCompletableFuture()
+                            .get(30, TimeUnit.SECONDS))
+                    .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.RETAIN);
+        }
+        try (var reconnected = connect()) {
+            var store = new Oxia09ExactMetadataTransactionStoreV1(reconnected);
+            assertThat(read(store, key)).isEqualTo(fenced);
+            var trim = new com.nereusstream.storage.object.retention.M5PulsarLogicalTrimCoordinatorV2(store, key);
+            assertThat(trim.commit(fenced, snapshot, attempt)
+                            .toCompletableFuture()
+                            .get(30, TimeUnit.SECONDS)
+                            .outcome())
+                    .isEqualTo(
+                            com.nereusstream.storage.object.retention.M5PulsarLogicalTrimCoordinatorV2.Outcome
+                                    .APPLIED_EXACT);
+            assertThat(trim.readFrontier()
+                            .toCompletableFuture()
+                            .get(30, TimeUnit.SECONDS)
+                            .orElseThrow()
+                            .pulsarContext()
+                            .orElseThrow()
+                            .newFrontier())
+                    .isEqualTo(snapshot.minimumPulsarFloor());
+            assertThat(trim.commit(fenced, snapshot, attempt)
+                            .toCompletableFuture()
+                            .get(30, TimeUnit.SECONDS)
+                            .outcome())
+                    .isEqualTo(
+                            com.nereusstream.storage.object.retention.M5PulsarLogicalTrimCoordinatorV2.Outcome
+                                    .EXISTING_EXACT);
+            assertThat(M5PulsarAggregateAuthorityCodecV1.projectAggregate(
+                            read(store, key).canonicalStoredBytes()))
+                    .isEqualTo(Nta1CodecV1.encode(aggregate));
         }
     }
 

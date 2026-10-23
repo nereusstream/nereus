@@ -76,6 +76,7 @@ public final class M5MaterializationPlannerV1 {
     public MaterializationPlan plan(MaterializationSourceCut sourceCut, PlanningPolicy policy) {
         Objects.requireNonNull(sourceCut, "sourceCut");
         Objects.requireNonNull(policy, "policy");
+        sourceCut.coverage().requireCurrentPulsar();
         M5MaterializationCodecV1.encodeSourceCut(sourceCut);
         if (sourceCut.sources().stream()
                 .anyMatch(source -> source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2)) {
@@ -143,15 +144,28 @@ public final class M5MaterializationPlannerV1 {
                             taskId.toHex(),
                             ordinal)
                     : source.physicalKey();
-            Sha256Digest planSha = hash(
-                    "M5-A-PART-V1",
-                    taskId.toHex(),
-                    Integer.toString(ordinal),
-                    source.sourceIdentitySha256().toHex(),
-                    kind.name(),
-                    Long.toString(source.coverage().inclusiveStart()),
-                    Long.toString(source.coverage().exclusiveEnd()),
-                    key);
+            Sha256Digest planSha = source.coverage().typedPulsar()
+                    ? hash(
+                            "M5-A-PULSAR-PART-V2",
+                            taskId.toHex(),
+                            Integer.toString(ordinal),
+                            source.sourceIdentitySha256().toHex(),
+                            kind.name(),
+                            source.coverage()
+                                    .pulsarCoverage()
+                                    .orElseThrow()
+                                    .sha256()
+                                    .toHex(),
+                            key)
+                    : hash(
+                            "M5-A-PART-V1",
+                            taskId.toHex(),
+                            Integer.toString(ordinal),
+                            source.sourceIdentitySha256().toHex(),
+                            kind.name(),
+                            Long.toString(source.coverage().inclusiveStart()),
+                            Long.toString(source.coverage().exclusiveEnd()),
+                            key);
             result.add(new OutputPartPlan(ordinal, source.coverage(), kind, planSha, key));
         }
         return List.copyOf(result);
@@ -166,15 +180,26 @@ public final class M5MaterializationPlannerV1 {
                     policy.exclusiveCellNamespace(),
                     taskId.toHex(),
                     kind.ordinal());
-            Sha256Digest planSha = hash(
-                    "M5-A-INDEX-V1",
-                    taskId.toHex(),
-                    kind.name(),
-                    cut.coverage().domain().name(),
-                    Long.toString(cut.coverage().inclusiveStart()),
-                    Long.toString(cut.coverage().exclusiveEnd()),
-                    key);
-            result.add(new IndexPlan(kind, cut.coverage(), 1, planSha, key));
+            Sha256Digest planSha = cut.coverage().typedPulsar()
+                    ? hash(
+                            "M5-A-PULSAR-INDEX-V2",
+                            taskId.toHex(),
+                            kind.name(),
+                            cut.coverage()
+                                    .pulsarCoverage()
+                                    .orElseThrow()
+                                    .sha256()
+                                    .toHex(),
+                            key)
+                    : hash(
+                            "M5-A-INDEX-V1",
+                            taskId.toHex(),
+                            kind.name(),
+                            cut.coverage().domain().name(),
+                            Long.toString(cut.coverage().inclusiveStart()),
+                            Long.toString(cut.coverage().exclusiveEnd()),
+                            key);
+            result.add(new IndexPlan(kind, cut.coverage(), cut.coverage().typedPulsar() ? 2 : 1, planSha, key));
         }
         return List.copyOf(result);
     }

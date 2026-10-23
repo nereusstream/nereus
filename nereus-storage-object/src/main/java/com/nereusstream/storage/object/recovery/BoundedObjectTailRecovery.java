@@ -146,6 +146,18 @@ public final class BoundedObjectTailRecovery {
         this.exactExtentKeyBytes = ObjectWalLeafKeyV1.maximumFullKeyBytes(root.providerConfiguration());
     }
 
+    /** Uses an actual same-Cell owner's existing cumulative budget for a cross-Run transfer read. */
+    public BoundedObjectTailRecovery usingBudgetOf(BoundedObjectTailRecovery owner) {
+        requireRootBound();
+        owner.requireRootBound();
+        if (!root.protocolCellIdentity().equals(owner.root.protocolCellIdentity())
+                || !root.providerScopeId().equals(owner.root.providerScopeId())
+                || root.shardId() != owner.root.shardId()) {
+            throw new IllegalArgumentException("protocol transfer cannot borrow another Cell/scope/shard budget");
+        }
+        return new BoundedObjectTailRecovery(provider, root, owner.budget);
+    }
+
     /** One-use prepared budget; it exposes neither counters nor replacement limits. */
     public static final class PreparedNewRootRecovery {
         private final WalRunRootRecord root;
@@ -1098,6 +1110,10 @@ public final class BoundedObjectTailRecovery {
 
     public void chargeRoot(boolean predecessor, long canonicalBytes) {
         budget.chargeRoot(predecessor, canonicalBytes);
+    }
+
+    public CumulativeRecoveryBudget.ControlMetadataReservation reserveControlMetadata(long maximumBytes) {
+        return budget.reserveControlMetadata(maximumBytes);
     }
 
     public void chargeControlMetadata(long canonicalBytes) {

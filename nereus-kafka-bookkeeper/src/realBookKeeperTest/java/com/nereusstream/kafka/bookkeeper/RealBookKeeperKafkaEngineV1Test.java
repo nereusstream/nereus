@@ -495,6 +495,12 @@ class RealBookKeeperKafkaEngineV1Test {
         private int mutations;
 
         @Override
+        public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> reserveRunBirth(
+                KafkaRunRootSnapshotV1 activeCandidate) {
+            return CompletableFuture.completedFuture(ProviderMutationResultV1.appliedExact(activeCandidate));
+        }
+
+        @Override
         public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(
                 KafkaRunRootSnapshotV1 activeCandidate) {
             return mutate(activeCandidate);

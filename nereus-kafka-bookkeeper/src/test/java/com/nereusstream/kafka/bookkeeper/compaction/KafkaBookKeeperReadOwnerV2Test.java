@@ -45,6 +45,35 @@ import org.junit.jupiter.api.Test;
 /** Synthetic native/physical admission fixtures; the local lifecycle is exercised through actual M4 and guard code. */
 class KafkaBookKeeperReadOwnerV2Test {
     @Test
+    void selectedCacheReadUsesTheOwnersExactM4Admission() {
+        var f = new Fixture();
+        var view = f.physical
+                .reader(1_000_000)
+                .recover(f.physical.descriptor)
+                .toCompletableFuture()
+                .join();
+        var controller = new AtomicReference<KafkaBookKeeperReadOwnerV2>();
+        var result = f.run(owner -> {
+                    controller.set(owner);
+                    return owner.readSelected(view, 0, 2, 1);
+                })
+                .toCompletableFuture();
+        assertThat(result).isNotDone();
+        f.assertTickets(1);
+        f.closed.complete(null);
+        var selected = result.join();
+        assertThat(selected.capturedAuthority().selectedViewSha256())
+                .isEqualTo(f.physical.descriptor.descriptorSha256());
+        assertThat(selected.batches()).singleElement().satisfies(batch -> {
+            assertThat(batch.startOffset()).isEqualTo(1);
+            assertThat(batch.rawRecordBatch()).isEqualTo(view.readBatch(0));
+        });
+        assertThatThrownBy(() -> controller.get().readSelected(view, 0, 2, 1).join())
+                .hasRootCauseMessage("BK read owner admission is closed");
+        f.assertTickets(0);
+    }
+
+    @Test
     void failedSessionConstructionReleasesPhysicalTicketsAndCellShareBeforeRead() {
         var f = new Fixture();
         var attempts = new AtomicInteger();
@@ -83,6 +112,12 @@ class KafkaBookKeeperReadOwnerV2Test {
         f.closed.complete(null);
         assertThat(recovered.toCompletableFuture().join()).isEqualTo("accepted");
         f.assertTickets(0);
+        var failedWork =
+                f.run(owner -> CompletableFuture.failedFuture(new IllegalArgumentException("semantic failure")));
+        assertThatThrownBy(() -> failedWork.toCompletableFuture().join()).hasRootCauseMessage("semantic failure");
+        assertThat(f.ticketCleanup.get().toCompletableFuture()).isCompletedWithValue(null);
+        f.assertTickets(0);
+        assertThat(f.budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
     }
 
     @Test
@@ -166,6 +201,7 @@ class KafkaBookKeeperReadOwnerV2Test {
         f.assertTickets(1);
         assertThat(f.closes).isEqualTo(1);
         assertThat(f.budget.usage()).isEqualTo(f.charge);
+        assertThat(f.ticketCleanup.get().toCompletableFuture()).isCompletedExceptionally();
     }
 
     @Test
@@ -286,6 +322,7 @@ class KafkaBookKeeperReadOwnerV2Test {
         final CompletableFuture<Void> closed = new CompletableFuture<>();
         final List<PhysicalResourceIdV2> resources;
         RunLedgerReadResultV1 pendingValue;
+        final AtomicReference<CompletionStage<Void>> ticketCleanup = new AtomicReference<>();
         int sessions;
         int closes;
         int reads;
@@ -307,7 +344,7 @@ class KafkaBookKeeperReadOwnerV2Test {
         }
 
         <T> CompletionStage<T> run(Function<KafkaBookKeeperReadOwnerV2, CompletionStage<T>> work) {
-            return KafkaBookKeeperReadOwnerV2.run(
+            return KafkaBookKeeperReadOwnerV2.runOwned(
                     budget,
                     physical.descriptor,
                     physical.m4,
@@ -315,7 +352,7 @@ class KafkaBookKeeperReadOwnerV2Test {
                     () -> {
                         sessions++;
                         assertTickets(1);
-                        return (BookKeeperCellSession) Proxy.newProxyInstance(
+                        var session = (BookKeeperCellSession) Proxy.newProxyInstance(
                                 BookKeeperCellSession.class.getClassLoader(),
                                 new Class<?>[] {BookKeeperCellSession.class},
                                 (proxy, method, args) -> {
@@ -337,6 +374,7 @@ class KafkaBookKeeperReadOwnerV2Test {
                                     }
                                     return result;
                                 });
+                        return new KafkaBookKeeperRunSourceV2.OwnedReadSession(session, ticketCleanup::set);
                     },
                     handle -> CompletableFuture.completedFuture(new CaptureResult(
                             CaptureOutcome.EXACT_TARGET,

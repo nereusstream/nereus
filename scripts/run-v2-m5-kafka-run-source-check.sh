@@ -28,6 +28,13 @@ m5_cleanup() {
 }
 trap m5_cleanup EXIT INT TERM
 
+# This non-deleting GC profile retains its native owner reservation permanently. It must not consume the
+# separate two-resource M4 bound-delete fixture's capacity; both profiles remain mandatory and source-bound.
+python3 "$m5_repo_root/scripts/run-v2-m5-epoch-grace-check.py" > "$m5_output/epoch-grace-dependency.log" 2>&1
+m5_epoch_output="$(sed -n 's/^PASS_V2_M5_EPOCH_GRACE_DEPENDENCY_NON_PROMOTABLE output=//p' "$m5_output/epoch-grace-dependency.log")"
+test -n "$m5_epoch_output"
+printf '%s\n' "$m5_epoch_output" > "$m5_output/epoch-grace-run-path.txt"
+
 # Run legacy unbound creation/terminal/recovery regressions on their own retained-data cluster first.
 # Namespace binding is permanent, so the bound-profile phase must not reset that cluster to run legacy clients.
 m5_legacy_output="${NEREUS_M5_VERIFIED_LEGACY_OUTPUT:-}"
@@ -56,7 +63,7 @@ for path,sha in json.loads(inputs).items():
     candidate=(root/path).resolve()
     if not candidate.is_relative_to(root.resolve()) or hashlib.sha256(candidate.read_bytes()).hexdigest()!=sha:
         raise SystemExit('Legacy tested source changed: '+path)
-if sum(suite['tests'] for suite in summary['suites'])!=83:
+if sum(suite['tests'] for suite in summary['suites'])!=116:
     raise SystemExit('Legacy focused suite count differs')
 for suite in summary['suites']:
     data=(previous/(suite['task']+'.xml')).read_bytes(); actual=ET.fromstring(data)
@@ -98,6 +105,8 @@ for module in ('nereus-domain','nereus-storage-api','nereus-metadata-spi','nereu
     paths.extend((root/module/'src/main/java').rglob('*.java'))
 for source in ('test','realBookKeeperTest'):
     paths.extend((root/f'nereus-kafka-bookkeeper/src/{source}/java/com/nereusstream/kafka/bookkeeper/compaction').glob('*.java'))
+paths.extend((root/'nereus-kafka-bookkeeper/src/test/java/com/nereusstream/kafka/bookkeeper/broker').glob('*.java'))
+paths.extend((root/'nereus-kafka-bookkeeper/src/test/java/com/nereusstream/kafka/bookkeeper/recovery').glob('*.java'))
 paths.extend((root/'nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/compaction').glob('*.java'))
 for source in ('test','realBookKeeperTest'):
     paths.extend((root/f'nereus-storage-bookkeeper/src/{source}/java').rglob('*.java'))
@@ -108,11 +117,15 @@ paths.extend([root/'nereus-storage-object/build.gradle.kts',root/'nereus-storage
               root/'config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml',root/'build.gradle.kts',root/'nereus-kafka-bookkeeper/build.gradle.kts',
               root/'nereus-metadata-oxia/build.gradle.kts',root/'scripts/run-v2-m5-publication-tickets-check.sh',
               root/'scripts/run-v2-m5-kafka-run-roots-check.sh',root/'scripts/run-v2-m5-kafka-run-source-check.sh',
+              root/'scripts/run-v2-m5-epoch-grace-check.py',
               root/'scripts/check-v2-m5-bookkeeper-descriptor.py',root/'scripts/check-v2-m5-bookkeeper-descriptor-tests.py',
               root/'scripts/run-v2-m5-bookkeeper-task-terminal-check.sh',root/'nereus-storage-api/build.gradle.kts'])
 paths.extend((root/'nereus-storage-object/src/test/java/com/nereusstream/storage/object/gc').glob('*.java'))
 paths.extend((root/'nereus-metadata-oxia/src/oxiaIntegrationTest/java/com/nereusstream/metadata/oxia/v2/retention').glob('*.java'))
 paths.extend((root/'nereus-storage-api/src/test/java/com/nereusstream/storage/api/lifecycle').glob('*.java'))
+paths.extend(root/'scripts'/name for name in (
+    'check-v2-m5-delete-eligibility.py', 'check-v2-m5-delete-eligibility-tests.py',
+    'check-v2-m5-retention-retirement.py', 'check-v2-m5-retention-retirement-tests.py'))
 manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 (out/'tested-inputs.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY
@@ -125,10 +138,14 @@ PY
   "-Pv2M5BoundDeleteRestartCheckpoint=$m5_output/bound-delete-checkpoint" \
   "-Pv2M5NativeDeleteCellRestartCheckpoint=$m5_output/native-cell-checkpoint" \
   :nereus-storage-bookkeeper:v2M5NativeDeleteQuotaRealTest \
-  v2M5KafkaRunSourceCheck :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest \
+  v2M5KafkaRunSourceCheck :nereus-kafka-bookkeeper:test \
+  :nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartWriteTest \
   :nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartWriteTest \
-  :nereus-kafka-bookkeeper:v2M5BoundDeleteRealTest :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartWriteTest --console=plain
+  :nereus-kafka-bookkeeper:v2M5BoundDeleteRealTest :nereus-kafka-bookkeeper:v2M5BoundDeleteRestartWriteTest \
+  :nereus-domain:jar :nereus-metadata-spi:jar :nereus-storage-api:jar \
+  :nereus-storage-object:jar :nereus-storage-bookkeeper:jar \
+  :nereus-metadata-oxia:jar :nereus-kafka-bookkeeper:jar --console=plain
 
 docker compose -p "$m5_project" -f "$m5_compose" ps -q > "$m5_output/bookkeeper-container-ids.txt"
 while IFS= read -r m5_id; do
@@ -215,15 +232,34 @@ bound_unknown=out/'bound-delete-checkpoint-unknown'
 if len(bound_unknown.read_text().splitlines())!=8:
     raise SystemExit('Bound Oxia/BK UNKNOWN restart checkpoint is incomplete')
 bound_unknown_sha=hashlib.sha256(bound_unknown.read_bytes()).hexdigest()
-suites=[]
+epoch_out=Path((out/'epoch-grace-run-path.txt').read_text().strip()).resolve()
+if not epoch_out.is_relative_to((root/'build/m5-epoch-grace').resolve()):
+    raise SystemExit('Epoch grace dependency is outside its owned profile directory')
+epoch_result=json.loads((epoch_out/'result.json').read_bytes())
+epoch_cleanup=json.loads((epoch_out/'cleanup.json').read_bytes())
+if epoch_result['actualGradleExit']!=0 or not epoch_result['freshXml'] or not epoch_result['capturedInputsUnchangedDuringRun'] or epoch_result['counts']!={'tests':1,'failures':0,'errors':0,'skipped':0}:
+    raise SystemExit('Native epoch grace dependency did not pass')
+if not epoch_cleanup['originalContainersUnchanged'] or not epoch_cleanup['ownedContainersAbsent']:
+    raise SystemExit('Native epoch grace dependency cleanup is incomplete')
+for path,expected in json.loads((epoch_out/'tested-inputs.json').read_bytes()).items():
+    source=(root/path).resolve()
+    archived=epoch_out/'source-archive/sources'/path
+    if not source.is_relative_to(root.resolve()) or hashlib.sha256(source.read_bytes()).hexdigest()!=expected or hashlib.sha256(archived.read_bytes()).hexdigest()!=expected:
+        raise SystemExit('Native epoch grace dependency source changed: '+path)
+epoch_xml=(epoch_out/'native-grace.xml').read_bytes()
+epoch_suite=ET.fromstring(epoch_xml)
+if {k:epoch_suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={'tests':'1','failures':'0','errors':'0','skipped':'0'}:
+    raise SystemExit('Native epoch grace dependency XML differs')
+(out/'v2M5EpochGraceProfileDependency.xml').write_bytes(epoch_xml)
+suites=[{'task':'v2M5EpochGraceProfileDependency','tests':1,'xmlSha256':hashlib.sha256(epoch_xml).hexdigest()}]
 for module,task,name,count in (
-    ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',9),
-    ('nereus-kafka-bookkeeper','v2M5KafkaCompactionTest','KafkaSemanticCompactorV1Test',14),
+    ('nereus-storage-object','v2M5MaterializationTest','M5MaterializationV1Test',18),
+    ('nereus-kafka-bookkeeper','v2M5KafkaCompactionTest','KafkaSemanticCompactorV1Test',22),
     ('nereus-kafka-bookkeeper','v2M5KafkaRecordBatchBudgetTest','KafkaRecordBatchBudgetV2Test',3),
-    ('nereus-kafka-bookkeeper','v2M5KafkaReadOwnerTest','KafkaBookKeeperReadOwnerV2Test',7),
+    ('nereus-kafka-bookkeeper','v2M5KafkaReadOwnerTest','KafkaBookKeeperReadOwnerV2Test',8),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperM4RecoveryTest','KafkaBookKeeperM4RecoveryV2Test',7),
     ('nereus-kafka-bookkeeper','v2M5KafkaSelectedSourceTest','KafkaBookKeeperSelectedSourceV2Test',3),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',13),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRealTest','KafkaBookKeeperRunSourceV2RealTest',14),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartWriteTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunSourceRestartReadTest','KafkaBookKeeperRunSourceV2RealTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteQuotaRealTest','M5BookKeeperNativeDeleteQuotaV2RealTest',2),
@@ -234,13 +270,13 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRealTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartWriteTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5BoundDeleteRestartReadTest','KafkaBookKeeperBoundDeleteV2RealTest',1),
-    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',12),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',5),
+    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',20),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',16),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartWriteTest','KafkaBookKeeperRunRootsV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartReadTest','KafkaBookKeeperRunRootsV2RealTest',1),
-    ('nereus-storage-object','v2M5MultiWriterTicketTest','M5TargetDeleteMultiWriterGuardV2Test',9),
+    ('nereus-storage-object','v2M5MultiWriterTicketTest','M5TargetDeleteMultiWriterGuardV2Test',10),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperDescriptorTest','KafkaSealedBookKeeperDescriptorV2Test',13),
-    ('nereus-kafka-bookkeeper','v2M5PublicationTicketsRealTest','KafkaBookKeeperPublicationTicketsV2RealTest',7),
+    ('nereus-kafka-bookkeeper','v2M5PublicationTicketsRealTest','KafkaBookKeeperPublicationTicketsV2RealTest',9),
     ('nereus-kafka-bookkeeper','v2M5PublicationTicketsRestartWriteTest','KafkaBookKeeperPublicationTicketsV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5PublicationTicketsRestartReadTest','KafkaBookKeeperPublicationTicketsV2RealTest',1),
 ):
@@ -250,8 +286,84 @@ for module,task,name,count in (
     if {k:suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={
         'tests':str(count),'failures':'0','errors':'0','skipped':'0'}:
         raise SystemExit('Native suite did not pass without skips: '+task)
+    if task=='v2M5KafkaRunRootsRealTest' and not any(
+        case.attrib.get('name')=='blockedOxiaSelectorCasDoesNotHoldPartitionFenceOrOldBkReadCompletion()'
+        for case in suite.findall('testcase')):
+        raise SystemExit('Native M4 held-selector-CAS real callback case is absent')
+    if task=='v2M5KafkaRunRootTest' and not any(
+        case.attrib.get('name')=='qualifiedRetiredAnchorPreservesDoneAndOriginalChildTicketsThroughLostReply()'
+        for case in suite.findall('testcase')):
+        raise SystemExit('Retired-anchor qualification and original-ticket cleanup regression is absent')
+    if task=='v2M5KafkaRunSourceRealTest' and not any(
+        case.attrib.get('name')=='nativePhysicalMembersRetainOriginalUnknownTicketAndEveryBinding()'
+        for case in suite.findall('testcase')):
+        raise SystemExit('Native member registration, UNKNOWN ticket and exact-version regression is absent')
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
+cache_budget_xml=(root/'nereus-kafka-bookkeeper/build/test-results/test/'
+    'TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test.xml')
+cache_budget_bytes=cache_budget_xml.read_bytes()
+cache_budget_suite=ET.fromstring(cache_budget_bytes)
+if {k:cache_budget_suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={
+    'tests':'9','failures':'0','errors':'0','skipped':'0'} or not any(
+    case.attrib.get('name')=='selectedCacheBudgetKeepsActualTaskBoundsAndRequiresIndependentOwnerIdentity()'
+    for case in cache_budget_suite.findall('testcase')):
+    raise SystemExit('Selected cache budget and native Task metadata unit suite did not pass without skips')
+(out/'v2M5KafkaSelectedCacheBudgetTest.xml').write_bytes(cache_budget_bytes)
+suites.append({'task':'v2M5KafkaSelectedCacheBudgetTest','tests':9,
+               'xmlSha256':hashlib.sha256(cache_budget_bytes).hexdigest()})
+broker_read_owner_xml=(root/'nereus-kafka-bookkeeper/build/test-results/test/'
+    'TEST-com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperM4BrokerReadOwnerV2Test.xml')
+broker_read_owner_bytes=broker_read_owner_xml.read_bytes()
+broker_read_owner_suite=ET.fromstring(broker_read_owner_bytes)
+if {k:broker_read_owner_suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={
+    'tests':'5','failures':'0','errors':'0','skipped':'0'}:
+    raise SystemExit('Native M4 Broker read-owner unit suite did not pass without skips')
+(out/'v2M5KafkaM4BrokerReadOwnerTest.xml').write_bytes(broker_read_owner_bytes)
+suites.append({'task':'v2M5KafkaM4BrokerReadOwnerTest','tests':5,
+               'xmlSha256':hashlib.sha256(broker_read_owner_bytes).hexdigest()})
+recovery_artifact_xml=(root/'nereus-kafka-bookkeeper/build/test-results/test/'
+    'TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRecoveryArtifactV3Test.xml')
+recovery_artifact_bytes=recovery_artifact_xml.read_bytes()
+recovery_artifact_suite=ET.fromstring(recovery_artifact_bytes)
+if {k:recovery_artifact_suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={
+    'tests':'9','failures':'0','errors':'0','skipped':'0'}:
+    raise SystemExit('Independent BK protocol recovery artifact unit suite did not pass without skips')
+for name in (
+    'replacementComparisonBindsIndependentBodiesRecoveryIndexesAndOriginalMembership()',
+    'unchangedCheckpointProvenanceCannotHideChangedStateOrForeignPhysicalNamespace()',
+    'retiredRawPrefixKeepsItsClosedLineageAndIndependentSelectedProtocolState()',
+    'selectedRecoveryRejectsChangedPhysicalMembersBoundaryAndOwnerClosureBeforeSdkWork()',
+    'maximumCoveredRunCatalogDoesNotGrowTheRecoveryCallbackStack()',
+):
+    if not any(case.attrib.get('name') == name for case in recovery_artifact_suite.findall('testcase')):
+        raise SystemExit('Selected raw-prefix recovery unit case is absent: '+name)
+(out/'v2M5KafkaRecoveryArtifactUnitTest.xml').write_bytes(recovery_artifact_bytes)
+suites.append({'task':'v2M5KafkaRecoveryArtifactUnitTest','tests':9,
+               'xmlSha256':hashlib.sha256(recovery_artifact_bytes).hexdigest()})
+read_classes={
+    'nativePartition':'nereus-kafka-bookkeeper/com/nereusstream/kafka/bookkeeper/broker/KafkaBookKeeperPartitionV1',
+    'nativeReadOwner':'nereus-kafka-bookkeeper/com/nereusstream/kafka/bookkeeper/broker/KafkaBookKeeperM4BrokerReadOwnerV2',
+    'readAsyncExecutor':'nereus-storage-object/com/nereusstream/storage/object/read/BindingReadAsyncExecutorV1',
+    'selectorRuntime':'nereus-storage-object/com/nereusstream/storage/object/read/control/BindingReadSelectorRuntimeV1',
+    'readControl':'nereus-storage-object/com/nereusstream/storage/object/read/control/M4ReadControlCoordinatorV1',
+    'proofCleanupPlanner':'nereus-storage-object/com/nereusstream/storage/object/read/control/M4ProofCleanupPlannerV1',
+    'oxiaReadRoute':'nereus-metadata-oxia/com/nereusstream/metadata/oxia/v2/retention/OxiaKafkaBookKeeperM4ReadRouteV2',
+}
+read_class_sha={}
+for name,location in read_classes.items():
+    module,qualified=location.split('/',1)
+    compiled=root/module/'build/classes/java/main'/f'{qualified}.class'
+    read_class_sha[name]=hashlib.sha256(compiled.read_bytes()).hexdigest()
+runtime_artifact_sha={}
+for module in ('nereus-storage-api','nereus-metadata-spi',
+               'nereus-storage-object','nereus-storage-bookkeeper',
+               'nereus-kafka-bookkeeper','nereus-metadata-oxia'):
+    artifact=root/module/'build/libs'/f'{module}-0.2.0-SNAPSHOT.jar'
+    runtime_artifact_sha[module]=hashlib.sha256(artifact.read_bytes()).hexdigest()
+oxia_lock=root/'gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/io/github/oxia-db'
+oxia_artifact_sha={name:hashlib.sha256((oxia_lock/name/'0.9.4'/f'{name}-0.9.4.jar').read_bytes()).hexdigest()
+    for name in ('oxia-client','oxia-client-api')}
 summary={'rawCaptureRequiresExpectedBinding':True,
     'rawCaptureReservesBeforeRootCatalogRead':True,
     'rejectedRawCaptureDoesNotReadRootCatalog':True,
@@ -288,6 +400,10 @@ summary={'rawCaptureRequiresExpectedBinding':True,
     'boundGcEpochIntentAndM5AuthoritySurvivedRestart':True,
     'boundCellUnknownAbsenceRecoveredAfterRestart':True,
     'boundUnknownCheckpointSha256':bound_unknown_sha,
+    'nativeEpochMonotonicGracePrerequisite':True,
+    'nativeEpochGraceUsesIndependentRetainedQuotaProfile':True,
+    'nativeEpochGraceDependencyResultSha256':hashlib.sha256((epoch_out/'result.json').read_bytes()).hexdigest(),
+    'nativeEpochGraceDependencyInputSha256':hashlib.sha256((epoch_out/'tested-inputs.json').read_bytes()).hexdigest(),
     'graceAndDispatchCapacityAdmitted':False,'schema':'NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2','suites':suites,
     'oxiaContainerId':sys.argv[3],'startedBefore':sys.argv[4],'startedAfter':sys.argv[5],
     'sameOxiaServerContainerRestarted':True,'bookKeeperClusterRetainedAcrossOxiaRestart':True,
@@ -299,6 +415,10 @@ summary={'rawCaptureRequiresExpectedBinding':True,
     'bookKeeperImageId':'sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605',
     'oxiaImageId':'sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da',
     'sourceAndProtocolAuthority':'SYNTHETIC_FACTS_WITH_REAL_OXIA_AND_BK',
+    'nativeM4HeldSelectorCasReadAndFenceReal':True,
+    'currentLoadedM4ReadClassSha256':read_class_sha,
+    'currentM4RuntimeArtifactSha256':runtime_artifact_sha,
+    'lockedOxiaClientArtifactSha256':oxia_artifact_sha,
     'nativeNamespaceBoundToActualOxia':True,
     'nativeSourceAndOutputLedgerBytesVerified':True,
     'inputAndOutputTicketsBeforeNativeSelectorCas':True,

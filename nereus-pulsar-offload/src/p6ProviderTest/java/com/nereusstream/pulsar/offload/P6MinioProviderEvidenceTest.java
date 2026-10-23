@@ -188,14 +188,20 @@ class P6MinioProviderEvidenceTest {
                 .containsExactly(999L, 1_000L, 1_001L);
         handle.verifyCompleteLedger().toCompletableFuture().join();
         handle.close().toCompletableFuture().join();
-        new PulsarSealedLedgerPublisherV1(
-                        store,
-                        LIMITS,
-                        ignored -> java.util.concurrent.CompletableFuture.completedFuture(null),
-                        Runnable::run)
-                .deleteAttempt(attempt)
-                .toCompletableFuture()
-                .join();
+        assertThatThrownBy(() -> new PulsarSealedLedgerPublisherV1(
+                                store,
+                                LIMITS,
+                                ignored -> java.util.concurrent.CompletableFuture.completedFuture(null),
+                                Runnable::run)
+                        .deleteAttempt(attempt)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage(
+                        "Pulsar attempt cleanup requires M5 intent, release and native reference-free proof");
+        assertThat(store.head(attempt.keys().rootKey()).toCompletableFuture().join())
+                .isNotNull();
+        assertThat(store.head(attempt.keys().dataKey()).toCompletableFuture().join())
+                .isNotNull();
     }
 
     private static String json(String sourceCommit, String imageReference, String imageDigest) {

@@ -208,6 +208,65 @@ class WalRunLifecycleManagerTest {
     }
 
     @Test
+    void protocolVerifiedRetiredPrefixUsesControlIdentityWithoutReplayingItsOldCheckpoint() {
+        var store = new TestControlMetadataStore();
+        var predecessorRoot = ObjectWalControlTestFixtures.root(1, Optional.empty());
+        var predecessor = ObjectWalControlTestFixtures.reference(WalRunControlKeys.rootKey(7, 1), predecessorRoot);
+        var checkpointHead = WalCheckpointHeadV1.empty(predecessor.rootSha256(), 1, 1);
+        var seal = new WalRunSealRecord(
+                predecessor,
+                LaneSequenceVector.empty(),
+                WalRunControlKeys.checkpointHeadKey(7, 1),
+                com.nereusstream.domain.bytes.Sha256Digest.hash(
+                        WalRunControlCodec.encodeCheckpointHead(checkpointHead)),
+                0,
+                0);
+        var boundary = new WalRunPredecessor(
+                predecessor,
+                WalRunControlKeys.sealKey(7, 1),
+                WalRunControlCodec.sealSha256(seal),
+                Optional.of(terminalBinding(1)));
+        var successorRoot = ObjectWalControlTestFixtures.root(2, Optional.of(boundary));
+        var pointer = new CurrentWalRunPointer(predecessor);
+        store.putExact(predecessor.rootKey(), WalRunControlCodec.encodeRoot(predecessorRoot));
+        store.putExact(boundary.sealKey(), WalRunControlCodec.encodeSeal(seal));
+        store.putExact(WalRunControlKeys.pointerKey(7), WalRunControlCodec.encodePointer(pointer));
+        // Adapter-boundary coverage only: production must read and qualify a persisted complete-prefix certificate.
+        var budgets = new ArrayList<com.nereusstream.storage.object.recovery.CumulativeRecoveryBudget>();
+        var manager = new WalRunLifecycleManager(
+                store,
+                TerminalProtocolCheckpointVerifierV1.failClosed(),
+                TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1.failClosed(),
+                (observed, retained, budget) -> {
+                    assertThat(observed).isEqualTo(boundary);
+                    assertThat(retained).isEqualTo(successorRoot);
+                    budget.chargeControlMetadata(19);
+                    budgets.add(budget);
+                    return true;
+                });
+        var successor = manager.publishSuccessorAndAdvance(
+                WalRunControlKeys.pointerKey(7),
+                pointer,
+                boundary.sealKey(),
+                seal,
+                WalRunControlKeys.rootKey(7, 2),
+                successorRoot);
+        assertThat(successor.rootSha256()).isEqualTo(WalRunControlCodec.rootSha256(successorRoot));
+        assertThat(manager.completeSealedPointer(WalRunControlKeys.pointerKey(7), predecessor, Optional.empty())
+                        .outcome())
+                .isEqualTo(WalRunLifecycleManager.SealedPointerCompletionOutcome.ALREADY_ADVANCED_EXACT);
+        assertThat(budgets).hasSize(2);
+        for (var budget : budgets) {
+            assertThat(budget.snapshot().liveRoots()).isOne();
+            assertThat(budget.snapshot().predecessorRuns()).isZero();
+            assertThat(budget.snapshot().canonicalBodyBytes())
+                    .isGreaterThan(WalRunControlCodec.encodeRoot(successorRoot).length() + 19L);
+        }
+        assertThat(store.operations())
+                .doesNotContain("get:" + seal.finalCheckpointHeadKey(), "get:" + terminalHeadKey(1));
+    }
+
+    @Test
     void absentExactSealFailsClosedBeforeSuccessorPublication() {
         TestControlMetadataStore store = new TestControlMetadataStore();
         WalRunLifecycleManager manager = manager(store);

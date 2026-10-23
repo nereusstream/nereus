@@ -44,6 +44,7 @@ public final class M5BookKeeperDeleteFaultFixtureV2 implements AutoCloseable {
     private final M5BookKeeperNativeCreateGuardV2 guard;
     private final M5BookKeeperNativeLedgerManagerV2 manager;
     private final M5BookKeeperNativeCreateSpecV2 spec;
+    private final M5PulsarNativeCreateSpecV1 pulsarSpec;
     private final BookKeeperCapabilitySnapshotV1 capability;
     private final List<org.apache.zookeeper.data.ACL> acls;
 
@@ -53,8 +54,24 @@ public final class M5BookKeeperDeleteFaultFixtureV2 implements AutoCloseable {
             M5BookKeeperNativeCreateSpecV2 spec,
             PhysicalNamespaceAuthorityBindingV2 binding)
             throws Exception {
+        this(uri, capability, spec, binding, null);
+    }
+
+    public M5BookKeeperDeleteFaultFixtureV2(
+            String uri, BookKeeperCapabilitySnapshotV1 capability, M5PulsarNativeCreateSpecV1 spec) throws Exception {
+        this(uri, capability, null, spec.namespaceBinding(), spec);
+    }
+
+    private M5BookKeeperDeleteFaultFixtureV2(
+            String uri,
+            BookKeeperCapabilitySnapshotV1 capability,
+            M5BookKeeperNativeCreateSpecV2 spec,
+            PhysicalNamespaceAuthorityBindingV2 binding,
+            M5PulsarNativeCreateSpecV1 pulsarSpec)
+            throws Exception {
         this.capability = capability;
         this.spec = spec;
+        this.pulsarSpec = pulsarSpec;
         var configuration = RealBookKeeperClientConfigurationV1.from(uri, capability);
         client = (BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(configuration)
                 .build();
@@ -68,14 +85,37 @@ public final class M5BookKeeperDeleteFaultFixtureV2 implements AutoCloseable {
             throw new IllegalStateException("native delete fault client did not connect");
         }
         acls = ZkUtils.getACLs(configuration);
-        guard = new M5BookKeeperNativeCreateGuardV2(zk, URI.create(uri).getPath(), spec, acls, Optional.of(binding));
+        guard = pulsarSpec == null
+                ? new M5BookKeeperNativeCreateGuardV2(zk, URI.create(uri).getPath(), spec, acls, Optional.of(binding))
+                : new M5BookKeeperNativeCreateGuardV2(
+                        zk,
+                        URI.create(uri).getPath(),
+                        pulsarSpec.nativeInstanceId(),
+                        pulsarSpec.sha256(),
+                        pulsarSpec.encode(),
+                        acls,
+                        Optional.of(binding),
+                        true);
         var delegate =
                 (AbstractZkLedgerManager) client.getLedgerManagerFactory().newLedgerManager();
-        manager = new M5BookKeeperNativeLedgerManagerV2(
-                delegate, () -> new M5BookKeeperNativeMetadataDriverV2.CreateScope(spec, guard), zk, acls);
+        manager = pulsarSpec == null
+                ? new M5BookKeeperNativeLedgerManagerV2(
+                        delegate, () -> new M5BookKeeperNativeMetadataDriverV2.CreateScope(spec, guard), zk, acls)
+                : new M5BookKeeperNativeLedgerManagerV2(
+                        delegate,
+                        pulsarSpec,
+                        guard,
+                        (id, value, creating, mutation) ->
+                                CompletableFuture.failedFuture(new UnsupportedOperationException(
+                                        "Fault observer cannot create or update Native metadata")),
+                        zk,
+                        acls);
     }
 
     public M5BookKeeperNativeDeleteAuthorityV2 deleteAuthority(RunLedgerHandleV1 handle) {
+        if (spec == null) {
+            throw new IllegalStateException("Native Pulsar fixture cannot delete a Run ledger");
+        }
         return new M5BookKeeperNativeDeleteAuthorityV2(
                 zk,
                 manager,
@@ -85,6 +125,14 @@ public final class M5BookKeeperDeleteFaultFixtureV2 implements AutoCloseable {
                 spec.namespace(),
                 capability,
                 () -> CompletableFuture.completedFuture(null));
+    }
+
+    public M5BookKeeperNativeDeleteAuthorityV2 pulsarDeleteAuthority(
+            com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.BookKeeperLedger resource) {
+        if (pulsarSpec == null) {
+            throw new IllegalStateException("Run fixture cannot delete a Native Pulsar ledger");
+        }
+        return new M5BookKeeperNativeDeleteAuthorityV2(zk, manager, guard, acls, pulsarSpec, resource, capability);
     }
 
     public void dropNextDeleteCallback() {

@@ -29,7 +29,6 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializedGeneration;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.OutputPartPlan;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PayloadKind;
-import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.RepresentationMode;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
@@ -67,29 +66,41 @@ public final class M5MaterializationCodecV1 {
     private M5MaterializationCodecV1() {}
 
     public static Sha256Digest calculateSourceSetSha256(List<SourceExtent> sources) {
-        return domainHash("NEREUS_V2_M5_SOURCE_SET_V1", out -> {
-            out.writeInt(sources.size());
-            for (SourceExtent source : sources) {
-                writeSource(out, source);
-            }
-        });
+        if (sources.isEmpty()) {
+            throw new IllegalArgumentException("source-set membership is empty");
+        }
+        ProtocolCoverage context = sources.get(0).coverage();
+        return domainHash(
+                context.typedPulsar() ? "NEREUS_V2_M5_PULSAR_SOURCE_SET_V2" : "NEREUS_V2_M5_SOURCE_SET_V1", out -> {
+                    if (context.typedPulsar()) {
+                        writeCoverage(out, context);
+                    }
+                    out.writeInt(sources.size());
+                    for (SourceExtent source : sources) {
+                        writeSource(out, source, context);
+                    }
+                });
     }
 
     public static CanonicalBytes encodeSourceCut(MaterializationSourceCut value) {
         verifySourceSet(value);
         return encode(out -> {
-            preamble(out, SOURCE_CUT_MAGIC);
+            preamble(out, SOURCE_CUT_MAGIC, M5CoverageWireV2.version(value.coverage()));
             writeEnvelope(out, value.identity());
             writeBytes(
                     out, M4ReadControlCodecV1.encodeSelector(value.predecessorSelector()), MAX_EMBEDDED_SELECTOR_BYTES);
             writeDigest(out, value.predecessorSelectorValueSha256());
             writeDigest(out, value.predecessorViewSha256());
             writeCoverage(out, value.coverage());
-            out.writeLong(value.durableFrontier());
-            out.writeLong(value.logEndFrontier());
-            out.writeLong(value.highWatermark());
-            out.writeLong(value.lastStableFrontier());
-            out.writeLong(value.trimFrontier());
+            if (value.coverage().typedPulsar()) {
+                value.pulsarFrontiers().orElseThrow().write(out);
+            } else {
+                out.writeLong(value.durableFrontier());
+                out.writeLong(value.logEndFrontier());
+                out.writeLong(value.highWatermark());
+                out.writeLong(value.lastStableFrontier());
+                out.writeLong(value.trimFrontier());
+            }
             writeDigest(out, value.protocolStateRootSha256());
             writeDigest(out, value.recoveryCheckpointRootSha256());
             writeDigest(out, value.materializationPolicySha256());
@@ -97,25 +108,27 @@ public final class M5MaterializationCodecV1 {
             writeDigest(out, value.sourceSetSha256());
             out.writeInt(value.sources().size());
             for (SourceExtent source : value.sources()) {
-                writeSource(out, source);
+                writeSource(out, source, value.coverage());
             }
         });
     }
 
     public static MaterializationSourceCut decodeSourceCut(CanonicalBytes encoded) {
         MaterializationSourceCut result = decode(encoded, input -> {
-            requirePreamble(input, SOURCE_CUT_MAGIC);
+            int version = readPreamble(input, SOURCE_CUT_MAGIC);
             IdentityEnvelope identity = readEnvelope(input);
             BindingReadSelector predecessor =
                     M4ReadControlCodecV1.decodeSelector(readBytes(input, MAX_EMBEDDED_SELECTOR_BYTES));
             Sha256Digest predecessorValue = readDigest(input);
             Sha256Digest predecessorView = readDigest(input);
-            ProtocolCoverage coverage = readCoverage(input);
-            long durable = input.readLong();
-            long logEnd = input.readLong();
-            long highWatermark = input.readLong();
-            long lastStable = input.readLong();
-            long trim = input.readLong();
+            ProtocolCoverage coverage = readCoverage(input, version);
+            Optional<M5PulsarFrontiersV2> frontiers =
+                    version == 2 ? Optional.of(M5PulsarFrontiersV2.read(input)) : Optional.empty();
+            long durable = version == 2 ? -1 : input.readLong();
+            long logEnd = version == 2 ? -1 : input.readLong();
+            long highWatermark = version == 2 ? -1 : input.readLong();
+            long lastStable = version == 2 ? -1 : input.readLong();
+            long trim = version == 2 ? -1 : input.readLong();
             Sha256Digest protocolState = readDigest(input);
             Sha256Digest recovery = readDigest(input);
             Sha256Digest materializationPolicy = readDigest(input);
@@ -124,7 +137,7 @@ public final class M5MaterializationCodecV1 {
             int count = boundedCount(input, M5MaterializationRecordsV1.MAX_SOURCES, "source count", false);
             List<SourceExtent> sources = new ArrayList<>(count);
             for (int index = 0; index < count; index++) {
-                sources.add(readSource(input));
+                sources.add(readSource(input, coverage));
             }
             return new MaterializationSourceCut(
                     identity,
@@ -142,7 +155,8 @@ public final class M5MaterializationCodecV1 {
                     materializationPolicy,
                     outputPolicy,
                     sourceSet,
-                    sources);
+                    sources,
+                    frontiers);
         });
         requireCanonical(encoded, encodeSourceCut(result));
         return result;
@@ -154,15 +168,19 @@ public final class M5MaterializationCodecV1 {
 
     public static Sha256Digest calculateTaskId(MaterializationSourceCut cut) {
         verifySourceSet(cut);
-        return domainHash("NEREUS_V2_M5_MATERIALIZATION_TASK_V1", out -> {
-            writeEnvelope(out, cut.identity());
-            writeCoverage(out, cut.coverage());
-            writeDigest(out, cut.predecessorSelectorValueSha256());
-            writeDigest(out, cut.sourceSetSha256());
-            writeDigest(out, cut.protocolStateRootSha256());
-            writeDigest(out, cut.materializationPolicySha256());
-            writeDigest(out, cut.outputFormatPolicySha256());
-        });
+        return domainHash(
+                cut.coverage().typedPulsar()
+                        ? "NEREUS_V2_M5_PULSAR_MATERIALIZATION_TASK_V2"
+                        : "NEREUS_V2_M5_MATERIALIZATION_TASK_V1",
+                out -> {
+                    writeEnvelope(out, cut.identity());
+                    writeCoverage(out, cut.coverage());
+                    writeDigest(out, cut.predecessorSelectorValueSha256());
+                    writeDigest(out, cut.sourceSetSha256());
+                    writeDigest(out, cut.protocolStateRootSha256());
+                    writeDigest(out, cut.materializationPolicySha256());
+                    writeDigest(out, cut.outputFormatPolicySha256());
+                });
     }
 
     public static Sha256Digest calculateOutputIdentity(
@@ -175,23 +193,27 @@ public final class M5MaterializationCodecV1 {
             Sha256Digest checksumPolicy,
             List<OutputPartPlan> parts,
             List<IndexPlan> indexes) {
-        return domainHash("NEREUS_V2_M5_MATERIALIZATION_OUTPUT_V1", out -> {
-            writeDigest(out, sourceCutSha256(cut));
-            out.writeByte(mode.ordinal());
-            out.writeByte(payloadKind.ordinal());
-            writeDigest(out, taskId);
-            writeDigest(out, encryptionGeneration);
-            writeDigest(out, compressionPolicy);
-            writeDigest(out, checksumPolicy);
-            writeParts(out, parts);
-            writeIndexes(out, indexes);
-        });
+        return domainHash(
+                cut.coverage().typedPulsar()
+                        ? "NEREUS_V2_M5_PULSAR_MATERIALIZATION_OUTPUT_V2"
+                        : "NEREUS_V2_M5_MATERIALIZATION_OUTPUT_V1",
+                out -> {
+                    writeDigest(out, sourceCutSha256(cut));
+                    out.writeByte(mode.ordinal());
+                    out.writeByte(payloadKind.ordinal());
+                    writeDigest(out, taskId);
+                    writeDigest(out, encryptionGeneration);
+                    writeDigest(out, compressionPolicy);
+                    writeDigest(out, checksumPolicy);
+                    writeParts(out, parts, cut.coverage());
+                    writeIndexes(out, indexes, cut.coverage());
+                });
     }
 
     public static CanonicalBytes encodePlan(MaterializationPlan value) {
         verifyPlanIdentities(value);
         return encode(out -> {
-            preamble(out, PLAN_MAGIC);
+            preamble(out, PLAN_MAGIC, M5CoverageWireV2.version(value.sourceCut().coverage()));
             writeBytes(out, encodeSourceCut(value.sourceCut()), MAX_CONTROL_BYTES);
             out.writeByte(value.representationMode().ordinal());
             out.writeByte(value.payloadKind().ordinal());
@@ -200,15 +222,18 @@ public final class M5MaterializationCodecV1 {
             writeDigest(out, value.encryptionGenerationSha256());
             writeDigest(out, value.compressionPolicySha256());
             writeDigest(out, value.checksumPolicySha256());
-            writeParts(out, value.outputParts());
-            writeIndexes(out, value.indexes());
+            writeParts(out, value.outputParts(), value.sourceCut().coverage());
+            writeIndexes(out, value.indexes(), value.sourceCut().coverage());
         });
     }
 
     public static MaterializationPlan decodePlan(CanonicalBytes encoded) {
         MaterializationPlan result = decode(encoded, input -> {
-            requirePreamble(input, PLAN_MAGIC);
+            int version = readPreamble(input, PLAN_MAGIC);
             MaterializationSourceCut cut = decodeSourceCut(readBytes(input, MAX_CONTROL_BYTES));
+            if (version != M5CoverageWireV2.version(cut.coverage())) {
+                throw new IllegalArgumentException("plan/source-cut coverage versions differ");
+            }
             RepresentationMode mode = enumValue(RepresentationMode.values(), input.readUnsignedByte(), "mode");
             PayloadKind payloadKind = enumValue(PayloadKind.values(), input.readUnsignedByte(), "payload kind");
             Sha256Digest taskId = readDigest(input);
@@ -216,8 +241,8 @@ public final class M5MaterializationCodecV1 {
             Sha256Digest encryption = readDigest(input);
             Sha256Digest compression = readDigest(input);
             Sha256Digest checksum = readDigest(input);
-            List<OutputPartPlan> parts = readParts(input);
-            List<IndexPlan> indexes = readIndexes(input);
+            List<OutputPartPlan> parts = readParts(input, cut.coverage());
+            List<IndexPlan> indexes = readIndexes(input, cut.coverage());
             return new MaterializationPlan(
                     cut, mode, payloadKind, taskId, outputId, encryption, compression, checksum, parts, indexes);
         });
@@ -264,7 +289,7 @@ public final class M5MaterializationCodecV1 {
 
     public static CanonicalBytes encodeGeneration(MaterializedGeneration value) {
         return encode(out -> {
-            preamble(out, GENERATION_MAGIC);
+            preamble(out, GENERATION_MAGIC, M5CoverageWireV2.version(value.coverage()));
             writeEnvelope(out, value.identity());
             out.writeByte(value.representationMode().ordinal());
             out.writeByte(value.payloadKind().ordinal());
@@ -278,30 +303,38 @@ public final class M5MaterializationCodecV1 {
             writeDigest(out, value.validationRootSha256());
             writeDigest(out, value.predecessorSelectedViewSha256());
             writeOptionalDigest(out, value.fallbackSetSha256());
-            writeGenerationObjects(out, value.payloadObjects());
-            writeGenerationObjects(out, value.indexObjects());
+            writeGenerationObjects(out, value.payloadObjects(), value.coverage());
+            writeGenerationObjects(out, value.indexObjects(), value.coverage());
         });
     }
 
     public static MaterializedGeneration decodeGeneration(CanonicalBytes encoded) {
         MaterializedGeneration result = decode(encoded, input -> {
-            requirePreamble(input, GENERATION_MAGIC);
+            int version = readPreamble(input, GENERATION_MAGIC);
+            IdentityEnvelope identity = readEnvelope(input);
+            RepresentationMode mode = enumValue(RepresentationMode.values(), input.readUnsignedByte(), "mode");
+            PayloadKind kind = enumValue(PayloadKind.values(), input.readUnsignedByte(), "payload kind");
+            Sha256Digest task = readDigest(input);
+            Sha256Digest output = readDigest(input);
+            Sha256Digest sourceSet = readDigest(input);
+            long generation = input.readLong();
+            ProtocolCoverage coverage = readCoverage(input, version);
             return new MaterializedGeneration(
-                    readEnvelope(input),
-                    enumValue(RepresentationMode.values(), input.readUnsignedByte(), "mode"),
-                    enumValue(PayloadKind.values(), input.readUnsignedByte(), "payload kind"),
-                    readDigest(input),
-                    readDigest(input),
-                    readDigest(input),
-                    input.readLong(),
-                    readCoverage(input),
-                    readDigest(input),
-                    readOptionalDigest(input),
-                    readDigest(input),
+                    identity,
+                    mode,
+                    kind,
+                    task,
+                    output,
+                    sourceSet,
+                    generation,
+                    coverage,
                     readDigest(input),
                     readOptionalDigest(input),
-                    readGenerationObjects(input),
-                    readGenerationObjects(input));
+                    readDigest(input),
+                    readDigest(input),
+                    readOptionalDigest(input),
+                    readGenerationObjects(input, coverage),
+                    readGenerationObjects(input, coverage));
         });
         requireCanonical(encoded, encodeGeneration(result));
         return result;
@@ -309,7 +342,7 @@ public final class M5MaterializationCodecV1 {
 
     public static CanonicalBytes encodeManifest(BindingManifestView value) {
         return encode(out -> {
-            preamble(out, MANIFEST_MAGIC);
+            preamble(out, MANIFEST_MAGIC, M5CoverageWireV2.version(value.coverage()));
             writeEnvelope(out, value.identity());
             writeDigest(out, value.preferredGenerationSha256());
             writeDigest(out, value.exactPredecessorViewSha256());
@@ -321,13 +354,13 @@ public final class M5MaterializationCodecV1 {
 
     public static BindingManifestView decodeManifest(CanonicalBytes encoded) {
         BindingManifestView result = decode(encoded, input -> {
-            requirePreamble(input, MANIFEST_MAGIC);
+            int version = readPreamble(input, MANIFEST_MAGIC);
             return new BindingManifestView(
                     readEnvelope(input),
                     readDigest(input),
                     readDigest(input),
                     readDigest(input),
-                    readCoverage(input),
+                    readCoverage(input, version),
                     readOptionalDigest(input));
         });
         requireCanonical(encoded, encodeManifest(result));
@@ -430,10 +463,11 @@ public final class M5MaterializationCodecV1 {
         return new IdentityEnvelope(cell, scope, binding, owner, worker, storage, capability);
     }
 
-    private static void writeSource(DataOutputStream out, SourceExtent value) throws IOException {
+    private static void writeSource(DataOutputStream out, SourceExtent value, ProtocolCoverage context)
+            throws IOException {
         out.writeByte(value.kind().ordinal());
         writeDigest(out, value.sourceIdentitySha256());
-        writeCoverage(out, value.coverage());
+        M5CoverageWireV2.writeChild(out, value.coverage(), context);
         writeText(out, value.physicalKey());
         out.writeLong(value.canonicalLength());
         out.writeInt(value.recordCount());
@@ -450,12 +484,15 @@ public final class M5MaterializationCodecV1 {
         for (Sha256Digest member : value.memberBindingIds()) {
             writeDigest(out, member);
         }
+        if (context.typedPulsar()) {
+            writeDigest(out, value.pulsarEntryRootSha256().orElseThrow());
+        }
     }
 
-    private static SourceExtent readSource(DataInputStream input) throws IOException {
+    private static SourceExtent readSource(DataInputStream input, ProtocolCoverage context) throws IOException {
         SourceKind kind = enumValue(SourceKind.values(), input.readUnsignedByte(), "source kind");
         Sha256Digest identity = readDigest(input);
-        ProtocolCoverage coverage = readCoverage(input);
+        ProtocolCoverage coverage = M5CoverageWireV2.readChild(input, context);
         String key = readText(input);
         long length = input.readLong();
         int recordCount = input.readInt();
@@ -466,8 +503,8 @@ public final class M5MaterializationCodecV1 {
         Optional<Sha256Digest> ledger = readOptionalDigest(input);
         Sha256Digest format = readDigest(input);
         Sha256Digest encryption = readDigest(input);
-        boolean readable = input.readBoolean();
-        boolean indexed = input.readBoolean();
+        boolean readable = readSourceBoolean(input, context);
+        boolean indexed = readSourceBoolean(input, context);
         int members = boundedCount(input, M5MaterializationRecordsV1.MAX_MEMBER_BINDINGS, "member bindings", false);
         List<Sha256Digest> memberBindings = new ArrayList<>(members);
         for (int index = 0; index < members; index++) {
@@ -489,27 +526,29 @@ public final class M5MaterializationCodecV1 {
                 encryption,
                 readable,
                 indexed,
-                memberBindings);
+                memberBindings,
+                context.typedPulsar() ? Optional.of(readDigest(input)) : Optional.empty());
     }
 
-    private static void writeParts(DataOutputStream out, List<OutputPartPlan> values) throws IOException {
+    private static void writeParts(DataOutputStream out, List<OutputPartPlan> values, ProtocolCoverage context)
+            throws IOException {
         out.writeInt(values.size());
         for (OutputPartPlan value : values) {
             out.writeInt(value.ordinal());
-            writeCoverage(out, value.coverage());
+            M5CoverageWireV2.writeChild(out, value.coverage(), context);
             out.writeByte(value.payloadKind().ordinal());
             writeDigest(out, value.canonicalPlanSha256());
             writeText(out, value.objectKey());
         }
     }
 
-    private static List<OutputPartPlan> readParts(DataInputStream input) throws IOException {
+    private static List<OutputPartPlan> readParts(DataInputStream input, ProtocolCoverage context) throws IOException {
         int count = boundedCount(input, M5MaterializationRecordsV1.MAX_PARTS, "part count", false);
         List<OutputPartPlan> result = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             result.add(new OutputPartPlan(
                     input.readInt(),
-                    readCoverage(input),
+                    M5CoverageWireV2.readChild(input, context),
                     enumValue(PayloadKind.values(), input.readUnsignedByte(), "payload kind"),
                     readDigest(input),
                     readText(input)));
@@ -517,24 +556,25 @@ public final class M5MaterializationCodecV1 {
         return result;
     }
 
-    private static void writeIndexes(DataOutputStream out, List<IndexPlan> values) throws IOException {
+    private static void writeIndexes(DataOutputStream out, List<IndexPlan> values, ProtocolCoverage context)
+            throws IOException {
         out.writeInt(values.size());
         for (IndexPlan value : values) {
             out.writeByte(value.kind().ordinal());
-            writeCoverage(out, value.coverage());
+            M5CoverageWireV2.writeChild(out, value.coverage(), context);
             out.writeInt(value.parserVersion());
             writeDigest(out, value.canonicalPlanSha256());
             writeText(out, value.objectKey());
         }
     }
 
-    private static List<IndexPlan> readIndexes(DataInputStream input) throws IOException {
+    private static List<IndexPlan> readIndexes(DataInputStream input, ProtocolCoverage context) throws IOException {
         int count = boundedCount(input, M5MaterializationRecordsV1.MAX_INDEXES, "index count", true);
         List<IndexPlan> result = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             result.add(new IndexPlan(
                     enumValue(IndexKind.values(), input.readUnsignedByte(), "index kind"),
-                    readCoverage(input),
+                    M5CoverageWireV2.readChild(input, context),
                     input.readInt(),
                     readDigest(input),
                     readText(input)));
@@ -542,12 +582,13 @@ public final class M5MaterializationCodecV1 {
         return result;
     }
 
-    private static void writeGenerationObjects(DataOutputStream out, List<GenerationObject> values) throws IOException {
+    private static void writeGenerationObjects(
+            DataOutputStream out, List<GenerationObject> values, ProtocolCoverage context) throws IOException {
         out.writeInt(values.size());
         for (GenerationObject value : values) {
             out.writeInt(value.ordinal());
             out.writeInt(value.indexKind() == null ? -1 : value.indexKind().ordinal());
-            writeCoverage(out, value.coverage());
+            M5CoverageWireV2.writeChild(out, value.coverage(), context);
             writeText(out, value.identity().key());
             out.writeLong(value.identity().bodyLength());
             writeDigest(out, value.identity().bodySha256());
@@ -555,14 +596,15 @@ public final class M5MaterializationCodecV1 {
         }
     }
 
-    private static List<GenerationObject> readGenerationObjects(DataInputStream input) throws IOException {
+    private static List<GenerationObject> readGenerationObjects(DataInputStream input, ProtocolCoverage context)
+            throws IOException {
         int count = boundedCount(input, M5MaterializationRecordsV1.MAX_PARTS, "generation Object count", true);
         List<GenerationObject> result = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             int ordinal = input.readInt();
             int rawKind = input.readInt();
             IndexKind kind = rawKind == -1 ? null : enumValue(IndexKind.values(), rawKind, "index kind");
-            ProtocolCoverage coverage = readCoverage(input);
+            ProtocolCoverage coverage = M5CoverageWireV2.readChild(input, context);
             ObjectIdentity identity = new ObjectIdentity(readText(input), input.readLong(), readDigest(input));
             result.add(new GenerationObject(ordinal, kind, coverage, identity, readOptionalBytes(input)));
         }
@@ -570,16 +612,19 @@ public final class M5MaterializationCodecV1 {
     }
 
     private static void writeCoverage(DataOutputStream out, ProtocolCoverage value) throws IOException {
-        out.writeByte(value.domain().ordinal());
-        out.writeLong(value.inclusiveStart());
-        out.writeLong(value.exclusiveEnd());
+        M5CoverageWireV2.writeFull(out, value);
     }
 
-    private static ProtocolCoverage readCoverage(DataInputStream input) throws IOException {
-        return new ProtocolCoverage(
-                enumValue(PositionDomain.values(), input.readUnsignedByte(), "position domain"),
-                input.readLong(),
-                input.readLong());
+    private static ProtocolCoverage readCoverage(DataInputStream input, int version) throws IOException {
+        return M5CoverageWireV2.readFull(input, version);
+    }
+
+    private static boolean readSourceBoolean(DataInputStream input, ProtocolCoverage context) throws IOException {
+        int flag = input.readUnsignedByte();
+        if (context.typedPulsar() && flag > 1) {
+            throw new IllegalArgumentException("Pulsar source boolean flag is unknown");
+        }
+        return flag != 0;
     }
 
     private static Sha256Digest domainHash(String domain, Writer writer) {
@@ -590,8 +635,23 @@ public final class M5MaterializationCodecV1 {
     }
 
     private static void preamble(DataOutputStream out, int magic) throws IOException {
+        preamble(out, magic, VERSION);
+    }
+
+    private static void preamble(DataOutputStream out, int magic, int version) throws IOException {
         out.writeInt(magic);
-        out.writeInt(VERSION);
+        out.writeInt(version);
+    }
+
+    private static int readPreamble(DataInputStream input, int magic) throws IOException {
+        if (input.readInt() != magic) {
+            throw new IllegalArgumentException("M5 materialization magic differs");
+        }
+        int version = input.readInt();
+        if (version != 1 && version != 2) {
+            throw new IllegalArgumentException("M5 materialization version is unknown");
+        }
+        return version;
     }
 
     private static void requirePreamble(DataInputStream input, int magic) throws IOException {

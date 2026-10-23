@@ -17,6 +17,7 @@ package com.nereusstream.pulsar.offload;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /** Cell-scoped immutable Object provider seam for one sealed-ledger attempt. */
@@ -101,6 +102,12 @@ public interface PulsarOffloadObjectStoreV1 {
     CompletionStage<ImmutableObject> head(String key);
 
     CompletionStage<byte[]> readRange(String key, long offset, int length);
+
+    /** GET must bind and verify this exact proof in the same response; HEAD plus an unbound GET is insufficient. */
+    default CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+        return CompletableFuture.failedFuture(
+                new ObjectStoreException(FailureKind.UNAVAILABLE, "version-bound Object reads are unsupported"));
+    }
 
     CompletionStage<Void> deleteAndProveAbsent(String key);
 

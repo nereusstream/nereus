@@ -257,8 +257,19 @@ public final class KafkaSemanticCompactorV1 {
                                     previous.recordIdentitySha256()));
                 }
             }
-            Optional<CanonicalBytes> outputBody = KafkaRecordBatchCodecV1.rewrite(
-                    input, retained, plan.policy().outputCompression());
+            Optional<CanonicalBytes> outputBody =
+                    (plan.policy().compressionPolicy() == KafkaCompactionRecordsV1.OutputCompressionPolicy.PRODUCER
+                                    || plan.policy()
+                                            .rewritePolicyVersion()
+                                            .equals(KafkaCompactionRecordsV1.NATIVE_REWRITE_POLICY_VERSION))
+                            ? KafkaRecordBatchCodecV1.rewriteNative(
+                                    input,
+                                    retained,
+                                    plan.policy().outputCompressionFor(input),
+                                    plan.policy().capturedNowMs(),
+                                    plan.policy().deleteRetentionMs())
+                            : KafkaRecordBatchCodecV1.rewrite(
+                                    input, retained, plan.policy().outputCompressionFor(input));
             Optional<ParsedBatch> output = outputBody.map(KafkaRecordBatchCodecV1::parse);
             outputs.add(
                     new BatchOutput(input, output, outputBody, output.isPresent() ? outputOrdinal : -1, payloadOffset));
@@ -308,7 +319,7 @@ public final class KafkaSemanticCompactorV1 {
                 plan.sourceCut().identity().providerScopeSha256(),
                 hash(
                         "M5-B-COMPRESSION-POLICY-V1",
-                        plan.policy().outputCompression().name()),
+                        plan.policy().compressionPolicy().name()),
                 hash("M5-B-CHECKSUM-POLICY-V1", "KAFKA_CRC32C_AND_FULL_SHA256"),
                 parts,
                 indexes);
@@ -321,7 +332,7 @@ public final class KafkaSemanticCompactorV1 {
                 plan.sourceCut().identity().providerScopeSha256(),
                 hash(
                         "M5-B-COMPRESSION-POLICY-V1",
-                        plan.policy().outputCompression().name()),
+                        plan.policy().compressionPolicy().name()),
                 hash("M5-B-CHECKSUM-POLICY-V1", "KAFKA_CRC32C_AND_FULL_SHA256"),
                 parts,
                 indexes);

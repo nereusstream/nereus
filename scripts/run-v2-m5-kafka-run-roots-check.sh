@@ -56,7 +56,7 @@ for path,sha in json.loads(inputs).items():
     candidate=(root/path).resolve()
     if not candidate.is_relative_to(root.resolve()) or hashlib.sha256(candidate.read_bytes()).hexdigest()!=sha:
         raise SystemExit('Legacy tested source changed: '+path)
-if sum(suite['tests'] for suite in summary['suites'])!=83:
+if sum(suite['tests'] for suite in summary['suites'])!=84:
     raise SystemExit('Legacy focused suite count differs')
 for suite in summary['suites']:
     data=(previous/(suite['task']+'.xml')).read_bytes(); actual=ET.fromstring(data)
@@ -162,8 +162,8 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
     raise SystemExit('Native BK restart did not retain all four exact containers and change their start times')
 suites=[]
 for module,task,name,count in (
-    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',12),
-    ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',5),
+    ('nereus-metadata-oxia','v2M5KafkaRunRootTest','OxiaKafkaRunRootAuthorityV2Test',19),
+    ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRealTest','KafkaBookKeeperRunRootsV2RealTest',16),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartWriteTest','KafkaBookKeeperRunRootsV2RealTest',1),
     ('nereus-kafka-bookkeeper','v2M5KafkaRunRootsRestartReadTest','KafkaBookKeeperRunRootsV2RealTest',1),
     ('nereus-storage-object','v2M5MultiWriterTicketTest','M5TargetDeleteMultiWriterGuardV2Test',9),

@@ -36,9 +36,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.crypto.SecretKey;
+import org.apache.bookkeeper.mledger.SourceSafeLedgerOffloader.OffloadedReadMemoryBounds;
 
 /** Bounded NPO1/NPD1 Object-side read handle for one immutable sealed-ledger attempt. */
 public final class PulsarObjectReadHandleV1 {
@@ -88,8 +89,13 @@ public final class PulsarObjectReadHandleV1 {
     private final PulsarSealedLedgerAttemptV1 attempt;
     private final SecretKey attemptKey;
     private final Root root;
+    private final ImmutableObject rootObject;
+    private final ImmutableObject dataObject;
     private final byte[] dataHeader;
-    private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object lifetimeLock = new Object();
+    private final CompletableFuture<Void> drained = new CompletableFuture<>();
+    private boolean closed;
+    private int activeReads;
 
     private PulsarObjectReadHandleV1(
             PulsarOffloadObjectStoreV1 objectStore,
@@ -97,12 +103,16 @@ public final class PulsarObjectReadHandleV1 {
             PulsarSealedLedgerAttemptV1 attempt,
             SecretKey attemptKey,
             Root root,
+            ImmutableObject rootObject,
+            ImmutableObject dataObject,
             byte[] dataHeader) {
         this.objectStore = objectStore;
         this.limits = limits;
         this.attempt = attempt;
         this.attemptKey = attemptKey;
         this.root = root;
+        this.rootObject = rootObject;
+        this.dataObject = dataObject;
         this.dataHeader = dataHeader.clone();
     }
 
@@ -121,21 +131,36 @@ public final class PulsarObjectReadHandleV1 {
                     if (rootProof.bytes() > Npo1CodecV1.MAX_ROOT_BYTES || rootProof.bytes() > Integer.MAX_VALUE) {
                         return failed(ReadFailureKind.FORMAT, "provider NPO1 length exceeds the hard cap");
                     }
-                    return readExact(objectStore, keys.rootKey(), 0, Math.toIntExact(rootProof.bytes()), "root GET")
-                            .thenApply(rootBytes -> parseRoot(rootBytes, rootProof, limits, attempt));
+                    return readExact(
+                                    objectStore,
+                                    keys.rootKey(),
+                                    rootProof,
+                                    0,
+                                    Math.toIntExact(rootProof.bytes()),
+                                    "root GET")
+                            .thenApply(rootBytes -> new NativeRoot(
+                                    parseRoot(rootBytes, rootProof, limits, attempt), attempt, rootProof));
                 })
-                .thenCompose(root -> provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
-                        .thenCompose(dataProof -> validateDataProof(root, dataProof)
+                .thenCompose(opened -> provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
+                        .thenCompose(dataProof -> validateDataProof(opened.root(), dataProof)
                                 .thenCompose(ignored -> readExact(
                                         objectStore,
                                         keys.dataKey(),
+                                        dataProof,
                                         0,
                                         Npd1CodecV1.DATA_HEADER_BYTES,
                                         "data header GET"))
                                 .thenApply(header -> {
-                                    validateDataHeader(root, header);
+                                    validateDataHeader(opened.root(), header);
                                     return new PulsarObjectReadHandleV1(
-                                            objectStore, limits, attempt, attemptKey, root, header);
+                                            objectStore,
+                                            limits,
+                                            attempt,
+                                            attemptKey,
+                                            opened.root(),
+                                            opened.rootObject(),
+                                            dataProof,
+                                            header);
                                 })));
     }
 
@@ -149,6 +174,32 @@ public final class PulsarObjectReadHandleV1 {
             int blockTargetBytes,
             CompressionPolicy compressionPolicy,
             NativeAttemptKeyResolver keyResolver) {
+        return openNative(
+                objectStore,
+                limits,
+                ledgerId,
+                attemptUuid,
+                providerScopePrefix,
+                retentionClass,
+                blockTargetBytes,
+                compressionPolicy,
+                keyResolver,
+                null,
+                null);
+    }
+
+    static CompletionStage<PulsarObjectReadHandleV1> openNative(
+            PulsarOffloadObjectStoreV1 objectStore,
+            PulsarOffloadLimitCandidateV1 limits,
+            long ledgerId,
+            UUID attemptUuid,
+            String providerScopePrefix,
+            RetentionClass retentionClass,
+            int blockTargetBytes,
+            CompressionPolicy compressionPolicy,
+            NativeAttemptKeyResolver keyResolver,
+            ImmutableObject publishedRoot,
+            ImmutableObject publishedData) {
         Objects.requireNonNull(objectStore, "objectStore");
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(attemptUuid, "attemptUuid");
@@ -160,12 +211,23 @@ public final class PulsarObjectReadHandleV1 {
             return failed(ReadFailureKind.FORMAT, "persisted NPD1 block target is not admitted");
         }
         PulsarOffloadKeysV1 keys = PulsarOffloadKeysV1.derive(providerScopePrefix, ledgerId, attemptUuid);
-        return provider(() -> objectStore.head(keys.rootKey()), "root HEAD")
+        if ((publishedRoot == null) != (publishedData == null)) {
+            return failed(ReadFailureKind.FORMAT, "published Object source is incomplete");
+        }
+        return (publishedRoot == null
+                        ? provider(() -> objectStore.head(keys.rootKey()), "root HEAD")
+                        : CompletableFuture.completedFuture(publishedRoot))
                 .thenCompose(rootProof -> {
                     if (rootProof.bytes() > Npo1CodecV1.MAX_ROOT_BYTES || rootProof.bytes() > Integer.MAX_VALUE) {
                         return failed(ReadFailureKind.FORMAT, "provider NPO1 length exceeds the hard cap");
                     }
-                    return readExact(objectStore, keys.rootKey(), 0, Math.toIntExact(rootProof.bytes()), "root GET")
+                    return readExact(
+                                    objectStore,
+                                    keys.rootKey(),
+                                    rootProof,
+                                    0,
+                                    Math.toIntExact(rootProof.bytes()),
+                                    "root GET")
                             .thenApply(rootBytes -> parseNativeRoot(
                                     rootBytes,
                                     rootProof,
@@ -189,11 +251,14 @@ public final class PulsarObjectReadHandleV1 {
                         return CompletableFuture.failedFuture(
                                 new ObjectReadException(kind, "attempt key unwrap failed", failure));
                     }
-                    return provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
+                    return (publishedData == null
+                                    ? provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
+                                    : CompletableFuture.completedFuture(publishedData))
                             .thenCompose(dataProof -> validateDataProof(nativeRoot.root(), dataProof)
                                     .thenCompose(ignored -> readExact(
                                             objectStore,
                                             keys.dataKey(),
+                                            dataProof,
                                             0,
                                             Npd1CodecV1.DATA_HEADER_BYTES,
                                             "data header GET"))
@@ -205,6 +270,8 @@ public final class PulsarObjectReadHandleV1 {
                                                 nativeRoot.attempt(),
                                                 attemptKey,
                                                 nativeRoot.root(),
+                                                nativeRoot.rootObject(),
+                                                dataProof,
                                                 header);
                                     }));
                 });
@@ -218,10 +285,36 @@ public final class PulsarObjectReadHandleV1 {
         return root;
     }
 
-    public CompletionStage<List<EntryPayload>> read(long firstEntryId, long lastEntryId) {
-        if (closed.get()) {
-            return failed(ReadFailureKind.CLOSED, "Object read handle is closed");
+    /** Facts validated by this handle's version-bound open; these alone grant no lifecycle authority. */
+    public ImmutableObject rootObject() {
+        return rootObject;
+    }
+
+    public ImmutableObject dataObject() {
+        return dataObject;
+    }
+
+    OffloadedReadMemoryBounds memoryBounds() {
+        long encoded = 0;
+        long decoded = 0;
+        int entries = 0;
+        for (var block : root.sparseIndex()) {
+            encoded = Math.max(encoded, block.encodedBlockBytes());
+            decoded = Math.max(decoded, block.decodedBlockBytes());
+            entries = Math.max(entries, block.entryCount());
         }
+        return new OffloadedReadMemoryBounds(encoded, decoded, entries);
+    }
+
+    boolean usesObjectStore(PulsarOffloadObjectStoreV1 expected) {
+        return objectStore == expected;
+    }
+
+    public CompletionStage<List<EntryPayload>> read(long firstEntryId, long lastEntryId) {
+        return admittedRead(() -> readRange(firstEntryId, lastEntryId));
+    }
+
+    private CompletionStage<List<EntryPayload>> readRange(long firstEntryId, long lastEntryId) {
         if (firstEntryId < 0
                 || lastEntryId < firstEntryId
                 || lastEntryId > root.sealedLedger().lastAddConfirmed()) {
@@ -248,23 +341,79 @@ public final class PulsarObjectReadHandleV1 {
     }
 
     public CompletionStage<VerificationReport> verifyCompleteLedger() {
-        if (closed.get()) {
-            return failed(ReadFailureKind.CLOSED, "Object read handle is closed");
-        }
+        return verifyCompleteLedger(() -> true);
+    }
+
+    CompletionStage<VerificationReport> verifyCompleteLedger(BooleanSupplier sourceUseOpen) {
+        return admittedRead(() -> verifyLedger(sourceUseOpen));
+    }
+
+    private CompletionStage<VerificationReport> verifyLedger(BooleanSupplier sourceUseOpen) {
         VerificationAccumulator accumulator = new VerificationAccumulator(dataHeader);
         CompletionStage<Void> chain = CompletableFuture.completedFuture(null);
         for (SparseBlock block : root.sparseIndex()) {
-            chain = chain.thenCompose(ignored -> readEncodedBlock(block).thenAccept(encoded -> {
-                List<EntryPayload> entries = decodeBlock(encoded, block);
-                accumulator.accept(block, encoded, entries);
-            }));
+            chain = chain.thenCompose(ignored -> {
+                if (!sourceUseOpen.getAsBoolean()) {
+                    return CompletableFuture.failedFuture(
+                            new ObjectReadException(ReadFailureKind.CANCELLED, "verification source use is closed"));
+                }
+                return readEncodedBlock(block).thenAccept(encoded -> {
+                    if (!sourceUseOpen.getAsBoolean()) {
+                        throw new ObjectReadException(ReadFailureKind.CANCELLED, "verification source use is closed");
+                    }
+                    List<EntryPayload> entries = decodeBlock(encoded, block);
+                    accumulator.accept(block, encoded, entries);
+                });
+            });
         }
         return chain.thenApply(ignored -> accumulator.finish(root));
     }
 
     public CompletionStage<Void> close() {
-        closed.set(true);
-        return CompletableFuture.completedFuture(null);
+        boolean complete;
+        synchronized (lifetimeLock) {
+            closed = true;
+            complete = activeReads == 0;
+        }
+        if (complete) {
+            drained.complete(null);
+        }
+        return drained.copy();
+    }
+
+    private <T> CompletionStage<T> admittedRead(Supplier<CompletionStage<T>> operation) {
+        synchronized (lifetimeLock) {
+            if (closed) {
+                return failed(ReadFailureKind.CLOSED, "Object read handle is closed");
+            }
+            activeReads++;
+        }
+        CompletableFuture<T> result = new CompletableFuture<>();
+        try {
+            operation.get().whenComplete((value, failure) -> {
+                readFinished();
+                if (failure == null) {
+                    result.complete(value);
+                } else {
+                    result.completeExceptionally(failure);
+                }
+            });
+        } catch (Throwable failure) {
+            readFinished();
+            result.completeExceptionally(failure);
+        }
+        return result.copy();
+    }
+
+    private void readFinished() {
+        boolean complete;
+        synchronized (lifetimeLock) {
+            activeReads--;
+            complete = closed && activeReads == 0;
+        }
+        if (complete) {
+            drained.complete(null);
+        }
     }
 
     private CompletionStage<List<EntryPayload>> readBlock(SparseBlock block) {
@@ -272,12 +421,10 @@ public final class PulsarObjectReadHandleV1 {
     }
 
     private CompletionStage<byte[]> readEncodedBlock(SparseBlock block) {
-        if (closed.get()) {
-            return failed(ReadFailureKind.CLOSED, "Object read handle is closed");
-        }
         return readExact(
                 objectStore,
                 attempt.keys().dataKey(),
+                dataObject,
                 block.blockOffset(),
                 block.encodedBlockBytes(),
                 "NPD1 block range GET");
@@ -341,7 +488,7 @@ public final class PulsarObjectReadHandleV1 {
                 retentionClass,
                 DeleteState.BK_DELETE_NONE,
                 false);
-        return new NativeRoot(root, attempt);
+        return new NativeRoot(root, attempt, rootProof);
     }
 
     private static boolean compressionPolicyAllows(CompressionPolicy policy, CompressionFamily actual) {
@@ -408,8 +555,13 @@ public final class PulsarObjectReadHandleV1 {
     }
 
     private static CompletionStage<byte[]> readExact(
-            PulsarOffloadObjectStoreV1 objectStore, String key, long offset, int length, String operation) {
-        return provider(() -> objectStore.readRange(key, offset, length), operation)
+            PulsarOffloadObjectStoreV1 objectStore,
+            String key,
+            ImmutableObject expected,
+            long offset,
+            int length,
+            String operation) {
+        return provider(() -> objectStore.readRange(key, expected, offset, length), operation)
                 .thenApply(bytes -> {
                     if (bytes.length != length) {
                         throw new ObjectReadException(
@@ -483,7 +635,7 @@ public final class PulsarObjectReadHandleV1 {
         }
     }
 
-    private record NativeRoot(Root root, PulsarSealedLedgerAttemptV1 attempt) {}
+    private record NativeRoot(Root root, PulsarSealedLedgerAttemptV1 attempt, ImmutableObject rootObject) {}
 
     private static final class VerificationAccumulator {
         private final MessageDigest digest = digest();

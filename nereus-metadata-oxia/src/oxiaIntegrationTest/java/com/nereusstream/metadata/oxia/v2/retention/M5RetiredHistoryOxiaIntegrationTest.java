@@ -28,7 +28,14 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.M
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
+import com.nereusstream.storage.object.materialization.M5MaterializationAdmissionV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationCoordinatorV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationKeysV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationPlannerV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
@@ -45,6 +52,10 @@ import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.Bat
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingRetirementAuthorityV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
 import com.nereusstream.storage.object.retention.M5BindingRetirementCoordinatorV1;
+import com.nereusstream.storage.object.retention.M5LogicalTrimCoordinatorV1;
+import com.nereusstream.storage.object.retention.M5RetentionCodecV1;
+import com.nereusstream.storage.object.retention.M5RetentionKeysV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.M4ReleaseBindingV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceKindV1;
@@ -74,6 +85,365 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 30, unit = TimeUnit.MINUTES)
 class M5RetiredHistoryOxiaIntegrationTest {
     static final CapabilityBinding CAPABILITY = new CapabilityBinding(7, digest("m5-capability"));
+
+    @Test
+    void declaredTypedRetentionRecordsUseActualScopedOxiaAndSurviveLostTrimReply() throws Exception {
+        try (Fixture fixture = Fixture.create(1)) {
+            var cell = digest(fixture.root + "/typed-retention-cell");
+            var route = new OxiaBindingLifecycleMetadataStoreV2(fixture.faults, fixture.root, 7, fixture.binding, cell);
+            var stored = await(route.read(fixture.selectorKey)).orElseThrow();
+            var fact = new AuthorityFactV1(stored.key(), stored.metadataVersion(), stored.canonicalStoredSha256());
+            var snapshot = declaredTypedFloor(
+                    fixture.binding,
+                    cell,
+                    fact,
+                    new M5PulsarCoverageV2.Position(91, 0),
+                    new M5PulsarCoverageV2.Position(91, 3));
+            var keys = new M5RetentionKeysV1(7, fixture.binding);
+            String snapshotKey = keys.floorSnapshot(snapshot.snapshotRootSha256());
+            assertThat(await(route.compareAndSet(
+                            Optional.empty(), snapshotKey, M5RetentionCodecV1.encodeSnapshot(snapshot))))
+                    .isEqualTo(MutationOutcome.APPLIED_EXACT);
+            assertThat(await(fixture.nativeStore.read(route.nativeKey(snapshotKey)))
+                            .orElseThrow()
+                            .canonicalStoredBytes())
+                    .isEqualTo(M5RetentionCodecV1.encodeSnapshot(snapshot));
+            fixture.faults.loseNextTrimResponse = true;
+            var applied = await(new M5LogicalTrimCoordinatorV1(route).advance(keys.trimFrontier(), snapshot));
+            assertThat(applied.outcome()).isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
+            assertThat(fixture.faults.loseNextTrimResponse).isFalse();
+            assertThat(fixture.faults.lastMutationKey).isEqualTo(route.nativeKey(fixture.selectorKey));
+            var coverage = M5MaterializationRecordsV1.ProtocolCoverage.pulsar(
+                    snapshot.pulsarContext().orElseThrow().coverage());
+            var rows = java.util.Arrays.stream(ReferenceKindV1.values())
+                    .map(kind -> new M5RetentionRecordsV1.ReferenceObservationV1(
+                            kind,
+                            fact,
+                            digest("declared-storage-target"),
+                            coverage,
+                            M5RetentionRecordsV1.ReferenceDispositionV1.ABSENT,
+                            true))
+                    .toList();
+            var scans = java.util.Arrays.stream(ReferenceKindV1.values())
+                    .map(kind -> new M5RetentionRecordsV1.ReferenceScanSummaryV1(kind, 1, 1, 64, true))
+                    .toList();
+            var proof = M5RetentionCodecV1.finalizeProof(new M5RetentionRecordsV1.ReferenceFreeProofV1(
+                    snapshot.identity(),
+                    ReferenceTargetKindV1.UNSELECTED_OUTPUT,
+                    digest("declared-storage-target"),
+                    coverage,
+                    fact,
+                    fact,
+                    fact,
+                    snapshot.snapshotRootSha256(),
+                    M5RetentionCodecV1.calculateObservationsRoot(rows),
+                    List.of(),
+                    fact,
+                    fact,
+                    fact,
+                    fact,
+                    1,
+                    2,
+                    scans,
+                    rows,
+                    digest("placeholder")));
+            String proofKey = keys.referenceFreeProof(proof.proofSha256());
+            assertThat(await(route.compareAndSet(
+                            Optional.empty(), proofKey, M5RetentionCodecV1.encodeReferenceFreeProof(proof))))
+                    .isEqualTo(MutationOutcome.APPLIED_EXACT);
+            fixture.reconnect();
+            var reopened =
+                    new OxiaBindingLifecycleMetadataStoreV2(fixture.client, fixture.root, 7, fixture.binding, cell);
+            assertThat(M5RetentionCodecV1.decodeSnapshot(
+                            await(reopened.read(snapshotKey)).orElseThrow().canonicalStoredBytes()))
+                    .isEqualTo(snapshot);
+            assertThat(M5RetentionCodecV1.decodeReferenceFreeProof(
+                            await(reopened.read(proofKey)).orElseThrow().canonicalStoredBytes()))
+                    .isEqualTo(proof);
+            assertThat(await(reopened.readLogicalTrimFrontier()).orElseThrow())
+                    .isEqualTo(applied.exactFrontier().orElseThrow());
+            assertThat(await(new M5LogicalTrimCoordinatorV1(reopened).advance(keys.trimFrontier(), snapshot))
+                            .outcome())
+                    .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.EXISTING_EXACT);
+            var currentAuthority = await(reopened.read(fixture.selectorKey)).orElseThrow();
+            var currentFact = new AuthorityFactV1(
+                    currentAuthority.key(),
+                    currentAuthority.metadataVersion(),
+                    currentAuthority.canonicalStoredSha256());
+            var next = declaredTypedFloor(
+                    fixture.binding,
+                    cell,
+                    currentFact,
+                    snapshot.minimumPulsarFloor(),
+                    new M5PulsarCoverageV2.Position(7, 2));
+            await(reopened.compareAndSet(
+                    Optional.empty(),
+                    keys.floorSnapshot(next.snapshotRootSha256()),
+                    M5RetentionCodecV1.encodeSnapshot(next)));
+            var advanced = await(new M5LogicalTrimCoordinatorV1(reopened).advance(keys.trimFrontier(), next));
+            assertThat(advanced.exactFrontier().orElseThrow().generation()).isEqualTo(2);
+            assertThat(advanced.exactFrontier()
+                            .orElseThrow()
+                            .pulsarContext()
+                            .orElseThrow()
+                            .newFrontier())
+                    .isEqualTo(next.minimumPulsarFloor());
+        }
+    }
+
+    @Test
+    void actualFloorWriterCannotCrossTheFinalInlineTrimScan() throws Exception {
+        try (var fixture = Fixture.create(1)) {
+            var cell = digest(fixture.root + "/trim-race-cell");
+            var route = new OxiaBindingLifecycleMetadataStoreV2(fixture.faults, fixture.root, 7, fixture.binding, cell);
+            var keys = new M5RetentionKeysV1(7, fixture.binding);
+            var headKey = new M4ReadControlKeysV1(7, fixture.binding).proofHead();
+            var head = M4ReadControlCodecV1.encodeHead(
+                    new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.QuiescenceProofHead(
+                            fixture.binding, 1, List.of(), List.of()));
+            assertThat(route.rawControlMetadata().putIfAbsent(headKey, head)).isEqualTo(ControlMutationOutcome.APPLIED);
+            var before = await(route.read(headKey)).orElseThrow();
+            var snapshot = declaredTypedFloor(
+                    fixture.binding,
+                    cell,
+                    new AuthorityFactV1(before.key(), before.metadataVersion(), before.canonicalStoredSha256()),
+                    new M5PulsarCoverageV2.Position(91, 0),
+                    new M5PulsarCoverageV2.Position(91, 3));
+            await(route.compareAndSet(
+                    Optional.empty(),
+                    keys.floorSnapshot(snapshot.snapshotRootSha256()),
+                    M5RetentionCodecV1.encodeSnapshot(snapshot)));
+            fixture.faults.holdBeforeInlineTrim = true;
+            var advance = new M5LogicalTrimCoordinatorV1(route)
+                    .advance(keys.trimFrontier(), snapshot)
+                    .toCompletableFuture();
+            fixture.faults.trimDispatchReached.get(30, TimeUnit.SECONDS);
+            var fenced = await(route.read(fixture.selectorKey)).orElseThrow();
+            assertThat(M5BindingAuthorityCodecV1.decodeAuthority(fenced.canonicalStoredBytes())
+                            .state())
+                    .isEqualTo(
+                            com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1
+                                    .BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2);
+            var changed = M4ReadControlCodecV1.encodeHead(
+                    new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.QuiescenceProofHead(
+                            fixture.binding, 2, List.of(), List.of()));
+            assertThat(await(route.compareAndSet(Optional.of(before), headKey, changed)))
+                    .isEqualTo(MutationOutcome.DEFINITIVE_CONFLICT);
+            assertThat(await(route.read(headKey))).contains(before);
+            fixture.faults.trimDispatchReleased.complete(null);
+            assertThat(advance.get(30, TimeUnit.SECONDS).outcome())
+                    .isEqualTo(M5LogicalTrimCoordinatorV1.Outcome.APPLIED_EXACT);
+            assertThat(await(route.readLogicalTrimFrontier())
+                            .orElseThrow()
+                            .pulsarContext()
+                            .orElseThrow()
+                            .newFrontier())
+                    .isEqualTo(snapshot.minimumPulsarFloor());
+            assertThat(await(fixture.nativeStore.read(route.nativeKey(keys.trimFrontier()))))
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    void actualFloorWriteUnknownKeepsItsTicketAcrossReconnectWithoutRedispatch() throws Exception {
+        try (var fixture = Fixture.create(1)) {
+            var route = fixture.route;
+            var key = new M4ReadControlKeysV1(7, fixture.binding).proofHead();
+            var head = M4ReadControlCodecV1.encodeHead(
+                    new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.QuiescenceProofHead(
+                            fixture.binding, 1, List.of(), List.of()));
+            assertThat(route.rawControlMetadata().putIfAbsent(key, head)).isEqualTo(ControlMutationOutcome.APPLIED);
+            var before = await(route.read(key)).orElseThrow();
+            var next = M4ReadControlCodecV1.encodeHead(
+                    new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.QuiescenceProofHead(
+                            fixture.binding, 2, List.of(), List.of()));
+            fixture.faults.loseMutableReplyKey = route.nativeKey(key);
+            assertThat(await(route.compareAndSet(Optional.of(before), key, next)))
+                    .isEqualTo(MutationOutcome.RESPONSE_UNKNOWN);
+            assertThat(fixture.faults.mutableWrites.get()).isEqualTo(1);
+            assertThat(M5BindingAuthorityCodecV1.decodeAuthority(await(route.read(fixture.selectorKey))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .trimMutationTickets())
+                    .hasSize(1);
+            fixture.reconnect();
+            await(fixture.route.reconcileLogicalTrimWrites());
+            assertThat(M5BindingAuthorityCodecV1.decodeAuthority(await(fixture.route.read(fixture.selectorKey))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .trimMutationTickets())
+                    .isEmpty();
+            assertThat(await(fixture.route.read(key)).orElseThrow().canonicalStoredBytes())
+                    .isEqualTo(next);
+            assertThat(fixture.faults.mutableWrites.get()).isZero();
+        }
+    }
+
+    /** Declared protocol values test real metadata storage only; this is not a native floor/reference producer. */
+    private static M5RetentionRecordsV1.RetentionFloorSnapshotV1 declaredTypedFloor(
+            BindingIdentity binding,
+            Sha256Digest cell,
+            AuthorityFactV1 fact,
+            M5PulsarCoverageV2.Position prior,
+            M5PulsarCoverageV2.Position minimum) {
+        var coverage = M5PulsarCoverageV2.of(
+                binding,
+                digest("declared-storage-chain"),
+                List.of(
+                        new M5PulsarCoverageV2.ChainLedger(91, false, 3, digest("declared91")),
+                        new M5PulsarCoverageV2.ChainLedger(7, false, 4, digest("declared7"))),
+                List.of(new M5PulsarCoverageV2.EntryRange(91, 0, 3), new M5PulsarCoverageV2.EntryRange(7, 0, 4)));
+        var identity = new M5MaterializationRecordsV1.IdentityEnvelope(
+                cell, digest("declared-provider"), binding, 1, 1, 1, CAPABILITY);
+        var rows = java.util.Arrays.stream(M5RetentionRecordsV1.FloorClassV1.values())
+                .map(kind -> new M5RetentionRecordsV1.RetentionFloorObservationV1(
+                        kind,
+                        fact,
+                        M5MaterializationRecordsV1.PositionDomain.PULSAR_ENTRY,
+                        -1,
+                        true,
+                        true,
+                        Optional.of(minimum)))
+                .toList();
+        return M5RetentionCodecV1.finalizeSnapshot(new M5RetentionRecordsV1.RetentionFloorSnapshotV1(
+                identity,
+                M5MaterializationRecordsV1.PositionDomain.PULSAR_ENTRY,
+                1,
+                -1,
+                digest("declared-policy"),
+                fact,
+                fact,
+                1,
+                4096,
+                rows,
+                digest("placeholder"),
+                Optional.of(new M5RetentionRecordsV1.PulsarFloorContextV2(coverage, prior))));
+    }
+
+    @Test
+    void completeMaterializationPlanAndSharedCellAdmissionSurviveActualReconnect() throws Exception {
+        try (Fixture fixture = Fixture.create(1)) {
+            var cell = digest(fixture.root + "/actual-cell-route");
+            var once = new java.util.concurrent.atomic.AtomicBoolean(true);
+            var nativeClient = new AsyncOxiaConditionalClient(fixture.client);
+            OxiaConditionalClient lostPlanReply = new OxiaConditionalClient() {
+                public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+                    return nativeClient.read(key);
+                }
+
+                public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes value) {
+                    return nativeClient
+                            .createIfAbsent(key, value)
+                            .thenCompose(ignored -> key.contains("/plans/") && once.compareAndSet(true, false)
+                                    ? CompletableFuture.failedFuture(new java.util.concurrent.TimeoutException(
+                                            "actual original plan write reply was lost"))
+                                    : CompletableFuture.completedFuture(null));
+                }
+
+                public CompletionStage<Void> compareAndSet(String key, CanonicalBytes value, long version) {
+                    return nativeClient.compareAndSet(key, value, version);
+                }
+            };
+            var route = new OxiaBindingLifecycleMetadataStoreV2(lostPlanReply, fixture.root, 7, fixture.binding, cell);
+            var plan = materializationPlan(fixture.binding, cell, fixture.selector(List.of(), 1));
+            var coordinator = new M5MaterializationCoordinatorV1(route.rawControlMetadata(), 7, fixture.binding);
+            assertThat(coordinator.register(plan))
+                    .isEqualTo(M5MaterializationRecordsV1.PublicationOutcome.APPLIED_EXACT);
+            assertThat(once).isFalse();
+            var admission = new M5MaterializationAdmissionV1(route.rawControlMetadata(), cell);
+            assertThat(admission.install(new M5MaterializationAdmissionV1.Caps(1, 100, 1000, 2, 2, 2, 2)))
+                    .isEqualTo(M5MaterializationAdmissionV1.Outcome.APPLIED_EXACT);
+            assertThat(admission.reserve(plan, 100, 1)).isEqualTo(M5MaterializationAdmissionV1.Outcome.APPLIED_EXACT);
+            fixture.reconnect();
+            var reopened =
+                    new OxiaBindingLifecycleMetadataStoreV2(fixture.client, fixture.root, 7, fixture.binding, cell);
+            assertThat(new M5MaterializationCoordinatorV1(reopened.rawControlMetadata(), 7, fixture.binding)
+                            .readPlan(plan.taskIdSha256()))
+                    .contains(plan);
+            var other = new BindingIdentity(
+                    new TopicBindingId(digest(fixture.root + "/sibling")),
+                    digest("sibling-incarnation"),
+                    digest("sibling-storage"));
+            var sibling = new OxiaBindingLifecycleMetadataStoreV2(fixture.client, fixture.root, 7, other, cell);
+            var second = new M5MaterializationAdmissionV1(sibling.rawControlMetadata(), cell);
+            var otherSelector = new BindingReadSelector(
+                    other,
+                    digest("sibling-view"),
+                    11,
+                    13,
+                    1,
+                    SelectorMode.PREFERRED_ONLY,
+                    AdmissionState.ADMITTING,
+                    Optional.empty(),
+                    CAPABILITY,
+                    List.of(),
+                    List.of());
+            assertThat(second.reserve(materializationPlan(other, cell, otherSelector), 100, 1))
+                    .isEqualTo(M5MaterializationAdmissionV1.Outcome.REJECTED_CAP);
+            String planKey = new M5MaterializationKeysV1(7, fixture.binding).plan(plan.taskIdSha256());
+            var actual = await(reopened.read(planKey)).orElseThrow();
+            assertThatThrownBy(
+                            () -> reopened.compareAndSet(Optional.of(actual), planKey, actual.canonicalStoredBytes()))
+                    .hasMessageContaining("create-only");
+            assertThat(second.read().orElseThrow().reservations()).hasSize(1);
+            System.out.println("M5_REAL_OXIA_COMPLETE_PLAN actualWriteThenLostReply=true "
+                    + "reconnectExactPlan=true siblingSharesCellCapacity=true immutablePlan=true "
+                    + "nativeWorkerAuthority=false");
+        }
+    }
+
+    private static M5MaterializationRecordsV1.MaterializationPlan materializationPlan(
+            BindingIdentity binding, Sha256Digest cell, BindingReadSelector selected) {
+        var identity = new IdentityEnvelope(
+                cell, digest("declared-provider"), binding, selected.ownerEpoch(), 1, 1, CAPABILITY);
+        var coverage = new M5MaterializationRecordsV1.ProtocolCoverage(
+                M5MaterializationRecordsV1.PositionDomain.KAFKA_OFFSET, 0, 3);
+        var source = new M5MaterializationRecordsV1.SourceExtent(
+                M5MaterializationRecordsV1.SourceKind.BOOKKEEPER_LEDGER,
+                digest("declared-source"),
+                coverage,
+                "declared-ledger",
+                3,
+                1,
+                1,
+                1,
+                digest("declared-body"),
+                Optional.empty(),
+                Optional.of(digest("declared-ledger-id")),
+                digest("format"),
+                digest("encryption"),
+                false,
+                false,
+                List.of(binding.bindingId().digest()));
+        var cut = new M5MaterializationRecordsV1.MaterializationSourceCut(
+                identity,
+                selected,
+                Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selected)),
+                selected.selectedViewSha256(),
+                coverage,
+                3,
+                3,
+                3,
+                3,
+                0,
+                digest("protocol"),
+                digest("recovery"),
+                digest("policy"),
+                digest("output-format"),
+                M5MaterializationCodecV1.calculateSourceSetSha256(List.of(source)),
+                List.of(source));
+        return new M5MaterializationPlannerV1()
+                .plan(
+                        cut,
+                        new M5MaterializationPlannerV1.PlanningPolicy(
+                                M5MaterializationRecordsV1.PayloadKind.KAFKA_BATCH_PRESERVING_V1,
+                                true,
+                                digest("encryption"),
+                                digest("compression"),
+                                digest("checksum"),
+                                List.of(),
+                                "declared-cell"));
+    }
 
     @Test
     void continuousNativeRetirementExceedsLifetimeCapAndReconnectRejectsOldIds() throws Exception {
@@ -528,8 +898,17 @@ class M5RetiredHistoryOxiaIntegrationTest {
         final CompletableFuture<Void> selectorApplied = new CompletableFuture<>();
         final CompletableFuture<Void> heldResponse = new CompletableFuture<>();
         volatile boolean loseNextNodeResponse;
+        volatile boolean loseNextTrimResponse;
         volatile String holdSelectorKey;
         volatile String lastCreatedKey;
+        volatile String lastMutationKey;
+        volatile boolean holdBeforeInlineTrim;
+        final CompletableFuture<Void> trimDispatchReached = new CompletableFuture<>();
+        final CompletableFuture<Void> trimDispatchReleased = new CompletableFuture<>();
+        volatile String loseMutableReplyKey;
+        volatile String lostMutableReadKey;
+        final AtomicInteger mutableReadsLost = new AtomicInteger();
+        final AtomicInteger mutableWrites = new AtomicInteger();
         volatile Runnable beforeSelectorCas;
 
         Faults(OxiaConditionalClient nativeClient) {
@@ -537,6 +916,9 @@ class M5RetiredHistoryOxiaIntegrationTest {
         }
 
         public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+            if (key.equals(lostMutableReadKey) && mutableReadsLost.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
+                return CompletableFuture.failedFuture(new IOException("lost original mutable reread"));
+            }
             if (failedReads.getAndUpdate(count -> Math.max(0, count - 1)) > 0) {
                 return CompletableFuture.failedFuture(new IOException("injected native read response loss"));
             }
@@ -545,6 +927,11 @@ class M5RetiredHistoryOxiaIntegrationTest {
 
         public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes value) {
             return nativeClient.createIfAbsent(key, value).thenCompose(ignored -> {
+                if (key.endsWith("/retention/trim-frontier") && loseNextTrimResponse) {
+                    loseNextTrimResponse = false;
+                    lastCreatedKey = key;
+                    return CompletableFuture.failedFuture(new IOException("injected actual trim create response loss"));
+                }
                 if (key.contains("/nodes/") && loseNextNodeResponse) {
                     loseNextNodeResponse = false;
                     lastCreatedKey = key;
@@ -562,8 +949,45 @@ class M5RetiredHistoryOxiaIntegrationTest {
             }
             CompletionStage<Void> before =
                     action == null ? CompletableFuture.completedFuture(null) : CompletableFuture.runAsync(action);
+            if (holdBeforeInlineTrim
+                    && key.endsWith("/selector")
+                    && M5BindingAuthorityCodecV1.isAuthorityValue(value)
+                    && M5BindingAuthorityCodecV1.decodeAuthority(value)
+                            .logicalTrim()
+                            .flatMap(
+                                    com.nereusstream.storage.object.retention.M5LogicalTrimRecordsV2.LogicalTrimStateV2
+                                            ::frontier)
+                            .isPresent()) {
+                holdBeforeInlineTrim = false;
+                trimDispatchReached.complete(null);
+                before = before.thenCompose(ignored -> trimDispatchReleased);
+            }
             return before.thenCompose(ignored -> nativeClient.compareAndSet(key, value, version))
                     .thenCompose(ignored -> {
+                        if (key.equals(loseMutableReplyKey)) {
+                            loseMutableReplyKey = null;
+                            mutableWrites.incrementAndGet();
+                            lostMutableReadKey = key;
+                            mutableReadsLost.set(2);
+                            return CompletableFuture.failedFuture(new IOException("lost actual mutable CAS reply"));
+                        }
+                        if (key.endsWith("/selector")
+                                && loseNextTrimResponse
+                                && M5BindingAuthorityCodecV1.isAuthorityValue(value)
+                                && M5BindingAuthorityCodecV1.decodeAuthority(value)
+                                        .logicalTrim()
+                                        .flatMap(
+                                                com.nereusstream.storage.object.retention.M5LogicalTrimRecordsV2
+                                                                .LogicalTrimStateV2::frontier)
+                                        .isPresent()
+                                && M5BindingAuthorityCodecV1.decodeAuthority(value)
+                                                .state()
+                                        == com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1
+                                                .BindingAuthorityStateV1.OPEN_V1) {
+                            loseNextTrimResponse = false;
+                            lastMutationKey = key;
+                            return CompletableFuture.failedFuture(new IOException("lost actual inline trim CAS reply"));
+                        }
                         if (key.equals(holdSelectorKey)) {
                             holdSelectorKey = null;
                             selectorApplied.complete(null);

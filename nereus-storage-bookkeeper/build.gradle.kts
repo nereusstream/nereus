@@ -69,6 +69,8 @@ val m5NativeDeleteFaultFixturesJar by tasks.registering(Jar::class) {
     archiveClassifier.set("m5-native-delete-fault-test-fixtures")
     from(sourceSets.test.get().output)
     include("com/nereusstream/storage/bookkeeper/M5BookKeeperDeleteFaultFixtureV2*.class")
+    include("com/nereusstream/storage/bookkeeper/M5PulsarGenerationReplyFixtureV1*.class")
+    include("com/nereusstream/storage/bookkeeper/M5ZooKeeperReadReplyFixtureV1*.class")
     dependsOn(tasks.named("testClasses"))
 }
 artifacts { add(m5NativeDeleteFaultFixtures.name, m5NativeDeleteFaultFixturesJar) }

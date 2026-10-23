@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, amended by [NSIP-1](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/v2/NSIP/nsip-1.md).
+Accepted, amended by [NSIP-1](../v2/NSIP/nsip-1.md).
 The current Kafka contract is RF=1/minISR=1, one native Controller-selected Owner, shared durable commit,
 and cold takeover from closed legal history. This revision replaces the previous mandatory
 Observation Journal/Applied/election-adoption contract; it does not introduce a second product mode.
@@ -309,6 +309,12 @@ BK recovery validates closed membership before I/O, then fences the exact ledger
 batches too, so response-loss retries can return the original offsets. Sealed root/end conflicts fail closed. HW is the
 recovered legal prefix end; LSO derives from that HW and recovered transaction state. Coordinator authority in
 `__transaction_state` is separate from partition marker/index state.
+The local Kafka log installation first moves its file carrier to the recovered end, then loads the recovered
+producer/transaction state. That intermediate file HW/LSO is not an activated native owner frontier. Fetch must
+reject the pending leader recovery before capturing response HW/LSO, and takeover validation waits for exact native
+owner installation before comparing the recovered HW/LSO. A controlled real BK/Oxia pause observed this intermediate
+state at HW=55/LSO=55 while the old owner had HW=55/LSO=41; after readiness, the real relocation test requires
+LSO=41. This does not authorize owner retirement or M4 source release.
 
 The Object core implements NSIP-1 section 6.4's durable grant/closing protocol. Both operations compare and replace
 the same selected Binding/partition Head; closure fixes the complete legal prefix and successor Owner carries its

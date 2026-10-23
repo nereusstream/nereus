@@ -48,9 +48,28 @@ public final class M5TaskSelectionCoordinatorV2 {
         return archived.isPresent() ? archived : anchored;
     }
 
+    public Optional<M5MaterializationWorkerV1> readCurrentWorker() {
+        return current().materializationWorker();
+    }
+
     /** Captures raw authority before checking absence; a concurrent decision or archive invalidates the exact CAS. */
     public Optional<Attempt> prepare(Sha256Digest taskId) {
+        return prepare(taskId, Optional.empty());
+    }
+
+    /** Native publication must retain the exact worker grant in the authority captured for its final CAS. */
+    public Optional<Attempt> prepare(Sha256Digest taskId, M5MaterializationWorkerV1 worker) {
+        if (!worker.taskIdSha256().equals(taskId)) {
+            throw new IllegalArgumentException("task selection belongs to another admitted worker task");
+        }
+        return prepare(taskId, Optional.of(worker));
+    }
+
+    private Optional<Attempt> prepare(Sha256Digest taskId, Optional<M5MaterializationWorkerV1> worker) {
         var current = current();
+        if (!matchesWorker(current, worker)) {
+            return Optional.empty();
+        }
         if (readArchive(taskId).isPresent()
                 || current.taskSelectionDecision()
                         .filter(value -> value.taskId().equals(taskId))
@@ -69,7 +88,7 @@ public final class M5TaskSelectionCoordinatorV2 {
                     Optional.of(M5BindingAuthorityCodecV1.encodeAuthority(current)),
                     M5BindingAuthorityCodecV1.encodeAuthority(released));
             current = current();
-            if (current.taskSelectionDecision().isPresent()) {
+            if (current.taskSelectionDecision().isPresent() || !matchesWorker(current, worker)) {
                 return Optional.empty();
             }
         }
@@ -78,6 +97,17 @@ public final class M5TaskSelectionCoordinatorV2 {
             return Optional.empty();
         }
         return Optional.of(new Attempt(taskId, current));
+    }
+
+    private static boolean matchesWorker(
+            BindingRetirementAuthorityV1 authority, Optional<M5MaterializationWorkerV1> worker) {
+        return worker.isEmpty()
+                || authority.materializationWorker().equals(worker)
+                        && worker.orElseThrow()
+                                .predecessorSelectorSha256()
+                                .equals(Sha256Digest.hash(
+                                        com.nereusstream.storage.object.read.control.M4ReadControlCodecV1
+                                                .encodeSelector(authority.selectorProjection())));
     }
 
     /** Copies the durable decision, retaining its inline anchor. Release is deferred to the next task admission. */

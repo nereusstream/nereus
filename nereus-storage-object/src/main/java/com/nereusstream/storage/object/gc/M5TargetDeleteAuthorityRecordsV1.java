@@ -283,7 +283,46 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             Optional<TargetDeleteIntentV1> deleteIntent,
             Optional<TargetDeleteDoneV1> deleteDone,
             Optional<DeleteRecoveryVetoV2> recoveryVeto,
+            Optional<DeleteEpochGraceMarkV1> epochGrace,
             Sha256Digest authorityCanonicalSha256) {
+        /** Historical wire4/5/6 constructor; absence does not qualify an epoch-clock production proof. */
+        public TargetDeleteAuthorityV1(
+                String authorityKey,
+                PhysicalDeleteTargetV1 target,
+                long authorityRevision,
+                Optional<Sha256Digest> predecessorAuthoritySha256,
+                TargetDeleteAuthorityStateV1 state,
+                long closedWriterFenceEpoch,
+                ProofBoundWriterEnrollmentV1 writerEnrollment,
+                Sha256Digest proofSnapshotDigest,
+                Optional<DeleteEligibilitySnapshotV2> eligibilitySnapshot,
+                List<ProofBoundWriterTicketV1> activeWriterTickets,
+                Optional<TargetReadFenceV1> readFence,
+                Optional<ExactExternalIdentityV1> externalIdentity,
+                Optional<TargetDeleteIntentV1> deleteIntent,
+                Optional<TargetDeleteDoneV1> deleteDone,
+                Optional<DeleteRecoveryVetoV2> recoveryVeto,
+                Sha256Digest authorityCanonicalSha256) {
+            this(
+                    authorityKey,
+                    target,
+                    authorityRevision,
+                    predecessorAuthoritySha256,
+                    state,
+                    closedWriterFenceEpoch,
+                    writerEnrollment,
+                    proofSnapshotDigest,
+                    eligibilitySnapshot,
+                    activeWriterTickets,
+                    readFence,
+                    externalIdentity,
+                    deleteIntent,
+                    deleteDone,
+                    recoveryVeto,
+                    Optional.empty(),
+                    authorityCanonicalSha256);
+        }
+
         public TargetDeleteAuthorityV1 {
             authorityKey = requireKey(authorityKey);
             Objects.requireNonNull(target, "target");
@@ -297,6 +336,11 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             eligibilitySnapshot = Objects.requireNonNull(eligibilitySnapshot, "eligibilitySnapshot");
             if (eligibilitySnapshot.isPresent()) {
                 DeleteEligibilitySnapshotV2 snapshot = eligibilitySnapshot.orElseThrow();
+                for (var fact : snapshot.authorityFacts()) {
+                    if (fact.key().equals(authorityKey)) {
+                        throw new IllegalArgumentException("eligibility cannot cite its own mutable target authority");
+                    }
+                }
                 if (!snapshot.resource().equals(target.resourceId())
                         || !snapshot.sha256().equals(proofSnapshotDigest)
                         || snapshot.generation() > authorityRevision
@@ -312,14 +356,43 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             deleteIntent = Objects.requireNonNull(deleteIntent, "deleteIntent");
             deleteDone = Objects.requireNonNull(deleteDone, "deleteDone");
             recoveryVeto = Objects.requireNonNull(recoveryVeto, "recoveryVeto");
+            epochGrace = Objects.requireNonNull(epochGrace, "epochGrace");
+            epochGrace.ifPresent(mark -> {
+                mark.encode();
+            });
+            boolean graceRenewal = recoveryVeto
+                    .filter(veto -> veto.reason() == DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING)
+                    .isPresent();
+            if (graceRenewal && epochGrace.isPresent()) {
+                var mark = epochGrace.orElseThrow();
+                var veto = recoveryVeto.orElseThrow();
+                if (veto.rejectedObservationEpoch() != mark.authority().observationEpoch()
+                        || !veto.rejectedContextSha256()
+                                .equals(M5TargetDeleteAuthorityCodecV1.observationContextSha256(mark.authority()))) {
+                    throw new IllegalArgumentException("pending grace renewal differs from its original mark context");
+                }
+            }
+            if (!graceRenewal && epochGrace.isPresent() && eligibilitySnapshot.isPresent()) {
+                var mark = epochGrace;
+                if (eligibilitySnapshot.orElseThrow().members().stream()
+                        .anyMatch(member ->
+                                !member.physicalReferences().epochGrace().equals(mark))) {
+                    throw new IllegalArgumentException("eligibility does not carry the exact epoch grace mark");
+                }
+            }
+
             if (recoveryVeto.isPresent()) {
                 DeleteRecoveryVetoV2 veto = recoveryVeto.orElseThrow();
-                if (state != TargetDeleteAuthorityStateV1.READ_FENCED_V1
+                if ((state != TargetDeleteAuthorityStateV1.READ_FENCED_V1
+                                && !(graceRenewal && state == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1))
                         || !predecessorAuthoritySha256.equals(Optional.of(veto.rejectedAuthoritySha256()))
                         || readFence.isEmpty()) {
                     throw new IllegalArgumentException("recovery veto lacks its exact closed predecessor");
                 }
-                long epoch = readFence.orElseThrow().observationContext().observationEpoch();
+                long epoch = deleteIntent
+                        .flatMap(TargetDeleteIntentV1::dispatchRefresh)
+                        .map(refresh -> refresh.current().observationEpoch())
+                        .orElse(readFence.orElseThrow().observationContext().observationEpoch());
                 if (veto.rejectedObservationEpoch() != epoch
                         && veto.rejectedObservationEpoch() != Math.addExact(epoch, 1)) {
                     throw new IllegalArgumentException("recovery veto observation epoch differs");
@@ -343,7 +416,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                         eligibilitySnapshot,
                         readFence,
                         externalIdentity,
-                        deleteIntent.orElseThrow());
+                        deleteIntent.orElseThrow(),
+                        graceRenewal);
             }
             validateTickets(activeWriterTickets, authorityRevision, writerEnrollment);
             validateState(
@@ -516,13 +590,18 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             Optional<DeleteEligibilitySnapshotV2> eligibility,
             Optional<TargetReadFenceV1> readFence,
             Optional<ExactExternalIdentityV1> external,
-            TargetDeleteIntentV1 intent) {
+            TargetDeleteIntentV1 intent,
+            boolean graceRenewal) {
         long refreshRevision = Math.addExact(refresh.predecessorAuthorityRevision(), 1);
         if ((state != TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
                         && state != TargetDeleteAuthorityStateV1.DELETE_DONE_V1)
-                || authorityRevision
-                        != Math.addExact(refreshRevision, state == TargetDeleteAuthorityStateV1.DELETE_DONE_V1 ? 1 : 0)
+                || (!graceRenewal
+                        && authorityRevision
+                                != Math.addExact(
+                                        refreshRevision, state == TargetDeleteAuthorityStateV1.DELETE_DONE_V1 ? 1 : 0))
+                || (graceRenewal && authorityRevision <= refreshRevision)
                 || (state == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                        && !graceRenewal
                         && !predecessor.equals(Optional.of(refresh.predecessorAuthoritySha256())))
                 || eligibility.isEmpty()
                 || eligibility.orElseThrow().generation() != refreshRevision

@@ -28,6 +28,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Bindi
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
+import com.nereusstream.storage.object.retention.M5MaterializationWorkerCoordinatorV1.Admission;
 import com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2;
 import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.util.List;
@@ -103,6 +104,95 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             List<SourceProtectionIdentity> exactFallbackSources,
             CurrentStateReader currentCompactionState) {
+        if (descriptor.recoveryStateLocator().isPresent()) {
+            throw new IllegalArgumentException("KBSD3 publication requires its captured independent recovery state");
+        }
+        return publish(
+                plan,
+                semantic,
+                descriptor,
+                exactFallbackSources,
+                currentCompactionState,
+                Optional.empty(),
+                Optional.empty());
+    }
+
+    /** The enclosing native input owner supplies the full captured state, not just its claimed provenance digest. */
+    public CompletionStage<PublicationOutcome> publish(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            CurrentStateReader currentCompactionState,
+            KafkaCompactionRecoveryStateV1 recoveryState) {
+        Objects.requireNonNull(recoveryState, "recoveryState").requirePlan(plan);
+        if (descriptor.recoveryStateLocator().isEmpty()
+                || !descriptor
+                        .recoveryStateLocator()
+                        .orElseThrow()
+                        .artifactSha256()
+                        .equals(recoveryState.sha256())) {
+            throw new IllegalArgumentException("KBSD3 publication differs from its captured recovery state");
+        }
+        return publish(
+                plan,
+                semantic,
+                descriptor,
+                exactFallbackSources,
+                currentCompactionState,
+                Optional.of(recoveryState),
+                Optional.empty());
+    }
+
+    /** Native worker authority and selection are checked against the same raw selector value at the final CAS. */
+    public CompletionStage<PublicationOutcome> publish(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            CurrentStateReader currentCompactionState,
+            KafkaCompactionRecoveryStateV1 recoveryState,
+            Admission worker) {
+        Objects.requireNonNull(worker, "native worker admission");
+        var grant = worker.worker();
+        if (physicalTickets.isEmpty()
+                || !grant.identity().equals(plan.sourceCut().identity())
+                || !grant.sourceCutSha256().equals(M5MaterializationCodecV1.sourceCutSha256(plan.sourceCut()))
+                || !grant.planRootSha256().equals(KafkaCompactionCanonicalV1.planRoot(plan))
+                || !grant.taskIdSha256().equals(descriptor.task().taskIdSha256())) {
+            throw new IllegalArgumentException(
+                    "native publication differs from its admitted complete worker/task plan");
+        }
+        Objects.requireNonNull(recoveryState, "recoveryState").requirePlan(plan);
+        if (descriptor.recoveryStateLocator().isEmpty()
+                || !descriptor
+                        .recoveryStateLocator()
+                        .orElseThrow()
+                        .artifactSha256()
+                        .equals(recoveryState.sha256())) {
+            throw new IllegalArgumentException("KBSD3 publication differs from its captured recovery state");
+        }
+        return publish(
+                plan,
+                semantic,
+                descriptor,
+                exactFallbackSources,
+                currentCompactionState,
+                Optional.of(recoveryState),
+                Optional.of(worker));
+    }
+
+    private CompletionStage<PublicationOutcome> publish(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            CurrentStateReader currentCompactionState,
+            Optional<KafkaCompactionRecoveryStateV1> recoveryState,
+            Optional<Admission> worker) {
+        if (worker.isEmpty() && taskSelections.readCurrentWorker().isPresent()) {
+            throw new IllegalArgumentException("native worker-bound authority requires its durable admission token");
+        }
         if (physicalTickets.isEmpty()
                 && plan.sourceCut().sources().stream()
                         .anyMatch(source -> source.kind()
@@ -120,10 +210,14 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                     .publish(
                             plan,
                             descriptor,
-                            () -> publishRegistered(plan, semantic, descriptor, sources, currentCompactionState),
-                            () -> taskSelections.readDecision(descriptor.task().taskIdSha256()));
+                            () -> publishRegistered(
+                                    plan, semantic, descriptor, sources, currentCompactionState, recoveryState, worker),
+                            () -> taskSelections.readDecision(descriptor.task().taskIdSha256()),
+                            metadata,
+                            () -> worker.isEmpty() || worker.orElseThrow().isCurrent());
         }
-        return publishRegistered(plan, semantic, descriptor, exactFallbackSources, currentCompactionState);
+        return publishRegistered(
+                plan, semantic, descriptor, exactFallbackSources, currentCompactionState, recoveryState, worker);
     }
 
     private CompletionStage<PublicationOutcome> publishRegistered(
@@ -131,7 +225,9 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             KafkaCompactionSemanticOutputV2 semantic,
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             List<SourceProtectionIdentity> exactFallbackSources,
-            CurrentStateReader currentCompactionState) {
+            CurrentStateReader currentCompactionState,
+            Optional<KafkaCompactionRecoveryStateV1> recoveryState,
+            Optional<Admission> worker) {
         var priorDecision = taskSelections.readDecision(descriptor.task().taskIdSha256());
         if (priorDecision
                 .filter(decision -> decision.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED)
@@ -150,8 +246,30 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
         return reader.recover(descriptor)
                 .thenApplyAsync(
                         recovered -> {
+                            if (worker.isPresent() && !worker.orElseThrow().isCurrent()) {
+                                return taskSelections
+                                                .readDecision(descriptor.task().taskIdSha256())
+                                                .equals(Optional.of(exactSelection))
+                                        ? PublicationOutcome.EXISTING_EXACT
+                                        : PublicationOutcome.OUTCOME_UNKNOWN;
+                            }
                             KafkaSealedBookKeeperDescriptorV2.requireBodies(semantic, recovered.artifacts());
+                            KafkaSealedBookKeeperDescriptorV2.requireRecoveryState(
+                                    recoveryState, recovered.artifacts());
                             Sha256Digest identity = descriptor.descriptorSha256();
+                            if (physicalTickets.isPresent() && recoveryState.isPresent()) {
+                                var original = metadata.get(KafkaBookKeeperPublicationTargetsV2.key(identity))
+                                        .map(KafkaBookKeeperPublicationTargetsV2::decode)
+                                        .orElseThrow(() -> new IllegalStateException(
+                                                "ticketed replacement lacks original publication membership"));
+                                var comparison = KafkaBookKeeperReplacementSemanticsV2.verify(
+                                        plan, semantic, descriptor, recoveryState.orElseThrow(), recovered, original);
+                                var verified = createExact(
+                                        KafkaBookKeeperReplacementSemanticsV2.key(identity), comparison.encode());
+                                if (verified != PublicationOutcome.EXISTING_EXACT) {
+                                    return verified;
+                                }
+                            }
                             PublicationOutcome immutable = createExact(descriptorKey(identity), descriptor.encode());
                             if (immutable != PublicationOutcome.EXISTING_EXACT) {
                                 return immutable;
@@ -171,17 +289,22 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                                                 ? PublicationOutcome.EXISTING_EXACT
                                                 : PublicationOutcome.CONFLICT;
                             }
-                            new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
                             BindingReadSelector expected = plan.sourceCut().predecessorSelector();
                             Optional<BindingReadSelector> current = m4.readSelector();
                             if (!current.equals(Optional.of(expected))) {
                                 return PublicationOutcome.CANCELLED_STALE;
                             }
-                            var prepared =
-                                    taskSelections.prepare(descriptor.task().taskIdSha256());
+                            var prepared = worker.isPresent()
+                                    ? taskSelections.prepare(
+                                            descriptor.task().taskIdSha256(),
+                                            worker.orElseThrow().worker())
+                                    : taskSelections.prepare(descriptor.task().taskIdSha256());
                             if (prepared.isEmpty()) {
                                 return PublicationOutcome.OUTCOME_UNKNOWN;
                             }
+                            // Capture the raw grant before the native policy/fence reread. Any subsequent worker CAS
+                            // invalidates this exact predecessor even when the projected read selector is unchanged.
+                            new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
                             var selecting = new M4ReadControlCoordinatorV1(
                                     prepared.orElseThrow().selectingControl(identity), shardId, binding);
                             M4ReadControlCoordinatorV1.Outcome outcome = expected.mode() == SelectorMode.PREFERRED_ONLY

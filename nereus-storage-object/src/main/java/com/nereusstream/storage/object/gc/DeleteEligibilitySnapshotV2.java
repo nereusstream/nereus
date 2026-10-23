@@ -172,6 +172,19 @@ public record DeleteEligibilitySnapshotV2(
                 throw new IllegalArgumentException(
                         "logical floors and physical proof do not share exact identity/fences");
             }
+            if (physicalReferences.coverage().typedPulsar()
+                    ? floors.pulsarContext().isEmpty()
+                            || !floors.pulsarContext()
+                                    .orElseThrow()
+                                    .coverage()
+                                    .contains(physicalReferences
+                                            .coverage()
+                                            .pulsarCoverage()
+                                            .orElseThrow())
+                    : floors.pulsarContext().isPresent()) {
+                throw new IllegalArgumentException(
+                        "logical floors and physical proof do not share a typed chain context");
+            }
             physicalReferences.m4Releases().forEach(release -> {
                 if (!M4ReadControlCodecV1.decodeProtection(release.canonicalProtectionBytes())
                         .binding()
@@ -356,8 +369,7 @@ public record DeleteEligibilitySnapshotV2(
                                 .binding()
                                 .equals(member.floors().identity().binding())
                         || trim.domain() != proof.coverage().domain()
-                        || trim.newFrontier() < proof.coverage().exclusiveEnd()
-                        || member.floors().minimumSafeFloor() < trim.newFrontier()
+                        || !expiryCoverageSatisfied(member.floors(), trim, proof.coverage())
                         || !trim.retentionPolicyRootSha256()
                                 .equals(member.floors().retentionPolicyRootSha256())
                         || !Sha256Digest.hash(M5RetentionCodecV1.encodeTrimFrontier(trim))
@@ -378,6 +390,32 @@ public record DeleteEligibilitySnapshotV2(
                 }
             }
         }
+    }
+
+    private static boolean expiryCoverageSatisfied(
+            RetentionFloorSnapshotV1 floors, BindingTrimFrontierV1 trim, ProtocolCoverage coverage) {
+        if (coverage.typedPulsar()) {
+            if (floors.pulsarContext().isEmpty() || trim.pulsarContext().isEmpty()) {
+                return false;
+            }
+            var context = floors.pulsarContext().orElseThrow().coverage();
+            var frontier = trim.pulsarContext().orElseThrow();
+            if (!context.equals(frontier.coverage())
+                    || !context.contains(coverage.pulsarCoverage().orElseThrow())
+                    || context.compare(floors.minimumPulsarFloor(), frontier.newFrontier()) < 0) {
+                return false;
+            }
+            return coverage.pulsarCoverage().orElseThrow().ranges().stream()
+                    .allMatch(range -> context.compare(
+                                    frontier.newFrontier(),
+                                    new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.Position(
+                                            range.ledgerId(), range.endEntryExclusive()))
+                            >= 0);
+        }
+        return floors.pulsarContext().isEmpty()
+                && trim.pulsarContext().isEmpty()
+                && trim.newFrontier() >= coverage.exclusiveEnd()
+                && floors.minimumSafeFloor() >= trim.newFrontier();
     }
 
     private static String memberKey(MemberSnapshot member) {

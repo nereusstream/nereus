@@ -30,6 +30,7 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.SemanticValidationProof;
 import com.nereusstream.storage.object.materialization.Nms1CodecV1;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -38,8 +39,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.kafka.common.record.MemoryRecords;
 
 /** Independent full-record semantic and rebuilt-index validator for one M5-B candidate. */
 public final class KafkaCompactionSemanticValidatorV1 {
@@ -277,8 +280,15 @@ public final class KafkaCompactionSemanticValidatorV1 {
                     || actual.controlKind() != input.controlKind()
                     || actual.partitionLeaderEpoch() != input.partitionLeaderEpoch()
                     || (input.controlKind() == ControlKind.NONE
-                            && actual.compressionType() != plan.policy().outputCompression())) {
+                            && actual.compressionType() != plan.policy().outputCompressionFor(input))) {
                 throw new IllegalStateException("M5-B output changed retained Kafka record/batch semantics");
+            }
+            if ((plan.policy().compressionPolicy() == KafkaCompactionRecordsV1.OutputCompressionPolicy.PRODUCER
+                            || plan.policy()
+                                    .rewritePolicyVersion()
+                                    .equals(KafkaCompactionRecordsV1.NATIVE_REWRITE_POLICY_VERSION))
+                    && input.controlKind() == ControlKind.NONE) {
+                requireProducerHeader(plan, input, actual, expectedRecords);
             }
             actualOffsets.addAll(
                     actual.records().stream().map(RecordValue::offset).toList());
@@ -300,6 +310,30 @@ public final class KafkaCompactionSemanticValidatorV1 {
         }
         if (!actualOffsets.equals(expectedOffsets)) {
             throw new IllegalStateException("M5-B output offsets differ from retained absolute offsets");
+        }
+    }
+
+    private static void requireProducerHeader(
+            CompactionPlan plan, ParsedBatch input, ParsedBatch output, List<RecordValue> retained) {
+        var original = MemoryRecords.readableRecords(
+                        ByteBuffer.wrap(input.canonicalBody().toByteArray()))
+                .batches()
+                .iterator()
+                .next();
+        var actual = MemoryRecords.readableRecords(
+                        ByteBuffer.wrap(output.canonicalBody().toByteArray()))
+                .batches()
+                .iterator()
+                .next();
+        var horizon = original.deleteHorizonMs();
+        if (horizon.isEmpty() && retained.stream().anyMatch(RecordValue::tombstone)) {
+            horizon = OptionalLong.of(
+                    Math.addExact(plan.policy().capturedNowMs(), plan.policy().deleteRetentionMs()));
+        }
+        if (actual.baseOffset() != original.baseOffset()
+                || actual.lastOffset() != original.lastOffset()
+                || !actual.deleteHorizonMs().equals(horizon)) {
+            throw new IllegalStateException("M5-B output changed the native batch header under PRODUCER compression");
         }
     }
 

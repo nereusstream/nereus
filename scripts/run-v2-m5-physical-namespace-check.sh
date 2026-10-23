@@ -58,7 +58,7 @@ for path,sha in json.loads(inputs).items():
     candidate=(root/path).resolve()
     if not candidate.is_relative_to(root.resolve()) or hashlib.sha256(candidate.read_bytes()).hexdigest()!=sha:
         raise SystemExit('Legacy tested source changed: '+path)
-if sum(suite['tests'] for suite in summary['suites'])!=71:
+if sum(suite['tests'] for suite in summary['suites'])!=109:
     raise SystemExit('Legacy focused suite count differs')
 for suite in summary['suites']:
     data=(previous/(suite['task']+'.xml')).read_bytes(); actual=ET.fromstring(data)
@@ -194,8 +194,8 @@ for module,task,name,count in (
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
     ('nereus-storage-bookkeeper','v2M5PhysicalNamespaceRealTest','M5PhysicalNamespaceOxiaBookKeeperRealTest',1),
     ('nereus-storage-bookkeeper','v2M5PhysicalNamespaceRestartTest','M5PhysicalNamespaceOxiaBookKeeperRealTest',1),
-    ('nereus-storage-object','v2M5GcQuotaTest','M5GcQuotaV2Test',9),
-    ('nereus-metadata-oxia','v2M5GcQuotaRealOxiaTest','M5GcQuotaOxiaIntegrationTest',8),
+    ('nereus-storage-object','v2M5GcQuotaTest','M5GcQuotaV2Test',10),
+    ('nereus-metadata-oxia','v2M5GcQuotaRealOxiaTest','M5GcQuotaOxiaIntegrationTest',10),
 ):
     matches=list((root/module/f'build/test-results/{task}').glob(f'TEST-*.{name}.xml'))
     if len(matches)!=1: raise SystemExit('Missing or ambiguous native test XML: '+task)

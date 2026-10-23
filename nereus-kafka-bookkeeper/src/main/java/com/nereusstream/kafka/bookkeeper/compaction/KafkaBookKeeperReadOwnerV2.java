@@ -75,6 +75,15 @@ public final class KafkaBookKeeperReadOwnerV2 {
         }
     }
 
+    /** Actual IO/session and physical tickets are resolved even though semantic work failed. */
+    public static final class TerminatedReadException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+
+        private TerminatedReadException(Throwable failure) {
+            super(failure.getMessage(), failure);
+        }
+    }
+
     /** Metadata-only retry handle, created only after this invocation's IO and owned session have terminated. */
     public static final class TicketCleanupException extends IllegalStateException {
         private static final long serialVersionUID = 1L;
@@ -174,6 +183,32 @@ public final class KafkaBookKeeperReadOwnerV2 {
             KafkaBookKeeperSelectedSourceV2.Bounds bounds,
             int capacity,
             Function<KafkaBookKeeperReadOwnerV2, ? extends CompletionStage<T>> work) {
+        return runOwned(
+                budget,
+                descriptor,
+                coordinator,
+                guard,
+                () -> new KafkaBookKeeperRunSourceV2.OwnedReadSession(
+                        Objects.requireNonNull(sessions.get(), "native session"), ignored -> {}),
+                metadataReader,
+                owner,
+                bounds,
+                capacity,
+                work);
+    }
+
+    /** The native owner observes exact physical cleanup separately from semantic work failure. */
+    public static <T> CompletionStage<T> runOwned(
+            KafkaBookKeeperReadCellBudgetV2 budget,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            M4ReadControlCoordinatorV1 coordinator,
+            M5TargetDeleteMultiWriterGuardV2 guard,
+            Supplier<KafkaBookKeeperRunSourceV2.OwnedReadSession> sessions,
+            KafkaBookKeeperCompactionWriterV2.SealedMetadataReader metadataReader,
+            Executor owner,
+            KafkaBookKeeperSelectedSourceV2.Bounds bounds,
+            int capacity,
+            Function<KafkaBookKeeperReadOwnerV2, ? extends CompletionStage<T>> work) {
         final KafkaBookKeeperReadCellBudgetV2.Reservation reservation;
         try {
             reservation = Objects.requireNonNull(budget, "budget").reserve(descriptor, bounds, capacity);
@@ -206,7 +241,7 @@ public final class KafkaBookKeeperReadOwnerV2 {
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             M4ReadControlCoordinatorV1 coordinator,
             M5TargetDeleteMultiWriterGuardV2 guard,
-            Supplier<? extends BookKeeperCellSession> sessions,
+            Supplier<KafkaBookKeeperRunSourceV2.OwnedReadSession> sessions,
             KafkaBookKeeperCompactionWriterV2.SealedMetadataReader metadataReader,
             Executor owner,
             KafkaBookKeeperSelectedSourceV2.Bounds bounds,
@@ -259,11 +294,14 @@ public final class KafkaBookKeeperReadOwnerV2 {
                             .putInt(0x4d354f44)
                             .put(descriptor.descriptorSha256().bytes().toByteArray())
                             .array()));
+                    var ticketCleanup = new CompletableFuture<Void>();
                     var guarded = guard.execute(resources, context, () -> CompletableFuture.supplyAsync(
                                     () -> {
                                         final BookKeeperCellSession session;
+                                        final KafkaBookKeeperRunSourceV2.OwnedReadSession owned;
                                         try {
-                                            session = Objects.requireNonNull(sessions.get(), "native session");
+                                            owned = Objects.requireNonNull(sessions.get(), "owned native session");
+                                            session = owned.session();
                                         } catch (Throwable failure) {
                                             // Construction accepted no native work; release the already acquired
                                             // tickets.
@@ -273,6 +311,7 @@ public final class KafkaBookKeeperReadOwnerV2 {
                                         reservation.sessionStarting();
                                         KafkaBookKeeperReadOwnerV2 controller;
                                         try {
+                                            owned.observeTicketCleanup().accept(ticketCleanup);
                                             if (!session.capabilitySnapshot()
                                                             .equals(descriptor
                                                                     .task()
@@ -316,31 +355,56 @@ public final class KafkaBookKeeperReadOwnerV2 {
                                     owner)
                             .thenCompose(stage -> stage));
                     return guarded.thenCompose(result -> {
-                        if (!result.mutationInvoked()) {
-                            return CompletableFuture.<T>failedFuture(
-                                    new IllegalStateException("BK read owner physical admission failed"));
-                        }
-                        if (result.value().isEmpty()) {
-                            return CompletableFuture.<T>failedFuture(
-                                    new IllegalStateException("BK read owner terminal or tickets unresolved"));
-                        }
-                        var value = result.value().orElseThrow();
-                        // This callback returns a WorkResult only after confirmed IO/session termination.
-                        if (!result.unresolvedTargets().isEmpty()) {
-                            return CompletableFuture.<T>failedFuture(new TicketCleanupException(
-                                    guard, resources, context, result.operationId(), terminalProof, value.failure()));
-                        }
-                        return value.failure() == null
-                                ? CompletableFuture.completedFuture(value.value())
-                                : CompletableFuture.<T>failedFuture(value.failure());
-                    });
+                                if (!result.mutationInvoked()) {
+                                    return CompletableFuture.<T>failedFuture(
+                                            new IllegalStateException("BK read owner physical admission failed"));
+                                }
+                                if (result.value().isEmpty()) {
+                                    return CompletableFuture.<T>failedFuture(
+                                            new IllegalStateException("BK read owner terminal or tickets unresolved"));
+                                }
+                                var value = result.value().orElseThrow();
+                                // This callback returns a WorkResult only after confirmed IO/session termination.
+                                if (!result.unresolvedTargets().isEmpty()) {
+                                    var failure = new TicketCleanupException(
+                                            guard,
+                                            resources,
+                                            context,
+                                            result.operationId(),
+                                            terminalProof,
+                                            value.failure());
+                                    ticketCleanup.completeExceptionally(failure);
+                                    return CompletableFuture.<T>failedFuture(failure);
+                                }
+                                ticketCleanup.complete(null);
+                                return value.failure() == null
+                                        ? CompletableFuture.completedFuture(value.value())
+                                        : CompletableFuture.<T>failedFuture(
+                                                new TerminatedReadException(value.failure()));
+                            })
+                            .whenComplete((value, failure) -> {
+                                if (failure != null) {
+                                    ticketCleanup.completeExceptionally(failure);
+                                }
+                            });
                 });
         return started.thenApply(value -> value);
     }
 
     /** The observer is detached so cancellation cannot turn a pending native read into a completed drain. */
     public CompletableFuture<KafkaBookKeeperM4RecoveryV2.RecoveryResult> recover() {
-        var observer = new CompletableFuture<KafkaBookKeeperM4RecoveryV2.RecoveryResult>();
+        return read(() -> recovery.recover(descriptor));
+    }
+
+    /** Selected-cache reads share recovery's exact admission, hazard pool and owner drain. */
+    public CompletableFuture<KafkaBookKeeperM4RecoveryV2.SelectedRead> readSelected(
+            KafkaBookKeeperReadViewV2 view, long requestedOffset, long upperBoundExclusive, long byteBudget) {
+        return read(() -> recovery.readSelected(view, requestedOffset, upperBoundExclusive, byteBudget));
+    }
+
+    private <T> CompletableFuture<T> read(Supplier<? extends CompletionStage<T>> operation) {
+        Objects.requireNonNull(operation, "operation");
+        var observer = new CompletableFuture<T>();
         dispatch(
                 () -> {
                     if (admissionClosed) {
@@ -349,7 +413,7 @@ public final class KafkaBookKeeperReadOwnerV2 {
                     }
                     active++;
                     try {
-                        recovery.recover(descriptor)
+                        Objects.requireNonNull(operation.get(), "BK read operation")
                                 .whenComplete((value, failure) -> dispatch(
                                         () -> {
                                             active--;

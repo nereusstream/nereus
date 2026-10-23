@@ -51,6 +51,107 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     @Test
+    void epochGraceEnvelopePreservesHistoricalBytesAndWriterAdmissionRetainsItsVersionedProfile() {
+        var original = open(1);
+        var historical = M5TargetDeleteAuthorityCodecV1.encodeAuthority(original);
+        var mark = new DeleteEpochGraceMarkV1(
+                new java.util.UUID(1, 2), M5DeleteEligibilityTestFixtures.observation(), 25, digest(81));
+        var marked = M5TargetDeleteAuthorityStateMachineV1.markEpochGrace(original, mark);
+        assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(marked)))
+                .isEqualTo(marked);
+        assertThat(marked.epochGrace()).contains(mark);
+        assertThat(marked.eligibilitySnapshot()).isEmpty();
+        assertThat(M5TargetDeleteAuthorityCodecV1.encodeAuthority(original)).isEqualTo(historical);
+        assertThat(DeleteEpochGraceMarkV1.decode(mark.encode())).isEqualTo(mark);
+        var admitted = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
+                marked, ticket(marked, ProofBoundWriterClassV1.REPLICA_TOPOLOGY_V1, 82));
+        assertThat(admitted.epochGrace()).contains(mark);
+        assertThat(admitted.authorityRevision()).isGreaterThan(marked.authorityRevision());
+        assertThat(admitted.eligibilitySnapshot()).isEmpty();
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.markEpochGrace(admitted, mark))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("active resource writers");
+        assertThatThrownBy(() -> new DeleteEpochGraceMarkV1(
+                        new java.util.UUID(1, 2), mark.authority(), 0, mark.initialObservationRootSha256()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DeleteEpochGraceMarkV1(
+                        new java.util.UUID(1, 2),
+                        mark.authority(),
+                        Long.MAX_VALUE,
+                        mark.initialObservationRootSha256()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void firstReadFenceUsesConfirmedLaterGraceEpochAndRejectsLegacyOrMismatchedProofs() {
+        var original = open(1);
+        var base = M5DeleteEligibilityTestFixtures.replacement(original.target().resourceId(), 3);
+        var member = base.members().get(0);
+        var proof = member.physicalReferences();
+        var audit = proof.observations().stream()
+                .filter(row -> row.kind()
+                        == com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceKindV1.AUDIT_GRACE)
+                .findFirst()
+                .orElseThrow()
+                .authority();
+        var context = new DeleteObservationContextV2(2, audit, audit, java.util.Optional.of(audit));
+        var mark = new DeleteEpochGraceMarkV1(new java.util.UUID(3, 4), context, 25, digest(81));
+        var marked = M5TargetDeleteAuthorityStateMachineV1.markEpochGrace(original, mark);
+        var epochProof = com.nereusstream.storage.object.retention.M5RetentionCodecV1.finalizeProof(
+                new com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceFreeProofV1(
+                        proof.identity(),
+                        proof.targetKind(),
+                        proof.targetIdentitySha256(),
+                        proof.coverage(),
+                        proof.selectorRoot(),
+                        proof.manifestRoot(),
+                        proof.trimRoot(),
+                        proof.retentionSnapshotRootSha256(),
+                        proof.observationsRootSha256(),
+                        proof.m4Releases(),
+                        proof.ownerFence(),
+                        proof.workerFence(),
+                        proof.storageFence(),
+                        proof.providerFence(),
+                        0,
+                        0,
+                        proof.scanSummaries(),
+                        proof.observations(),
+                        java.util.Optional.of(mark),
+                        digest(82)));
+        var qualifiedMember = new DeleteEligibilitySnapshotV2.MemberSnapshot(
+                member.floors(),
+                epochProof,
+                member.nativeAuthority(),
+                member.nativeDisposition(),
+                member.replacement(),
+                member.expiry(),
+                member.unpublished());
+        var epochSnapshot = new DeleteEligibilitySnapshotV2(
+                base.resource(),
+                base.reason(),
+                base.generation(),
+                base.namespaceAdmission(),
+                base.completeMemberInventory(),
+                List.of(qualifiedMember));
+        var qualified = M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(marked, epochSnapshot);
+        assertThat(M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(qualified, digest(83), context)
+                        .readFence()
+                        .orElseThrow()
+                        .observationContext())
+                .isEqualTo(context);
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                        qualified, digest(83), M5DeleteEligibilityTestFixtures.observation()))
+                .hasMessageContaining("current epoch mark");
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(marked, base))
+                .hasMessageContaining("exact epoch grace mark");
+        assertThatThrownBy(
+                        () -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(original, digest(83), context))
+                .hasMessageContaining("initial observation epoch");
+    }
+
+    @Test
     void everyTicketMutationConsumesARevisionAndPreventsCanonicalAba() {
         TargetDeleteAuthorityV1 open = open(1);
         ProofBoundWriterTicketV1 ticket = ticket(open, ProofBoundWriterClassV1.REPLICA_TOPOLOGY_V1, 10);

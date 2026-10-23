@@ -9,20 +9,2769 @@ sourceTuple: v2-m1
 
 # Current M5 contracts and implementation
 
+## Current C4 Native BookKeeper lifecycle closeout (2026-10-23)
+
+The reader-only successor input `3aa5c9c1c697f5cedf2951c9fa78927ef0cdd6b45ce85e0c193563ad6d72df1f`
+passes source-bound candidate validation and its fresh COMPONENTS566 execution. C4 initially rejected whole-M5
+promotion: PULSAR_NATIVE_LIFECYCLE pointed to an ObjectVersion orphan-delete case. Native source-absence
+fixtures use deliberate bare BK deletion; SDK intent/done tests use MockBookKeeper. Neither proves the required
+real Native completion/selection, exact M4 RELEASED and BK pin drain, BK intent/delete/UNKNOWN/done composition
+for both replacement and expiry with remaining subscription backlog. The original obligation remains unchanged.
+
+The current work closes only this existing Review8.3 gap through the Native adapter and existing bound namespace
+deleter. RETAIN_BK remains a veto and DELETE_AFTER_VERIFIED requires actual native admission; defaults and old
+Binding policies are unchanged. The eb/3aa inputs, original five stages and reader-only proof remain retained.
+Their reader-only reuse permission does not cover these product/fixture changes. Affected-stage validation and
+another C4 review are required before the already authorized C5 delivery. Nothing is staged, committed or pushed.
+
+Development20 reaches actual Native completion, exact old M4 RELEASED, current-owner INTENT, original
+callback-loss UNKNOWN reconciliation, real BK absence, cleared Cell holds, compact D DONE/settlement, cold backlog
+reads and Native DONE in both replacement and expiry. Expiry also reaches the intended typed-directory-change
+rejection after actual Native parent/DONE changes. Its last assertion incorrectly expected a nested root cause
+instead of that direct IllegalArgumentException; only the matcher is corrected. The original failed XML remains
+retained, and neither that run nor diagnostic capsules are a passing formal stage.
+
+Current frozen input `d9c419aa4ca7294c6f7148bee4e9cde41672f061ac66b742962bdd9f4a23dad7` passes
+COMPONENTS566, BOOKKEEPER_OXIA1332, OBJECT39 and NATIVE_KAFKA63, with no failures/errors/skips. The first Kafka
+attempt passes57 but its internal-topic case times out during initial Produce/admit/rollover. An unchanged isolated
+diagnostic passes1; one coordination-approved complete57+6 recovery passes, preserving the first three original
+stage records byte-for-byte. Forty bounded read-only thread captures cover the internal case startup and subsequent
+compaction/GC. The original timeout remains unexplained; no product fix or further unchanged retry is claimed.
+
+Native Pulsar passes its first32 suites/649 cases, then the separate DELETE SDK qualification fails3 of5 on actual
+S3 BucketAlreadyOwnedByYou409: the repeated recipe reuses its first configuration's bucket names. Owner81 never
+starts, the stage exits1, and there is no complete candidate. Original failed XML/logs remain; owned cleanup,
+original-container preservation and independent d9 input verification pass. The fixture now gives only that second
+SDK configuration an explicit resource-name suffix, covering its bucket, ledger and Binding/Native names together.
+The RETAIN configuration and Owner81 names/capacity remain unchanged; neither existing data nor quotas are reset.
+Fixture compilation, Checkstyle and Spotless pass17s. Coordination selects one standard fresh input/preparation/
+stability cycle and the original five-stage campaign for this fixture correction together with the CI change below.
+No new cross-source proof or additional development backend run is introduced. Validation and C4 remain open.
+
+The authorized delivery preflight also finds that CI fetches the Pulsar branch and requires its tip to remain at
+the historical a14 commit; publishing the already-required SDK source would invalidate that assertion. Only that
+selection step now reads the unique formally selected M5 Final through the existing evidence reader, validates its
+phase/tuple/source locks, Root source/binding and archive, and fetches/checks out the exact SDK SHA from the fixed
+fork. It has no old-SHA or branch-tip fallback. Strict complete-tree binding and evidence-only successor rules are
+unchanged. Three selector/real temporary-Git checkout contracts and YAML syntax pass; all57 evidence contracts pass
+in18.370s. This selection does not replace the independent complete Final source/dependency check. The CI-only
+d9 successor permission required all five d9 stages to pass and is not used after the actual Native failure.
+
+The merged standard input `40594af934fa8977d37f9284c5b10a860aec982bdf9474a288a413951514d94b` completes
+fresh build/stability and passes COMPONENTS566, BOOKKEEPER_OXIA1332 and OBJECT39. Original Kafka57 passes25m37s,
+but the additional6 again fails1: initial Produce waits30s, the rollover later times out/fences, and the internal
+case takes124.42s. Native Pulsar is not reached; no complete candidate or C4 result exists. Its original source,
+XML/logs and verified owned cleanup remain. The earlier green recovery does not close this reproduced defect.
+
+One approved diagnostic copy changes only the original test helper's timeout catch. Without pre-failure sampling,
+the one original case fails again and captures complete ThreadMXBean state before producer/admin/cluster teardown.
+At iteration3, append thread498 holds the log guard while waiting for rollover; attach thread329 holds Opened while
+waiting for that log guard; Oxia callback252 must enter the same Opened monitor to verify the sealed root. The exact
+snapshot SHA is32fc7629e9b0698a3659b6382c5064a1b740afad8562c6735c53f1af9febb86c. This establishes a lock cycle,
+distinct from the historical passing-run GC CPU observations. The diagnostic remains failed/non-promotable, its
+source diff/compiled identities and raw snapshot remain retained, and actual cleanup/original-container checks pass.
+The focused fix claims one attachment and registers its existing inputOperations drain under the Opened monitor,
+performs enrollment/initial policy installation outside it, and publishes nativeLog only after success if not draining.
+Failure retains the single-attempt claim; the drain settles only after actual termination, so close still protects
+source/session/verifier lifetime. The old synchronized phase deterministically times out in the three-actor cycle;
+the fixed four-test suite and applicable Checkstyle/SpotBugs pass. The one original real case passes1/1 in264.7s
+(Gradle4m45s), with its unchanged helper and all three helper class hashes matching frozen originals, normal
+deadlines/capacity/load and no sampler. Owned cleanup, original-container preservation and the complete4059
+input verifier pass. This focused result is non-promotable. Coordination selects one existing standard fresh
+preparation and complete five-stage campaign: current equivalence contracts accept only fixed historical v5/eb
+origins, so4059 records cannot be attached to this product-changed source without a new protocol. No such helper
+is added. New live-source workspaces inherit no diagnostic Scala/Gradle state; actual Python3.14/JDK21/JDK17,
+dependencies, NoTest builds and stability are captured before freezing. Kafka uses its new actual Source/Legacy
+with the original57+6; Pulsar retains both SDK qualifications and the exact81 Owner corpus on its original capacity.
+Existing focused regressions are not repeated separately. No new complete candidate or C4 is established.
+
+The new standard root `f541a0ab31538a6d2b9a3bca1991d079927a2cc47d4d30e53dcfc24ff966fa34` passes fresh
+build/stability and the first three stages566/1332/39. During the original Kafka57, the rollover-UNKNOWN fixture
+fails its assertion that the CAS response-loss signal is already complete when Produce first fails. Its original
+1s request/5s delivery limits are unchanged. The original57 finishes56pass/1fail, Gradle30m45s. Its complete
+primary is Kafka TimeoutException: Disconnected from node0 due to timeout. The main path subsequently passes its
+actual loss-gate wait and close-pending/admission checks, releases the held reply, then receives the worker
+assertion through produce.get. The instantaneous isDone check therefore imposes an unjustified asynchronous
+event order. Later UNKNOWN/ticket checks do not execute. Actual owned cleanup/original-container preservation
+pass, and the completef541 input verifier independently passes. Coordination approves the minimal fixture
+correction: catch waits for the same real rolloverLost gate within the existing main30s bound, preserving the original Produce error as cause and the wait/assertion failure as suppressed. Missing/exceptional events still fail; short client
+limits, no-acknowledged-UNKNOWN rejection, close/drain, original tickets and all later obligations remain. This
+correction is implemented; its final validation/binding scope is confirmed below. Original frozen inputs remain
+unchanged;
+the additional6 and Native Pulsar do not run in that campaign, and there is no new complete candidate.
+
+Coordination then selects a dependency-based order: execute the required, previously unreached complete
+NATIVE_PULSAR once through existing execute_stage in independently verified frozenf541. The original stage
+driver, class/input/XML/cleanup records, RETAIN plus isolated DELETE qualification, exact81 Owner/negatives and
+capacity remain. Original three records and Kafka exit1/raw bytes stay unchanged; no successful candidate is
+assembled. The minimal fixture additionally rejects non-timeout errors arriving before the gate and attaches
+the original Produce exception as cause and the wait/assertion failure as suppressed. Only necessary compilation/style
+checks run for that fixture. Pulsar terminal and final actual differences will determine the last complete
+source binding and necessary revalidation; no new cross-source helper, isolated green rerun or new full campaign
+is started. The compact catch initially reaches NCSS1504 against the existing1500 class bound. Coordination
+approves the concrete equivalent timestamp initialization in the same fixture call path, preserving MAX/MIN
+offset, zero and ordinary current-time values. Necessary compilation and Checkstyle now pass18s without any
+check suppression/limit change, standalone test or production edit. Actual UNKNOWN composition remains for the
+next formal57+6. The complete originalf541 Native Pulsar stage now passes736 tests with zero failure/error/skip,
+including both qualifications, exact81 Owner and namespace negative. The two BK lifecycle cases pass65.033s
+(expiry) and57.513s(replacement), asserting actual offload, exactM4 RELEASED, Native INTENT/bound BK delete,
+original UNKNOWN reconciliation, real absence/compact D and Cell settlement, Native DONE and active backlog.
+Input/runtime-source/cleanup verification and preservation of all three original records plus failed Kafka
+XML/cleanup bytes pass. No successful candidate is assembled. Final actual differences and this terminal must
+now enter the confirmed final binding plan. Keep only the approved fixture catch/timestamp and these three
+current status documents as final source; prepare a new standard fresh workspace with actual NoTest/stability
+builds and tools/dependencies, then execute all five original stages once under its single new input root.
+Existing fixedv5/eb exceptions cannot attach oldf541 records to the new fixture root, and no new cross-source
+protocol is added. Original57+6 uses the new actual Source/Legacy, and Pulsar retains its full double
+qualification/exact81/namespace/capacity/deadline corpus. Do not change awaiting source or update process status
+during execution. A passing complete candidate goes directly to concentrated C4 on final differences, raw
+results/origins,17 obligations/five children, necessary checks/docs/staging ownership; unchanged accepted product
+chains receive no optional re-review. Authorized C5 follows C4 without another user approval. Later pure status
+changes use existing STATUS_DOCS/evidence-only successors rather than restart product validation. Actual new
+failures must retain their primary and receive cause/impact review before any new execution. C4/C5 remain open.
+
+The first final input `5ef7ed2e…18c147da` passes COMPONENTS566. All four BK/Oxia recipes finish successfully,
+including current Source/Legacy, retention,1026 real retirements/reconnection/restart and quota, but the outer
+stage exits1 at immutable-input verification. The exact differences are five JavaCompile
+`previous-compilation-data.bin` files; all three source inventories, all other materialized artifacts and1227
+observed runtime inputs match. This newly readable failure is distinct from the deleted, previously unreproduced
+October22 discrepancy. Its original closure, state bytes, logs and exit1 remain retained; it is not a passing stage.
+
+Coordination accepts one precise build-audit classification. Actual JavaCompile producer/project/task and
+temporary-directory facts identify only `build/tmp/<taskName>/previous-compilation-data.bin`. Across all Root,
+SDK and Kafka build/stability before/after graphs, any input/source/compiler/classpath/runtime consumer prevents
+classification. Qualifying mutable incremental state remains fully audited, with its original bytes frozen as
+immutable audit objects, while its compiler-owned path is not a test execution dependency. Such state can affect
+later compilation; source, class/JAR, tools and actual dependencies remain byte-bound. Other state, unknown types
+or paths retain the original checks. General input verification is unchanged. All54 evidence contracts pass,
+including exact-path/producer and cross-project/build consumer negatives and real-artifact drift rejection.
+That classification is used by the d9 closure above; no failed record is promoted.
+
+Coordination accepts an explicit optional BK grace in the existing Native scope, wirev3. Historicalv1/v2 bytes,
+hashes and no-policy behavior remain; no old ledger or Binding is retagged/upgraded. The three values are provider
+minimum (zero allowed only for actual confirmed drain), strictly positive audit minimum and positive duration
+meeting both minima and the existing monotonic-unit overflow bound. Factory derivation and sealed-source binding
+preserve that policy. Execution must reread the original scope and verify the actual provider minimum; Object-only
+policy never qualifies BK. Only the two new real lifecycle cases explicitly admit0/1/25ms at first creation.
+
+Current local implementation adds a tagged CLOSED-data target to the existing bound BK epoch/intent/Cell deleter;
+unqualified/cursor/foreign/no-policy scopes reject it. The actual SDK captures a metadata-only deletion handle from
+its verified Native read cut, so fully replaced data is never reopened. Native INTENT/DONE requires confirmed
+original read/pin/handle drain, explicit DELETE_AFTER_VERIFIED and exact native attempt/version. UNKNOWN retains
+the original candidate and permits exact reread only. SDK absence is required for DONE. The focused BK tests pass13,
+and the Native SDK transition/SourceSafe regression passes11, with zero failures/errors/skips. These are local
+contract results, not the missing real replacement/expiry composition. The Native GC wiring and two new real
+fixtures now compile. The final two Native metadata transition cases also execute successfully, including cold
+INTENT/DONE idempotence and RETAIN capture rejection. Complete all-floor/reference eligibility, original epoch/
+intent/Cell dispatch and canonical DONE settlement are connected. Earlier real executions expose missing birth
+admission for new Native NPD1/NPO1 output and then a fixture retention-profile override. The accepted source
+qualification cut and the corrected matching DELETE conformance are described below; those earlier failures
+remain in the implementation log. The current work preserves the complete-source identity gate and composes
+original Native retirement before NMS1 publication. Necessary compilation, adapter unit/style and reader checks
+pass; the two actual BK lifecycle closures and C4 remain open.
+
+Coordination selects the existing-source qualification cut: in each new fixture the source is born in its actual
+v3 Native BK scope with the fixed Cell/birth quota and explicit grace, while native offload completes before
+M5 metadata-writer enrollment. Existing APIs claim the original first Native factory against the actual missing
+parent and confirm retention on that actual SDK/config; the later factory cannot adopt an unclaimed old parent
+or import missing retention history. The original creator then drains/closes; the M5 factory uses the existing
+sealed-source capture/registration with exact prior scope facts. No old ledger is retagged, no failed
+enrolled factory is reopened with its writer removed, and no NMS1 plan is assigned to NPD1/NPO1. The enrolled
+factory's new Native offload output path remains rejected without birth admission; this work does not implement
+that separate output-production capability. The fixture order is updated but requires a new real execution.
+
+That source preparation and first sealed-source admission subsequently execute successfully. The retained
+primary exception then identifies a configuration veto at initial M4 owner admission: the common Native fixture
+hardcodes RETAIN_BK despite the requested DELETE_AFTER_VERIFIED conformance property. Earlier f26c/5894/dc28
+capsules therefore do not establish the matching DELETE configuration; earlier descriptions claiming otherwise
+are corrected, with raw bytes retained. The fixture now honors the explicit profile for all prerequisite cases,
+while retaining the old default. A failed initial owner also closes its still-unregistered source preparation
+through the existing original-drain API. Development6 then establishes actual matching DELETE SDK5/Provider5
+conformance (zero failures/errors/skips), capsule56886c11c449c0c4016ed28f4b9f00a96aa12a62d59075e3a6cc186e3af7417f.
+Both lifecycle cases reach NMS1 write/verification but are rejected before publication because the mixed Native
+fallback identities differ from the complete frozen source cut. That strict existing check remains unchanged.
+
+The accepted composition now retires the original Native PWF fallback to its real PO successor before capturing
+the full NMS1 cut. The retirement result retains the original persisted source-map version/bytes, predecessor
+selector, batch, terminal, proof and release-head association. NMS1 then rewrites/publishes the complete cut and
+recovers the current selected M5 owner. The Native INTENT uses that current owner's verified SDK metadata cut and
+original drain, while its BK membership is resolved independently from the original immutable release map.
+It never reopens the closed old owner or aliases old Native protection identities to new slot identities.
+GC rereads that original map, exact terminal/proof and current proof head, requires the exact original RELEASED
+protection/batch/head, and incorporates these facts in the existing fresh reference proof. A current PWF selector
+is permitted only when all existing physical-reference producers establish absence for this particular BK target;
+unrelated Object fallback can remain. Complete ten-floor/fifteen-reference, whole-ledger replacement/expiry,
+Native scope/epoch/version, elapsed grace, original UNKNOWN reconciliation and DONE/settlement checks remain.
+Native INTENT precedes the P1 trim/GC scan. Development9 reaches that actual INTENT in both cases, then the
+existing generation floor rejects a missing durable current-owner drain and the bound deleter rejects missing
+native epoch/intent quota. The adapter now uses existing drainForRecovery before INTENT, retaining the original
+control executor and confirmed-drain record. The fixture explicitly bootstraps the existing native quota for its
+two targets before any guarded ledger reservation, including prerequisite cases; it never imports resources or
+expands/resets counters after birth. The separate Oxia physical quota remains the original500,000,000 root.
+The initial Native actor also records its actual drainForLogicalTrim before the first retirement, so every closed
+selector anchor has its original durable drain. Development10 confirms the current-owner drain and native quota
+then rejects that missing older-epoch record; development11 tests the corrected original-actor sequence after
+fresh matching prerequisites. Both physical lifecycle closures remain pending.
+Task-root capture includes both the actual BK backend and the Object authority from the original qualified NMS1
+connection. The complete Task/output-credit checks are retained. Expiry asserts the acknowledged boundary in the
+actual typed chain's canonical position; M4 proof-interval verification runs on the existing control executor,
+avoiding synchronous metadata I/O inside the Oxia completion callback. Development13 is testing these corrections.
+The trim identity uses its actual P1 capability, independently of the M4 capability retained for materialization
+and release checks. Development14 commits that actual expiry frontier and verifies scan rollover without a
+directory change. GC manifest/validation witnesses now use the exact raw Native facts from the complete floor
+capture, requiring a unique consistent version and byte equality with the selected logical materialization.
+The logical store's decorated version is never substituted for the raw version. Development15 tests this
+qualification; physical deletion, UNKNOWN reconciliation and settlement remain open.
+
+M5ES eligibility now selects wirev3 only when a replacement SemanticTransfer has actual typedPulsar coverage.
+Each v3 transfer has an explicit scalar/typed marker; typed coverage retains the existing bounded ledger-keyed
+Binding/chain/ranges encoding. All other snapshots remain wirev2, including legacy scalar Pulsar replacement,
+Kafka replacement and typed Pulsar expiry. Their pre-revision lengths/digests and decode/encode identity are
+fixed in the existing codec tests. V3 without a typed transfer, unknown versions, typed/domain mismatch,
+oversized/truncated/trailing/noncanonical forms reject. Old wire/digests, existing intent/UNKNOWN candidates,
+M4/floor/reference/semantic/freshness checks and all byte/count limits remain. No migration or redispatch occurs.
+The original codec deterministically fails true typed replacement; the corrected codec/target-authority tests
+pass66 with zero failures/errors/skips, including those old-byte goldens. Development16 runs both real cases
+with fresh source-matching SDK/provider admission. These results do not establish C4 acceptance.
+
+Coordination also accepts a directory-identity correction required by expiry. The NPCF witness contains the
+current P1 scan key/version/value; using its entire hash as the typed chain authority makes a new physical-GC
+scan differ from its just-committed trim directory even with unchanged Native facts. The actual capture now uses
+the explicit NPGD/v1 directory domain, binding exact Binding/namespace assignment, Native parent key/version/raw
+digest, actual selection/source/manifest facts and the complete ordered typed chain. Current P1/cursor/floor facts
+remain in the full witness and fresh proof. Every existing reread, scan/owner fence and generic expiry equality
+check remains. Old stored roots/frontiers are neither rewritten nor aliased; incompatible old frontiers reject.
+The two real cases must still demonstrate scan rollover with an unchanged directory and rejection after a real
+Native directory/version change. That real closure is pending.
+
+## Current C3 reader correction (2026-10-23)
+
+The fresh input `eb378e578695a923a2fb0bfe070dcde5c6e7636e653e48a1fcbdd4f9b5d19d9e` completes all five
+real stages: COMPONENTS566, BK/Oxia1326, Object39, Native Kafka63 and Native Pulsar724, all without failures,
+errors or skips. Their input and cleanup checks pass; the earlier materialized-input error does not recur.
+The aggregate remains unqualified because two reader defects are found: the shared current M4 suites contain
+five explicit M5 regressions beyond the historical exact inventory, and the GC reader omits the length-framed
+physical-resource digest domain. M5 now checks the historical inventory plus those exact five methods without
+rewriting raw XML or the historical M4 reader. The digest expression now follows PhysicalResourceIdCodecV2;
+all entry/DONE, version, birth, refund and readmission checks remain. Reader contracts pass48, and a diagnostic
+read of all retained real evidence passes2718 cases. That unbound read is not a valid candidate: the unchanged
+validator-source guard still rejects the new reader against the old source closure.
+
+Coordination authorizes only one exact reader-only successor of this eb input, retaining the complete original
+source and four backend records byte for byte. The new reader, contracts and necessary handoff code enter a new
+complete source closure; COMPONENTS executes again. Reuse requires unchanged Kafka/Pulsar trees, Java/test
+sources, real drivers/recipes, build configuration, locks, tools and runtime dependencies, plus exact original
+record identities and actual Source/Legacy lineage. The old v5 continuation is not generalized. Current raw
+evidence remains through C4/C5. Candidate source binding, five-child/17-obligation review and authorized C5
+delivery are still pending; M5 is incomplete and nothing is staged, committed or pushed.
+
+The bounded entry is `scripts/m5-reader-only-evidence.py`. It pins the four original records, exact reviewed
+source versions, unchanged execution/collection AST and complete runtime inputs. It retains the original
+Source/Legacy directory rather than claiming a relocation as new execution. Three focused handoff contracts
+pass for source/dependency drift, original-record/runtime-input tampering and execution-boundary changes.
+New source capture, COMPONENTS and the complete source-bound successor check remain pending.
+
+## Latest local cleanup (2026-10-22)
+
+The implementation session mistakenly reapplied the older cleanup request after the newer authorization to
+resume complete validation; there was no new user cleanup request. The entire fresh preparation and
+execution directory `nereusstream/nereus-m5-fresh-20261022` is removed, including attempts1–3, captured inputs,
+dependency copies, logs and the incomplete candidate. Its actual preparation completed and COMPONENTS passed566,
+but BOOKKEEPER_OXIA exited1 at the final input verification with `materialized dependency input differs`;
+there is no successful BK/Oxia receipt or complete candidate. These deleted bytes cannot support later reuse.
+Eight stopped M5 test containers, six exclusive test volumes and their one Compose network are also removed.
+Other containers, volumes and networks, including the running connector, are unchanged; Docker is not restarted.
+The earlier retention statements below describe their respective historical points. Source and uncommitted work
+are preserved. C3 is resuming with diagnosis of that actual input-verification failure, fresh preparation and
+complete applicable validation. New failure/success evidence must remain through C4/C5; M5 is incomplete.
+
+## Local test artifacts cleared (2026-10-22)
+
+The user authorizes clearing local test artifacts and rebuilding the evidence through a later full validation.
+The root `build/`, all eleven module `build/` directories and the project `.gradle/` cache are removed, including
+the old frozen test workspaces, captured input objects, execution packages, logs and preparation outputs.
+References below to those local paths describe historical runs; their bytes are no longer retained locally and
+cannot support stage reuse, source equivalence or a new candidate. Existing design decisions and checked-in
+historical documents, source locks and receipts remain unchanged. M5 is still incomplete.
+
+The next acceptance must prepare fresh inputs and execute the complete applicable validation again. This cleanup
+does not run that validation or grant candidate/Final, C4/C5, commit or push authority. Source, configuration,
+documentation and the preserved Docker backend are retained; Docker is not restarted and no container, volume,
+global dependency cache or other checkout is cleaned.
+
+### Fresh complete preparation entry (offline contracts only)
+
+`scripts/m5-native-build-preparation.py` now defaults to `--mode fresh`. It takes the three current source roots,
+explicit JDK21/JDK17 and Python3.14 executable paths, plus actual finite Maven dependency repositories through
+`--maven-repository` and `--sdk-testing-repository`. It requires no prior package, prior input closure, v5/v11 hash
+or deleted flat inventory. The candidate directory must have no `/build/` ancestor: the SDK quality convention
+excludes source paths containing that component. Dependency copies retain the existing file/count/total bounds.
+
+The fresh path captures the complete sources and actual tools, publishes the six current Root dependencies, and
+uses the existing NoTest producer recorder to prepare all required Root/Kafka/Pulsar Test upstreams in one final
+workspace. Root/Pulsar and Kafka each run build/stability passes before the single final input freeze. Empty
+Checkstyle source participation, changing source/external inputs, producer drift and changed published Root JARs
+reject preparation. Producer records, logs, dependencies and actual tool identities enter the frozen inventory.
+No Source/Legacy summary is invented: the complete runner's real BK/Oxia stage later supplies the current
+source-run, whose JAR digests must match the prepared artifacts. The subsequent five-stage run consumes the
+workspace's captured `build/m5-evidence-ant-repository`; it uses no stage-equivalence or continuation proof.
+
+The old preparation branches require explicit `--mode historical-kafka` or `--mode historical-pulsar` and their
+original materials. They retain their rejection checks and are not fresh fallbacks. Offline contracts pass46
+evidence/entry,11 input and10 JUnit tests. The fresh-flow unit uses synthetic producer records only; no actual
+Gradle preparation, backend, fresh candidate, C4/C5 or full acceptance has run. Docker recovery remains outside
+this offline change and subject to the user's existing decision to preserve its scene.
+
+### Environment recovery authorized (2026-10-22)
+
+The user now authorizes restoring Docker and proceeding with real fresh preparation and all five stages, followed
+by C4 review and the previously authorized C5 delivery. The engine is already reachable at29.7.2; no additional
+restart is needed. The current container/volume baseline is captured, the unrelated connector is running, and old
+stopped test backends are retained. Recent VM log tail has no I/O errors; actual BookKeeper writeability remains
+for the new real BK/Oxia stage to establish. Fresh preparation uses a new workspace outside `/build/`, explicit
+Python3.14/JDK21/JDK17 and finite current Maven dependencies, not deleted historical evidence. Actual preparation,
+candidate and complete acceptance are pending; the offline results above do not establish them.
+
+The first actual fresh preparation stops during Root configuration because the cold Gradle cache lacks Kotlin
+stdlib2.3.20; no compile or Test runs. Fresh publication and the first producer pass now resolve configured real
+dependencies normally, while both stability passes are explicitly offline. Actual dependency bytes and producer
+inventories must still match before freeze. Historical preparation commands keep their original offline behavior.
+
+The second attempt publishes all six Root modules successfully, then stops during SDK plugin configuration when
+Plugin Portal terminates TLS for `io.streamnative.lightproto:lightproto-code-generator:0.7.3`. The evidence init
+now resolves only that exact coordinate from Maven Central, retaining version and TLS checks. A configuration-only
+probe passes with the same official artifact (SHA25625086bfd149411e4255b7a1b727e1d07cf95af8ed06f8cdda2066b271632bdca).
+This proves the download-path repair only; real NoTest producer/stability and complete acceptance remain pending.
+
 Read [ADR 0148](../../../decisions/0148-v2-m5-lifecycle-contract-amendment.md) and the
 [lifecycle amendment](m5-lifecycle-contract-amendment.md) first. The exact supersession table selects current clauses;
 unlisted original I0/A-E and amendments 1/2 remain applicable. Their frozen bytes and receipts are historical inputs.
 The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and its immutable predecessor chain.
 
+## M5-E execution-order supplement (2026-10-09)
+
+The coordination decision in `01a0e113-1ba8-70e3-b6cd-3b5fd715a656` supplements the execution order of the frozen
+M5-E child, aggregate and Final requirements. Frozen documents, manifests, source locks and historical receipts
+remain unchanged. This supplement grants no present commit, push, scenario promotion or Final authority.
+
+Before the concentrated M5 delivery node, complete every current implementation and applicable real acceptance
+obligation, all five children's responsibilities, the complete combinations and affected current-source regressions.
+Execute the complete candidate in an isolated directory matching a frozen, independently readable input closure:
+each changed repository's base commit and exact source/build/test/script/configuration bytes, required dependencies,
+service images, actual loaded JARs, raw results and child/aggregate archives. Unregistered inputs invalidate it.
+A base HEAD, selected file list or collection of historical focused receipts cannot stand in for this candidate.
+
+The pre-commit result is **complete M5 candidate acceptance, awaiting commit binding and Final sealing**. It does
+not close the final source/archive obligation, promote scenarios or report `PASS_V2_M5_FINAL`; the whole goal stays
+ACTIVE. After coordination review of that complete candidate and its explicit staging scope, the delivery node may
+form the real source commits. Independent checks must prove each committed tested input equals the frozen executed
+input, including Kafka/Pulsar and runtime dependencies. A difference affecting tested inputs, generated bytes or
+runtime artifacts requires the affected validation to run again. Do not relabel an old base SHA or rewrite raw runs.
+
+Commit-bound children and Final retain the same real tested Nereus commit, consistent source tuple, complete
+attachment/ownership/archive checks and scenario validation. Preserve the original candidate and failed records;
+the new binding records their actual execution and subsequent independently verified source equivalence. Necessary
+source and evidence-only successor commits belong to this one reviewed delivery node, preserving the existing
+tested-source/evidence-successor separation rather than introducing commit self-reference. Final source checks,
+`v2M5Check` and coordination's final review precede the ordinary non-force push and whole-goal completion.
+Any failure keeps the goal unfinished; M6/M7/M8 remain outside this task.
+
+### Candidate input preparation and independent verification
+
+The [candidate input tool](../../../../scripts/m5-candidate-inputs.py) implements source/dependency preparation and
+later source equivalence, not execution acceptance. `prepare` captures the complete tracked/unignored file inventory
+of each actual Nereus/Kafka/Pulsar Git worktree, including deletions, executable modes and repository-contained source
+links. It copies immutable Git metadata without checkout or mutation of the originals, stores every captured input
+as a regular content-addressed object, and retains independent source directories. Explicit dependency path/SHA
+inventories and their own original bytes are part of the closure; verification reparses every dependency edge and
+checks ignored materialized inputs as well. Source changes during preparation invalidate the candidate.
+
+`verify` requires no original source directory: it rereads the entire stored object inventory and independently
+reconstructs all source/dependency relationships, rejecting missing/extra objects, unregistered source files,
+changed bytes/modes, unsafe links, external Git object alternates and dependency omissions. `bind` independently
+compares every committed tree path/mode/blob with the frozen source inventory and checks the captured base ancestry.
+It emits a separate input-equivalence record only, without changing the original input closure or raw evidence.
+
+The schemas are `NEREUS_V2_M5_CANDIDATE_INPUT_CLOSURE_V1` and
+`NEREUS_V2_M5_CANDIDATE_COMMIT_EQUIVALENCE_V1`; both require `executionEvidence=false` and
+`promotionEligible=false`. Neither operation creates a child receipt, aggregate, Final or scenario promotion.
+`v2M5CandidateInputsContractTest` verifies these boundaries using real temporary Git repositories. Complete candidate
+execution, all five exclusive children, runtime input registration and aggregate/Final validation remain separately
+required. These new source/build inputs advance the input cohort; older focused archives remain exact historical
+results and cannot be relabeled as the complete current candidate.
+
+The [raw JUnit attachment checker](../../../../scripts/m5-evidence-junit.py) validates exact XML bytes,
+actual testcase statuses/counts and unique task/class/case identities. It rejects empty/failed/skipped evidence,
+ambiguous names, duplicate attachments, unsupported XML and symlinks. Its explicit structural-only result grants
+no execution, source, semantic ownership, child or Final authority. `v2M5EvidenceJUnitContractTest` verifies this
+component; the complete five-child evidence contract and execution gates remain separate requirements.
+
+## Pulsar typed materialization coverage supplement (2026-10-11)
+
+Coordination confirmed that [ADR 0011](../../../decisions/0011-v2-position-domains-and-multi-protocol-fabric.md),
+the [Pulsar context](../../domain/pulsar/CONTEXT.md) and the
+[native BK path](../../04-bookkeeper-and-pulsar.md#pulsar-native-bookkeeper-path) already require `(ledgerId, entryId)`
+and ledger-keyed half-open entry ranges. Across ledgers, the actual ManagedLedger or Object-WAL virtual Ledger Chain
+proves order and adjacency. Numeric ledger-ID sorting, cross-ledger subtraction and a global logical offset are
+not admitted. The current M5 single-long `PULSAR_ENTRY` projection cannot qualify a complete native source cut.
+
+The necessary M5 implementation must carry the exact Binding/incarnation/storage epoch, captured authoritative
+chain identity/directory and per-ledger entry ranges through source cut/set, task/output identity, each entry's
+payload locator, position/timestamp/checksum indexes, generation/manifest, independent validation and actual
+read/publication. Applicable retention/reference/replacement/delete consumers must retain that typed coverage.
+Kafka's existing half-open offsets, wire bytes and identities remain valid. No Kafka HW/LSO number becomes a Pulsar
+frontier. Only actual applicable confirmed/sealed/trim/recovery boundaries qualify the Pulsar cut.
+
+Before installing this producer, fix explicit new Pulsar control/NMS1/lookup wire versions, field order/type tags,
+chain/range bindings, finite caps, checked arithmetic, goldens and rejection cases in the current projection mechanism.
+Historical frozen M5-A/projection/amendment/golden/receipt bytes remain unchanged. An old single-long Pulsar record
+without independently verifiable ledger/chain identity fails closed; it cannot be guessed or promoted.
+
+Acceptance must use an actual owner with at least two sealed ledgers, entry IDs restarting at zero, and an excluded
+active tail. Capture the full chosen sealed cut and exact predecessor preferred/fallback inventory; read and preserve
+every entry's bytes and native position; independently reread and verify all payload/lookup boundaries, then publish
+through the existing authority. Test cross-ledger successor, missing/reordered chain/source, foreign Binding/chain,
+stale capture/selector and codec corruption/caps/overflow. A legitimate sealed prefix/subcut is allowed, with the
+outside mapping retained exactly; reducing acceptance to one ledger does not fulfill cross-ledger coverage.
+This required implementation and native acceptance remain OPEN. The supplement supplies no SourceProof, M4 release,
+delete or whole-M5/Final authority; the full goal remains ACTIVE.
+
+The first strict value is [M5PulsarCoverageV2](../../../../nereus-storage-object/src/main/java/com/nereusstream/storage/object/materialization/M5PulsarCoverageV2.java),
+with the current [coverage projection](m5-pulsar-coverage-projection.json) and independent golden. M5PC version2 carries
+Binding/incarnation/storage epoch, the declared chain authority root, a domain-separated directory digest, exact
+ordered ledger/state/end/source rows and ledger-keyed ranges. It allows sealed subcuts and explicitly empty sealed
+chain rows, rejects active-tail selection and unexplained holes/duplicates/reordering, and counts only per-ledger
+entries with checked addition. Scoped comparison/lookup/containment/adjacency use that directory, including ledger
+IDs whose numeric order disagrees with chain order. Counts are checked before decoder allocation; the byte cap is
+65,536 and both row caps256, within the existing M5 source cap.
+
+Eight codec/value cases and the existing 17 materialization cases pass, zero failures/errors/skips; Main/Test style
+checks pass. These are declared-value fixtures, not native chain/source proof. Construction/decoding validates the
+encoded directory commitment without certifying its supplied authority root. Actual native/virtual-chain producers,
+typed control/NMS1/lookup propagation, independent per-entry validation, publication and downstream lifecycle
+consumers still require implementation and real acceptance. Kafka and all historical frozen bytes remain unchanged.
+
+The [current Pulsar materialization projection](m5-pulsar-materialization-projection.json) now fixes v2 for affected
+source-cut/plan/generation/manifest, NMS1 sections and lookup bodies. A parent carries the exact M5PC2 context once;
+child extents/index rows encode only its bounded ledger ranges. Mixed versions, another chain, legacy scalar
+promotion and a different envelope Binding reject. Pulsar cuts carry native confirmed/trim/recovery boundaries;
+the five Kafka scalar fields are omitted from the Pulsar wire. Task/validation records with only opaque identities
+retain their unchanged layout and bind the new domain-separated source/task/output identities.
+
+Rewrite and independent validation now use a per-entry cursor plus separate native/provider source verification.
+They verify each original position/payload/timestamp, exact ordered entry root, full contribution and every locator;
+an empty native entry remains one entry with zero payload bytes. NMS1/lookup goldens are independently assembled.
+Flat-only readers cannot authorize Pulsar materialization. The declared-entry fixture and existing shared regressions
+pass 927 unit cases (Object578/Kafka-BK349), zero failures/errors/skips; this is not native execution evidence.
+
+The existing declaration builder/validator retains its buffered part path. The staged writer and independent streamed
+payload validator below use the identical Pulsar NMS1 projection, bounded metadata and a fixed64KiB payload buffer;
+lookup index bodies remain bounded and buffered. Actual task/Cell/Provider writer admission remains uninstalled.
+The actual native source/cursor is recorded below;
+virtual-chain source/cursor and its actual publication remain required.
+Pulsar reuse/index-only explicitly require their actual payload-locator adapter and do not dispatch through the
+scalar implementation. Native read/publication, full outside-cut mapping, retention/reference/replace/delete
+consumers and real two-sealed-ledger plus active-tail acceptance still remain required. The whole goal stays ACTIVE.
+
+The finite consumer review found and corrected before-cut lookup and unvalidated embedded-index bodies. Typed lookup
+first rejects outside selected bounds by the exact chain; its in-cut successor remains unchanged. Embedded sections
+must parse the actual lookup version/kind/coverage and bind the parent task/output. Current deterministic rewrite
+uses external indexes only, so semantic validation rejects extra embedded sections. The legal codec golden stays
+valid. A 12-case old-source run reproduces exactly three new failures; corrected current Object/Kafka-BK regression
+passes 930 unit cases, zero failures/errors/skips. Prior 927 archives remain historical, not relabeled as corrected.
+
+[PulsarNativeMaterializationSourceV2](../../../../nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/PulsarNativeMaterializationSourceV2.java)
+now obtains the actual original M4 owner/view and separately reserves a bounded Cell source workspace. It rereads
+actual P1, stored ManagedLedger metadata, BK source versions and Object namespace/source verification. Its immutable
+directory comes from the actual captured ledger order/sealed bounds. Original SDK reads preserve each native
+ledger/entry, complete payload and publish timestamp; the selected entry root/count and native BK canonical body or
+immutable NPD1 body/version identities are separately bound. Active-tail selection and stale owner/selector/source
+reject. No caller-supplied SourceProof or new SDK client creates this source.
+
+The workspace holds descriptor/owned-entry conversion bytes and original cleanup slots through actual SDK drain
+and local delivery. Interrupted/unknown cleanup retains charge; undelivered original workspace reconciliation never
+opens another client. Source close excludes new work and waits outside the cursor/source locks; preparation settles
+before synchronous delivery so the recipient can close from that actual callback. Actual BK/Object/Oxia runs pass
+two sealed ledgers/6 entries with entryId restart, excluded active tail, independent payload/timestamp checks,
+stored-metadata version-change rejection, original workspace refund and callback close. Final 17 fresh suites/211
+cases include42 owner cases, zero failures/errors/skips, owned resources removed and original containers unchanged.
+Native429 and BK35 are matched UP-TO-DATE, not counted as fresh; all620 exact inputs/raw results are archived.
+
+Finite review found a P1 close race: delivered source metadata qualification was not registered before actual GET,
+so close could refund while that original I/O was pending. The proper old-source43-case run reproduces one failure
+by requiring close to remain pending for5seconds while the actual GET reply is held; the earlier immediate pending
+assertion did not reproduce it and remains a separate passing run, not RED. Qualification now registers before
+durable selector/P1/native/BK/Object I/O and retains its original metadata future through interruption and local
+completion. Local admission checks perform no remote I/O. The local directory is captured before starting P1 GET,
+preventing a stale local snapshot exception from orphaning that accepted chain. Close and original admission share
+the source lock, while actual I/O waits remain outside it.
+
+The final current-source run `build/m5-native-pulsar-offload-green-native-source-qualification-drain-final` exits0,
+passes17 fresh suites/212 cases including43 owner cases, zero failures/errors/skips, and archives621 unchanged
+inputs. Held actual metadata GET retains workspace charge through close, refunds only after its reply and local
+qualification settle, and rejects subsequent source use. Actual source capture and synchronous delivery-close
+regressions remain green. Native429/BK35 are matched UP-TO-DATE, not fresh. Owned services/networks/volumes are
+absent and original containers unchanged. Earlier211, false-RED/improper-setup and first corrected212 archives
+remain separate. Coordination accepted this frozen correction after finite source/receipt review; no aggregate
+qualification is inferred.
+
+`M5PulsarStagedPartV2` stages one source part under a finite local byte bound, preserves each entry locator/root,
+then assembles the same v2 NMS1 body and digest with one64KiB copy buffer. It rejects reference/index-only plans before
+source I/O. Its files are repeatable and owned; closing
+fences new streams and retains files/read counts through original reads, with failed close retaining charge. Failure
+cleanup touches only owned paths and keeps the original exception. `createStagedExact` checks all typed plan/scope/
+part identities before PUT and reuses C1 streaming creation and existing UNKNOWN reconciliation. This is a library
+bridge, not actual native worker/Task/writer admission. Four declaration-only staging/bridge cases and shared
+regressions pass934 unit cases (Object585/Kafka-BK349), with the six contract cases and non-promotable source check
+passing. Neither a numeric staging cap nor these fixtures grants actual Provider/native composition or lifetime/budget
+admission. The subsequent streamed read/validation implementation and its remaining scope are recorded below.
+
+Coordination independently accepted the frozen212 source P1 correction and its621-source/raw receipt tuple. That
+finite conclusion closes only the reviewed source/cursor dependency. Later staging/provider/validator library changes
+are separate inputs; the frozen tuple is not presented as the current complete runtime closure.
+
+C1 now consumes a full Object response through a caller-owned synchronous parser without building a whole body.
+It proves exact length/SHA/EOF and the optional immutable version from that same GET, passing the frozen version to
+the transport. A failed response close retains the original operation and a private cleanup handle; cleanup only
+recloses that response, preserves the work failure and never opens another GET. Three targeted C1 cases pass. The
+existing real MinIO diagnostic proves the64MiB payload byte sequence and full SHA through one64KiB consumer buffer.
+Its initial constant-byte test expectation was incorrect for the existing varying pattern, is archived as a fixture
+failure and is not a production RED. The corrected actual diagnostic passes with no M3/whole-M5 evidence promotion.
+
+The independent NMS1 streamed rewrite parser checks the exact v2 header/source contribution, every original native
+entry position/length/bytes/timestamp/digest and locator, exact entry root/count, section/footer digests and EOF.
+Its verified-part result has a private constructor. It retains bounded metadata directories and one bounded original
+entry, without a whole-payload buffer. The C1-backed reader binds the exact plan and payload/index versions; generation
+validation produces the same roots/bytes as the existing buffered declaration path. Lookup index bodies remain bounded
+and buffered. Current affected regression passes94 suites/946 unit cases (Object591/Kafka-BK349/S3-adapter6), plus
+the six contract cases and non-promotable source check.19 typed cases include stream equivalence and corrupted payload/
+footer/EOF/source rejection. This library read path still needs actual native worker/Task/Cell/writer admission,
+Provider lifetime/byte ownership, native output/read/publication, reuse/index-only, virtual-chain and lifecycle composition.
+The complete M5 goal stays ACTIVE and all17 obligations stay OPEN/null.
+
+The original Native S3 store/offloader now retain a package-owned C1 connection loan through original GET/PUT/UNKNOWN
+and response cleanup. Actual marker/versioning checks reuse that same client. Compilation and style checks pass;
+the held-GET mode46 real run passes with offloader/store close pending until original C1 drain and loan release.
+17 fresh suites/213 cases include44 owner cases, zero failures/errors/skips, with621 archived unchanged inputs,
+owned resources removed and original containers unchanged. This is SDK lifetime evidence, not native materialization
+qualification; the mode46 declared scope is not promoted to actual Task/Cell/provider authority. Actual Task/Cell/
+writer/byte admission remains required. The existing lifecycle route also needs its normative M5 Task/immutable-record
+and Cell admission keys, preserving its current root and exact Binding/version protections. This implementation is
+in progress and cannot be replaced with a synthetic Object create identity before the server version exists.
+
+Task registration now stores the complete immutable plan at the existing Binding materialization prefix's
+`plans/<taskId>` key before publishing PLANNED task state. Restart/adoption reads the exact frozen mode, part/index
+identities, policies and embedded source cut rather than reconstructing them from an opaque output hash. Registering
+a changed output plan for that same task conflicts, and publication requires the original stored complete plan.
+The original source-cut/task/validation/generation/manifest wire bytes remain unchanged. The new focused restart/
+response-loss/conflicting-plan case passes with18 materialization cases. The affected shared library regression and
+contract/source checks pass; actual native M5 route/Task/writer integration and composed acceptance remain required.
+
+### Native Pulsar input and Provider scope implementation supplement (2026-10-11)
+
+Coordination resolved the concrete native field meanings against I0/A, ADR0014 and the existing worker transition.
+`storageFence` retains Storage Epoch semantics: checked actual P1 epochOrdinal+1 with that actual StorageEpochId,
+not the changing Native Cell generation. The current ordinal0 profile yields1 only after actual P1 verification.
+Owner/worker epochs retain their selector/grant CAS duties. Native worker identity separately commits the complete
+actual admitted Cell-owner bytes, including domain/profile/generation/nonce, and every use rechecks the original
+active head. Original durable holds and SDK/local drain must cover Task/output/UNKNOWN; cancellation or a new owner
+cannot release a live old writer.
+
+Native protocol-state root binds the actual P1 aggregate/selector keys, versions and canonical values, captured
+native view/chain and native recovery input. In this native profile `recoveryCheckpointRootSha256` denotes a typed,
+versioned ManagedLedger recovery-input snapshot: actual metadata namespace/key/name, Binding/incarnation/StorageEpoch,
+metadataVersion and original storedMetadataBytes. Persist its parseable body or exact immutable reference with native
+input/full Plan under existing capacity limits; a process-local opaque view hash is insufficient. Reuse existing view
+bytes when independently decodable. No separate native checkpoint frontier exists here, so recovery frontier stays
+absent. This grants no cursor/dedup/recovery-reference transfer or deletion qualification.
+
+Provider scope binds actual physical namespace assignment, actual Protocol Cell and canonical frozen prefix, plus
+the admitted profile's stable security/credential references, allowed KMS, admission/quota domains, operator owner
+and deletion capability scope. A parseable persisted profile reference may carry these dimensions; secrets are not
+persisted. Worker nonce/generation/task and temporary endpoint aliases are excluded from scope identity. Actual
+namespace/Cell admission must prevent distinct Cells sharing one exclusive prefix. The existing physical namespace
+authorityRoot remains unique. The current endpoint/region/checksum-only S3 configuration is insufficient for that
+complete scope and must be supplemented and actually admitted before native producer installation.
+
+The native M5 route uses an explicit canonical key/value whitelist, exact key/version and Binding/Cell/task/output
+checks under the existing root. Cell admission remains one shared Cell capacity. Immutable source cut, native input
+and full Plan must be persisted and exactly reread before matching Task/fullPlan grant dispatch. Partial/UNKNOWN
+registration and restart retain original candidates, charges and references; neither opaque PLANNED state nor Object
+existence proves complete admission/publication. These are necessary current implementation clauses; original frozen
+bytes and receipts remain unchanged. All17 obligations and complete native composition remain OPEN.
+
+This supplies actual source/cursor dependencies only. Actual worker/output admission, fixed-buffer/staging rewrite,
+native read/publication, reuse/index-only, virtual-chain source and downstream retention/reference/replacement/delete
+remain required. It does not authorize M4 release, physical dispatch, whole M5 or Final; all17 obligations stay OPEN.
+
+The configured actual-Cell Oxia route now admits only canonical M5 source-cut/native-input/plan/task/validation/
+generation/manifest
+and its shared Cell admission key under the existing root. Body/key/hash/Binding/incarnation/StorageEpoch/Cell checks,
+create-only immutable values and exact stored source-cut/complete-plan/generation links are enforced. Legacy routes
+retain their previous whitelist. Three new route unit cases pass; an actual owned Oxia write-then-lost-reply and SDK
+reconnect case verifies exact Plan recovery and shared capacity across Binding routes,1/0/0/0. Declared source/proof
+facts supply no native worker authority. Affected Metadata176/Object593/Kafka-BK349 regression passes117 suites/1118
+unit cases, zero failures/errors/skips, plus6 contract cases and the non-promotable source check.
+
+The declared M5PulsarRecoveryInputV2 codec and original SDK capture getters remain implemented. The native source
+now persists [OxiaPulsarMaterializationInputV2](../../../../nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/v2/retention/OxiaPulsarMaterializationInputV2.java)
+at its same-root canonical native-inputs/protocolStateRoot key. NPMI2 binds actual P1 aggregate/selector key, original
+native version and canonical value, metadata namespace, exact immutable source-map key/version/value digest,
+complete M5PC2 coverage and recovery-input root. The finite parser checks canonical P1 Binding/Cell/ordinal0/profile,
+reconstructs the original metadata snapshot from NPBV/NPSM, and verifies original directory/source hashes and typed
+boundaries. Original source-map bytes are reused; large stored metadata is not duplicated. Same values at new P1 or
+source-map versions invalidate the input. storageFence is checked actual Storage Epoch ordinal+1.
+
+Actual-Cell routes admit only this create-only input key/body and its own exact source-map reference. Typed native
+source-cut creation requires the stored input's exact coverage, recovery root, view root and Storage Epoch, then
+rereads actual references. The Native source retains the original candidate before dispatch. UNKNOWN input writes or
+observations keep the original Cell workspace through source/Cell close; exact retry/reread can only settle that same
+candidate. Existing historical input bytes settle an original I/O hold, never admit a new worker. Input persistence
+still requires subsequent original source/P1 revalidation before delivery. Four declared input/wire/reference cases
+plus eleven existing route cases pass, zero failures/errors/skips; affected compilation and style checks pass.
+The affected full Metadata regression passes25 suites/180 cases and six materialization contract checks. Initial
+locked-backend Gradle execution passes17 fresh suites/215 cases, including both new Native input checks, but runnerExit1
+rejects its original-container preservation gate because an unrelated Nereus Delay test container disappeared.
+That failed runner and raw results are preserved. The final new-baseline runner exits0: four fresh suites/57 cases
+(native5/provider5/owner46/namespace1), zero failures/errors/skips, with owned cleanup and original-container
+preservation verified. Module158/Native429/BK35 are source-matched UP-TO-DATE, excluded from fresh counts. Both
+623-input manifests and independently copied source archives rehash identically. This is actual input/source/I/O
+lifetime evidence only, not Native Task/output/publication qualification or a complete M5 candidate.
+Admitted Provider profile, matching Native Task/Cell/writer, full output/read/publication and recovery/reference
+transfer remain required. All17 OPEN/null and whole goal ACTIVE remain unchanged.
+
+The complete [M5CellProviderProfileV2](../../../../nereus-storage-object/src/main/java/com/nereusstream/storage/object/materialization/M5CellProviderProfileV2.java)
+and original-root [scope registry](../../../../nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/v2/retention/OxiaCellProviderScopeRegistryV2.java)
+are now implemented. M5CP2 commits the actual physical assignment/full Cell/frozen original prefix, six stable operator
+references, actual stable SDK configuration and version-delete caps. Original SDK credential-provider identity is
+checked against the explicit configuration; its values/address and temporary endpoint aliases are not persisted.
+Actual versioning/encryption/KMS reads precede admission. Native configured PUTs bind allowed AES/KMS headers and
+check the original response; foreign encryption remains UNKNOWN. Full/range GET checks occur under the original C1
+response owner, preserving failed-close cleanup. These references do not supply an IAM/grace/delete/Task proof.
+
+One append-only M5SR2 catalogue below the existing physical authorityRoot stores at most256 profiles/1MiB, in full
+Cell order. Same-key native-version CAS prevents distinct Cells admitting equal/parent/child prefixes concurrently;
+each Cell's complete profile is frozen. The original Source workspace retains its configured SDK connection and
+original scope attempt before catalogue mutation. Unknown observation/reply and actual callbacks keep Source/Cell
+close and SDK loan charges. Exact same-profile recovery, or known no-dispatch/conditional exclusion, settles the
+original scope hold; it never constructs a different worker or grants output capacity. Seven declared metadata/wire/
+SDK-response cases pass and affected compilation/style checks pass. The owned actual Native scope run exits0 and
+passes17 fresh suites/217 cases (module158/native5/provider5/owner48/namespace1), zero failures/errors/skips. The two
+new cases independently reread the full actual Source/SDK profile, reject overlapping foreign-Cell declaration before
+mutation and retain original scope PUT/observation UNKNOWN through Source/Cell close until exact recovery. A foreign
+negative declaration is not a second positive Native Cell qualification. Owned containers/networks/volumes are absent
+and original containers unchanged. Source and archive rehash625 inputs identically. Native429/BK35 are UP-TO-DATE,
+not fresh. Shared Metadata184/Object593/S3 9 unit cases pass68 fresh suites/786 cases and six materialization contract
+checks. This qualifies only this Source/SDK/scope dependency, not Native Task/writer/output/publication. Shared Cell
+Task/output capacity, native worker/full Plan, pending-output inventory and complete lifecycle composition remain
+required; all17 OPEN/null and Goal ACTIVE.
+
+### Native Pulsar complete-plan Task preparation (2026-10-12)
+
+[PulsarNativeMaterializationTaskV2](../../../../nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/PulsarNativeMaterializationTaskV2.java)
+now belongs to the original qualified Source/SDK workspace before any Task mutation. It checks the original actual
+NCO1 owner, P1, admitted complete scope and M4 selector. Worker identity commits the full original NCO1 bytes;
+namespace identity commits the actual permanent physical-to-Oxia assignment. Storage Fence comes from the original
+P1 input, Owner Epoch from the selector, and Worker Epoch from the existing same-key authority CAS.
+
+The typed cut carries the actual captured source extents/entry roots, NPMI2/NPMR2 roots and native confirmed boundary;
+trim/recovery frontiers remain absent without independent proof. Planning policy commits the explicit mode/index
+request, actual complete profile, implemented uncompressed NMS1 V2 and SHA256 configuration, and frozen prefix.
+The existing shared Cell admission freezes configured finite caps and reserves the complete source count/bytes,
+parts/indexes, worst-case profile object bytes and UNKNOWN slots before persisting cut, full Plan and PLANNED Task.
+The complete-plan worker entry independently rereads those exact values and charge before granting work. Existing
+opaque declared-fixture entry and historical wire bytes remain unchanged. An OUTPUT_VERIFIED task may keep its
+existing current token; another grant requires PLANNED, and cancelled/quarantined tasks fail closed.
+
+This preparation actor has no output-create API. Source close stops it and drains its original preparation; partial
+or UNKNOWN persistence retains the same candidates and charge. For an unstarted actor, close confirms the complete
+original immutable records, installs its exact CANCELLED_STALE Task terminal, then releases the original shared
+Cell reservation and SDK/Source workspace. The terminal denotes a stopped local source actor and gives no physical
+cleanup proof. Eight declared worker cases and affected Main/Native-test compilation pass. The initial owned Native
+run exits0 with17 fresh suites/220 cases, zero failures/errors/skips and verified owned cleanup/original-container
+preservation. Its626-input source archive matches exactly; Native429/BK35 are source-matched UP-TO-DATE, not fresh.
+The three actual new cases verify independent complete Plan/grant reads, original applied-Plan reply/observation
+UNKNOWN through Source/Cell close, and capacity rejection before Plan/output. The later actual held-GET regression
+fails on the original post-preparation current-read path: Source close returns while that original selector GET is
+still held. The52-case RED has exactly one failure; its owned runner also fails the independent original-container
+gate because another Nereus Delay container disappears. Both failures and the626-byte-matched input/source archive
+remain preserved. The corrected actor owns its bounded current-read slot and all original accepted async metadata
+callbacks, including interrupted waits, until they end. It rechecks actual NCO/P1/profile and the complete original
+reservation; stop/fence during I/O rejects delivery. Close drains preparation and current checks before terminal and
+refund, and control I/O runs outside the Task monitor. The replacement owned GREEN exits0 with17 fresh suites/221
+cases, zero failures/errors/skips, verified cleanup/original-container preservation and626 exactly archived inputs.
+The same actual held-GET assertion passes: Source/SDK/Cell charge stays until original read drain, and the closed
+actor cannot deliver a usable result. Native429/BK35 remain source-matched UP-TO-DATE, not fresh. Shared Object595/
+Metadata184 regressions pass66 fresh suites/779 cases and Object style checks. Native Task process restart/resume
+remains incomplete; the original Source ownership/warm continuation result is recorded below.
+Pending-output inventory, permanent physical creation capacity,
+native output/independent validation/publication and complete lifecycle/Final remain required. All17 OPEN/null.
+
+The original Native Cell budget now permits one materialization Source per full Binding at a time. Its local slot
+belongs to the original durable workspace reservation and releases only after the same confirmed refund; UNKNOWN
+retains it. It adds no authority root, UUID worker identity, thread or queue. This prevents two local Sources for the
+same native worker/predecessor from both owning one identical Task grant/reservation. A new Source requires the
+original Source/SDK/Task cleanup to finish first.
+
+Unstarted close also settles the same original complete-plan grant before cancellation when the original native
+owner/selector still admits and no local token was confirmed. It rechecks actual NCO/P1/profile, then uses the same
+proposal/Plan/charge and existing authority CAS. The stopped actor never delivers this history-only token or creates
+output. This consumes the original worker epoch, avoiding reuse of a cancelled task ID by the same still-live owner.
+A fenced or changed predecessor is not revived. The actual owned UNKNOWN/exclusive-source/same-owner next-epoch run
+exits0 with17 fresh suites/222 cases (module158/native5/provider5/owner53/namespace1), zero failures/errors/skips and
+verified owned cleanup/original-container preservation. Its626 inputs/source archive match exactly; Native429/BK35
+are source-matched UP-TO-DATE, not fresh. The new case rejects a second Source before charge and throughout UNKNOWN,
+settles the original unstarted grant/cancellation/charge, then qualifies worker epoch2 under the same native owner
+without a cancelled task-ID collision. This is warm continuation; process restart and output lifecycle remain
+required independently.
+
+### Native pending-output chosen-key inventory (2026-10-12, current implementation)
+
+[M5PendingOutputInventoryV2](../../../../nereus-storage-object/src/main/java/com/nereusstream/storage/object/materialization/M5PendingOutputInventoryV2.java)
+stores the original qualified worker, full admitted profile and exact chosen new payload/index keys under the same
+Binding materialization prefix/pending-outputs/taskId. M5PO wire2 is bounded to1MiB,288 slots and1024 UTF8 bytes per
+key; it has PREPARED and CANCELLED_UNSTARTED states. Reused native payloads are excluded from the new-key list.
+The worker's complete Plan/source-cut commitments and derived planned key list are independently checked. No invented
+Provider version, physical resource ID, body-success receipt or physical capacity grant is stored here.
+
+The original route explicitly admits this key family, checks full Binding/Cell/key/body, exact stored Plan, Native
+input metadata namespace and the same complete profile in its original physical-root scope catalogue. Native-version
+CAS permits only create PREPARED, exact retry or cancellation of that same unstarted inventory; terminal import,
+different keys/profile/worker and resurrection reject. Native Task retains its original candidate before dispatch,
+confirms it before delivery and rechecks it on current validation. Source close first confirms any possible late
+original create-only write, then its exact unstarted inventory terminal before Task cancellation/reservation refund.
+Reply/observation UNKNOWN keeps original candidate, Source slot/SDK/workspace and shared Cell charge.
+
+Nine declared worker/inventory cases and affected compilation/style pass. Initial owned inventory verification
+blocks in offloader close: the existing generic create-only materialization guard still rejects the inventory's
+prepared-to-cancelled transition. Original PREPARED inventory/PLANNED Task and SDK/Source/Cell holds remain. Thread/
+heap and read-only actual metadata observations are preserved; only this confirmed-blocked owned JVM is terminated,
+runnerExit1 with verified owned cleanup/original-container preservation. This is interrupted runtime diagnosis,
+not a completed failing owner suite or GREEN. The guard now explicitly exempts only pending-outputs, while its
+separate exact transition check still rejects terminal import, mutation and resurrection. Corrected style passes;
+replacement green-native-pending-inventory-final exits0,17 fresh suites/223 cases, zero failures/errors/skips, with
+verified owned cleanup/original-container preservation. Its627 inputs and independent source archive match exactly;
+Native429/BK35 are source-matched UP-TO-DATE, not fresh. Actual positive independently rereads original Plan/worker/
+complete profile/all chosen keys and the same cancellation; applied inventory PUT reply/observation loss retains
+Source/Cell charge and SDK loan through close until original inventory cancellation and refund. Shared Object596/
+Metadata184 regressions pass66 fresh suites/780 cases. The inventory describes chosen keys and known no-dispatch only.
+Permanent namespace creation/deletion capacity, original Provider output receipts/versions, writer drain, independent
+read/publication and full lifecycle remain required before activating physical output. All17 OPEN/null.
+
+### Object chosen-key birth capacity (2026-10-12, current implementation)
+
+[M5ObjectBirthCreditV3](../../../../nereus-storage-object/src/main/java/com/nereusstream/storage/object/gc/M5ObjectBirthCreditV3.java)
+records one original worker/chosen-key capacity claim under the same assigned physical authority root. RESERVED has
+no PhysicalResourceId or invented version. The existing quota head conditionally uses M5GH wire3 (8,492 bytes),
+retaining the existing scope/profile, resource entries and capacity. Unused wire2 heads remain 272 bytes with
+unchanged encoding. Each issued claim permanently charges its native key plus 8,192 bytes; each unassigned claim
+also reserves the full future resource entry, authority and physical-member allowance. No second capacity pool is
+introduced and no automatic initialization/expansion occurs.
+
+Assignment accepts the exact chosen key's immutable Object version in the original namespace and transfers the
+future allowance into the existing resource reservation in one head CAS. Native SDK/full-read qualification remains
+the caller's obligation; declaration fixtures do not supply it. Only original known no-dispatch cancellation refunds
+the unused future allowance. History remains charged. Age, process death and missing observations are insufficient.
+The head retains bounded exact pending credit/resource work; original-condition recovery excludes duplicate grants,
+refunds, terminal imports and resurrection. Initialization scans the credit family at its actual native depth.
+
+Native Task reopens preconfigured original quota after exact pending inventory/current worker qualification, retains
+each claim before dispatch, and confirms all credits before delivery. Its unstarted close drains original preparation
+and metadata callbacks, persists the exact inventory terminal, settles original credits, then cancels Task/refunds
+Cell/Source. UNKNOWN retains those original claims and holds. Close first reconciles any original committed pending
+head before cancellation. This actor still has no output-create API. Final owned Native runner exits0 with17 fresh
+suites/225 cases and628 unchanged archived inputs, including actual credit applied-reply-loss/Source/Cell retention
+and configured exhaustion. Initial224-case run has two fixture-configuration failures before those scenarios; it is
+retained separately. Actual quota/Oxia gate passes7 fresh suites/44 cases over471 unchanged archived inputs, with
+original head/credit byte/version checks across same-container restart and separate JVMs. Its Worker/version facts
+are explicitly declared, not native SDK output qualification. Shared Object599/Metadata184 regressions pass66 fresh
+suites/783 cases. Full SDK outputs, writer enrollment, independent validation and
+publication, M4 RELEASED, recovery/reference/delete, 17 obligations and whole M5 remain incomplete.
+
+### Original Native SDK output and independent read (2026-10-12, in verification)
+
+The original Task now owns one bounded write-and-verify invocation. Before SDK PUT it persists the original output
+key/length/SHA in WRITE_ARMED on the same birth key and quota head. M5BC wire4 adds that body commitment while
+preserving unarmed wire3 encoding, claim identity, 8,192-byte allowance and M5GH wire3 size. No resource/version is
+invented. Arming retains all future capacity; assignment preserves the exact body and transfers only the original
+allowance. Native actor ownership proves no-dispatch cancellation; an armed record, timeout or absence alone cannot.
+
+Actual staging and index encoding are bounded before growth, and an additional original NCO workspace reservation
+precedes local files and SDK work. It uses the already admitted Source/Task/SDK owner. Public result mutation cannot
+settle private accepted work. SDK/full-GET matching immutable versions bind actual Object resources; independent
+streamed NMS1 and original entry-cursor verification checks every entry byte, typed position, timestamp and locator
+index. The private output proof retains digests/descriptors, not whole index bodies. It grants no M4 publication.
+
+Source close drains original output/metadata work and failed response cleanup. Known dispatched outputs are handed
+to durable QUARANTINED Task plus original inventory/assigned credits; physical data and its quota remain. Partial
+unstarted slots alone may cancel. UNKNOWN retains original files, SDK loan, Source/Cell and workspace. Owned files
+and buffers are cleared only after actual drain and confirmed workspace refund; retry keeps dispatch history.
+The corrected actual Native owned runner exits0 with17 fresh suites/230 cases,0 failures/errors/skips,629 exact
+archived inputs/sources and verified original-container preservation/owned cleanup. Owner61 at
+2026-10-12T09:01:13.465Z independently checks actual immutable output versions and six original4MiB entries across
+two ledgers, plus actual write-intent UNKNOWN, applied-PUT observer cancellation/drain and lost PUT reply. Shared
+Object600/Metadata184 regressions pass66 fresh suites/784 cases. Earlier workspace fixture failures and interrupted
+non-null C1 consumer diagnosis remain preserved; the complete-GET consumer now returns its measured byte count.
+Native429/BK35 are source-matched UP-TO-DATE and excluded from fresh totals. Actual
+M4 protection/publication/outside-cut mapping, restart adoption, membership/recovery/reference/delete and full M5
+remain unfinished. All17 OPEN/null; no commit/push/PR/subagent/M6.
+
+The original output actor now also constructs one complete Binding routing value,
+[PulsarNativeMaterializationReadMapV2](../../../../nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/PulsarNativeMaterializationReadMapV2.java).
+NPMM wire2 embeds the unchanged full original NPSM view, complete typed Plan and exact assigned body/version credits;
+its maximum is1MiB, checked before encoding growth. The original output workspace includes a conservative16MiB
+mapping allowance before any output dispatch. Factory capture requires the independently verified output proof and
+matching actual namespace/version/body; decode validates original Binding, complete ledger order/source SHA/native
+entry frontiers and original worker/Plan/cut/assigned credits. Entries inside a planned part locate its actual immutable
+payload version; all other admitted entries retain original native source bytes, including partial-ledger prefixes,
+suffixes and active tail. Unknown ledger/frontier positions reject. This is bounded routing data, not execution of
+those reads, persisted M4 publication, fallback protection or release. Original Task owns construction through its
+private output completion and clears its local map after confirmed workspace refund; stopped Tasks cannot expose it.
+The actual owned Native runner exits0,17 fresh suites/230 cases,0 failures/errors/skips,629 unchanged archived
+inputs/sources. Owner61 at2026-10-12T09:01:13.465Z/301.794s includes actual partial offloaded[1,3) and BK[0,2)
+output reads for four4MiB entries, exact original full NPSM/assigned credits and retained prefix/suffix/active-tail
+routes; frontier/unknown-ledger/trailing inputs reject. Original-container preservation and owned cleanup pass.
+This verifies the current original SDK/output/routing-data actor, not ordinary mapped read execution or M4 publication.
+
+The current implementation additionally provides bounded positioned NMS1 reads. Its parser shares the exact
+streamed header/directory/footer checks with independent source comparison, drains and hashes every entry with one
+64KiB buffer, validates the original entry root and timestamps, and allocates only the requested entry under the
+admitted byte cap. Unrequested corruption, zero-length entries, oversized requests and truncated/trailing bodies
+have declared-value coverage; all existing NMS1/lookup/golden bytes stay unchanged. Original Task `readMappedEntry`
+uses actual same-version full C1 GET inside a bounded original Native owner read/hazard admission and an additional
+same-Cell byte reservation. Outside-cut entries use the original Native SDK route. A sole original read slot prevents
+unbounded pending work; observer cancellation cannot end accepted I/O. Stop/fence rejects delivery, and original
+response/native drain plus confirmed workspace refund precede slot reuse or Source close. Failed response close
+retains the exact original cleanup handle and all holds; retry never performs another GET. This is actual Task-owned
+positioned I/O, not an installed ordinary ManagedLedger read route or M4 selector publication. The22-case declaration
+suite and shared Object602/Metadata184 regressions pass. The initial generic SDK hold catches profile namespace GET,
+then a corrected exact payload-key hold exposes early source-preparation refund during actual mapped GET. Native
+owner fence had run preparation close in parallel with registered hazard/alias cleanup. The release path now waits
+both native handle drain and all original registered cleanup before closing preparation and refunding its charge;
+failed/UNKNOWN cleanup retains that exact preparation. Original strict charge/close assertions remain. Corrected
+actual Native runner/cleanup exit0 with4 fresh suites/73 cases,0 failures/errors/skips (Native5, Provider5, owner62,
+namespace1),629 unchanged archived inputs/sources. Module158/Native429/BK35 are exact source-matched UP-TO-DATE,
+excluded from fresh counts. Owner62 at2026-10-12T10:13:15.759Z/305.722s verifies actual located four-entry rewrite and
+native prefix/suffix/tail reads, same-version held full GET, observer cancellation, unchanged original total charge,
+Source/Owner/Cell wait, actual response/hazard/preparation drain before refund and all-zero whole-Cell terminal.
+Physical outputs remain. Prior fixture/production failures stay preserved. This qualifies the focused original
+Task/SDK/source-read lifetime; ordinary ManagedLedger mapped routing, publication/recovery/reference/delete and
+whole M5 remain incomplete, all17 OPEN/null.
+
+The original Task now owns one immutable publication candidate and private accepted attempt. It derives validation/
+generation/manifest roots from the same private full-read proof and exact actual M4 protection identities; no second
+output build/PUT or synthetic source identity is used. Preferred-only introduction protects each original cut source
+at its actual next read epoch/source generation, with the original worker counter for protection generation. Existing
+fallback membership must match exactly; when a mixed cut differs, the existing fused retirement precedes recapture.
+The current source/profile/P1/NCO recheck and original Native owner SDK/hazard/alias/preparation drain precede the sole
+selector CAS. A private dispatch gate fences a stopped pre-dispatch actor; already accepted UNKNOWN retries retain
+that same candidate. Actual selector key/native version/value are read twice before returning the receipt. Observer
+cancellation cannot stop accepted publication. Source close waits private publication work, then confirms selected
+handoff or quarantines only unselected work before workspace/SDK/Cell refund. An OUTPUT_VERIFIED task cannot be
+quarantined when its manifest is selected. All assigned physical versions/credits persist; Task audit state is not
+selection authority. This does not install a new reader, recover an actor, release protections or grant deletion.
+Corrected actual owned Native runner/cleanup exit0 with17 fresh suites/233 cases,0 failures/errors/skips,
+629 unchanged archived input/source bytes (module158, Native5, Provider5, owner64, namespace1). Owner64 at
+2026-10-12T11:15:32.194Z/350.853s covers actual partial Object+BK output publication after real old SDK owner close/
+fresh owner open, exact stored validation/generation/manifest/Task/source protections and independent full native
+selector key/raw version/bytes. Applied selector reply/observation UNKNOWN retains original candidate/Source/SDK/
+workspace/Cell until original confirmed handoff, no repeat PUT. Earlier warmed-composite and logical-vs-native
+receipt failures stay preserved. Shared Object602/Metadata184=786 pass; Native429/BK35 source-matched UP-TO-DATE
+excluded from fresh counts. This qualifies the focused original native publication, not ordinary mapped reader,
+restart/source/reference/RELEASED/delete or whole M5; all17 OPEN/null, full goal active.
+
+Selected Native M5 recovery data now follows the actual sole selector into its immutable manifest, generation,
+complete plan, validation, full original Native input/source-map version and configured pending-output profile.
+Each payload/index version is reconstructed from its actual permanent ASSIGNED birth-credit record, under the exact
+original scope/worker/chosen slot; no reserved value or physical version is invented for lookup. Original recovery
+metadata and every outside-cut Native ledger remain in the full map. All captured immutable/P1/source/credit and
+full native selector key/version/value facts are reread before returning the data. This method creates no actor,
+conformance admission, hazard or recovery/read grant; ordinary mapped ManagedLedger installation remains pending.
+Current compile/Checkstyle and fresh shared Object602/Metadata184=786 pass. The actual 65 publication case now
+checks new-control reconstruction and a same-byte real selector CAS during an original held manifest GET; the latter
+must reject its changed native version. Owned green-native-selected-manifest-recovery-docker-ready ended16 fresh
+suites/232 cases,1 failure: reconstruction/map/native receipt comparison succeeded, then an assertion called the Source
+input accessor after actual Owner drain and was correctly rejected. The test now freezes original input/recovery
+before publication; the production guard stays unchanged. Corrected green-native-selected-manifest-recovery-original-input
+is terminal runner0/cleanup0,17 fresh suites/233 cases,0 failures/errors/skips,629 unchanged archived sources,
+manifest0b23aa8a45ad61d6213b1480ba01444418c19fb5e731c096935a6de45bb2748e. Owner64 at
+2026-10-12T13:05:39.893Z/305.627s verifies actual new-control map/input/recovery/profile reconstruction, exact raw
+selector receipt, same-byte actual selector CAS version rejection and exact fresh retry. Native429/BK35 are source-matched
+UP-TO-DATE, excluded from fresh counts. Shared786 still matches all424 source bytes. This is data reconstruction,
+not ordinary mapped read installation, recovered actor/owner grant or new RELEASED/reference/delete authority.
+The first invocation stopped before any backend/test creation because Docker was stopped; that diagnostic is retained.
+The previous233-case publication receipt remains evidence only for its recorded source. All17 obligations stay OPEN/null.
+
+The current implementation additionally persists the original Native Owner's confirmed private SDK/hazard drain at
+the existing predecessor NPOD key before the sole materialization selector CAS. It reuses the same exact drain body
+and confirmed-owner/selector checks on the original blocking control worker, without queuing work onto that same
+worker and waiting for it. This is predecessor drain evidence, not successor actor admission, fallback retirement,
+RELEASED or deletion. Independent actual predecessor-row/successor-row checks are added to publication65/66.
+These four Native production/test source changes follow the archived233 run and remain uncompiled/unverified at
+the bounded convergence audit; that prior receipt does not qualify this new handoff. No new regression was launched
+for the audit. Remaining delivery is production read/recovery, Kafka lifecycle composition, native retirement/delete
+authority and the existing five-child/candidate closure, as discussed in the current reply; no new acceptance ledger.
+
+Ordinary Native mapped read and exact fallback retirement now have focused actual SDK evidence. The existing
+SourceSafe NativeReadAdmission gains a cached preferred-source hook and independent original backend-drain stage;
+legacy implementations keep their default behavior. ManagedLedger single/cursor reads dispatch preferred data before
+opening original BK handles, retain max-position/empty/acked/skip semantics and bound each admitted range by the
+actual owner's entry limit. Existing OrdinaryReadOperation waits for backend cleanup, callback return and every
+Entry data-buffer alias. Retained segments use the original Native cache/SDK under that same outer admission.
+Actual configured S3 loans perform same-version full NMS1 verification; original uncertain response cleanup remains
+held, and the loan survives through the original Native callback/alias drain. Fully rewritten exact-end ledgers are
+not opened or retained as old BK members during mapped preparation; partial sources remain real Native handles.
+The immutable NPMV2 recipe wraps current actual Native retained-source bytes, the original selected manifest root
+and complete NPMM2 map under the unchanged NPSM1 envelope/key family, within its1MiB bound. No mutable pointer or
+virtual ledger ID is introduced. Current-source raw-version capture follows that recipe to the original immutable
+M5 roots. The first real mapped actor claims the epoch already granted by materialization, after exact predecessor
+NPOD and current SDK/profile/preparation checks; a domain-separated immutable claim in the existing cold-claim family
+prevents a second actor and does not obstruct later takeover. It creates no extra unowned read epoch. Later takeover
+uses the exact current actor NPOD and caches its original terminal/proof candidate before selector dispatch, retaining
+those bytes through UNKNOWN. After the exact grant, it publishes the closed-epoch terminal/proof through existing M4.
+Fallback identities retain the original cut worker generation, first read epoch, source generation and capability
+across takeovers. Existing fused retirement closes the final fallback-bearing actor and consumes the complete proof
+interval before exact SourceProtection RELEASED. RELEASED alone grants no retention/reference or physical deletion.
+Affected compile/Checkstyle/Spotless pass. The current owned green-native-mapped-exact-release-continuity run is
+terminal runner0/Gradle0:17 fresh suites/171 cases,0 failures/errors/skips (module158,Native5,Provider5,Owner2,
+namespace1). BK35 is source-matched UP-TO-DATE; broad Native429 and other62 Owner cases were not rerun. Existing65
+verifies ordinary single/cursor bytes, two actual cold SDK owners, Entry-held drain and independent real Oxia exact
+RELEASED/batch identity after fused retirement, then every original message again. UNKNOWN66 remains green. All630
+current and archived source bytes match manifesta176de8fb201bb4b1bb1e147f19a55b4ad1118be545a5f9c718efb8500732589.
+Owner2 timestamp2026-10-12T15:24:39.010Z/35.781s; original containers remain unchanged and owned backend is absent.
+Earlier failing source/results remain in the existing log. The unchanged pure candidate helper retains its focused
+13-case shared M4 result. Four delivery loops remain fixed; this is no full candidate or combination qualification.
+
+The actual-frontier focused run is terminal: actual Gradle0,4 fresh suites/13 cases,0 failures/errors/skips
+(Native5,Provider5,Owner2,namespace1); module158/BK35 are source-matched UP-TO-DATE and broad Native429 not run.
+Actual65 reads full original Native bytes before publication, then verifies ordinary single/cursor reads through
+the mapped SDK after real owner/factory reopen, a second cold reconstruction, and Entry-held drain rejection until
+real release. Actual66 preserves original UNKNOWN handoff.630 sources/archive remain unchanged, manifest
+07c0863014bc1e4875c7c409a96d05cd0eb32dfce5ecbe12a9c707e79ea9a1c6. Owner2 at
+2026-10-12T14:37:17.512Z/34.764s. The runner exits1 on its external-container preservation assertion: twelve
+pre-existing IoT/performance/other container identities disappear during the run. Its standard cleanup receipt is
+not emitted. Independent read-only cleanup audit confirms this run's owned containers/networks/volumes absent,
+records originalContainersUnchanged=false and the actual external delta; no environment-preservation PASS is invented.
+This is actual focused ordinary/cold functional evidence, not a complete qualified clean-environment M5 child/Final.
+No broad rerun is caused by that unrelated environment delta. Full mixed/repeated retirement/references/delete,
+writer/Cell combinations and the fixed four delivery loops remain. All17 OPEN/null/full Goal ACTIVE.
+
+
+The current repeated-source extension adds PULSAR_NMS1_DATA_V2 at source-kind ordinal5, admitted only with typed
+Pulsar V2 coverage, an exact immutable version, a long-lived payload and one actual member Binding. Existing
+ordinals0-4 and frozen V1/V2 goldens remain unchanged. Actual source preparation groups consecutive ranges by their original
+physical source/assigned credit and includes fully replaced ledgers in the complete logical chain. Discrete runs
+of one physical source receive distinct extent identities bound to their exact coverage, while physical key/version
+and original credit remain unchanged; each child extent still obeys canonical contiguous sealed coverage. Mapped entries
+use the installed actual Owner hazard gate and original configured SDK on the existing Source worker; they keep
+independent backend cleanup and reconcile only the original response. There is no new thread or replacement GET.
+NPMM2's existing predecessor NPSM1 may carry its NPMV2 recipe. New cuts preserve predecessor payloads still selected
+outside the cut, decode each with its original Plan, and reread every reachable permanent credit. Obsolete payloads
+are omitted from live member inventory; current generation indexes remain. The unchanged1MiB recipe/map bounds and
+an explicit64-map predecessor bound limit decoding; next Task checks depth before grant, and the actual nested-byte
+workspace is included in the Owner read charge. These parser/data limits alone do not establish complete Cell quota.
+Affected compile/format/Checkstyle and two core suites/41 cases pass. Two earlier repeated runs are terminal
+with their original failures/cleanups retained: a noncontiguous requested cut, then missing recipe support in P1
+input verification. The corrected continuous source performs actual NPD1/NMS1 reads before reaching that P1 gate.
+OxiaPulsarMaterializationInputV2 now projects the bounded NPMV2/NPMM2 envelope only after exact source-map version/
+value/digest checks, then retains exact P1 versions/value, actual Native recovery snapshot and original directory
+checks. Missing Native handles require complete mapped coverage and the exact view-bound ledger root; every parsed
+assigned credit matches its original full Plan/Binding/slot and physical namespace. This metadata projection grants
+no SDK actor or output semantics. Affected compile/format/Checkstyle and input4 cases pass. The input-corrected real run then reaches a same-executor publication deadlock: synchronous Owner fence awaits
+mapped cleanup queued to its own control worker. Its live thread dump and aborted failed run are retained; only the
+confirmed owned Test JVM is terminated, and original runner cleanup preserves other containers. Current publication
+retains one original candidate/private work lifetime but composes the actual Owner drain asynchronously, then
+resumes exact predecessor NPOD/profile/Cell/selector metadata handoff on the same existing executor. UNKNOWN close
+reconciles only that original already-drained selection; no repeated outputs. Compile/format/Checkstyle pass16s.
+The async-publication run is terminal runner0/Gradle0,17 fresh suites/171 cases,0 failures/errors/skips,
+original containers unchanged/own backend absent, on630 matching inputs/archives under
+629465982bee329ed331b4ff10558f52497300cffbe15e11db67f42bf4ca4264. Actual65 passes second mixed Source/worker/full
+Plan/actual output/manifest, retained old outside-cut payload identity and cold full-byte reopen/real drain;66 retains
+original UNKNOWN candidate semantics. Owner2 at2026-10-12T16:37:14.384Z/54.279s. One final source partition correction
+now derives boundaries from actual output-part coverage, preserving distinct immutable keys when a cut has multiple
+parts in one ledger. Its corrected compile/format/Checkstyle pass16s after a retained15s formatting-only failure.
+Current part-boundary source is terminal runner0/Gradle0,17 fresh suites/171 cases,0 failures/errors/skips
+(module158,Native5,Provider5,Owner2,namespace1), on630 exactly matching current/archived inputs under
+752547e9a95ef0c8686974595454c3445bab125a9100222bc66ddd291f643afc. Owner2 at2026-10-12T16:45:54.223Z/52.187s
+passes the actual second mixed source/worker/full Plan/outputs/publication, exact prior outside-cut object identity,
+cold full-byte reads/real drain, and original UNKNOWN66. Original containers remain unchanged; owned containers/
+networks/volumes are absent. BK35 is source-matched UP-TO-DATE, broad Native429/other62 Owner cases excluded. Affected
+core41 and input4 retain their separate scopes. v2DocumentationCheck/v2M5LifecycleDesignCheck pass21s at
+build/m5-native-repeated-mapped-current-docs.log with no runtime authority; the preceding171 case tuple qualifies its archived source only. Native retention/reference/delete, full combinations/five children
+and all17 OPEN/null remain required.
+
+### Actual Native cursor metadata observation (2026-10-13)
+
+`PulsarNativeCursorMetadataV2` captures the actual ManagedLedger cursor catalogue, exact row versions and original
+stored/parsed bytes through the existing Native metadata store. It rereads each row, the directory and the exact
+ManagedLedger predecessor before returning its bounded NPCS2 observation. The original Owner hazard and shared
+Cell reservation precede dispatch; the existing control executor performs the capture. Original backend termination
+and delivery cleanup precede byte refund. The 8MiB input and decoded workspace are charged together; the existing
+1MiB materialization-directory limit remains unchanged. Stable rereads alone do not close a directory ABA race or
+establish complete writer enrollment.
+
+The owned `green-native-cursor-metadata-budget` run is terminal runner0/Gradle0 with 17 fresh suites/170 cases,
+zero failures/errors/skips: module158, Native5, Provider5, publication65 only, namespace1. Actual65 independently
+rereads the Native metadata rows and compares original bytes/versions, then verifies original charge release.
+All631 current/archive inputs match manifest e8acef205445a5db0424a3eabe492cbbb3db6d3f690f8e8e328a383e26725ad0.
+Owner1 at2026-10-12T17:34:18.376Z/37.73s has XML SHA256
+9ec9d52666c17accb07781d4005cd07b9d53cbf67f0f70cfb6c220e4d581e6c0. Cleanup verifies original containers unchanged
+and owned backend absent. BK35 matching UP-TO-DATE, UNKNOWN66, other Owner cases and Native429 are excluded.
+Failed compile/style and the original pre-dispatch budget rejection retain their raw source/log/cleanup evidence.
+
+This is a data producer only. Actual cursor-ledger BK PositionInfo, typed Native retention floors, closed writers,
+complete references, exact M4 RELEASED composition, metadata retirement and actual physical deletion remain required.
+No reference-free/delete/child/whole-M5 authority is granted; all17 obligations remain OPEN/null.
+
+Actual durable cursor checkpoints now supplement that observation. For nonnegative cursorLedgerId the original
+configured BookKeeper client opens withRecovery(false), reads one entry at its captured LAC, and retains the complete
+PositionInfo bytes plus cursor-ledger/checkpoint-entry identity. It never invokes cursor recovery or fences a writer.
+Metadata-only cursors retain their ManagedCursorInfo. Original SDK entries and handle close before the next cursor;
+an unresolved close retains the original operation, Owner hazard and Cell charge. Reconciliation closes only those
+original objects, with no new open/read. The catalogue is reread after all checkpoint reads. This bounded observation
+still does not establish complete writers or exclude changes after its read; typed floor/reference consumers remain
+required. Compile/format/affected Checkstyle pass19s. The fixed631-source owned actual checkpoint run is live under
+manifest e690b6c18e2cd8890d7a05d5d1bd372a8206f7a9f4389a98eb3a4a2e76da5029; publication65 independently compares
+actual BK LAC and raw PositionInfo bytes. That run is terminal runner1/Gradle1 with16 fresh suites169 cases,1 failure and0 errors/skips: its cold cursors
+were all metadata-only, so the positive actual BK checkpoint assertion fails. Original source/failure/cleanup are
+preserved; original containers unchanged/owned backend absent. Existing publication65 now creates and mark-deletes
+one actual cursor ledger before source preparation. Corrected fixture compile/format/Checkstyle pass14s. The new
+fixed631-source owned run is live under manifest7087828388380b32274be993e02664f3a3cc73bd17b685eb4f081260d5b0e1d1;
+That corrected run is terminal runner0/Gradle0,4 fresh suites/12 cases,0 failures/errors/skips: Native5,Provider5,
+publication65,namespace1. Actual65 independently checks original BK LAC/PositionInfo bytes and original charge release.
+All631 current/archive inputs exactly match that manifest; module158/BK35 source-matched UP-TO-DATE are excluded,
+as are UNKNOWN66/other Owner/Native429. Owner1 at2026-10-12T20:17:38.476Z/38.115s has XML SHA256
+be0013588531163c17b0e50b5421a630875863ed158757674cc1ab1c6c9aa119. Original containers unchanged/owned backend absent.
+This confirms actual cursor metadata/checkpoint data and ordinary publication on the recorded source; no complete
+floor/reference/writer/delete authority. Earlier170 results qualify only their archived source. All17 OPEN/null,
+full goal ACTIVE.
+
+Actual cursor-floor derivation now keeps ledger/entry positions and the original captured chain. First required
+entry follows the durable mark-delete; an end-of-ledger boundary advances to the next captured ledger. Comparisons
+use chain ordinals, never numeric ledger-ID ordering or a flattened long. Unresolved/outside-chain positions retain
+the entire range. No cursors or any unresolved position produces no minimum floor and requires independent policy.
+NPCS2 observation bytes bind that actual chain and each floor. cursorRetains supplies only a conservative veto;
+it grants no logical trim, complete retention snapshot or reference-free authority. RetentionFloorSnapshotV1's
+scalar compatibility path is not a Native floor consumer and receives no promoted Native position.
+
+Current compile/Spotless/Checkstyle pass18s after correcting one output-marker line width; original failure log kept.
+The owned fixed631-source green-native-cursor-typed-floor is live under manifest
+584600c8ba08a832718403e007422b68091138c80ef106e58fa939541b739d1a. Existing publication65 compares the actual BK
+PositionInfo-derived ledger/entry with each resolved floor and verifies conservative old-cut retention. Actual
+runtime/cleanup is terminal runner0/Gradle0,17 fresh suites170 cases,0 failures/errors/skips: module158,Native5,
+Provider5,publication65,namespace1. Original containers unchanged/owned backend absent; BK35 matching UP-TO-DATE,
+UNKNOWN66/other Owner/Native429 excluded. Owner1 at2026-10-12T20:26:01.367Z/38.036s, XML SHA256
+9ac93572f90c7973d9aa1e8a9455ba3360d04bfb01f96b8e6b9eed62af9abfb8. No closed-writer or all-ten-floor qualification.
+
+A subsequent relevant API trace confirms Native getCursors uses the MetadataStore children cache. Source-bound
+catalogue capture now uses additive readStoredCursorNames, backed by actual getChildrenFromStore on the same Native
+store, preserving existing getCursors behavior. Publication65 independently compares that backend directory with
+all observed rows. Compile/Spotless/Nereus and Native Checkstyle pass17s. The owned fixed631-source backend-directory
+run is terminal runner0/Gradle0 under manifest55d3bb636fb011f4af7509d0d05f66a923247035709aba5ea5fbb01e2dd73b9b:
+17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,publication65,namespace1). All631
+current/source archive inputs match. Actual65 checks the independent backend directory, original row bytes/versions,
+actual BK LAC/PositionInfo, typed floor and old-cut veto, plus original mixed publication/cold bytes/drain.
+Owner1 at2026-10-12T20:31:40.650Z/38.479s XML SHA256388f1a51e933f916030356dc80eb892600027de0f6dc08d0b51a5abab05812ce.
+Cleanup verifies original containers unchanged/owned backend absent. BK35 matching UP-TO-DATE, UNKNOWN66/other Owner/
+Native429 are excluded. Direct backend reads still do not prove closed writers or exclude directory ABA; complete
+ten-floor/fifteen-reference, metadata retirement/delete and prescribed full combinations remain required.
+All17 OPEN/null/full goal ACTIVE.
+
+### Native mutable metadata dispatch seam (2026-10-13)
+
+Actual MetaStoreImpl now routes all five mutable metadata call sites through one additive StoredMutationGuard:
+ManagedLedger initial creation/update, cursor update/delete and ManagedLedger deletion. It installs once per factory
+and cannot be replaced or removed. The existing uninstalled behavior is unchanged. Installed guards receive the
+exact Native ledger name, backend path, expected version and a separate candidate copy; the original put uses its
+own retained bytes. Synchronous admission failure follows the existing Native asynchronous failure callback.
+
+Native compilation/main Checkstyle pass17s. Two focused ManagedLedgerTest cases pass at2026-10-12T20:56:49.775Z/
+0.39s,0 failures/errors/skips, XML SHA256ea864ef625ad25fa81eca70b346293a2feb619a422bd42c87894cfc871430a47.
+They exercise pre-dispatch rejection, byte-copy isolation and create/update/delete routing on the existing mock
+backend. Initial compile missing Optional and three test line-width failures are preserved and corrected. These
+are API contracts only: no actual native writer/ticket/Cell/ref-free or complete closed-writer qualification.
+The installation boundary now rejects a previously writing factory. First mutation and installation use the same
+short monitor; guard/backend invocation remains outside it. This prevents adopting unguarded accepted writes as
+closed coverage. All three focused API cases and Native main/test Checkstyle pass17s at
+build/m5-native-meta-store-guard-install-boundary-corrected.log,0 failures/errors/skips. XML at
+2026-10-12T21:04:45.360Z/0.365s has SHA256fe26e70278dc8c8bdd6e4a6c7d49fc2960d25b9f9efe662e3bedd0e394722c59.
+The late-install test uses the existing cursor read API after an initial compile API-name error; raw failed log kept.
+These remain mock-backend API checks. Nereus durable-ticket adaptation and actual SDK installation remain required. The preceding631-source Native cursor
+receipt qualifies its own archived source only. Persistent encodings/frozen documents/receipts remain unchanged;
+all17 OPEN/null/full goal ACTIVE, no commit/push.
+
+### P1 immutable source version under mutable C authority (2026-10-13)
+
+M5PA v2 migration now persists the exact original NTA1 predecessor MetadataVersion from the actual VersionedValue.
+Every C authority successor preserves it. VersionedAggregateSnapshot.metadataVersion remains the current physical
+backend envelope version; aggregateSourceVersion is the separately recorded immutable source token. It must not be
+used for a physical CAS. V1 values/constructors retain their original byte encoding and fallback version meaning.
+No historical/frozen bytes are changed and no token is invented for an already migrated v1 envelope.
+
+Native Binding revalidation checks the exact ACTIVE selector, complete original NTA1 bytes and that source token.
+The same token enters Native view bytes, NPMI2 and recovery input; C authority/reference proofs retain their actual
+physical metadata versions. Thus legitimate ticket envelope updates can preserve source identity without weakening
+Legacy NTA1 same-byte/version-change rejection. Physical and immutable-source version roles remain separate.
+
+Compilation/format/affected Checkstyle pass21s. Focused C119/codec5/input5 pass,0 failures/errors/skips; they are
+model/component checks, not a native writer or all-reference qualification. Existing publication65 now performs
+actual Oxia same-key migration and a canonical successor, verifies physical version changes/original source token
+survives, and proceeds through the actual Native source/Task/publication/cold reads. The owned current run is live:
+631 fixed source/archive inputs under manifest9f7fa94d9a2e75c418b63a5daa4b317edc32f850f7fc4cf02189cb58f5cb5a80.
+That run is terminal runner0/Gradle0,17 fresh suites170 cases0 failures/errors/skips: module158,Native5,Provider5,
+publication65,namespace1. All631 current/source archive inputs match. Actual65 verifies the real Oxia migration/
+successor/current physical version/original source token and completes original Binding/source/NPMI2/publication/
+cold bytes/drain. Owner1 at2026-10-12T21:29:32.258Z/38.751s, XML SHA256
+e7041fbe21eddde2eb63593c1c38c1bd7d5b3751eb2b8ffe99fb5f2b9c5721ff. Cleanup confirms original containers unchanged/
+owned backend absent. BK35 matching UP-TO-DATE, UNKNOWN66/other Owner/Native429 excluded. This is actual source
+projection compatibility only, not Native writer/closed classes/reference-free/delete qualification. Durable writer
+adapter, full prescribed combinations/children remain required; all17 OPEN/null/full goal ACTIVE.
+
+### Native metadata C-aggregate ticket adapter (2026-10-13)
+
+Native metadata mutation source capture now reads the same factory/backend's exact original stored value and Stat
+(or authoritative absence) before ticket acquisition. NPMW3 binds original bytes SHA, original version/create/modify
+time and metadata flags alongside full namespace/Binding/path, proposal SHA and expected version. One bounded
+predecessor buffer is read/committed at a time within the existing factory workspace; no old-body cache is retained.
+Failure before entering the ticket guard releases only original pending occupancy and cannot dispatch SDK mutation
+or invent ticket completion. Original put/delete bytes, version and one-dispatch behavior remain unchanged. Current
+Native/Nereus compile/style and actual guarded-factory25 validation pending. This supplies exact reference-comparison
+inputs; complete physical target extraction/tickets and all-writer/reference/delete qualification remain required.
+
+The installed adapter now also resolves old/proposed ManagedCursorInfo checkpoint ledger IDs against the original
+configured SDK BookKeeper namespace. NPMW3 includes this canonical physical-target vector. C admission precedes
+actual resource/member checks and sorted D tickets; original SDK terminal/readback precedes D cleanup, then C cleanup.
+D writer class is REFERENCE_SHARED_PHYSICAL_MEMBER_V1 with the original create scope's capability/Owner fence.
+Missing authority is never initialized by this writer. The actual append-only member inventory is read independently
+of reservation/authority facts and must contain the original PULSAR_ENTRY Provider/Binding member with the original
+Protocol Cell. Installation also requires the original creation scope's Binding and Cell-budget ownership; a shared
+Cell Owner identity alone is insufficient. Member/scope revision passed17 fresh suites170 cases on current source632/archive
+b27cd27e01ea731cecf21af17075cdf9d0e99ed2ef80ea77b112a6cf6a7b93a8.
+ SDK or physical-ticket UNKNOWN retains the original pending
+operation and factory workspace; reconciliation clears only original known terminal/no-dispatch attempts without
+SDK replay. This covers checkpoint metadata references only: ManagedLedger data/offload/materialized references
+and complete physical writer/proof/delete qualification remain required. Initial focused actual checkpoint guard
+validation passed4 fresh suites12 cases; the dispatch-time freshness/bounded-compression revision now passed17 fresh
+suites170 cases on current source632/archivef55e869cd4e7edede4e3836ac58cf956227f959a6a1660f7f212ab31338a7af3.
+Dispatch-time freshness uses the same serialized predecessor workspace, checking original absence or exact Stat/body
+after target acquisition and before invoking SDK, alongside actual Cell Owner and Binding. It does not replace
+the SDK's original version condition or claim an atomic lease for an unconditional backend mutation. Native cursor
+compression-envelope and declared decoded-body sizes are bounded before decoding.
+
+
+
+Cursor observation revalidation now uses one original Native capture and Owner hazard inside the retained workspace. The entire
+canonical snapshot must remain exact, including directory/row bytes and versions, checkpoint LAC/PositionInfo, typed
+floors and physical resource mappings. Current Owner is checked again, and temporary SDK cleanup precedes return.
+Only one revalidation is active; unresolved temporary cleanup prevents a new SDK capture. Its bounded temporary data uses the original observation allowance and never releases that original reservation. Observation close also
+waits for its original temporary observation; observer cancellation/completion cannot complete private work.
+Compile/owned formatting/affected Checkstyle pass19s. Current actual65 revalidates all three observed phases and
+advances a real initial cursor through normal SDK mark-delete to reject the old snapshot. Runtime/cleanup remains
+pending under source632 manifest887dc25b0d89389fc571148652591867c862928d84176be13705951e54f4c4fa.
+This is a fresh observation check, not a durable writer fence, complete reference proof or physical-delete grant.
+
+Current cursor data-reference source632/archive manifest9dae449093f43b570e2891dc3d951b9beb989afb55620d1ef703bb2e1dabd1ec is terminal
+runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,publication65,namespace1).
+Three actual cursor observations cover original Native sources, first mapping after real M4 release, and repeated
+materialization/cold recovery. Each entry has exactly the required cursor-data veto; rewritten entries name the
+selected immutable payload and unrewritten entries name actual Native members. Independent cursor bytes/checkpoint
+reads and namespace identities, original mixed publication, repeated old outside-cut versions and cold reads/drain
+remain green. Owner XML593f85371b1763612d4e14d55d403a35289f7de964302c5a91a34ed3693a344c at2026-10-12T23:22:59.781Z/39.507s.
+All632 current/archive inputs match. Original containers unchanged/owned backend absent. BK35 matching UP-TO-DATE,
+guarded-factory25/UNKNOWN66/other Owner/Native429 excluded. C scan-fence branch remains model-only. This supplies
+actual cursor physical veto data, not complete writer admission, all reference kinds, freshness closure, retirement,
+physical deletion, permanent UNKNOWN or whole-M5 qualification; all17 OPEN/null/full Goal ACTIVE.
+
+Cursor data-reference production now maps the union of durable cursor obligations through the current Native chain
+and selected source boundaries. Missing/unresolved cursor floors conservatively retain all data. Unrewritten ranges
+carry exact Native BK/Object read dependencies; rewritten ranges carry the selected immutable NMS1 payload, including
+original predecessor payload versions still selected outside a later cut. Manifest/index references are a separate
+class. NPCS4 binds typed ranges and canonical physical IDs under the existing8MiB observation cap. Read-admission
+configuration now uses the captured BookKeeper namespace even if all data slots are mapped. Current compilation/owned formatting/affected Checkstyle pass21s and the exact-byte bound refinement passes16s.
+Actual65 original/first-mapped/repeated-cold checks pass at the following source scope. These observations are not complete writer, freshness,
+reference-free or physical-delete qualification.
+
+Current checkpoint-reference source632/archive manifest07c9d6c83bec002fb990d10bc9e5c639eb7b7921bc1398901cfe589e7baf1072
+is terminal runner/Gradle0,4 fresh suites12 cases0 failures/errors/skips (Native5,Provider5,publication65,namespace1).
+Actual65 verifies independently observed namespace, stored cursor bytes/version and physical checkpoint identity,
+original BK entry/PositionInfo SHA plus the original mixed publication/cold bytes/drain. Owner XML082b1b1c0ef5bb15ee7b9388db6d530953de732c3b381fe5416dc4b641d7aba0
+at2026-10-12T23:09:54.732Z/38.521s. All632 current/archive inputs match; original containers unchanged/owned backend absent.
+Module158/BK35 matching UP-TO-DATE, guarded-factory25/UNKNOWN66/other Owner/Native429 excluded. The earlier invalid
+selector attempt/source/logs remain separate; its168 cases do not become fresh cases in this12-case run. This is
+checkpoint physical-reference data only: full Native mutable metadata physical writer admission and complete
+reference/retention/metadata retirement/physical-delete/UNKNOWN/all combinations/children remain incomplete.
+All17 OPEN/null/full Goal ACTIVE; no whole-M5 authority or commit/push.
+
+Cursor checkpoint physical-reference data is now produced from the original captured cursor rows/checkpoints. Native
+read views retain the SDK-verified BookKeeper namespace even when mapped Object outputs replace every data source.
+NPCS3 commits that namespace alongside the existing exact cursor bytes/versions, checkpoints and typed floors; the
+Native source-map/read-view byte format stays unchanged. Each actual checkpoint reference binds cursor name, cursor
+metadata version/stored SHA, physical BK namespace/ledger ID, original checkpoint entry and PositionInfo SHA. A
+metadata-only cursor produces no invented checkpoint file. Compilation/owned formatting/affected Checkstyle pass18s. The first actual run has an invalid selector
+and is terminal with cleanup verified; the corrected source-verified publication65 run is pending on source632
+manifest07c9d6c83bec002fb990d10bc9e5c639eb7b7921bc1398901cfe589e7baf1072; this is reference data, not complete live-writer, namespace scan, reference-free or delete qualification.
+
+An original undispatched acquire may now reconcile after the aggregate enters REFERENCE_SCAN_FENCED_V1. The
+coordinator rereads the exact fenced value/version and leaves the scan version vector unchanged; the fence already
+excludes the original OPEN predecessor. A changed/missing fence or failed read retains the original cleanup. C model122
+passes with an explicit delayed-acquire rejection and unchanged-fence check. This new branch has model evidence only;
+the earlier actual SDK/source archives remain bound to their original inputs. Native mutable metadata still lacks
+physical target writer admission, whose complete BK/Object reference set must come from actual stored metadata and
+selected mappings. Neither this correction nor the C aggregate ticket qualifies that physical writer gap.
+
+Current focused source632 manifest2e9d0cb986f18cc698ba3213f09a4fa7173dbb9ec51f912c3389fcc4f247af3a is terminal runner/Gradle0,
+17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,Owner25,namespace1). Actual Native old-version
+PUT returns ZooKeeper BADVERSION, preserving original stored bytes/version. A subsequently lost C clear reply retains
+the original factory share; restored reconciliation uses only its known rejection and metadata cleanup, no PUT replay.
+The same fixture also passes the original ACK/clear-UNKNOWN and applied/delayed no-dispatch cleanup checks. All632
+current/archive inputs match. Original containers unchanged/owned backend absent. BK35 matching UP-TO-DATE and
+publication65/UNKNOWN66/other Owner/Native429 excluded. Permanent SDK UNKNOWN, complete other writers, namespace/
+physical GC/reference-free and full current-source combinations remain unqualified; all17 OPEN/null/full Goal ACTIVE.
+
+Undispatched cleanup source632 manifestb03895cfbe9908c5f753329ed6a37fe88be4eec3362d3e1aadc189106a33d133 is terminal
+runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,Owner25,namespace1).
+The original actual Oxia acquire is either applied with lost reply or delayed before backend execution. Blocked
+cleanup retains the original factory share; restored cleanup advances the canonical authority even with no ticket.
+The delayed original CAS then fails actual Oxia version conditions, and both paths issue zero Native PUTs. All632
+current/archive inputs matched before the next edit; original containers unchanged/owned backend absent. C model122
+is separately passing. This supplies scoped no-dispatch cleanup, not permanent SDK UNKNOWN/all-writer/GC authority.
+Native server BADVERSION is now treated as original DEFINITIVELY_NOT_APPLIED; other SDK failures retain. Its actual
+version-rejection/lost-clear-reply check passes at the following source scope.
+
+Latest focused original-ACK/clear-UNKNOWN evidence: source632 manifest94677a55e2b506bc2e6e4a2fd2ba5378ade5b07651b06f668aa952823811df09,
+runner/Gradle0,4 fresh suites12 cases with no failures/errors/skips. Actual Native PUT is acknowledged once; lost
+actual Oxia clear reply retains the original factory charge. A blocked reconciliation fails; restored metadata-only
+reconciliation cleans the original ticket without another Native PUT or changing the failed observer to success.
+Original containers are preserved and owned resources absent. This archive predates the following undispatched
+implementation: cleanup must confirm a canonical successor version even if the ticket is absent, preventing a late
+original acquire CAS from applying. Its model122 and actual SDK validation now pass at the source scope recorded below. Permanent Native SDK UNKNOWN,
+other writers, namespace/physical GC/reference-free and whole-M5 qualification remain outstanding.
+
+PulsarNativeMetadataWriterV2 installs the Native MetaStore dispatch guard only before factory writes. It checks the
+actual P1 aggregate key, original NTA1 digest/source version and exact registry enrollment. Each Native mutation
+charges the existing Cell before SDK work, acquires/rereads its visible C aggregate ticket, and dispatches only the
+original put/delete. Known original SDK response is followed by same-factory/backend byte/version/absence readback;
+then ticket cleanup and quota refund. Unknown SDK/readback/ticket cleanup retains the original operation and charge.
+reconcileCompleted consumes only the original known terminal and exact request; it performs metadata-only ticket
+cleanup, preserves sibling operations, and rejects a changed external root or aggregate target. No SDK redispatch.
+
+This is C aggregate protection only, not complete native metadata namespace qualification, physical GC writer
+admission, all classes or reference-free authority. The existing guarded-factory25 fixture uses real Oxia migration/
+enrollment and installs this owner on its actual Native factory. Its registry declares expected concrete source
+owners with source hashes; other owners are not installed by this fixture and gain no closed-writer qualification.
+
+Compilation/format/affected Native/Nereus Checkstyle pass21s; the C model120-case suite passes0 failures/errors/skips.
+The aggregate-target boundary compile/style check passes18s. The owned current guarded-factory run is live with
+632 frozen source/archive inputs under manifest9ab9d7f818a43fb99734435c301cdf0143612a61cf18601ad8497e66f8fcbd54.
+That original run is terminal runner1/Gradle1,16 fresh suites169 cases1 failure0 errors/skips. Actual final cursor
+metadata persistence follows the old fixture's Cell close, so the guard rejects that uncharged SDK request. Failure
+source/XML/cleanup retained; original containers unchanged/owned backend absent. The fixture now closes actual
+Native ledger/factory and its final metadata writer before SDK/Cell shutdown; no closing admission is weakened.
+Corrected compile/format/Checkstyle pass15s. New fixed632-source close-order run is live under manifest
+95560b305a9eb9e203645be0f4b650466ad32de3fc5fc27b80be3619ba2b7edb is terminal1,3 fresh suites11 cases1 failure,
+0 errors/skips. The original observer test deliberately starts Cell close before accepted SDK final metadata work.
+Per-operation new actor admission is the wrong lifetime. Both failure/source/cleanup tuples retained with original
+containers unchanged/owned backend absent.
+
+The metadata factory now acquires one original same-Cell lifetime reservation at installation:8MiB encoded input
+plus decoded allowance. At most256 pending operations share an8MiB cumulative input cap. Per-operation cleanup
+returns only its lifetime occupancy; final factory/writer SDK work and exact tickets precede lifetime refund.
+Accepted SDK close metadata remains within the original actor after Cell close starts. Unknown keeps that actor/
+share, and observer cancellation cannot cancel private installation or cleanup. No new allocator/queue/thread or
+closing-admission bypass is introduced. The existing close observer test is retained. Compile/Spotless/Checkstyle
+pass17s then final observer ownership correction14s. Current632-source lifetime run is live under manifest
+67bb545917a9082b7a5ee21da52b5b970607c7b4c9b5a85d31e8d9f7c353420a is terminal1,16 fresh suites169 cases1 failure,
+0 errors/skips. Actual concurrent cursor closes race on the same C aggregate; the guard previously conflates known
+CAS conflict with UNKNOWN. Failure/source/cleanup preserved, original containers unchanged/owned backend absent.
+
+Acquire/clear now retry only a confirmed CONFLICT by rereading actual authority, at most8 times with original ticket/
+operation/root. This is metadata CAS contention handling; native SDK dispatch stays once. Unknown/enrollment/source
+mismatch still retains. A focused model injects sibling acquisition at both CAS boundaries and verifies one SDK
+call plus preserved sibling tickets. C model121/compile/Spotless/Checkstyle pass18s. Current632-source contention
+run0d89353bd50487c48d58ce953584cca4fc81acb59eb9d9e8b8c2d9e8b9f44d33 is terminal1,16 fresh suites169 cases1 failure,
+0 errors/skips. Actual Native metadata close/tickets complete; the failure moves to the existing BK admission check
+expecting one actor while the finished metadata factory lifetime is still held. Its assertion remains valid. Factory/
+metadata writer now close immediately after final Native metadata persistence and before BK-specific SDK checks;
+two-owner pre-close and one-owner BK-only checks remain strict. Compile/format/Checkstyle pass14s. Current632-source
+original-actors run is terminal runner0/Gradle0 under manifest10618f63b0ce363a30055450cc34d28cbe97f9025218fd291368423a6ce57570:
+4 fresh suites12 cases0 failures/errors/skips (Native5,Provider5,guarded-factory25,namespace1). All632 current/archive
+inputs match. Actual Native metadata dispatch/Oxia tickets/original backend readback/factory and Cell release pass.
+Original containers unchanged/owned backend absent. Module158/BK35 matching UP-TO-DATE, publication65/UNKNOWN66/
+other Owner/Native429 are excluded. Owner1 at2026-10-12T22:16:55.658Z/9.563s, XML SHA256
+93a60d895d7ea94536e3476657b9a143fc9e1f27c3c7531418b2de3c0b43c071. This is one installed Native metadata C owner;
+expected other owner declarations do not qualify their installation. Permanent unknown/no-dispatch/metadata namespace/
+physical-GC/all-writer/ref-free and full prescribed combinations remain required. All17 OPEN/null/full goal ACTIVE.
+
+
 | Flow | Current contract | Current implementation and evidence boundary |
 | --- | --- | --- |
-| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, and a permanent BK binding now selects one actual Oxia namespace; Object namespace, complete writer/Cell admission and real dispatch remain OPEN |
-| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; native raw-run, selected-generation and one-selected-plus-raw input membership use exact BK/Oxia sources and scoped read budgets, including one ticketed mixed-input republication and recovery; complete catalog and namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
+| M5-A reuse validation | Builder may reuse frozen immutable payload references; publication still needs an independent full read and exact identity/coverage validation | REFERENCE_REUSE and INDEX_ONLY builders no longer open source bytes. One validator invocation shares a verified Object read only when Provider Scope, kind, key, version, length, digest and format/encryption roots match; each source slice and declared member Binding remains checked. New indexes and rewritten outputs are read independently. The C1 Object reuse reader rejects another Cell Provider scope, unplanned Object keys, changed source version and rewrite/BK plans; rewrite source bytes still require a native decoder. Plan-bound C1 output creation rejects wrong scope or candidate key/coverage/kind before PUT; the M5-B bridge supplies its frozen plan. Body hashes, byte equality and lookup-boundary root no longer allocate whole-cut concatenations or whole-index hex strings; full Object reads remain. The 17-case materialization unit suite passes; native NWG1/NPD1 directory/member proof, real Provider identity/admission, fixed-buffer streaming, native BK source composition and full publication remain OPEN |
+| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation observes actual INSTANCEID and permanent reservations, and a permanent BK binding selects one actual Oxia namespace; the running Broker reserves an exact run/ledger choice in an owner-scoped Oxia birth inventory, rereads quota-backed revision-one OPEN bytes, then invokes native create. Restart can enumerate the closed owner's selected and unselected births. Guarded physical orphan cleanup, Object namespace, complete writer/Cell admission and real dispatch remain OPEN |
+| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Native published-version cold reads and confirmed-drain cold read grants now pass actual BK/Object/Oxia combinations, including unique UNKNOWN retry; full Cell/writer/reference/delete closure remains OPEN. Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | The current native member-history quota amendment reserves permanent member capacity. Initial source 4893/fresh legacy 4904 predate the ResourceFact correction; the current source/JAR/native qualification is recorded in the existing implementation log. Earlier tuples below retain their historical scope. Native raw Run source-reference publication requires actual member presence for its Cell/Binding before source tickets. Current 6 + 29 + 77 native cases pass on identical 14-path inputs, retaining all preceding 109 cases plus three actual member failure modes; all three groups have zero failures/errors/skips and actual exit 0. The preceding member-registration tuple creates members before actual raw Run/Part creation and reads/rereads native member versions during replacement capture. Source 54025/fresh legacy 54053 retain 181/109 library cases over 751/731 inputs; their six matched JARs and the preceding 14-path native input tuple supplied 29 + 80 historical Broker cases with independent member byte/version checks. Complete membership and namespace accounting remain unqualified; see [current member amendment](#native-physical-member-registration-current-implementation-amendment). The preceding sealed-source tuple reads exact BK Task/reservation/CLOSED metadata and selected Oxia root/creating-Owner versions, revalidates the complete cut and rejects source identity drift. Corrected source 24804/fresh legacy 24846 and six matched local JARs support 29 + 80 native cases on identical 14-path inputs; the cold closed-Owner refresh regression remains effective. Complete member/writer/floor/grace/delete and whole-M5 authority remain unqualified; see [current sealed-source amendment](#native-sealed-source-metadata-current-implementation-amendment). Preceding reference qualifications retain their recorded scope: Latest native reference capture adds the sole-assigned actor's leader-epoch recovery class, with actual cold epoch-boundary and pending-reference checks; 29 + 80 native cases pass on identical 14-path inputs including the actual assignment predicate and the revalidated core/JAR tuple. Full member/floor/delete authority remains unqualified; see [current leader-epoch amendment](#native-leader-epoch-physical-references). Preceding scoped stages retain their recorded source/evidence boundaries: Latest recovery-checkpoint amendment checks the actual coherent native cut and all checkpoint carriers/locators before and after replacement capture; scoped recovery rows preserve missing/UNKNOWN vetoes. Fresh matching source/legacy locks and six JARs support 107 native cases in two disjoint owned datasets (27 + 80), with unchanged quota; see [current recovery amendment](#native-recovery-checkpoint-reference-capture). These datasets do not qualify the shared-backend gate or whole M5. Preceding implementation/evidence stages retain their historical source locks: Shared semantics, inventoried BK parts and sealed descriptor publication/recovery compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; native raw-run, selected-generation and one-selected-plus-raw input membership use exact BK/Oxia sources and scoped read budgets, including one ticketed mixed-input republication and recovery; an isolated `DURABLE_DRAIN_ONLY_V1` path installs the actual Broker Fetch read owner and passed a real three-Broker BK/Oxia cold-relocation case on its recorded source; the native source-map hash rejects a missing, extra or out-of-order sealed-run read index, a foreign Provider Scope and a broken root link, with the earlier locked BK/Oxia source receipt 84706 covering 27 suites/151 tests and 737 input hashes plus fresh legacy 84717 (22 suites/99 tests); the M4 local-capture correction moves physical reference admission to source activation/rollover, and its expanded 28-case real Broker gate passed 28/28 on the replacement run plus the original no-M4 entry; the first 27/28 AdminClient-heap-failed run is retained and ordinary hot-path correction is independently verified; the earlier 31-case real Broker gate passed 31/31, including actual READ_FENCED rejection, committed-selector UNKNOWN retention and exact original-ticket cleanup with a same-Context sibling; the negative fence uses synthetic eligibility only and that local batch passed coordinator re-review; the earlier 34-case Broker gate passed 34/34, including actual native user-topic input membership, rollover/takeover rejection and cancelled-scan/original-nonce cleanup, independently accepted for that necessary dependency slice; the native KRaft policy/input cut, held configuration-callback rejection and default-policy invalidation passed the earlier 35-case Broker gate plus six focused input/close cases and one stock-precedence unit case; the preceding source 29780/fresh legacy 29791 and 36-case Broker gate verify the resolved native checkpoint prerequisite, with eleven coherent unit cases and five focused native-input cases; preceding source 28963/fresh legacy 28991 and 21 unit cases verify the independent input protocol carrier; preceding source 79447/fresh legacy 79476, 31 related unit cases and 36 Broker cases verify the independent state physical output and explicit KBSD3 carrier, including retained-server recovery, with exact tuples below; source 65491/26-case and the earlier no-M4 receipt are historical, while the unchanged supported no-M4 entry also passed its subsequent focused real run; accepted source 92335/fresh legacy 92381 and 36 Broker cases verify the worker grant and terminal-first publication cleanup dependencies; preceding accepted source 74674 (28 suites/160 cases), fresh legacy 74686 (23/107) and 36 Broker cases verify the explicit PRODUCER-policy dependency; preceding accepted source 53880 (28 suites/163 cases), fresh legacy 53893 (23/107), runtime snapshots 26/47 and 37 Broker cases verify retained preparation capacity and exact no-dispatch UNKNOWN cleanup; preceding source 60379 (28/164), rechecked fresh legacy 39956 (23/107), KafkaBK runtime 48 and 38 Broker cases verify native raw sealed-prefix plan derivation and the distinct native fixed-codec header policy; preceding source 29383 (28/164), fresh legacy 29396 (23/107), Oxia runtime 33 and 44 Broker cases verify native prepared-task registration, atomic capacity conversion and pre-dispatch UNKNOWN cancellation; preceding source 84771 (28/165), freshly executed legacy 84784 (23/107), KafkaBK runtime 51 and 50 Broker cases verify effective native raw-prefix cleaner eligibility and zero-length key/tombstone semantics; the revalidated same source/legacy/runtime tuple and preceding 59 Broker cases verify private native worker admission, separate Task SDK output, complete sealed bytes and actual unpublished termination with retained capacity/tickets across SDK and metadata UNKNOWN; preceding source 20290 (28/165/745), fresh legacy 20318 (23/107/725), KafkaBK runtime 52 and 60 Broker cases verify the preferred-prefix Fetch byte prerequisite over independently recovered native output and the live raw tail, including shared budget/isolation, preserved compaction gaps and actual SDK response loss; preceding source 82571 (28/165/745), fresh legacy 82604 (23/107/725), KafkaBK runtime 54 and 63 Broker cases verify actual same-Task guarded publication, selected-prefix/live-tail native Fetch and cache/SDK charge retention across publication UNKNOWN and held close; preceding fresh source 25641 (28/165/745), fresh legacy 25652 (23/107/725), KafkaBK/Oxia runtime snapshots 57/40 and 65 Broker cases verify two actual selected raw-tail rollovers, preserved descriptor/fallback authority, held applied source-CAS response/Owner-close ordering, original UNKNOWN source invocation cleanup and same-Context sibling retention; preceding corrected source 85769 (28/168/745), fresh legacy 85781 (23/107/725), KafkaBK/Oxia runtime snapshots 58/41, 24 related unit cases and the reexecuted 65-case Broker gate verify the selected-prefix recovery algorithm prerequisite and preserve the actual pending-root UNKNOWN attachment path; preceding source 41861 (29/176/746), fresh legacy 41872 (23/108/726), KafkaBK/Oxia runtime snapshots 59/42 and the 66-case Broker gate verify actual Task-bound cache-budget publication, retained capacity/writer tickets and raw read continuity through unreadable applied budget creation, then exact reread/retry and selected Fetch; preceding source 75824 (29/176/746), fresh legacy 75853 (23/108/726), KafkaBK/Oxia snapshots 60/43 and the 67-case Broker gate verify the confirmed-drain selected-owner cold entry, independent cache reservation, skipped covered raw SDK prefix, post-cut replay, ordinary Fetch and live Produce with one recovery executor thread; preceding source 56599 (29/176/747), fresh legacy 56636 (23/108/727), KafkaBK/Oxia snapshots 63/46 and the expanded 11-case native publication subset verify actual fallback closure, confirmed SDK/hazard drain, immutable planned-drain terminal/proof, exact RELEASED retry and post-release cold Owner entry; the 71-case full native gate verifies that preceding tuple; preceding source 6797 (29/176/747), fresh legacy 6832 (23/108/727), KafkaBK/Oxia snapshots 64/47 and the 12-case native publication subset plus 72-case full native gate verify actual post-RELEASED raw-source and checkpoint transfer, held/UNKNOWN preservation, forbidden covered raw SDK reads and rollover before/after transfer; preceding source 4028 (29/178/748), fresh legacy 4123 (23/108/728), KafkaBK/Oxia snapshots 65/48 and the 12-case publication subset plus 72-case full native gate verify ticketed independent eight-aspect replacement semantic comparison persistence, actual Oxia fact/version capture and immutable cleanup retry before ordinary Fetch/release/UNKNOWN/rollover/cold combinations; preceding source 1224 (29/178/748), fresh legacy 1235 (23/108/728), KafkaBK/Oxia snapshots 66/49 and the 15-case publication subset plus 75-case full native gate qualify actual Owner key/version/value capture and post-drain reread, closed/same-value-new-version rejection with hot source/checkpoint retention, and UNKNOWN retry preserving the original terminal/proof and cache charge before resumed ordinary Fetch; preceding source 55200 (29/178/749), fresh legacy 55211 (23/108/729), KafkaBK/Oxia snapshots 67/50 and the 16-case publication subset plus 76-case full native gate qualify the privately observed live source/checkpoint transfer record bound to the actual Owner key/version/value and exact M4 terminal/proof/RELEASED membership, including append-fence/cache retention and selected Fetch through applied scope-write UNKNOWN with exact immutable-record retry; preceding source 71612 (29/178/750), fresh legacy 71623 (23/108/730), KafkaBK/Oxia snapshots 68/51 and the 18-case publication subset plus 78-case full native gate qualify the actual initial cold selected actor record, exact open/closed Owner facts and confirmation before readiness, including retained cache/no-ready behavior through applied cold scope-response loss; preceding source 45080 (29/179/750), legacy 23242 (23/108/730), KafkaBK/Oxia snapshots 69/52 and 18+78 native cases qualify the existing post-cut-tail paths after the retired-anchor qualification amendment; the preceding 79-case full gate additionally proves actual rejected-Produce empty-tail formation and all-covered payload publication/release/cold entry on that core tuple; preceding source 70513 (29/179/750), fresh legacy 70524 (23/108/730), KafkaBK/Oxia snapshots 70/53 and 1+80 native cases qualify actual released selected-generation plus sealed-tail capture, exact physical-membership revalidation, mixed native plan and dirty eligibility with the old cache retained; preceding source 65945 (29/180/750), fresh legacy 65956 (23/109/730), KafkaBK/Oxia snapshots 74/57 and 7+87 native cases qualify actual second publication, held old SDK/hazard drain, cache-capacity transfer, second complete M4 release, generation-only dirty rejection, actual second-generation cold recovery, second-selector response loss/original-Task retry and applied live/cold scope response loss/held confirmation; preceding source 41931 (29/180/750), fresh legacy 41943 (23/109/730), KafkaBK/Oxia snapshots 75/58 and 8+80 separate-backend cases qualify the preceding per-resource mapping and RELEASED/Binding/Owner fact capture; preceding source 75108 (29/180/750), fresh legacy 75119 (23/109/730), KafkaBK/Oxia snapshots 76/59 and 10 repeated-publication native cases qualify actual versioned M4 interval/fold facts and three exact Binding reference classes, including proof same-value CAS rejection and proof-response UNKNOWN with retained cache; the remaining 80 native regressions pass on a separate fresh backend with the identical 13-path manifest; individual case sets cover all 90 cases, while the shared-backend gate remains unqualified after actual permanent quota exhaustion; preceding source 47408 (29/180/750), fresh legacy 47439 (23/109/730), KafkaBK/Oxia snapshots 77/60 and 13 repeated-publication native cases verify actual physical namespace/reservation/authority predecessor facts, physical and quota same-value CAS rejection and actual physical GET response loss with retained cache; the remaining 80 native regressions pass against the identical 13-path manifest on a separate fresh backend; the disjoint case sets cover all 93 preceding cases; the shared-backend gate remains unqualified; preceding source 63828 (29/180/750), fresh legacy 63856 (23/109/730), KafkaBK/Oxia snapshots 78/61 and 16 repeated-publication native cases verify actual shared Cell Task directory/version facts, K5AD same-value CAS rejection and K5AD/Task GET response loss; the remaining 80 native regressions, including live preparation enumeration, pass on a separate fresh backend with the identical 13-path manifest; the disjoint groups cover all 96 preceding cases; current source 75261 (29/180/750), fresh legacy 75272 (23/109/730), BK/KafkaBK/Oxia snapshots 62/79/62 and 19+80 separate-backend cases verify actual native Task decisions, selected descriptors, full create fences and reference rows, including decision refresh/UNKNOWN and absent-terminal UNKNOWN; live preparation and registered undispatched Task observations retain references and capacity, with independent cancellation and native non-creation checks; those two groups cover all 99 preceding cases against one identical 13-path manifest; the current native reader capture adds actual live/cold scope, current/closed Owner, predecessor adoption and M4 interval reference rows, with scope/closed-archive refresh and UNKNOWN rejection and missing-scope retention; 26+80 disjoint cases cover all 106 current cases against the identical corrected 13-path manifest, including actual reader capture after later raw-tail admissions; complete cross-provider Task/reader/member reference qualification and the shared-backend gate remain unqualified; actual positive all-covered retired-anchor validation, cold crash/overlap/UNKNOWN accounting, cold tail rollover, remaining repeated-compaction crash/overlap combinations, complete catalog and namespace/task/protocol-owner admission, internal-topic compaction lifecycle, complete physical-reference/grace/eligibility production and cleanup remain OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; wire 4 adds one bounded materialization worker grant on that same CAS key; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
 | Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction/cache recovery and a configured durable quota route pass; pre-reserved intent writes continue at exhaustion and pending grants/refunds recover after restart; unique namespace/all-writer admission, backend disk provisioning and GC scheduling remain OPEN |
-| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | READ_FENCED refresh/takeover now passes real Oxia CAS, fact-version invalidation, competing-client and server-restart checks with synthetic owner/eligibility facts; sorted multi-resource tickets now wrap the guarded native BK publication path; automatic same-key recovery veto now survives restart and requires qualified refresh before intent; complete mixed native catalog admission, owner adapters, physical dispatch and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
+| Object exact-delete identity read | Complete full GET and SHA-256, same-response immutable version, exact version-match delete and complete LIST/full-GET reconciliation; physical absence also requires an exact old-version GET because a delete marker can hide retained bytes | `M5ObjectDeleteSessionV1` verifies full-body identity with a fixed 64 KiB buffer and distinguishes old-version absence from same-key new-version presence; eight focused tests pass. Real MinIO cases cover 200,000-byte content, hidden and coexisting old versions, exact deletion, preservation of a new version and response loss. `S3M5PhysicalNamespaceAuthorityV2` binds an empty versioned bucket with no active uploads to one native Oxia identity using a single immutable marker version; it owns the S3 connection used by `S3M5ObjectDeleteIdentityReaderV2`. The reader requires the active matching Oxia resource route and exact persisted READ_FENCED `VersionedValue`, including its metadata version, before capture, then rereads the complete native version observation. A real MinIO/Oxia case passes with two Oxia clients, one S3 reconnect, stale-version rejection, persisted INTENT-bound exact-version delete, native absence then DONE, full/compact DONE retry, old-version absence alongside a new version, an injected lost S3 delete response, and rejection of a changed physical marker. Its owner verifier and eligibility semantics are synthetic, although their fact versions are actual Oxia values. The coordinator rechecks owner, facts, exact INTENT and physical identity around the native read; its focused 36-case suite includes capability revocation during that read. Existing Object create/GC routes have not installed this adapter. `If-None-Match: *` and marker provisioning do not prove old in-flight writer drain or namespace admission. Production owner/Cell/reference/M4 proof, writer admission and complete drain, protocol-owned upload inventories and Pulsar root/data/upload ordering, dispatcher installation, Oxia DONE response-loss injection and source-bound Object/Oxia lifecycle evidence remain OPEN |
+| Multipart exact-upload cleanup | Complete bounded inventory of the owned exact key and upload IDs, exact abort, complete relist after every result; a prefix LIST may also return sibling keys | `M5MultipartCleanupSessionV1` bounds the supplied owned inventory by the configured upload/byte caps before hashing or Provider I/O. It filters same-prefix sibling keys only after validating and charging all scanned rows against the page/upload/byte caps. Each exact-key scan receives the remaining aggregate page/upload/byte budget, so scanning a later key cannot exceed the complete-pass cap before rejection. Foreign upload IDs on the owned exact key still veto every abort. Eleven focused tests pass, including paginated sibling-key filtering and a two-key page-budget exhaustion before another Provider request. One fixed-image real MinIO case passes and leaves a sibling upload intact; that MinIO release returns exact-key results for the tested prefix, so the generic prefix-filter branch has unit evidence only. A separate S3/Oxia MultipartUpload resource now captures one exact ID after READ_FENCED and aborts it only under its own persisted INTENT; a real MinIO/Oxia case passes with same-key foreign veto and unrelated upload preservation, using synthetic owner and semantic facts. Protocol-owned inventory, root/data/upload ordering, production dispatch and a source-bound M5 lifecycle child remain OPEN |
+| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | Native M4 owners now reserve fixed local Cell owner/hazard and temporary read-work byte capacity from actual source facts, retaining submitted UNKNOWN grants and actual cleanup failures; open/cache/global-reader/backend/delete qualification remains OPEN. READ_FENCED refresh/takeover now passes real Oxia CAS, fact-version invalidation, competing-client and server-restart checks with synthetic owner/eligibility facts; sorted multi-resource tickets now wrap the guarded native BK publication path; automatic same-key recovery veto now survives restart and requires qualified refresh before intent; Native P4 now disposes late primary/fallback ranges that a completed public observer cannot accept, retaining its existing source pin until actual range closure; the actual cancelled MinIO GET and Native owner-close case passes under the [current cancellation amendment](#native-p4-cancelled-range-ownership-current-implementation-amendment); native owner-backed capture now fixes the actual attempt/version/extent and cached composite, rejects stale source use before GET and survives cancelled pending capture under the [current capture amendment](#native-captured-offload-source-current-implementation-amendment); complete mixed native catalog admission, owner adapters, physical dispatch and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
+
+The current Object create call chain is `WalRunObjectSession.conditionalCreateNwg1` or
+`conditionalCreateKafkaProtocolObject`, and `M5MaterializationObjectSessionV1.createExact`, through
+`C1ObjectProviderSession.conditionalCreate` to `S3C1ObjectProviderTransport.putIfAbsentWithEvidence`.
+The S3 operation checks `If-None-Match: *` on the target key only. Its
+[documented conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html)
+allows a write after the current version becomes a delete marker; the local MinIO version-delete test observes
+the same behavior. That write creates a distinct physical resource because the immutable version ID differs.
+The S3 namespace adapter establishes a native backend incarnation for its own client, but the existing Object
+create routes have not yet installed it or established a unique Oxia authority route, complete admission of relevant
+control writers, or completion-based drain of old in-flight I/O.
+These obligations do not require an atomic remote gate check on every Object PUT. No M5 Object delete dispatcher is
+activated from these Provider sessions; native composition and source-bound lifecycle evidence remain OPEN.
+In particular, the S3 empty-history/multipart scan and marker read do not stop a write admitted earlier from
+completing later; production deletion requires writer admission closure and completion-based drain.
+
+`NereusPulsarLedgerOffloaderV1.deleteOffloaded` previously called the Object store's root/data delete and
+multipart cleanup directly from a native Pulsar callback identified only by ledger/attempt and persisted policy.
+That callback cannot establish the required M5 intent, M4 RELEASED and reference-free authority, so it now fails
+before Provider mutation. The focused offloader test verifies both objects remain and no delete/cleanup call occurs.
+This closes that unqualified deletion entry point; a native Pulsar M5 dispatcher and successful authorized cleanup
+remain OPEN. `PulsarSealedLedgerPublisherV1.deleteAttempt` also now fails before Provider I/O; the public
+signature remains for callers that must receive an explicit rejection. Its focused test verifies root/data remain.
+The authorized unpublished/orphan branch and successful native Pulsar cleanup remain OPEN.
+
+### Pulsar S3 provider I/O lifetime (current implementation amendment)
+
+`S3PulsarOffloadObjectStoreV1.close` closes admission and waits for admitted local SDK operations before
+closing its owned client. Admission and the active-operation count share one lock. Executor rejection returns an
+exceptional stage, and queued operations check closed admission before SDK dispatch. This uses the existing
+executor. Cancelling a returned operation or close observer does not release the underlying SDK operation or
+complete the owned close. Repeated close observes the same pending, successful or failed result.
+
+Three actual versioned MinIO cases qualify this local lifetime: a successful PUT response is held after an
+independent HEAD confirms its native version and SHA; cancelled observers cannot finish the drain, queued PUT
+dispatch is rejected, and releasing the actual SDK callback allows close to finish. The other cases verify executor
+rejection without remote creation and a lost actual client-close reply whose failure persists on repeated close.
+All three pass without skips. The offload module's current 150 tests and Main/Test Checkstyle and Spotless
+also pass; the unchanged P6 sources passed their Checkstyle gate in the provider run. The preceding two-case
+actual RED archive is retained, and owned backend cleanup is verified.
+
+This qualifies local SDK ownership. A timeout or lost I/O reply can still leave a remote UNKNOWN outcome;
+the native owner/ticket and independent reconciliation must establish that outcome. Close is not an absence proof.
+Native Pulsar writer admission, M4 release, protocol references, physical namespace admission and authorized
+delete composition remain OPEN, as does whole M5 acceptance.
+
+### Pulsar offload batch callback ownership (current implementation amendment)
+
+`NereusPulsarLedgerOffloaderV1` now handles rejection by its existing file executor as a failed offload completion.
+The rejected callback's returned `LedgerEntries` are closed before completion; a native read failure remains primary
+when dispatch also fails. Encoder close finishes before the encoding result becomes available to publication or
+failure cleanup. This uses the existing executor and keeps native batch count/byte admission unchanged.
+
+Two deterministic callback controls use the offload entry point and actual BookKeeper `LedgerEntriesImpl`/Netty
+buffers with an injected read source. Before the fix, the rejected callback leaves offload incomplete; the cancelled
+observer control already passes and does not justify changing cancellation semantics. After the fix, both pass:
+rejected dispatch fails, buffers are released, no Object is published, and staging is removed. Cancellation still
+retains underlying batch/publication completion and staging cleanup. All 150 module cases pass without skips,
+with Main/Test Checkstyle and Spotless. These controls qualify callback resource release, not real native ledger,
+protocol, storage, M4 RELEASED, remote UNKNOWN reconciliation or whole M5 acceptance.
+
+### Native Pulsar offload byte admission and retained subscription (current implementation amendment)
+
+The pinned BookKeeper 4.18.0 `LedgerHandle.batchReadAsync` falls back to a count-bounded range read without
+using `maxSize`, including when ensemble size differs from write quorum. The offloader now requests at most
+`min(maxEntriesPerBlock, maxDecodedBlockBytes / maxEntryBytes)` entries. The admitted maximum entry size
+therefore bounds the request even on that fallback. Candidate caps, batch validation, encoding and quorum semantics
+remain unchanged; no additional scheduler or queue is introduced.
+
+An actual `ManagedLedgerImpl` using three bookies with E=3/W=2/A=2 first reproduces the failure: 17 sealed
+entries of 4 MiB exceed the 64 MiB batch cap after the fallback has read them. The production count bound then
+passes native offload. The current test uses the native Pulsar `MessageMetadata`/CRC32C frame, a retained durable
+subscription, actual versioned MinIO PUT/HEAD/GET and AES wrapping/encryption. It verifies native completion/UUID/
+driver metadata, independent root/data versions and NPO1 facts, and full message-frame readback after replacing
+the ManagedLedger factory, metadata client and BK client. Backlog remains 18 entries and the original BK source
+still exists. Unqualified Object deletion remains rejected and both versions remain unchanged. Ledger close is
+awaited before the test closes its native clients; metadata parse and client-close errors are absent.
+
+The preceding `green-frames` snapshot's native case and three SDK-drain cases pass without failures/errors/skips,
+with actual exit 0 and all Main/Test/P6 Checkstyle and Spotless gates satisfied. Its 150 module unit cases passed
+in the preceding invocation; their 41 main/test inputs were unchanged at that snapshot, and its final invocation
+correctly reported them UP-TO-DATE. The later Object read-handle amendment below changes that input tuple. The initial
+opaque-payload passing case still had a static failure and is retained separately, not used as the current native
+message-frame proof. All owned backend objects are removed and the dependency-matched Pulsar checkout is clean.
+
+This is native library/source qualification, not broker process activation or live KMS qualification. The test retains
+BK and does not establish M4 RELEASED, an admitted Oxia writer/floor/reference/member set, native delete intent/done,
+UNKNOWN takeover or the complete native Pulsar M5 lifecycle. Those obligations and whole M5 acceptance remain OPEN.
+
+### Pulsar Object read-handle drain (current implementation amendment)
+
+`PulsarObjectReadHandleV1.close` now fences new range reads and complete-ledger verification under the same lock
+as operation admission, and waits for each admitted operation's provider reads, decoding and validation. An admitted
+multi-block read can finish its remaining blocks after close starts; another read or verifier cannot enter. Read and
+verification failures remain visible on their operation stages. Close success reports that this local operation set
+has drained, including failed operations; it is not a successful-data or remote-absence claim.
+
+Read/verification observers and repeated close observers cannot cancel the owned completion state. The native
+`NereusPulsarReadHandleV1.closeAsync` adapter also returns an isolated view of the same Object-layer drain. The
+existing SDK, executor, decoding and sparse-block sequence are reused without another scheduler, queue or retry.
+
+Three deterministic cases and an actual held MinIO GET reproduce premature close completion on the predecessor.
+The corrected `green-drain` source tuple passes the native Pulsar case, three SDK-drain cases and all 153 module
+cases with zero failures/errors/skips, actual exit 0, and Main/Test/P6 Checkstyle and Spotless unchanged. The actual
+GET case verifies pending close, cancellation isolation, rejection of a new read and complete two-entry native
+frame readback after releasing the response. Source/image identities, raw XML and owned cleanup are retained in
+the existing implementation log's referenced artifacts. This replaces the preceding tuple's unit reuse with a fresh
+module execution on the changed read-handle sources.
+
+This boundary covers Object provider reads and decoding/validation. It does not drain the offloader's complete
+encoding/publication pipeline, native adapter result conversion, protocol callbacks or borrowed entries held by their
+callers. The offloader operation amendment below adds a separate pipeline drain. The ManagedLedger amendment
+records returned read-handle close acknowledgements; native protocol callbacks and borrowed entries still require
+their owning lifecycle. M4 RELEASED and the complete native Pulsar
+writer/floor/reference/member/delete/UNKNOWN composition remain OPEN.
+
+### Pulsar offloader operation drain (current implementation amendment)
+
+`NereusPulsarLedgerOffloaderV1.closeAsync` now fences admission and waits for the private completion chains of
+all admitted offloads, read-handle opens and source-deletion revalidation. The native synchronous `close` waits for
+that same completion. Admission and close share one lock. Offload completion retains key preparation, native batch
+callbacks, streaming encoding, publication verification and staging-cleanup execution; caller cancellation cannot
+shorten it. Staging deletion remains best effort and this drain does not prove local-file absence after a cleanup
+I/O failure. Source revalidation waits for its owned Object handle's verification and close before leaving the set.
+
+Close observers are isolated from the owned state. An open completing after the fence closes its unissued Object
+handle and fails the handoff. A cancelled open observer cannot cancel the actual provider work; an unreceived
+native adapter is closed. A read handle already handed to ManagedLedger remains owned by that native caller.
+The existing file executor and Object store are borrowed and are not shut down by this offloader. There is no new
+runtime scheduler, queue, retry or policy switch. Operation failures remain on their operation stages; successful
+drain means that this admitted operation set terminated, not that every operation succeeded or that remote
+UNKNOWN effects are absent.
+
+Three held-operation unit controls and the actual native offload with a held successful MinIO PUT response
+reproduce premature close on the predecessor. The corrected `green-pipeline` tuple freshly passes 156 module
+cases, the native case and three SDK-drain cases, with zero failures/errors/skips and actual exit 0. Main/Test/P6
+Checkstyle and Spotless retain their limits and pass. The native case checks the server-generated PUT version through
+an independent client while close remains pending, cancels a separate close observer, releases the response, awaits
+both the offloader drain and actual ManagedLedger completion, then cold-reads through a fresh offloader/factory/
+metadata/BK client. The existing retained subscription/source/version and held-GET drain checks still pass. These
+are library/native-source prerequisites; no new M5 lifecycle receipt or runtime authority is granted.
+
+This boundary does not confirm ManagedLedger offload-completion metadata CAS, returned native handle drain,
+protocol callback/entry lifetime or M4 RELEASED. Native Oxia writer/floor/reference/member admission, delete
+intent/done/UNKNOWN composition and whole M5 acceptance remain OPEN.
+
+### Pulsar ManagedLedger read-handle close (current implementation amendment)
+
+The current pinned Pulsar `ManagedLedgerImpl` source now retains a private close result. Repeated normal-owner
+close callbacks observe that result, including failure, with their original callback contexts. Cancelling a caller's
+close observer does not cancel ownership. Successful close waits for the existing writer/cursor closes and read
+handle close acknowledgements, including pending opens and handles already removed from the cache. A failed
+handle close remains in the owner's tracked set and cannot be converted into successful close or pin-registry release.
+An open failure that returned no handle is not a close failure. Fenced-owner close retains its existing failed result;
+this amendment does not qualify fenced-owner cleanup.
+
+Cache misses use the existing owner monitor to serialize admission against close; cache hits retain their existing
+lock-free lookup. New calls on already-closed owners reject opens and single/range reads. `reopenReadHandle` returns an
+isolated observer, so cancelling it cannot cancel the private open promise or orphan a late handle. A read error
+from a previously invalidated handle cannot remove its newer cached replacement. BookKeeper source deletion
+waits for already-invalidated handles of that ledger; the existing DualSource partial BookKeeper close still preserves
+the Object child. The same SDK/futures/executor are reused, without another thread, queue or retry layer.
+
+The preceding `green-owner-guard-corrected` tuple freshly passed 156 Nereus module cases, 26 Native cases, the one actual
+native offload case and three SDK-drain cases: 18 suites/186 cases, zero failures/errors/skips, actual exit 0. Native
+coverage includes four close-acknowledgement branches in one case, cancelled pending open, replacement-handle
+ownership, three existing closes, 13 DualSource cases and seven SourceSafe delete cases. The actual MinIO case
+keeps a Native owner close pending while an admitted data GET is held; another fresh owner remains pending after
+its public open observer is cancelled while the SDK root GET is held. New reads/opens are rejected without another
+Object GET, and releasing the responses completes the owned closes. Prior PUT/version/cold-subscription checks
+remain effective. Main/Test/P6 Nereus and Main/Test Native Checkstyle and both Spotless gates pass unchanged.
+
+That preceding tuple uses Pulsar HEAD `a14e0e6f4e49be0677318b4ceefc7b85b445823b` plus two explicit, uncommitted
+source/test paths; its 118-path manifest locks those bytes and the temporary exact-version test dependency route.
+It is not a clean-HEAD claim. Raw inputs/XML, actual backend identities and cleanup are in the existing implementation
+log. Handle acknowledgements alone do not drain native protocol callbacks, adapter result conversion, borrowed
+entry release or metadata CAS. The extensions below cover accepted offload completion and Native adapter
+conversion/delivery; ordinary native protocol read callbacks and borrowed entries still need their own lifetime. Native
+writer/floor/reference/member/grace/delete/UNKNOWN composition, M4 RELEASED, all 17 receipts, five M5-E children
+and aggregate/Final remain unqualified.
+
+### Pulsar ManagedLedger accepted offload drain (current implementation amendment)
+
+Normal-owner close now also waits for each prefix offload admitted under the existing owner monitor. Its private
+operation lifetime spans provider publication, native completion metadata acknowledgement and delivery of the
+original offload callback. Cancelling a close observer does not retire that operation. A completed final ledger
+preserves its success, and a preceding offload error remains visible; closing the owner prevents another queued
+ledger from starting. Close reports that admitted operations ended, while each offload result separately reports
+its success or failure. No public signature, persistent format, executor, queue, retry or default changes.
+
+Three controlled Native cases reproduced premature close during publication success/failure and during an actual
+metadata write whose response was held. The actual Native/MinIO case independently inspects the successful PUT
+version while both offloader and Native owner close remain pending; releasing the response completes publication,
+native metadata and close, followed by cold retained-subscription readback. The current
+`green-owner-offload-style-corrected` tuple exits 0 and freshly executes six suites/80 cases: Native ManagedLedger
+nine, DualSource 13, SourceSafe deletion seven, full OffloadPrefix 47, actual Native offload one and SDK drain three.
+All have zero failures/errors/skips. The preceding `green-owner-offload` run freshly passed those 80 plus 156 module
+cases, then failed two test Checkstyle rules. Only Native test import order and line wrapping changed between the
+runs; the final module task is UP-TO-DATE. The combined evidence covers 19 suites/236 cases, without claiming all
+236 were rerun in the final phase. All unchanged Main/Test/P6 Checkstyle and Spotless gates pass in the final phase.
+
+The current 119-path manifest locks the same Pulsar HEAD plus its two explicit dirty paths and the temporary
+exact-version dependency route. Raw predecessor RED, final XML, source copies, backend and cleanup identities are
+in the implementation log. Detached orphan-cleanup retry futures, ordinary native read callbacks, borrowed entries and fenced-owner cleanup
+remain outside this admitted-prefix drain. Adapter conversion/delivery has its own boundary below. It grants no
+M4 RELEASED, complete native writer/floor/reference/member/grace/delete/UNKNOWN qualification or whole-M5 receipt.
+
+### Native Object read adapter result ownership (current implementation amendment)
+
+`NereusPulsarReadHandleV1` now admits each read under its existing monitor and retains a private local operation
+count through Object completion, Native `LedgerEntries` construction and synchronous delivery callbacks triggered
+by result completion. Close fences admission and waits for this adapter drain as well as the underlying Object
+handle. A cancelled or externally completed read observer does not cancel or retire the actual read. A result that
+cannot be handed off is closed; partial conversion releases already-created Native entries. Caller ownership of
+successfully delivered entries remains unchanged. There is no additional provider read, thread, queue or retry.
+
+A controlled unit case and the actual Native/MinIO case both reproduce close returning while a Native delivery
+callback is held after successful Object data completion. The corrected `green-adapter-delivery` phase actually
+exits 0, freshly executing 15 suites/161 cases: 157 module cases, the actual Native case and three SDK-drain cases,
+all zero failures/errors/skips. The preceding corrected 76 Native component cases are UP-TO-DATE with unchanged
+source/test bytes. Combined current evidence covers 19 suites/237 cases; it does not claim all 237 reran in this
+phase. All Main/Test/P6 Checkstyle and both Spotless gates pass at unchanged limits. The 119-path input manifest,
+exact source copies, raw RED/GREEN XML and actual cleanup identities are recorded in the implementation log.
+
+This owns conversion and synchronous handoff within the admitted read. Async protocol callbacks or consumers
+attached after completed delivery, downstream borrowed Native `Entry` lifetime and full M4 quiescence are still
+outside it. Detached orphan cleanup, fenced-owner cleanup and complete native writer/floor/reference/member/
+grace/delete/UNKNOWN composition remain unqualified. All 17 receipts, five M5-E children and aggregate/Final stay
+OPEN/unqualified.
+
+### Native cursor close acknowledgement (current implementation amendment)
+
+`ManagedCursorImpl.asyncClose` now retains one private close result. A second close during Closing waits for the
+actual first metadata/cursor-ledger acknowledgement; a failed first close remains failed on subsequent calls and
+on the enclosing ManagedLedger close. Every observer retains its callback context. Cancelling a caller's close
+Future cannot cancel that private ownership. The existing persistence and Closed/Closing transitions remain;
+no ordinary-read counter, scheduler, queue, retry, public signature or metadata format is added or changed.
+
+Two component cases and the actual Native/ZK/BK/MinIO case reproduce premature repeat success. The actual case
+uses a separate metadata client to verify that the cursor PUT committed before its response is held; both the
+repeated cursor close and enclosing Native owner close stay pending. Successful release completes them; response
+loss preserves failure on every repeat, including the Native owner. Retained backlog stays 18 and previous
+PUT/version/cold-read/data-GET/cancelled-open/adapter-delivery checks still run in the same one provider case.
+
+The preceding `green-cursor-metadata` run freshly passes 20 suites/410 cases, then fails one new test line-length
+rule. Only that Native test line wrap changes in `green-cursor-metadata-style-corrected`, whose actual exit is 0.
+The final phase freshly passes seven suites/253 cases: full ManagedCursor 173, existing ManagedLedger nine,
+DualSource 13, SourceSafe deletion seven, OffloadPrefix 47, actual Native one and SDK drain three. The 157 module
+cases are UP-TO-DATE with unchanged production/test bytes. All zero failures/errors/skips; combined evidence is
+410 cases, without claiming all reran in the final phase. Unchanged Main/Test/P6 Checkstyle and Spotless gates pass.
+
+The preceding cursor-close 121-path manifest locks fixed Pulsar HEAD plus four explicit dirty paths: ManagedLedgerImpl/Test and
+ManagedCursorImpl/Test. The existing log records raw RED/GREEN, source copies, temporary dependency route and
+actual backend/cleanup identities. Factory shutdown is best effort and is used only for test cleanup, not as a
+successful Native owner-close or M4 proof. Ordinary native async read callbacks/borrowed entries, detached orphan
+and cursor-ledger GC, fenced-owner cleanup, exact native M4 source projection and full writer/floor/reference/member/
+grace/delete/UNKNOWN composition remain unqualified. No M4 RELEASED or M5 receipt is granted.
+
+### Native P4 cancelled range ownership (current implementation amendment)
+
+`DualSourceReadHandle` now closes a successfully validated primary range if its public Future cannot accept that
+range. The fallback success handoff applies the same rule to its already pinned range. Cancellation or external
+completion retires only that public observer; the existing P4 source pin remains until the actual range is closed.
+No new pin layer, counter, queue, scheduler, retry, public signature or storage format is added. Source choice,
+whole-request purity, asymmetric fallback eligibility, validation and delivered-result ownership are unchanged.
+Validation failure handling remains separate from disposing an undeliverable successful result.
+
+Three component cases reproduce leaked late ranges after primary cancellation, primary external completion and
+fallback cancellation. They verify actual range closure, pin drain and owned-child close. The actual Native/ZK/BK/
+MinIO case obtains the ManagedLedger's cached P4 composite handle, holds a successful data GET, cancels only the
+read observer and starts Native owner close. Close remains pending while GET is held; after response release it
+completes, and the observer remains cancelled. New closed-owner reads dispatch no additional GET. This actual
+control verifies primary disposal; the secondary handoff fault is covered by the component case.
+
+The existing actual provider test still checks retained backlog 18, 17 sealed message frames, held successful PUT,
+exact versions/native completion, cold reads, held GET, cancelled open, adapter delivery, cursor metadata ACK/loss
+and unqualified-delete rejection. The final combination freshly passes 20 suites/413 cases with actual exit 0:
+157 Nereus module cases, 252 Native cases, one actual Native case and three SDK drain cases. Main/Test/P6 Checkstyle
+and both Spotless gates pass with unchanged limits. The exact 121-path manifest and raw RED/GREEN evidence are in
+the existing implementation log. Pulsar is the fixed HEAD plus six owned source/test paths: ManagedLedger,
+ManagedCursor and DualSourceReadHandle; staging is empty. Earlier four-path cursor evidence retains its own tuple.
+
+Factory shutdown remains cleanup only. Ordinary native async callbacks and downstream borrowed Entries, detached
+orphan/cursor-ledger GC, fenced-owner cleanup, exact Native M4 source projection and full writer/floor/reference/
+member/grace/delete/UNKNOWN composition remain unqualified. All 17 obligations remain OPEN/null; this correction
+grants no M4 RELEASED, Native lifecycle, five-child aggregate or whole-M5 authority.
+
+### Native captured offload source (current implementation amendment)
+
+`ManagedLedgerImpl.captureOffloadReadSource` now captures one complete source-safe native offload against the
+owner's cached metadata version, attempt/delete state, sealed LAC/length, immutable driver metadata and actual
+cached P4 composite. The native ManagedLedger metadata version is distinct from immutable NPO/NPD Object
+versions and BK ledger-metadata versions. Native ledger ID zero is retained directly. Capture uses the existing owner monitor and
+cached open; it does not replace that handle or expose the raw BK SDK. The result borrows the ManagedLedger's
+handle; callers own and must close returned ranges. Cancelling capture's public observation leaves the private
+cached open and its actual owner-close acknowledgement intact.
+
+The captured reader checks known owner Closed/Fenced state, exact cached metadata state/extent, actual backend/
+priority and handle identity/admission before dispatch. A stale capture returns a failure without reopening or
+substituting a source. Each captured range passes that exact source state through both P4 attempts: a metadata-
+version change during the primary prevents a secondary attempt and retains the primary failure with a suppressed
+stale-source fence. A source-pin fence is NOT_ELIGIBLE and does not redirect a captured read. A completed/cancelled
+observer prevents a new secondary after the actual primary terminates. State-unchanged reads retain P4 whole-range
+validation, its asymmetric fallback table and existing pins; ordinary uncaptured P4 reads retain their native
+revalidation behavior. Driver metadata is copied once at capture, with no added per-range remote metadata IO, new
+cache/queue/thread/retry or proof counter.
+This additive implementation helper leaves the ManagedLedger interface and persistence/wire formats intact.
+
+The one existing actual Native/ZK/BK/MinIO case independently matches initial native metadata version nine, reads
+and checks actual entry frames, updates native metadata through its existing property API, and observes refreshed
+version ten. The old capture, replaced composite, explicitly closed composite and closed owner all reject further
+reads without additional GET. A separate held actual Root GET verifies cancelled pending capture cannot shorten
+Native owner close; response release lets close complete. Previous source/drain/cursor-ACK/backlog checks remain.
+The preceding capture tuple `green-captured-source` freshly passes 20 suites/413 cases, zero failures/errors/skips, actual
+exit 0, with unchanged Main/Test/P6 Checkstyle and both Spotless gates. The existing implementation log records
+exact runtime/source/route/XML/backend evidence; the fixed Pulsar HEAD still has six owned dirty paths.
+
+The current real control holds a successful native MinIO GET response, advances ManagedLedger metadata from
+version eleven to twelve and independently confirms the newer store version before reporting UNAVAILABLE. The
+preceding reader incorrectly succeeds through BK fallback (actual RED); the current captured reader fails with the
+original Provider cause and no BK read completion. A refreshed capture with an unchanged version then succeeds
+through actual BK fallback and validates both native frames; the SDK read metric increases by one. Five component
+controls cover stale-before-I/O, changed-version fallback versus ordinary native revalidation, state-unchanged
+whole-range fallback, pin-fenced NOT_ELIGIBLE and cancelled-primary drain without a secondary. Final combination
+`green-captured-fallback` freshly passes 20 suites/418 cases, zero failures/errors/skips, actual exit 0, with the same
+Main/Test/P6 Checkstyle and both Spotless gates. The six owned Native paths and 121 input paths remain explicit.
+
+`CapturedOffloadReadSource.readOwnedAsync` now returns one bounded heap-owned batch with the original native
+ledger ID and captured source state. Caller-admitted entry/count/aggregate-byte limits reject an oversized range
+before SDK use. After P4 validates the whole range, the helper checks exact ledger/contiguous entry identity and
+byte bounds, copies payloads and closes the original SDK `LedgerEntries` before completing its private conversion.
+Returned payload access copies the owned bytes; the immutable result retains no SDK buffer or source pin.
+The raw `readAsync` result remains caller-owned and must be closed.
+
+A nonblocking, thread-safe source-use gate is passed through both captured P4 attempts. It closes new admission
+when the public owned observation is cancelled/completed or the known Native capture becomes stale; it does not
+cancel accepted SDK work or shorten its actual cleanup. A gate failure after pin admission releases that pin.
+Already admitted successful work may drain after owner close. Public cancellation itself is no termination proof.
+No new P4 pin layer, queue, thread, retry, default limit or persistence/wire format is introduced.
+
+The expanded existing real Native/ZK/BK/MinIO case holds actual GETs for delivered, cancelled and externally
+completed observations. Native owner close waits for response release in each mode. The delivered heap payload
+remains exact after Native owner and metadata/BK clients close; changing a returned byte-array copy cannot mutate
+it. A separate failed held GET cancels the owned observer while the Native owner remains open: actual provider
+close drains that GET, no BK read completes, then Native owner close succeeds. The unchanged-state positive
+fallback additionally reads one owned native frame from actual BK and verifies it after client closure; its earlier
+two-frame raw control remains intact. Three component cases verify gate rejection before SDK use, accepted-primary
+drain without a new fallback and post-pin gate failure cleanup. Final `green-owned-capture-style-corrected` freshly
+passes 20 suites/421 cases, zero failures/errors/skips, actual exit 0; Native and Nereus Checkstyle/Spotless pass.
+The preceding same-count runtime passes but exits 1 on four Native style violations; its raw tuple is preserved.
+The exact six Native paths, P6 source, 121 inputs and temporary dependency route remain bound to each tuple.
+
+These are facts from the owning ManagedLedger's cached view and known native state. The initial steady-state view
+is independently compared with the actual metadata store in the test. This API does not reread remote ownership
+on each read or establish an Oxia Binding/source selector, native namespace/member/writer qualification, a complete
+Native M4 publication cell, terminal/quiescence proof or RELEASED. Ordinary callbacks/downstream borrowed Entries,
+detached GC, fenced-owner cleanup and the complete lifecycle composition remain required. All 17 obligations,
+five M5-E children and aggregate/Final remain OPEN/unqualified.
+
+### Native immutable Object read versions (current implementation amendment)
+
+`PulsarObjectReadHandleV1` now retains the actual root/data HEAD proofs across open and passes their exact identity
+through NPO root GET, NPD header GET and every subsequent block GET. The provider interface adds a version-bound
+range overload whose default explicitly fails; it cannot silently substitute an unbound GET. Existing direct range
+API signatures remain available. The production S3 path requests the captured version ID, or conditions the
+existing unversioned ETag path, then checks version/ETag, SHA metadata, exact content length and full Content-Range
+in that same GET response. Its original private SDK ownership and close drain remain effective. No additional
+per-range HEAD, thread, queue, retry or storage/wire field is added. Existing counting and in-memory test seams
+implement the new operation; counting still measures one provider range request. The read handle exposes the two
+validated immutable Object facts, which alone grant no namespace, member, writer or lifecycle authority.
+
+The real Native/ZK/BK/MinIO case reproduces physical identity drift with identical payloads: after actual root
+HEAD returns, an independent SDK creates a different version with exactly the same root bytes/metadata. After
+native source capture, it similarly creates a different current data version. The old reader returns those newer
+physical versions despite successful native payload validation (actual RED). The corrected reader returns the
+original captured root/data versions, preserving native ledger zero and existing source state. Test cleanup removes
+only the two versions created by its fault injection and independently verifies the original versions remain.
+
+Two additional actual SDK controls read a captured version after a different current body is written, reject a
+wrong SHA proof and out-of-extent range, and verify conditional-ETag compatibility in an unversioned bucket with
+replacement rejection. ETag compatibility is not immutable-version namespace qualification for M5. One component
+case rejects a provider lacking version-bound reads before any range dispatch. Existing cold subscription/backlog,
+PUT/GET/cursor close, strict native-version fallback and owned-result cancellation controls remain effective.
+
+`green-immutable-get` actually exits 0, freshly passing 15 suites/164 cases: module 158, actual Native one and actual
+SDK five, all zero failures/errors/skips. Native five suites/260 cases and their exact source inputs are unchanged
+and UP-TO-DATE; matched combined coverage is 424 cases, without claiming all reran. Nereus Main/Test/P6 Checkstyle
+executes and passes; Spotless and Native style gates are UP-TO-DATE on unchanged checked bytes. The new 122-input
+manifest also binds the modified P6 counting seam. Exact RED/GREEN source, runner/route, raw XML/backend/cleanup
+records remain in the existing log. The current actual strict-fallback control observes native metadata twelve/
+thirteen; cursor ACK/loss observes ten/eleven. Earlier tuples retain their own versions and source scope.
+
+This closes a real Object source-version gap needed by Native M4. It does not install the actual Oxia Binding/source
+selector or complete source/owner/namespace/member/writer qualification, publication cell, quiescence/proof/RELEASED,
+ordinary protocol callback/borrowed Entry drain, fenced-owner cleanup or detached GC. Complete lifecycle publication/
+release/delete/UNKNOWN remains required; all 17 obligations and five-child aggregate/Final stay OPEN/unqualified.
+
+### Native fenced close and failed-child drain (current implementation amendment)
+
+Native `ManagedLedgerImpl.asyncClose` now attaches every observation to its one private result and initiates cleanup
+once, including Fenced owners. Fenced state remains Fenced while cached/pending read handles, admitted prefix
+operations, cursors and the current writing ledger close; the final result retains the Fenced failure. Cancelling
+one public close observation cannot shorten that cleanup or replace its result. Normal writer-close failure also
+continues child cleanup. The owner-local aggregate uses `CompletableFuture.allOf`, so a failed cursor/read child
+cannot acknowledge close before another accepted child ends. Primary owner/writer failure is retained and child
+failure is suppressed; a normal close with child failure remains failed. This changes no public signature or format.
+
+The actual Native/ZK/BK/MinIO case holds a successful data GET, independently advances ManagedLedger metadata and
+triggers a real BadVersion through its existing property API. The predecessor acknowledges Fenced close before GET
+release (actual RED). Current close and repeated close wait; a cancelled observer cannot shorten that wait, new
+fenced capture reads dispatch no GET, the admitted owned range drains after release, and all close observers retain
+Fenced failure. Existing cursor ACK/loss controls now hold a separate GET: even after cursor success or actual lost
+ACK, Native close waits for that GET, then preserves success or the original cursor failure respectively.
+
+`green-fenced-owner` actually exits 0 and freshly passes 20 suites/558 cases, all zero failures/errors/skips: module
+158, Native 394 (full configured ManagedLedger 143, cursor 173, DualSource 24, SourceSafe 7, OffloadPrefix 47), real
+Native one and SDK five. Main/Test/P6 and Native Checkstyle pass; Spotless retains its checked inputs. The complete
+ManagedLedger class is included because this is shared close behavior; its pre-existing disabled test is unchanged.
+The 122-input tuple, exact RED/GREEN source and original cleanup facts remain bound in the existing log. This owns
+local accepted-child drain; it grants no Native M4/Oxia source-owner qualification, terminal/quiescence/RELEASED,
+ordinary protocol callback/downstream borrowed Entry lifetime, detached GC or complete lifecycle authority.
+
+### Native cached Object source identity (current implementation amendment)
+
+Native `CapturedOffloadReadSource.captureOffloadedReadSourceIdentity` now captures the actual cached Object child's
+root/data key, provider read token, length and SHA-256, plus the unchanged ledger ID and attempt. The optional
+`SourceSafeLedgerOffloader` description contract reads facts from that existing handle without provider IO; an
+unsupported provider fails only this explicit identity query and keeps ordinary reads. Nereus checks that the handle
+belongs to its exact Object store and projects the version-bound NPO1/NPD1 proofs already held by that handle.
+These tokens are read facts, not physical namespace qualification; an ETag token still supplies no M5 immutable
+version authority. ManagedLedger metadata revisions remain separate from root/data versions.
+
+For BK-first reads, fact capture opens the composite's existing lazy Object child under its native Object pin.
+Exact captured state and known owner/cache/backend admission are checked around pin admission and after opening.
+Cancellation of the returned observer cannot cancel that private open or clear its pin. Stale/replaced/closed
+captures fail before IO. An already opened Object child needs no provider IO for this query; capture never substitutes
+BK metadata for Object identity, opens a parallel Object handle or adds an executor.
+
+The real Native/ZK/BK/MinIO control queries the cached facts before and after independent same-byte root/data
+version replacement and retains the original versions. A BK-first control holds the lazy Object GET, cancels the
+identity observer and starts repeated Native close: close stays pending until GET release; new queries dispatch no
+GET, then close completes and the observer stays cancelled. Two Native tests cover an unsupported identity provider
+and a throwing post-pin gate, confirming pin cleanup and retained ordinary read behavior.
+
+The initial tuple runs five Native suites/396 cases successfully but exits 1 at Nereus Spotless before the actual
+Native/SDK suites. After a P6-only formatting correction, `green-cached-source-identity-style-corrected` exits 0,
+newly executes 15 suites/164 cases and retains those 396 source-matched Native cases as UP-TO-DATE. Combined coverage
+is 560, not 560 fresh cases. Native/Nereus style checks pass within their respective source tuples. The 122-input
+manifest now binds seven dirty Native files, including `SourceSafeLedgerOffloader`; exact source and cleanup evidence
+are retained in the existing log. Native M4 Binding/source/owner/namespace publication, proof/RELEASED and complete
+writer/floor/reference/member/grace/delete/UNKNOWN qualification remain required. All 17 obligations remain OPEN.
+
+### Native P1 Binding and stored source identity (current implementation amendment)
+
+`PulsarNativeBindingV1` reads the permanent metadata namespace marker, ACTIVE selector and canonical aggregate
+through one actual Oxia client, then rereads the selector and namespace. It derives Binding/incarnation/storage-
+epoch identity from that aggregate. `configureCreate` preserves user properties and records those identities,
+aggregate digest and metadata namespace in Native creation properties; conflicting properties fail. This records
+creation identity, not a native writer/create fence. Recovery checks the stored identities without retagging.
+
+Capture requires the exact Native owner/cache/offloader and persistence name. Native `verifyStoredMetadata` reads
+through the existing MetaStore with `createIfMissing=false`, checks its actual version, complete property map and
+exact sealed-ledger metadata bytes, and rechecks known owner/current state. Cached facts alone do not qualify an
+unacknowledged write. Capture verifies stored metadata before Object IO and again after Object namespace/P1
+reread. Independent public futures cannot cancel or complete the private accepted verification chain. This adds
+no thread, queue or retry and does not install M4 read admission or prove global owner drain.
+
+The Object namespace observation runs through the exact offloader's S3 store/client/bucket and existing owned SDK
+executor. Its actual permanent marker must match the requested physical namespace and current metadata namespace.
+The captured root/data facts come from the actual cached NPO1/NPD1 handle. Only immutable version tokens become
+Object physical members; ETag tokens cannot qualify this path. The original Native ledger ID is retained, including
+zero. The BK join below adds actual namespace/member observations; source generation, writer floor and deletion
+capability remain unqualified.
+
+The actual Native/ZK/BK/MinIO/Oxia test verifies persisted properties with an independent metadata client, cold
+reopen without creation tags, immutable Object members, and rejection of changed Native identity, another provider,
+another bucket namespace, deleting P1 selector and same-byte metadata marker rewrite. An actual successful Native
+property PUT holds its acknowledgement after the stored revision changes. Old code accepts capture (RED); the
+stored-source check rejects before Object GET (GREEN), and releasing acknowledgement makes the old capture stale.
+The retained-subscription fixture prevents Native trim from removing the source during this offload scenario.
+
+The first GREEN tuple freshly passes 20 suites/561 cases but exits 1 for two P6 Checkstyle violations. The style-only
+correction exits 0 and freshly passes seven real Native/SDK cases; 554 source-matched module/Native cases remain
+UP-TO-DATE. Combined coverage is 561, not 561 fresh cases in the final run. Current 567-input closure includes the
+actual P1/namespace source dependencies and 21 Native inputs. Exact failed/RED/GREEN source and runtime tuples are
+retained in the implementation log. M4 publication/proof/RELEASED, ordinary read/callback/borrowed Entry ownership,
+Native create/trim/delete authority and full writer/floor/reference/member/grace/UNKNOWN composition remain required.
+All 17 obligations remain OPEN and all M5-E/aggregate/Final authority remains unqualified.
+
+### Native BK namespace and sealed header (current implementation amendment)
+
+The existing `M5BookKeeperNamespaceAuthorityV2` now lends its exact privately created client to the Native factory.
+Native source capture checks that its own BookKeeper field is that same instance; another connection to the same
+physical namespace cannot stand in for the owner. Borrowers must drain Native owners before closing this authority.
+This bridge introduces no executor, thread, queue or retry and grants no native create, append or delete authority.
+
+`PulsarNativeBindingV1` reads the permanent BK namespace binding through that exact connection and matches the
+actual P1 metadata namespace. It reads actual SDK ledger metadata and checks closed state, LAC, length, Pulsar
+application/managed-ledger component, absence of a cursor marker, and exact persistence-name bytes. The actual
+LongVersion remains separate from Native ManagedLedger revision and Object version tokens. The namespace is
+reread after the ledger SDK reply; the BK observation is repeated after Object/P1 capture and compared, followed
+by the final actual Native metadata verification. Three physical observations retain ledger zero: one BK ledger
+and the existing immutable root/data versions. A missing BK ledger still fails this path; no M2 DONE observation
+is relabeled as M5 physical absence or deletion authority.
+
+The actual Native/ZK/BK/MinIO/Oxia test verifies the BK version independently, changes/restores real SDK header
+owner and cursor metadata while Native cached state remains current, and rejects both before Object GET. It also
+rejects another actual namespace client and same-byte permanent BK marker rewrite. Persisted cold source capture,
+Native pending property acknowledgement and prior Object/owner controls remain effective. The local Pulsar build
+explicitly consumes current domain and prefers project modules because the added BK edge otherwise selects
+historical N1 types lacking current allocator APIs; the historical Storage API N1 lock remains unchanged.
+
+The final build passes with seven fresh real cases and 589 source-matched module/Native/BK cases UP-TO-DATE:
+combined coverage 596, not an all-fresh final run. Its 594-input closure includes the BK source/tests and 22 Native
+inputs. Failed compile/style tuples and actual XML/source/cleanup are preserved in the log. BK namespace authority
+is newly enrolled from a clean HEAD file; its original bytes and JAR are retained. Previous 751/731 source tuples
+now differ at that one file and are historical evidence, not current qualification. Five other built/published
+JAR pairs and all six prior published JARs remain unchanged; the new BK built JAR awaits the required complete
+current-source runtime closure. M4 owner/admission/publication/proof/RELEASED, Native create/member/writer guards,
+ordinary Entry/callback lifetime and the full trim/delete/UNKNOWN composition remain required. All 17 obligations,
+five M5-E children and aggregate/Final remain unqualified.
+
+### Native ordinary EntryCache read and buffer drain (current implementation amendment)
+
+For a SourceSafe offloader, Native single-entry and cursor range reads now register their actual operation before
+EntryCache dispatch under the same owner monitor as close. New reads fail after closing starts. Owner close waits
+for actual callback return and delivered buffers, including EntryCache hits that perform no source GET. Completed
+operations stay in the close snapshot once closing starts, preserving a callback failure even if writer-close
+acknowledgement delays that snapshot. Legacy non-SourceSafe read behavior is unchanged.
+
+Each delivered Entry uses one owned CompositeByteBuf root over its existing payload reference, preserving capacity
+and reader/writer indices. Entry copies and retained ByteBuf duplicates share that root; its final deallocation
+releases the payload before completing the private operation's buffer witness. A temporary Entry reference keeps
+the delivery callback from recycling/reusing its Entry while still running. No payload copy, executor, thread,
+queue or retry is added. These are local ownership facts; they do not install an M4 selector/hazard or prove remote
+owner quiescence. Native create/GC/trim and full Binding/source/floor/reference/release/delete qualification remain.
+
+The actual RED hits EntryCache without new Object GET, retains Entry/ByteBuf aliases, and observes Native close
+incorrectly succeed. GREEN waits through both aliases and cancelled/repeated close observers. Actual successful
+and failed callback holds also keep close pending; the original callback failure survives delayed writer close.
+A buffer test verifies payload release order and preserved indices/capacity. Initial buffer construction and close
+snapshot failures remain separate recorded tuples. The final build freshly passes 21 suites/572 cases; unchanged
+BK module 35 are source-matched UP-TO-DATE, combined coverage 607. Native/Pulsar/BK style checks pass or retain
+source-matched success. The runtime cleanup collector fails its obsolete whole-machine equality assumption when
+an external Nereus Delay task starts three containers; the successful Gradle result is preserved, and a separate
+read-only supplement confirms the six owned services absent and four original identities/states unchanged. External
+containers are preserved; later cleanup only compares original identities and owned resource labels. All 17 receipts
+remain OPEN/null; M4 publication/proof/RELEASED and full M5 authority remain unqualified.
+
+### Native one-way owner read fence (current implementation amendment)
+
+An actual current `CapturedOffloadReadSource` can now fence its Native owner's read admission once. The owner
+monitor closes admission before invalidating its cached read handles and collecting actual handle-close and ordinary
+read futures. Single-entry/cursor range reads, new read-handle opens and explicit captures check that gate; an
+EntryCache hit cannot bypass it. Known captured-state checks also fail after the fence. Accepted work retains its
+SDK pins, callback and buffer ownership until actual completion; a completed read failure remains in the snapshot
+once either read fencing or owner close starts. Native owner close also observes the same private fence result.
+
+Each returned fence observer is independent; cancellation or caller completion cannot release the private drain.
+DualSourceReadHandle.closeAsync now likewise returns independent observers of its one actual cleanup. Its existing
+range-pin test cancels/completes observers while cleanup remains pending, then verifies both initialized children
+close once after actual range release. No public interface/persistence format, retry, queue or executor is added.
+The local read fence cannot reopen an old owner, grant a successor, stop writers or establish remote quiescence.
+
+The actual Native/ZK/BK/MinIO/Oxia case holds cache-hit Entry/ByteBuf aliases, fences the read owner, cancels/completes
+fence observers and rejects single-entry/cursor/capture/identity requests before any new Object GET. Repeated fences
+wait until both aliases are released, then complete; final Native close is separately asserted. Native 407 cases
+first pass while a new helper signature fails P6 compilation. The corrected final build passes 165 fresh module/
+Native/SDK cases; Native 407 and BK module 35 are source-matched UP-TO-DATE, combined coverage 607. Style gates pass
+or retain matching success. Exact tuples are retained in the log. M4 selector/hazard/capability/source publication,
+terminal proof/RELEASED and complete create/member/writer/floor/reference/delete/UNKNOWN qualification remain
+required. All 17 receipts and aggregate/Final authority stay unqualified.
+
+### Native sealed read-view identity (current implementation amendment)
+
+`PulsarNativeBindingV1.CapturedSource` now constructs `PulsarNativeReadViewV1` from its actual source cut. The private
+construction requires the existing P1/native/BK/Object observations; it does not accept caller-created source facts.
+Its immutable domain-separated encoding includes exact Binding/P1 versions, both permanent namespace assignments,
+Native LedgerInfo bytes/version/attempt/delete state/read priority/properties, actual sealed BK metadata version,
+and ordered BK/root/data physical identities plus Object lengths and body digests. Native exposes a defensive copy
+of its captured sealed LedgerInfo. Metadata counters are predecessors, not owner epochs or source generations.
+
+The route preserves the actual Native ledger ID, including zero, and delegates bounded whole-range reads to that
+same captured source and its existing source-use gate/SDK pin ownership. A different ledger, an out-of-range request,
+a closed source-use gate or a known stale Native capture rejects before new source IO. The encoded view stays frozen
+when later metadata changes; a fresh capture after same-byte BK metadata rewriting has a different digest. This is
+one sealed source, not full Binding/WAL/tail coverage. It asserts no BK/Object semantic equivalence, M4 capability,
+selector/hazard/publication, remote owner terminal, RELEASED or physical delete authority.
+
+The actual six-service Native/ZK/BK/MinIO/Oxia run freshly passes 21 suites/572 cases with no failures/errors/skips,
+including ledger-zero reads, independent stored LedgerInfo verification, version-sensitive view identity and cold
+capture/read. Applicable format/Checkstyle gates pass. Its 597-input manifest, exact sources and raw tuples are
+retained in the implementation log; the owned services are removed and external containers are preserved. The full
+M5 combinations, all 17 obligations, five M5-E children and aggregate/Final remain unqualified.
+
+### Native complete data-ledger cut (current implementation amendment)
+
+`PulsarNativeBindingV1.captureReadView` now captures all current Native data ledgers, including offloaded sources,
+plain sealed BK ledgers and the active tail, against one Native metadata predecessor. Before any Object source can
+open, it checks every actual BK header/role/version and permanent namespace assignment; active tails require OPEN,
+not IN_RECOVERY. Source capture and final BK/native/P1 rereads must remain aligned. The resulting
+`PulsarNativeBindingReadViewV1` freezes the complete data-ledger membership and Native confirmed position. Later
+appends do not enlarge an old cut; a fresh confirmed frontier changes its digest. Native ledger zero stays unchanged.
+
+The new MetaStore exact-read entry point neither creates metadata nor repairs recovery timestamps. Existing recovery
+reads retain timestamp repair; unsupported MetaStore implementations reject exact capture. Parsed stored bytes and
+ledger facts are defensively copied. Plain BK routes borrow their owner's existing handle, including the current
+writer handle without recovery, and register private read cleanup with the existing fence/close lifetime. Cancelling
+or completing public observers cannot discard accepted SDK entries. Byte bounds use authenticated payload buffer
+size: BK 4.18's entry header length is cumulative ledger length and is not an individual entry size.
+
+The real case covers offloaded, sealed plain BK and active-tail reads, frozen/frontier-advanced cuts, cold recovery,
+and IN_RECOVERY rejection before Object GET. A focused Native fixture holds SDK replies through observer mutation,
+fence and close and verifies both borrowed entry references are released. The corrected real run freshly passes
+22 suites/581 cases with zero failures/errors/skips and applicable format/Checkstyle gates. The final additional
+plain-BK first-header equality check passes 165 fresh cases; Native/MetaStore 416 are source-matched UP-TO-DATE,
+combined coverage 581, not all fresh in that final run. Failed tuples and exact 600-input sources remain separate.
+This is complete Native **data-ledger coverage**, not cursor/writer/reference
+closure or a qualified M4 capability/selector/hazard/publication/terminal/RELEASED. All 17 M5 obligations remain OPEN.
+
+### Native private SDK cleanup observation (current implementation amendment)
+
+Native captured plain-BK and offloaded reads now expose `CapturedReadOperation`: data/result observations and actual
+SDK/entry-cleanup observations are independent copies of separate private futures. Data observer cancellation or
+caller completion closes new source use and never cancels accepted SDK work. Mutating a drain observer cannot
+complete private cleanup or clear Native fence/close tracking. Both Native read-view adapters propagate the same
+operation; existing `readOwnedAsync` delegates to its data observer. Range/budget checks still precede source IO.
+
+The common bounded heap-copy/entry-close path ends cleanup only after actual entries disposal. A normal read error
+with confirmed cleanup may drain; disposal failure and synchronous dispatch uncertainty retain failed private
+cleanup and Native fence/close failure. Offloaded captured cleanup now also joins the owner tracker instead of
+relying only on the composite pin. The focused Native fixture verifies independent data/drain mutation and retained
+cleanup failure. The actual held GET cases verify all three delivered/cancelled/completed observations while drain
+remains pending, then release SDK replies and separately await cleanup. The real run freshly passes 22 suites/582
+cases and applicable format/Checkstyle gates; exact tuples remain archived. This local cleanup signal is not an M4
+hazard, qualified capability, durable selector or remote terminal/RELEASED. Full M5 and all 17 obligations remain open.
+
+### Native registered read admission (current implementation amendment)
+
+The SourceSafe Native owner now accepts one `NativeReadAdmission` through a current captured Native cut after
+ordinary reads, source pins, pending handle opens and handle cleanup drain. Registration itself grants no M4
+authority. With a registered owner, ordinary single-entry/cursor EntryCache reads (including cache hits) and captured
+owned reads register their actual cleanup before awaiting admission. Source dispatch rechecks Native fence/close;
+an operation awaiting admission remains in Native fence/close waiting. Cancelling a captured data observer before
+admission prevents its subsequent BK dispatch. Delivered Entry/buffer aliases and callback return retain cleanup.
+
+Ordinary handle lookup cannot open an uncaptured source after registration. Low-frequency explicit capture uses
+the owner-managed open path; raw captured LedgerEntries reads reject instead of bypassing registered admission.
+Existing behavior without registration remains. The captured binding read view propagates registration. The actual
+cached-alias case installs a held admission, verifies no delivery/new GET before acceptance, and keeps registered
+cleanup pending through Entry/ByteBuf aliases; two focused cases verify cancel/fence before SDK dispatch. The real
+run freshly passes 22 suites/584 cases plus applicable format/Checkstyle checks. This is the actual Native hook;
+qualified M4 owner/capability/selector/hazard and remote terminal/RELEASED remain required. All 17 obligations stay OPEN.
+
+### Native Oxia M4 control-fact route (current implementation amendment)
+
+The actual P1 `PulsarNativeBindingV1` now exposes a private-client `PulsarNativeM4ControlV1` route. Its canonical Cell
+root binds the permanent metadata namespace and complete P1 protocol-Cell identity; one control shard is independent
+of Native ledger IDs/BK bookie distribution. Its read-fact entry point creates no selector/capability and accepts no caller Cell root
+or metadata client. Reads check current Native view and P1/namespace, decode the exact OPEN selector projection,
+validate its view/admission and capability generation/evidence digest, reread both exact versioned predecessors,
+and revalidate Native/P1/namespace. Missing selector returns no facts and never creates authority; missing/foreign/
+revoked/mismatched capability, stopped/nonmatching view, blocked Binding envelope or changed predecessor rejects.
+
+These are captured control facts, not current backend conformance or an M4 owner grant; ADMITTED bytes alone cannot
+promote Native read admission. The Native binding view now checks every captured child. Plain BK capture checks the
+actual owner cache-handle reference, including again after asynchronous admission, so cache replacement cannot keep
+an obsolete borrowed source current merely because its ledger metadata still says CLOSED. The actual SDK case reads
+an absent selector/capability without creation/new Object GET, rejects malformed actual Oxia selector bytes, rejects
+an obsolete plain-BK handle after replacement and repeats control capture after cold recovery. The real run freshly
+passes 22 suites/584 cases and applicable format/Checkstyle checks; exact tuples remain archived. M4 owner/capability
+conformance/hazard/publication/terminal/RELEASED and full M5 lifecycle composition remain required; 17 obligations OPEN.
+
+### Native initial M4 owner and actual SDK drain (current implementation amendment)
+
+The actual private-client control route now also provides an initial-only owner factory. Its explicit admission
+capsule checks current source/configuration bytes, complete loaded class-directory/JAR hashes and selected SDK
+class hashes, fixed actual backend image identities, raw successful Native/SDK XML and the actual Native/BK/Object
+configuration and permanent namespaces. The caller must supply the capsule's exact SHA-256. This is current Native
+SDK-drain evidence; it supplies no authority-time expiry, remote terminal, RELEASED, physical deletion or whole-M5
+qualification. Actual BK configuration is retained from the owned client's construction; no caller label substitutes
+for that client or its namespace. Historical receipts and stored ADMITTED bytes alone cannot construct this owner.
+
+Only an absent selector can create the initial durable owner/read/source counters, capability and PROTECTED source
+inventory. These counters come from the new M4 selector, not Native SDK versions. Occupied, conflicting or uncertain
+selector creation cannot create a duplicate actor. Exact selector/capability predecessor rereads and actual
+Native/P1/namespace revalidation precede registration. Capability binding uses the existing codec's immutable
+evidence-body digest; full stored wire digest is not that digest. The complete typed Native view retains physical
+ledger zero and the frozen Native confirmed frontier, without a virtual-P4 offset conversion.
+
+Ordinary EntryCache and captured owned reads acquire the bounded outer M4 hazard before source dispatch. Actual
+SDK/Entry cleanup confirms its exact lease release on the owner event loop. Cancelling/completing data or drain
+observers cannot clear it. Callback/cleanup failure closes admission and keeps the hazard pinned. Local fencing
+waits for Native cleanup and outer leases; it emits no durable terminal. The registered view retains this local
+close authority after its read cut changes, while a different stale unregistered capture cannot fence it.
+
+Registration also freezes each actual cached P4 composite's source state and known owner gate. The real RED held a
+primary GET, advanced actual Native metadata and lost the primary response: the old ordinary path returned BK
+fallback under the new cut. The corrected ordinary path preserves the original provider failure and rejects that
+secondary. A second actual failure exposed stale-cut rejection of the registered owner's fence; exact registration
+identity now permits its cleanup without permitting new reads or weakening stale-capture rejection.
+
+The final actual six-service pipeline freshly passes 24 suites/588 cases: Native/MetaStore 419, module 158,
+Native conformance two, SDK five, owner three and the original permanent-namespace negative one. Actual exit is 0,
+with zero failures/errors/skips and applicable style gates passing or source-matched UP-TO-DATE. The owner cases
+verify held GET/Entry aliases, independent observers, duplicate actor rejection, retained callback-failure hazard
+and metadata-advanced fallback rejection. Namespace poisoning runs after owner tests on the same actual backend;
+its original assertions remain. Exact source/runtime/configuration and RED/failed/GREEN tuples are archived in the
+existing implementation log. Full Native M4 backend qualification, Cell-wide read capacity, successor/publication,
+remote terminal/proof/RELEASED and cold takeover, writer/create/member/reference and delete/UNKNOWN combinations
+remain required. All 17 obligations, five M5-E children and aggregate/Final remain unqualified.
+
+### Native preferred-only source candidate (current implementation amendment)
+
+The Native composite now has an explicit Object-only opening/reading plan. It opens only the actual Object child,
+overrides configured BK-first priority and disables both open-time and whole-range BK fallback. A cached composite
+with a different plan is rejected; capture cannot silently replace an already borrowed source. The existing
+ordinary dual-source opening and range behavior remain. Source pins, private cleanup and independent close
+observers use the existing lifetime paths.
+
+`capturePreferredOnlyReadView` still validates the complete Native/P1/stored-metadata cut, actual SDK ownership,
+permanent BK namespace and actual immutable Object root/data identities. Before opening Object data it validates
+all remaining plain/sealed/tail BK headers. An offloaded Object-only node requires no original BK ledger metadata;
+its selected members contain only the two actual Object versions. Its BK header/version observation is absent,
+never a synthesized version or member. The actual permanent BK namespace remains verified before/after capture.
+The existing dual-source canonical encoding stays version 1; the new Object-only source uses version 2 with its
+own domain and omits the nonexistent BK header version. Native ledger IDs, including zero, remain unchanged.
+
+The initial-only M4 factory derives PREFERRED_ONLY from this actual fallback-free source graph, rather than a
+caller assertion, then registers its actual cached Object-only composites. The current-source SDK capsule now
+requires the additional real cold Object-only source case. The controlled fixture removes the old ledger through
+the real BK SDK and confirms metadata reading fails, then a new metadata client/factory/offloader captures and
+reads its Object source plus remaining plain/sealed tail data. This SDK absence fixture grants no M5 physical-delete
+authority or absence/quota-settlement receipt. A separate actual PO-owner case keeps the original BK available,
+loses a held primary response and confirms failure instead of a successful BK fallback, followed by confirmed
+private cleanup and an empty hazard scan. Two focused composite cases verify BK-first override and zero BK factory
+dispatch on Object open/range failure.
+
+The actual six-service pipeline freshly passes 24 suites/592 cases, zero failures/errors/skips, with all applicable
+style checks passing or source-matched UP-TO-DATE. Exact source/runtime/capsule and raw XML/backend/cleanup tuples
+are archived in the existing log. This supplies the actual preferred-only successor source candidate and initial
+PO admission. The planned retirement below now implements same-Binding fused closure and old-owner terminal/proof/
+RELEASED. Durable/cold successor activation and complete M5 writer/member/reference/delete/UNKNOWN combinations
+remain required. No obligation or M5-E
+child/aggregate/Final is promoted.
+
+### Native planned fallback retirement and protection release (current implementation amendment)
+
+The actual private-client Native control route now retires one initial fallback-bearing read actor through the
+existing M4 fused CAS and proof/release coordinator. The successor must be the actual preferred-only view for the
+same Binding and properties, preserve the complete frozen admitted cut and retained BK extents, retain the exact
+immutable Object versions/lengths, and exclude each offloaded BK member. This is existing-source continuity, not
+a general compaction semantic verifier or a caller-created replacement proof. Actual backend configuration still
+must match the explicit current-source SDK admission.
+
+Old local admission closes before the low-frequency selector mutation. The fused CAS advances the actual M4
+read/source counters and creates its closure anchor/batch inside the existing M5 authority envelope. The private
+retirement waits for Native SDK/alias cleanup and the exact outer hazards before constructing a PLANNED_DRAIN
+terminal. Terminal evidence binds old/new selector cores, anchor, both actual views and the source-bound admission
+receipt. No expiry timestamps or forced hazard clearing are used. The existing coordinator publishes immutable
+terminal/proof and verifies the contiguous interval before actual PROTECTED rows become RELEASED. Only then is
+one successor actor registered on the actual PO Native SDK view. Registration uncertainty fences that successor
+and does not create another actor on retry.
+
+Public cancellation/completion cannot finish the private retirement or SDK drain. UNKNOWN metadata attempts retain
+the same predecessor, successor and eventual terminal/proof bytes. Exact retry rereads the actual fused successor
+and continues that owned retirement. A completed result is its historical immutable outcome, not refreshed M5
+deletion eligibility. This planned path requires the original actual actor; it does not infer termination of a
+lost process or construct cold takeover authority from stored bytes.
+
+Two real Native/BK/MinIO/Oxia cases hold both a primary GET and a borrowed Entry alias. An independent actual SDK
+read confirms PO was applied while protection remains PROTECTED and terminal/proof are absent. GET release alone
+does not drain the alias. Final alias release permits exact terminal/proof, RELEASED and successor ordinary owned
+reading. A forwarding SDK fault loses a completed actual selector CAS response and subsequent actual GET responses;
+the same actor remains closed/protected until original drain and exact retry. No SDK result/fact is fabricated.
+The independent reads correctly decode the persisted M5 envelope's M4 projection. The earlier failure tuple that
+treated it as bare M4 bytes remains preserved. Final actual exit is 0: 15 fresh Native/SDK cases in four suites,
+with source-matched Native/MetaStore 421 and module 158 UP-TO-DATE (combined coverage 594, not 594 freshly rerun).
+Applicable format/Checkstyle pass or retain matching success; exact tuples are in the existing log.
+
+This verifies actual planned Native M4 protection release. Full Native backend qualification and Cell capacity,
+lost-actor/cold reconstruction, durable source-map activation and complete writer/create/member/reference/floor/
+physical-delete/UNKNOWN combinations remain required. All 17 obligations, five M5-E children and aggregate/Final
+remain unqualified; this is no M5 physical-delete authority.
+
+### Native immutable selected source-map bytes (current implementation amendment)
+
+Native initial grant and fused fallback closure now persist the complete actual captured view before selector CAS.
+The private namespace/Cell/Binding route derives a content-addressed native-source-map key from the same view SHA
+used by M4. A bounded 1 MiB NPSM v1 carrier retains every canonical view byte and its SHA; it adds no inferred SDK
+metadata version, member, cold qualification or expiry. Existing-key bytes must match exactly. UNKNOWN publication
+or conflicting/missing confirmation prevents the selector transition; the old actor stays closed/protected.
+An unreferenced prepublication map is not an actor grant or selected physical-reference proof.
+
+The actual selected-map reader revalidates P1/namespace, reads the M5 selector projection and immutable map through
+the actual SDK, checks the full payload against selected view SHA, rereads both exact versioned facts and revalidates
+P1/namespace. A new controller can load these bytes without the in-memory original owner. Loading does not recreate
+Native SDK handles, advance owner/read/source counters, prove a lost actor's termination or authorize deletion.
+Cold source decoding/validation, immutable-version opening and confirmed-drain owner activation remain required.
+Source-map lifecycle/quota/reference accounting also remains part of full M5 acceptance.
+
+The three actual retirement cases now independently read initial/successor maps, reload the selected map through a
+new control route and reject corrupted map bytes. The new case loses a completed actual map PUT response and
+subsequent completed actual map GET responses: the map exists remotely while the selector remains the exact old
+PWF and protection stays PROTECTED with no terminal/proof. Actual original GET/alias drain and exact retry then
+permit PO, RELEASED and successor reading. Prior selector-response UNKNOWN and ordinary planned cases remain.
+Actual exit is 0 with 17 fresh suites/174 cases and matching Native/MetaStore 421 UP-TO-DATE; combined coverage 595,
+not 595 fresh executions. Exact input/runtime/capsule/XML/backend/cleanup tuples are preserved in the existing log.
+All 17 obligations and M5-E children/aggregate/Final remain unqualified.
+
+### Native published Object versions and cold read owner (current implementation amendment)
+
+The selected NPSM carrier now strictly decodes its SHA-bound full PNBV/NPRV bytes, actual Binding/P1/namespace
+identities, source tags, sealed bounds, driver metadata and the exact immutable Object members. Actual Native
+Object-only opening uses those published root/data proofs directly with version-bound GET; it does not replace
+an old version with current HEAD. Physical resource IDs retain raw version IDs, while the SDK read proof restores
+the established `version:` token. Remaining published BK data extents retain their exact physical member and at
+least the admitted range; a sealed extent also retains exact LAC/length. A published empty writer tail carries no
+admitted data extent. This is data-source continuity, not writer/cursor/reference termination.
+
+An actual same-byte new root/data version does not alter the cold source. Removing the old published root while
+leaving the new root current rejects capture. The initial actual run exposed the raw-ID versus SDK-token mismatch;
+its failing tuple remains archived. Token-corrected and complete-BK-coverage runs pass; the final coverage run has
+17 fresh suites/175 cases plus source-matched Native/MetaStore 421 UP-TO-DATE, combined coverage 596.
+
+A PO actor can now persist its exact read drain only after its private Native SDK/callback/Entry-alias cleanup and
+outer hazard pool are confirmed CLEAN and its durable selector is still exact. Cancelling the observer does not
+complete that drain. The private namespace/Cell/Binding route stores bounded NPOD v1 bytes containing the exact
+selector and current source/runtime/configuration/receipt identities. A fallback-bearing actor still needs the
+existing fused retirement. This record supplies no writer drain, expiry or lost-process termination.
+
+A new controller captures the published versions through a new metadata factory/offloader and verifies the actual
+PO selector, source map, current capsule-backed capability and exact durable drain. A private cold attempt chooses
+one nonce, persists its immutable claim, publishes the actual successor map and uses the existing same-selector
+CAS to advance owner/read/source counters. Two independent attempts cannot share the claim even if their source
+view is identical. UNKNOWN keeps that same attempt/nonce/predecessor/successor and returns no registered actor;
+its exact retry can observe the applied CAS. Registration follows exact actual selector/capability/Native/P1
+rereads. A completed handle returns its historical owner, never a second grant. A missing drain, changed cut,
+foreign claim or failed registration retains the unresolved state.
+
+The two actual cold cases retain an Entry alias, confirm no durable drain/new grant, cancel the drain observer,
+then release the alias and reload the record through a new controller. They verify new epochs, ordinary Object
+read, duplicate-attempt rejection and final actual cleanup. One loses the successful grant PUT response and later
+completed GET responses, confirms the new selector independently, then retries the original private attempt.
+The final actual run passes 17 fresh suites/177 cases with Native/MetaStore 421 source-matched UP-TO-DATE,
+combined coverage 598. Exact source/runtime/capsule/raw XML/backend/cleanup tuples are in the existing log.
+
+Full Native backend and all-reader qualification, Cell-wide hard capacity, crashed grant/actor reconciliation,
+source-map/drain/claim lifecycle and quota/reference accounting, writer/create/member/floor/delete/UNKNOWN and
+complete Kafka closure remain required. Current SDK-drain capsules, these read grants and the preceding RELEASED
+result confer no physical-delete or production authority. All 17 lifecycle obligations remain OPEN/null; five
+M5-E children and aggregate/Final remain unqualified. The full goal stays ACTIVE.
+
+### Native local Cell owner and hazard capacity (current implementation amendment)
+
+`PulsarNativeReadCellBudgetV1` binds the actual P1 metadata namespace and full protocol Cell identity. Its fixed
+shares use complete Binding identity, including incarnation/storage epoch. At most 1,024 configured Bindings
+reserve at most 65,536 owners and 65,536 read/hazard slots in total. Shares must sum within the Cell limit, are not
+borrowed and have no waiting queue or timeout release. Usage observations count reserved owner/pool capacity,
+not actual in-flight read counts or bytes. One admitted local Cell owner must retain the same instance for its life.
+This API does not establish uniqueness across independently created Cell owners or durable restart budgeting.
+
+Initial owner admission now requires that budget before M4 metadata enrollment. A failure before actor creation
+returns its own unused reservation; an actor whose registration fails is fenced and returns capacity only after
+confirmed private cleanup. The actual owner keeps its reservation until Native SDK/callback/Entry-alias cleanup
+and outer hazards have drained. Cancellation, timeout and cleanup failure cannot clear it. Fused retirement reuses
+the old owner's same Cell profile and allocates its successor only after old drain. Cold recovery requires one
+exact budget instance/owner executor/capacity across retries, retaining its reservation after a possible selector
+CAS. A competing claim that never submits a grant returns only its unused reservation. The budget-free owner/
+cold-grant entry points are removed. No additional thread, queue or per-read remote lookup is introduced.
+
+The actual two-Binding case publishes independent P1 identities in one Cell and reads them through real Native
+ledgers on the same BK/Object/Oxia services. One actor retains primary GET and an Entry alias, cancels observers
+and times out a fence observation. Its share stays occupied and rejects another owner while the healthy sibling
+can enroll/read through its own share. Healthy actual drain returns only its share. GET completion alone leaves
+the stalled share occupied; final alias/private drain clears it. The real callback-failure case also verifies the
+reservation remains. Existing cold UNKNOWN checks now directly observe retained submitted-grant capacity,
+unused competing-claim cleanup and confirmed final release. There is no fabricated SDK cleanup or deletion grant.
+
+The first current run passes 17 fresh suites/178 cases. The final stronger UNKNOWN-capacity run passes four fresh
+suites/20 cases with module 158 and Native/MetaStore 421 source-matched UP-TO-DATE, combined coverage 599; it does
+not freshly execute all 599. Main/P6 compile/Checkstyle and applicable format gates pass or retain matching success.
+Raw source/runtime/capsule/XML/backend/cleanup tuples are preserved in the existing log.
+
+Byte budgets, transport/result-cache capacity, all native read/open entry points, one actual global Cell owner,
+complete backend qualification and source-map/drain/claim durable accounting remain required along with the full
+writer/create/member/reference/floor/delete/UNKNOWN/Kafka combinations. This local owner/hazard reservation does
+not close Review 8.1 or grant physical-delete/production authority. All 17 obligations remain OPEN/null; five
+M5-E children/aggregate/Final remain unqualified. The full goal stays ACTIVE.
+
+### Native read work bytes and caller copy bounds (current implementation amendment)
+
+The local Cell reservation now includes encoded and decoded read-work allowances. Actual opened NPO1 handles
+report maximum encoded/decoded block bytes and block entry count from their verified sparse index, with no new
+HEAD, replacement handle or caller estimate. Native captures these facts under the existing source pin/current
+checks. The full Native view also retains the frame limit of its exact borrowed BK capability/client. These facts
+are derived from the same immutable source bytes; existing NPRV/PNBV/source-map identity encodings stay unchanged.
+
+A Cell profile now declares maximum entries per physical range plus owned-entry/batch copy limits. SourceSafe's
+additive owned-read admission method forwards to the original admission by default, preserving existing functional
+admissions. Actual Native owned operations pass their declared copy limits before dispatch; the M4 owner rejects a
+larger copy or a range wider than its reservation. Ordinary single/cursor ranges use the same range count limit.
+Unregistered ordinary Native behavior remains unchanged. The opened-memory SPI fails unsupported qualification
+while leaving ordinary provider reads available.
+
+For range bound n and actual BK frame f, encoded allowance is n*f plus eight times the largest actual encoded
+Object block. Decoded allowance sums four times n*f, the maximum actual Object codec/output allowance and twice
+the owned batch bound. The Object term reserves eight times encoded block + decoded block + 16-byte directory
+rows, plus four times the bounded range output (at most its actual sealed logical length). The factors cover
+Java copies in range capture, NPD ciphertext/plaintext/directory/compressed/decoded/EntryPayload work, native
+entry wrapping and owned-copy work. Sum BK/Object allowances so a failed Object range followed by whole-range
+BK fallback cannot borrow unreserved workspace. Multiply by owner capacity before any M4 enrollment. Fixed
+Binding shares sum within explicit Cell byte limits as well as owner/slot limits; arithmetic overflow rejects.
+Usage is reserved work allowance, not measured heap/RSS or throughput.
+
+The actual dual-Binding case now publishes a 17-entry healthy native tail, rejects a tiny byte share before
+capability/selector creation, rejects 17-entry owned range and excess copy limit before dispatch, and then verifies
+ordinary healthy reads. Both encoded/decoded usage remain positive; exact occupied byte snapshots persist through
+GET/alias retention, cancelled observers and timeout. Actual final private drain clears all four usage dimensions.
+Current callback-failure/cold UNKNOWN paths also retain bytes. Existing duplicate selector/claim assertions remain.
+The first run passed Native 421, module 158 and SDK/Native prerequisites but failed six owner assertions because
+its old test profile could not reserve both intended owners with codec work. The declared duplicate-attempt test
+profile is expanded to cover both; no successful return, source bound or assertion is weakened.
+
+Final actual execution passes four fresh suites/20 cases with identical main/Native/config inputs to the preceding
+passed 421/158 cases, combined coverage 599 rather than all fresh. Compile/format/Main/P6/Native Checkstyle pass
+or retain matching success. Exact failed/corrected source/runtime/capsule/XML/backend/cleanup tuples are preserved.
+Root-opening/resident-source costs, codec-native/transport internals, caller-owned results/result caches, complete
+all-reader/global Cell and durable restart accounting remain required. This temporary-read allowance does not
+close Review 8.1, full backend/writer/reference/delete qualification or any lifecycle obligation. All 17 OPEN/null,
+five M5-E children/aggregate/Final remain unqualified; the full goal remains ACTIVE.
+
+### Native source preparation before owner registration (current implementation amendment)
+
+`prepareReadSources` now reads the actual Native/P1 cut and reserves source-opening capacity before its Object
+opens. It accepts at most 512 data sources, matching the existing bounded source-map decoder, and derives actual
+offloaded count from that cut. Fixed Cell shares reserve one preparation, four times the NPO1 maximum root bytes
+plus twice BK metadata bytes in encoded allowance, and twelve times root plus four times metadata in decoded
+allowance. These cover opening/parse/retained-source allowances during this Native preparation, not measured RSS,
+transport/KMS internals or caller-retained closed view graphs. The ordinary capture compatibility path remains.
+
+An exact quiescent current Native snapshot installs one private preparation gate. Before a read owner is granted,
+ordinary/owned data dispatch and raw captured offload reads are rejected; explicit source capture can open only
+members of its current prepared cut. The preparation keeps its actual close authority when that cut advances.
+SDK opens/cache-handle disposal, delivered callbacks/aliases and existing private read cleanup remain under the
+Native source fence. Cancelling or completing a view/close observer cannot release the private reservation.
+Failure triggers the same actual fence; failed/unknown cleanup retains capacity.
+
+A completed prepared view carries its exact budget ownership. A different budget cannot enroll it. Successful
+owner registration retains both preparation/source and actor/read reservations; owner fence waits for Native,
+outer hazards and preparation drain before clearing them. Closing preparation before registration fences Native
+sources and prevents a grant from that stale cut. No new thread, queue, cache, per-read metadata lookup or expiry
+is added. Existing ordinary providers and legacy non-prepared Native reads keep their behavior; this does not yet
+qualify all native opening/reader/verification paths.
+
+The two new actual cases use a new metadata factory/offloader and real versioned S3 range GET. One holds the
+completed Root GET response, cancels the view observer and externally completes a close observer, then verifies
+private close still times out and retains the exact full preparation usage. Actual SDK release and Native handle
+fence return zero. The other completes capture, rejects pre-grant owned data without another GET, loads the current
+actual capsule, enrolls its M4 owner, reads ordinary Object data and clears source/read capacity through actual
+owner fence. Existing owner, immutable-version, UNKNOWN, Cell byte/range/copy, alias and callback failure checks
+remain. Actual exit is 0 with 24 fresh suites/601 cases and zero failures/errors/skips; BK module 35 remains
+source-matched UP-TO-DATE and excluded. Compile/format/Main/P6/Native style gates pass or retain matching success.
+Exact source/runtime/capsule/raw XML/backend/cleanup tuples are preserved in the existing log.
+
+Migration of the remaining source-capture/verification/ordinary reader paths, global Cell uniqueness and durable
+restart accounting, transport/KMS/codec internals, caller-owned result/cache and complete backend/writer/member/
+reference/floor/delete/UNKNOWN/Kafka combinations remain required. These preparation gates and byte reservations
+provide no lost-process terminal, physical-delete or production authority. Review 8.1/all 17 OPEN/null obligations,
+five M5-E children and aggregate/Final remain unqualified. Full goal ACTIVE.
+
+### Prepared-source requirement for Native M4 grants (current implementation amendment)
+
+Actual initial and fallback-successor owner enrollment now requires a view carrying its real source preparation
+and the same budget. An unprepared diagnostic capture cannot obtain a M4 owner grant. The successor transition
+checks preparation ownership before constructing its retirement; original SDK/callback/alias drain and exact
+terminal/proof/RELEASED remain necessary. Preparation/source and actor/read reservations stay separate, so fixed
+profiles account for an unresolved source scope and the intended competing owner attempts.
+
+The private current M4 control path now prepares published sources: selected-map reading precedes actual Native
+preparation and version-bound opens under its budget. Cold owner preparation accepts that actual preparation
+instead of opening a caller-supplied ledger outside the budget. It verifies current configuration/capability,
+selector/map bytes and the original actor's exact durable drain. The preparation must match the current published
+map, and its view retains the original budget. Competing private grant attempts share that same actual source
+preparation; they still have distinct immutable claim nonces and cannot duplicate a registered actor. Missing
+drain grants no owner and leaves the separately owned preparation for actual close/retry.
+
+Actual initial/successor/cold, byte/range/copy, Cell sibling, failed callback, alias, selector/map UNKNOWN and
+immutable published-version cases now use prepared views where they enroll M4 owners. Diagnostic capture and
+ordinary unsupported/unregistered compatibility remain separate, with no new owner authority. One actual run
+failed a strict PINNED assertion while another completed SDK lease was being cleared: bounded hazard scan returned
+its valid transient INCONCLUSIVE state. The test waits only while scan is INCONCLUSIVE, fails immediately on CLEAN
+and still requires PINNED while the Entry alias is retained. No production drain/scan logic or valid assertion is
+relaxed. Raw failed/corrected tuples remain archived.
+
+The final real run passes four fresh suites/22 cases with module 158 and Native/MetaStore 421 source-matched
+UP-TO-DATE, combined coverage 601 rather than all fresh. Compile/format/Main/P6 checks pass or retain matching
+success. Root/source preparation and actor/read capacity remain until actual owner/preparation fence. Complete
+native verification/reader migration, global/durable Cell, backend/KMS/transport/codec/cache ownership and full
+writer/create/member/reference/floor/delete/UNKNOWN/Kafka closure remain required. All 17 OPEN/null obligations,
+five M5-E children and aggregate/Final remain unqualified. Full goal ACTIVE.
+
+### Native cached source verification and legacy-delete exclusion (current implementation amendment)
+
+Native now exposes a source-owned complete Object verification operation using the actual cached, identity-bound
+child. SourceSafe's additive opened-verification and verification-admission methods fail unsupported by default;
+existing ordinary functional read admission remains compatible. The actual Nereus adapter validates store/ledger/
+LAC/count/length against that opened NPO1 handle, tracks accepted verification through its private read lifetime
+and provider close, and uses the existing sequential full-ledger checksum/decoded verification. It does not open
+a replacement Root or follow a later HEAD. Source-use is checked before each block and after the accepted GET;
+cancellation/fence can stop new blocks while accepted SDK cleanup still finishes.
+
+The actual Native operation separately exposes result and private-drain observers. The registered M4 owner acquires
+the same bounded outer lease before dispatch and validates that the ledger is an actual captured Object source.
+Its existing per-slot Object codec allowance covers streaming verification's current block; no whole-ledger range
+allocation or BK fallback is added. Modifying result/drain observers cannot complete private cleanup or clear the
+lease. Known pre-dispatch rejection has no SDK work; synchronous dispatch uncertainty retains failed drain.
+Fencing/cut drift forbids another verification. These observations are not physical-reference or delete proofs.
+
+Native legacy DELETE_AFTER_VERIFIED cannot delete a ledger managed by a source preparation/read admission. The
+check is under the same lock as source-safe deletion enrollment. Preparation and read-admission installation reject
+an already active legacy deletion, closing the reverse race. Unmanaged legacy behavior remains covered by its
+existing tests. A M5 physical dispatcher still requires complete separate intent/owner/reference/RELEASED facts;
+verification success cannot invoke the old automatic deletion path.
+
+Three actual cases create a same-byte newer Data version after opening, then confirm verification GET still uses
+the old cached version. They cover delivered, cancelled and externally completed observations, held SDK lease,
+mutated drain observer, unchanged Cell usage through fence timeout, actual private drain and no post-fence GET.
+Two supplementary existing-class Native tests execute the real ManagedLedger trim/enrollment paths with mocked BK:
+preparation prevents old revalidation/deletion and active revalidation prevents both preparation/read enrollment.
+They are not real physical-delete qualification. The final actual combination passes 11 fresh suites/448 cases,
+with module 158 source-matched UP-TO-DATE, combined coverage 606 rather than all fresh. Applicable compile/format/
+Main/P6/Native checks pass or retain matching success. Raw exact source/runtime/capsule/XML/backend/cleanup are
+archived. Global/durable Cell, remaining verification/materializer/reader paths, backend/KMS/transport/codec/cache
+qualification and full writer/create/member/reference/floor/delete/UNKNOWN/Kafka closure remain required. All17
+OPEN/null, five M5-E children and aggregate/Final remain unqualified; full goal ACTIVE.
+
+### Durable exclusive Native Cell read allocator (current implementation amendment)
+
+The actual private P1 client now constructs a read allocator whose fixed profile and owner head are routed by the
+full encoded protocol Cell and physical metadata namespace. Public unqualified budget construction is removed.
+`admit` confirms the exact immutable profile and a single owner CAS before the allocator can reserve any Native
+source/actor. Distinct allocator instances have distinct private owner UUIDs; an existing ACTIVE owner blocks another
+instance even when its local usage happens to be zero. Profile/share/read-limit mismatch also rejects. Canonical
+shares sort by complete Binding identity, not just BindingId. Owner heads bind domain/profile, monotonically
+advanced generation, owner UUID, state and checksum.
+
+Only the original Cell allocator can request close. It rejects new reservations, waits for every private actual
+source/actor reservation to return and then CASes its exact owner head to DRAINED. A modified close observer cannot
+publish that terminal. DRAINED allows a later allocator's new exact generation; ACTIVE from a lost/undrained owner
+is not time expiry or process-death proof. The immutable first profile creator identifies interrupted initialization;
+a missing previously observed/head belonging to another creator cannot be recreated. CAS/read UNKNOWN retains
+this same owner identity or terminal bytes and supplies no new capacity; exact retry can reconcile.
+
+Actual SDK profile/head operations use the existing source-locked single-key exact CAS adapter. They do not pretend
+that Oxia 0.9 supports atomic multi-key transactions. This establishes one durable exclusive allocator identity and
+quarantine boundary, not a per-reservation durable journal, distributed usage metrics or complete backend/process
+ownership. Runtime source/open/cache/reader migration, namespace/history quota and restart receipts remain required.
+
+Actual qualification cases now use separate actual Cell identities for their independent datasets; the sibling
+isolation case still puts both P1 Bindings in one shared Cell/profile. Two new cases read the same actual Cell via an
+independent SDK/P1 binding: another allocator and a different profile reject while original Root GET is held, Cell
+close remains pending with exact ACTIVE head/usage after observer modification, and actual source fence publishes
+DRAINED. A new allocator then succeeds while another duplicate rejects. One loses the applied terminal PUT and
+subsequent completed GET responses, confirms changed remote head independently and retries original close. Final
+actual run passes 17 fresh suites/185 cases with Native/MetaStore 423 source-matched UP-TO-DATE, combined coverage
+608 rather than all fresh. Compile/format/Main/P6 checks pass; raw exact tuples are preserved. All17 OPEN/null,
+five M5-E children/aggregate/Final and full backend/writer/reference/delete authority remain unqualified; goal ACTIVE.
+
+### Native Cell durable reservation inventory (current implementation amendment)
+
+The exclusive owner head now carries each source/actor reservation's private operation UUID, complete Binding
+identity and four-dimensional charge. NPCH v2 bounds the inventory at 1,024 rows / 147,600 bytes, checks ordering,
+uniqueness, domain/profile/owner/generation/state and checksum, and retains the previous empty-inventory v1 reader.
+The original allocator serializes exact single-key CAS mutations on its existing async client. Actual source opens
+and actor grants wait for confirmed reservation bytes. UNKNOWN cannot dispatch source work or return local capacity.
+
+After actual source/actor drain, release removes only the original operation with identical facts. Local usage falls
+only after the exact removal is observed. Even an absent row advances the head revision by CAS, fencing a delayed
+original reserve that still holds an older predecessor. A failed release keeps its private charge and can retry the
+same operation; DRAINED requires both local zero and an empty durable inventory. No expiry or crashed-owner drain
+is inferred. `durableUsage` reads the actual SDK head, independently of the local usage observer.
+
+Two actual reserve/release response-loss cases verify no source GET after reserve UNKNOWN and retained local charge
+after release UNKNOWN until original-operation cleanup confirms. Final run passes 17 fresh suites / 187 cases;
+Native/MetaStore 423 remains source-matched UP-TO-DATE, combined coverage 610 is not all fresh. All17 OPEN/null,
+five M5-E children/aggregate/Final stay unqualified. Complete quota/reference/restart/reader/backend accounting and
+the remaining writer/member/floor/delete/UNKNOWN/Kafka combinations remain required; full goal ACTIVE.
+
+Initial owner creation and successor registration now await their original failed-invocation cleanup. When cleanup
+is unresolved, the private `OwnerCleanupException` retains that reservation's exact release or that actor's existing
+fence. `reconcileCleanup` retries only this owned cleanup; it cannot create another actor or reopen admission. Owner
+construction marks actor-started only after its synchronous local construction succeeds. Original work failure is
+preserved and cleanup failure remains visible. Successor registration stays closed after failure, independently of
+whether its retained cleanup later confirms. The original live responsibility is also retained by the Cell as
+described below; this supplies no reconstruction after process loss.
+
+Actual initial reserve UNKNOWN has no selector/source dispatch and keeps the original charge. Actual successor
+reserve UNKNOWN after predecessor RELEASED exposes the same cleanup on repeated retirement failure, performs no
+new actor/read, and returns only its original share after exact metadata cleanup. Latest run passes 17 fresh suites
+/ 189 cases (owner 22); Native/MetaStore 423 remains source-matched UP-TO-DATE, combined 612 is not all fresh.
+All17 OPEN/null and five children/aggregate/Final remain unqualified; full goal ACTIVE.
+
+### Native undelivered initial M4 owner grant (current implementation amendment)
+
+Initial owner opening keeps its original completion private and returns a separate observer. Ending that observer
+before grant dispatch prevents new grant work and cleans only the original reservation. A successful original actor
+that cannot be handed to the observer is retained by its original reservation. Its actual Native read/preparation
+drain, unchanged selector/capability checks and exact durable owner-drain publication precede the normal quota
+return. Native read drain is observed separately from the full fence, which still includes quota confirmation.
+If Native reads already fenced that actor, cleanup still confirms its original durable drain. This does not close
+a delivered owner or release fallback protection.
+
+The Cell retains unresolved failed-owner cleanup even if an exception observer is lost. Cleanup attempts share
+private completions; successful original cleanup removes the retained entry. Cell close retries outside its lock
+and cannot publish DRAINED while an undelivered-owner cleanup remains. Initial/successor cleanup uses the control
+executor from that invocation; it does not extend a delivered owner's original creation-executor lifetime.
+
+Two actual cases hold the applied initial selector PUT response, then cancel or externally complete the opening
+observer. They lose the original durable-drain PUT response and block its rereads after actual Native drain.
+Original actor charge and Cell close remain pending. Recovery confirms the same stored drain bytes and selector/
+source-map identity, returns the original reservation and reaches zero local/durable usage with no additional
+Source GET. Current seventeen fresh suites pass195 (owner26) on 614 matching inputs; Native425/BK35 are matched
+UP-TO-DATE. Grant UNKNOWN without an actor, lost processes, full source/byte/backend/writer/reference/orphan/delete/
+current Kafka and complete M5 qualification remain required. All17 OPEN/null and five children/aggregate/Final
+remain unqualified; full goal ACTIVE.
+
+### Native actorless initial-create quarantine (current implementation amendment)
+
+Entering initial selector create now retains the exact attempted candidate. If opening subsequently fails without
+a confirmed original actor, that reservation is not treated as unused. Its privately constructed cleanup exception
+keeps the candidate and original charge in the Cell. The diagnostic candidate is not an ownership/drain proof:
+the selector candidate alone lacks an invocation nonce, so equal or absent SDK reads cannot establish this invocation's grant
+ownership or fence a delayed mutation. Reconciliation therefore retains quarantine while qualified proof is absent.
+Confirmed actors and failures before selector create retain their preceding original-cleanup behavior.
+
+An actual regression first failed on the preceding production path: the selector PUT applied and its response/
+rereads were lost, yet owner usage fell from2 to1. The corrected path retains2; after actual preparation drain it
+retains the original owner charge1, publishes no owner-drain record, keeps Cell close pending and rejects another
+allocator. The exact selector remains unchanged, with no additional Source GET. RED preserves one failure among
+27 owner cases; GREEN passes seventeen fresh suites/196 cases on 614 matching inputs, Native425/BK35 matched
+UP-TO-DATE. This proves the required retention when qualification is absent, not quarantine exit. A qualified live
+actorless-grant reconciliation, unique original-creation ownership, lost-process handling and complete M5 source/
+backend/bytes/writers/references/delete/current Kafka/full A-E remain required. All17 OPEN/null and five children/
+aggregate/Final remain unqualified; goal ACTIVE.
+
+### Native unique initial-opening claim (current implementation amendment)
+
+Initial creation now reserves a private single-key claim before source-map/capability/protection/selector work.
+NPIC v1 has fixed324-byte, checksummed ACTIVE/ABORTED records binding the actual admitted Cell owner, full Binding,
+original durable reservation UUID, view and conformance receipt. Each Binding has one head and one immutable
+initializer profile. Only the original initializer may finish an unconfirmed missing initial head; another
+invocation, changed profile, corrupt record or previously observed missing head cannot recreate it. A confirmed
+ACTIVE claim excludes another invocation and is reread before selector create. No cross-key atomicity is asserted.
+
+If the private opening fails before entering selector create, cleanup confirms the original initializer and
+conditionally writes its ABORTED head. The terminal also fences an old delayed claim CAS/create. Confirmed ABORTED
+allows a later original operation at the next generation; another permanent valid value/version can fence the old
+conditional claim write without being overwritten. Claim/read/abort UNKNOWN retains the original charge. Claims
+after selector create stay ACTIVE and do not establish actor drain, process death, fallback release or deletion.
+
+Actual cases hold an applied claim reply while an independent controller competes, lose applied claim and abort
+responses, then admit a distinct generation2 operation, and delete an aborted head while retaining its profile.
+They confirm no competing selector dispatch, unchanged winning claim, original charge until exact abort, no
+additional Source GET and rejection of missing-head reinitialization. Current17 fresh suites pass199 (owner30) on
+615 matching inputs; Native425/BK35 are matched UP-TO-DATE. Complete claim quota/reference/retirement and bootstrap/
+restart/fault combinations, qualified live actorless-grant drain, full source/backend/bytes/writers/references/
+delete/current Kafka/full A-E remain required. All17 OPEN/null and children/aggregate/Final unqualified; goal ACTIVE.
+
+### Live unregistered initial grant reconciles actual preparation drain (current implementation amendment)
+
+The original live opening now retains its SDK preparation, exact initial claim/version, selector and conformance
+through unresolved cleanup. Before and after cleanup it reads the unchanged owned claim, exact selector/current
+capability and immutable source-map bytes. Native exposes a lock-protected fence for this installed preparation
+only when no read owner was ever installed; owner installation competes under the same Native monitor. The actual
+private SDK fence must complete successfully. Changed claim versions, foreign/registered scopes, failed cleanup,
+missing/changing metadata or absent live original context remain vetoes. No new actor is constructed for cleanup.
+
+NPUD v1 is distinct from the unchanged NPOD actor-drain record. It binds the original selector/conformance,
+canonical claim and exact metadata-version token. The original owner reservation is removed only after actual
+unregistered preparation drain and confirmed NPUD publication. SDK/write/observation UNKNOWN keeps its charge and
+Cell terminal pending. An independently prepared PO cold reader validates the same observed ACTIVE claim/version,
+NPUD bytes, current capability/selector and published source map before its existing unique cold grant/read path.
+This is one qualified live unregistered SDK scope; it supplies no lost-process inference or fallback release.
+
+The initial whole Native rerun exposed a real older create-registration deadlock: cursor ArrayDeque -> ML monitor
+opposed ML -> cursor. Captured Java deadlocks and failed/aborted raw artifacts are retained. Creation enrollment
+and close exclusion now use the private creation-set monitor plus volatile close state; registry lock sections do
+not invoke callbacks or acquire ML. Ordinary offloaders avoid this registry; successful/late/failed SourceSafe
+ownership and queued handle transfer protections remain. Two bounded dispatch regressions cover both paths.
+
+Native unit checks reject observer-faked/failing unregistered drains. Actual cases reject registered-scope cleanup,
+retain quarantine after same-value claim rewrite, lose an applied NPUD response/reads, then reconcile identical
+proof bytes, zero the original Cell and read a message via independent factory/SDK/cold owner. Corrected run has
+24 fresh suites/629 passing cases (Native429, module158, Native5, SDK5, owner31, namespace1); BK35 matched
+UP-TO-DATE. Exact615 inputs/575 Nereus/26 Native source archives are retained. Full source/backend/bytes/writers/
+references/delete/current Kafka and complete M5 A-E remain required; All17 OPEN/null and children/aggregate/Final
+unqualified. Goal ACTIVE.
+
+### SourceSafe Native SDK creation drain (current implementation amendment)
+
+Native ManagedLedger now enrolls each SourceSafe SDK data/cursor creation before dispatch, separately from its
+caller timeout future. Native close stops new enrollment and includes those private drains. Actual SDK response
+and queued handle transfer must complete; an abandoned successful creation waits for actual handle close, and a
+failed close remains a failed owned drain. SourceSafe queued initial-data/cursor callbacks cannot transfer a handle
+after Native close. Existing Native executor supplies the handoff; no new executor or waiting queue is introduced.
+Other offloaders retain their existing creation path. SourceSafe late-created resources are closed and retained for
+birth/orphan reconciliation instead of the old unqualified timeout-deletion shortcut.
+
+Two Native supplementary regressions cover timeout/observer mutation, held late-handle close and sticky failed
+close. Two actual BK cases hold completed SDK data/cursor creation responses after caller timeout: Native close
+stays pending, then actual BK metadata confirms CLOSED and the resource remains present. Cursor coverage uses
+actual asyncMarkDelete; merely opening a cursor writes its initial metadata-store position without BK creation.
+The live SDK conformance reader now requires exactly five Native cases and both actual creation-drain controls,
+in addition to every preceding Native/read/provider control. Historical three-case receipts are not promoted.
+
+Current actual run passes 17 fresh suites / 191 cases (Native five, SDK five, owner 22, module 158, namespace one).
+Native/MetaStore 425 passed on identical Native source in the retained preceding run and is current-source
+UP-TO-DATE; combined 616 is not all fresh. This is accepted SDK-request/handle lifetime, not durable birth/member
+inventory, writer isolation, all metadata publication, orphan adoption, physical delete or process-restart proof.
+Those paths and complete quota/reference/backend/Kafka combinations remain required; All17 OPEN/null, five
+children/aggregate/Final remain unqualified and full goal ACTIVE.
+
+### Native Pulsar guarded BK birth/member path (current implementation amendment)
+
+An explicit m5pzk profile now serves Native data/cursor ledgers. Its bounded immutable scope binds the actual
+physical/metadata namespace assignment, full protocol Cell, admitted allocator owner, complete Binding identities,
+exact managed-ledger names and actual SDK configuration. It accepts only the declared Native data/cursor roles,
+adds immutable scope/Binding tags, and rejects foreign names/roles/configuration. It reuses the existing ZK task/
+namespace/ledger reservation checks and atomic metadata-create transaction; NBKE2 bytes and checks remain separate.
+Generated ledger IDs gain a permanent native reservation before returning to the SDK. Ordinary SDK physical deletion
+is denied by this profile. Native create fencing does not close existing append handles or grant delete eligibility.
+
+The actual private P1 adapter checks the current namespace/P1/Cell owner, reserves quota-backed revision-one OPEN,
+registers durable PULSAR_ENTRY membership, rereads its exact physical authority facts, then holds an actual M5 ticket
+through native metadata create. Seal/ensemble metadata updates use the same ticketed mutation boundary. Actual
+returned metadata/version supplies the successful mutation terminal; failure/UNKNOWN leaves unresolved tickets.
+OPEN initialization has no eligibility or observation/deletion verifier. Its declared writer classes and driver/scope
+roots do not certify complete all-writer enrollment. Metadata mutation completion is not SDK-handle or delete proof.
+
+One original Cell reservation covers this SDK connection and declared scope/header workspace. New native owner/
+birth admission stops when Cell close begins; existing scope metadata close/seal may still drain against its exact
+ACTIVE durable owner. Native scope fencing and accepted metadata callbacks drain before SDK client close, then the
+original reservation returns. A modified Cell close observer cannot release the connection. Scope accounting covers
+declared Java scope/header work, not all provider transport/write buffers or every SDK request queue.
+
+Actual P1/BK/Oxia cases create data and cursor ledgers, independently read native reservation/tagged metadata,
+quota-backed authority and durable member facts, and confirm native fencing rejects a correctly configured create.
+Applied birth authority response loss leaves the actual SDK ledger absent and the reserved birth retained; clearing
+the fault permits a new SDK attempt without adopting that old birth. Latest Native/BK/Object/Oxia combination has
+17 fresh suites / 193 passing cases; Native/MetaStore 425 remains source-matched UP-TO-DATE, combined 618 is not
+all fresh. BK module 35 also passed after the common native guard change. All17 OPEN/null, five children/aggregate/
+Final remain unqualified. Existing raw Native factory/client paths still require migration; restart enumeration,
+crashed-owner/writer isolation, full quota/reference/SDK ownership and physical orphan/delete composition remain
+required. The active goal and complete Kafka/Pulsar/BK/Object/Oxia acceptance scope are unchanged.
+
+The Pulsar scope now maintains a permanent, bounded native birth index. Its 80-byte checksum head records the
+scope/count/native revision; at most 1,024 generated IDs are admitted. One ZK transaction checks the namespace and
+open scope, advances the head, and creates both the original 56-byte reservation and matching index entry before
+returning an ID to the SDK. Only the original ID/nonce retries a concurrent head CAS or reconciles a lost response.
+Missing/corrupt index records are rejected rather than recreated. Historical NBKE2 scope/reservation bytes are unchanged.
+After the exact scope fence, actual SDK reads capture the full indexed reservation set and physical metadata presence,
+then reread their native bytes/versions. An independent observation connection requires an existing fenced scope and
+cannot create missing task/index records or physical ledgers. Actual data/cursor and birth-UNKNOWN cases verify complete
+coverage, identical fresh-connection observations, and rejection of corrupt or same-byte/new-version index entries.
+The current run passes 17 fresh suites/193 cases; matched Native425 and BK35 remain UP-TO-DATE. This is reservation
+enumeration, not append fencing, lost-process drain, orphan adoption or delete eligibility. Full M5 remains unqualified.
+
+The explicit SDK profile now admits at most two metadata mutations through their original private completions.
+Exhaustion returns BKTooManyRequests before native metadata dispatch or M5 birth/ticket mutation. A conservative
+format-3 payload bound of 1 MiB is checked before SDK serialization, including custom values, UTF-8 strings and
+ensemble history; the fixed Cell reservation charges both slots' declared metadata workspace. Native create payload
+serialization occurs inside admission. Returned mutation/drain futures are independent observers; modifying them
+cannot free a slot or return the SDK lifetime reservation. Real data/cursor metadata writes with both applied Oxia
+completion responses held verify unchanged native version on overflow/oversize rejection and actual close waiting
+until both original completions return. The current 17 fresh suites/193 cases pass, with Native425/BK35 matched
+UP-TO-DATE. Append, transport and remaining SDK queue/accounting, complete writer/restart/orphan/delete
+and full Kafka/Pulsar/BK/Object/Oxia qualification remain required; no whole-M5 authority is granted.
+
+Guarded metadata admission now includes completed calls whose original physical ticket cleanup remains UNKNOWN.
+`PulsarNativeBookKeeperCreateV1` retains each original guard result and its private terminal/no-dispatch cleanup;
+the same two-slot limit applies before another metadata call can dispatch. A confirmed SDK close does not return
+the Cell reservation until these original cleanups are confirmed. `reconcileMetadataCleanup` and repeated close
+retry only those exact invocation tickets, without opening a connection or repeating native metadata writes.
+Native failure/UNKNOWN without a qualified terminal still retains its tickets, slot and lifetime reservation.
+
+Two actual BK/Oxia regressions lose applied ticket-acquisition or ticket-removal replies and their rereads on data
+and cursor resources. They verify full-slot rejection, retained close/Cell capacity, then exact original cleanup
+and independently unchanged native version and complete serialized metadata bytes after retry. The corrected
+predecessor fails both overflow checks; the current source passes all 33 owner cases and 11 related native/provider/
+namespace cases (44 fresh, zero failures/errors/skips). Module/Native/BK cached or UP-TO-DATE results are identified
+separately in the implementation log. This closes this live terminal-cleanup dependency only; lost processes,
+native UNKNOWN outcome proof, complete writers/references/delete and whole-M5 acceptance remain required.
+
+### Original native metadata write terminal (current implementation amendment, 2026-10-11)
+
+The actual guarded SDK update now retains a privately constructed `NativeMetadataWriteUnknownException` with the
+original ledger, scope, requested-metadata digest, creation token and frozen conditional version. Its original SDK
+failure remains a failure. BookKeeper's ZooKeeperClient retries SET_DATA after CONNECTIONLOSS, so a final BadVersion
+does not prove the original update was unapplied. No SDK return code alone grants this terminal.
+
+Before SDK close, the owner stops new metadata/ID admission and waits for the original callbacks, then observes
+the exact native reservation, INSTANCEID and stored metadata bytes/Stat. Only the same creation token/Binding/scope
+with a native version greater than the original conditional version excludes all late writes using that condition.
+Missing/corrupt identity, unchanged version and uncertain reads keep the SDK, original slot/ticket and Cell charge.
+The terminal digest binds the original request plus observed version/zxids/ctime/raw digest. It does not assert which
+retry applied, does not return operation success, and does not establish physical-delete eligibility or SDK drain.
+
+The owner retains this qualified terminal across metadata-cleanup UNKNOWN. After actual SDK close, reconciliation
+removes only the original operationId through the existing guard; it does not reopen a client, repeat SET_DATA or
+clear another invocation's tickets. Native conditional versions are frozen and restricted to `0..Integer.MAX_VALUE`
+before metadata admission; BK 4.18 narrows LongVersion to int, making negative/wrapping values unsafe for this profile.
+Other native BK profiles retain their existing path.
+
+Real data-ledger cases hold an actually successful SET_DATA reply, return CONNECTIONLOSS, independently observe
+the applied version and preserve the SDK's actual BadVersion after its conditional retry. They verify exactly two
+SDK SET_DATA requests and no additional requests during reconciliation, immutable final metadata/version, qualified
+terminal preservation after an applied Oxia cleanup reply is lost, and quarantine on an actual creation-token change.
+The modified old-source baseline fails four relevant owner cases; current source passes 24 fresh suites/240 cases,
+including all 36 owner cases, with zero failures/errors/skips. Unchanged Native429 is UP-TO-DATE, not fresh execution.
+The interrupted predecessor run remains invalid as a complete receipt. The creation terminal is extended below;
+unapplied/unchanged-version update reconciliation, lost-process, complete namespace/writer/reference/delete and
+whole-M5 candidate/Final remain required.
+
+### Original native metadata create terminal (current implementation amendment, 2026-10-11)
+
+The same privately constructed original-operation handle now covers the actual m5pzk CREATE pipeline, including
+the guarded reservation/parent checks after physical ticket admission. It captures the original generated creator
+token and serialized-request digest. A failed original operation remains failed; reconciliation neither repeats
+the SDK create nor promotes a later read into successful creation.
+
+Before cleanup, fence the exact permanent native scope, then reread the reservation, INSTANCEID and exact task
+version-one bytes. Every original create multi checks task version zero. That real fence excludes late creates.
+The native ledger path must then be authoritatively NoNode, or contain bounded, fully parsed metadata with the same
+original creation token and Binding/scope. An uncertain read, missing/rewritten scope fence or foreign creator keeps
+the original SDK, ticket, slot and Cell charge. The NMCT terminal digest binds request/scope/ledger/creator, exact
+fence bytes/version and presence plus native metadata identity. It proves original-operation termination only;
+it does not prove native deletion eligibility, absent bookie bytes or full namespace/writer qualification.
+
+Actual tests hold a successful SDK metadata multi reply, return CONNECTIONLOSS and block original readback. They
+preserve the failed original future and the SDK's two real multis, then independently verify exact created identity
+and unchanged stored bytes/version after cleanup. The other cases cover a preexisting durable scope fence with
+actual native NoNode, an independently changed creator token retaining capacity until exact identity returns, and
+the second real reservation GET failing after ticket admission while no metadata multi is dispatched.
+
+The old-source baseline fails the first three new cases. The initial fourth-case fixture instead hit the P1
+pre-admission check and passed; that record is retained as an upstream regression, not the intended RED. The corrected
+second-GET fixture fails exactly that fourth case while the preceding 39 owner cases pass. A first 39-case GREEN has
+all behavior checks pass but its runner's unrelated-container preservation assertion fails; runnerExit1 is retained.
+The source archived for CREATE verification passes 24 fresh suites/244 cases, including all 40 owner cases, with zero failures/errors/
+skips and runner/Gradle exit0. Owned services/network/volumes are absent and original containers remain unchanged.
+All 615 current/archived inputs and raw results match; unchanged Native429 is UP-TO-DATE, not fresh execution.
+Full lost-process, all-writer/source/member/reference/grace/delete composition and all M5 candidate/Final obligations
+remain required; the goal stays ACTIVE. The new BK artifact still needs current Kafka binding/regressions.
+
+The same driver now admits at most two original ledger-ID generation operations before native SDK dispatch.
+Both the SDK callback and exact native reservation remain tracked, alongside metadata mutations, until original
+delivery finishes. Scope close rejects new generation requests and waits for this work; caller result/drain
+observers cannot remove it. The real test uses an independent fresh scope with no metadata mutations and delays
+two successful native ZooKeeper CREATE responses. Overflow and closed-admission requests produce no further native
+CREATE. SDK close retains the Cell charge; late original callbacks encounter the actual scope fence and add no
+reservation/index entry, then the SDK closes and capacity returns. The current 17 fresh suites/193 cases pass on
+613 inputs, Native425/BK35 remain matched UP-TO-DATE. Native SDK post-callback cleanup/transport, complete byte and
+queue accounting, creator/writer/reference/restart/orphan/delete and full M5 qualification remain required.
+
+Birth observation now has one private admitted read operation per SDK connection. The Cell reservation includes its
+declared index/header workspace; roots are capped at 2 KiB, individual metadata at 1 MiB and a bulk result at 2 MiB.
+The original read completion controls drain before SDK close. Complete summaries retain actual byte digests, sizes
+and native versions rather than every raw metadata header; a single-header API rereads the exact inventory and
+metadata against that summary. Every indexed ID remains represented, including an actually absent physical header.
+Real data/cursor/UNKNOWN cases verify complete summary-to-header equality, aggregate-budget rejection, unchanged
+summary after rejected reads, actual metadata-version refresh rejection and post-close read rejection. Current
+17 fresh suites/193 cases passed on 613 inputs, Native425/BK35 remain matched UP-TO-DATE. Current actual GET-response
+hold cases also verify birth-read drain: a test-only bounded TCP forwarder retains one successful ZooKeeper reply
+and subsequent wire order. Externally completed and cancelled read observers cannot free admission, complete the
+original drain or return Cell capacity. Original SDK close completes after the exact response is released; an
+independent connection reads the same inventory. Four fresh suites/35 cases pass on 614 inputs, module158/Native425/
+BK35 are matched UP-TO-DATE. Caller-retained control snapshots and complete SDK/backend byte, writer, orphan and
+delete qualification remain required; these diagnostic observations do not grant physical authority.
+
+Failed SDK opening now retains a privately constructed OpenCleanupException when its original cleanup is unresolved.
+Before SDK dispatch it retries only the original reservation removal. If an actual SDK namespace is already known,
+its original close/drain precedes removal; a confirmed close is not reissued on a later removal retry. Cleanup attempts
+share one private completion, independent of returned observers. No new SDK or admission is created by retry.
+Actual applied reserve-response loss verifies retained local charge, failed cleanup while observations are blocked,
+no SDK connection and exact original cleanup after fault recovery. A separate actual closed-SDK removal-UNKNOWN
+case retains charge, rejects reads on the closed SDK, verifies the native fence independently and retries removal.
+Current 17 fresh suites/193 cases pass on 614 inputs, Native425/BK35 remain matched UP-TO-DATE. SDK constructor
+uncertainty without a returned SDK reference, lost processes, complete byte/writer/orphan/delete
+and full M5 qualification remain required; live cleanup handles do not reconstruct those outcomes.
+
+The initial SDK opening now keeps its original completion private. If its observer has ended before SDK dispatch,
+the admitted original reservation is cleaned without starting an SDK. If a successful SDK cannot be delivered to
+that observer, its reservation retains the original close/drain/removal action. Failed-open cleanup handles are
+also retained there. Cell close or explicit reconciliation retries these original actions outside the Cell lock;
+delivered SDK ownership remains with its caller. Removing the exact durable reservation is still required before
+returning local capacity. An actual successful INSTANCEID response is held while the observer is cancelled or
+externally completed; both modes close the original SDK, retain charge during removal UNKNOWN, and finish exact
+cleanup after fault recovery. Seventeen fresh suites/193 cases pass on 614 matching inputs; Native425/BK35 remain
+matched UP-TO-DATE. This covers undelivered live invocations, not reconstruction after process loss or a constructor
+failure without a returned SDK reference. Full M5 qualification and all 17 obligations remain OPEN.
+
+The failed-open handoff is also exercised after an actual reservation PUT applies but its response is held.
+Cancelling or externally completing the opening observer precedes losing that response and blocking rereads.
+No SDK starts; Cell reconciliation still finds the original failed-open cleanup, retains charge while observations
+are unavailable and removes the exact reservation after recovery. These two cases do not obtain a cleanup exception
+from the ended observer. The current run passes four fresh suites/35 cases on 614 matching inputs; module158,
+Native425 and BK35 are matched UP-TO-DATE. Constructor/process, complete backend/byte/writer/reference/orphan/delete
+and full M5 qualification remain required.
+
+The ordinary BK broker read path remains separate from the focused M5 read owner:
+`KafkaBookKeeperPartitionV1.read` builds a raw/history run table and calls
+`KafkaBookKeeperTargetedReaderV1.readSequential` on its shared `BookKeeperCellSession`.
+The existing Kafka adapter `NereusKafkaOwnedProviderRuntime.open` installs that partition in `NereusUnifiedLog`,
+whose Fetch and timestamp lookup both call this read path. The adapter's resource shutdown now calls
+`partition.fence`, waits for the BK session to close, and closes the native client before marking that connection
+released. A failed owned close retains the backend/Oxia connections. BrokerServer now leaves a failed close
+uncompleted, retries it once from its existing `finally`, and reports the original error if that retry also fails.
+The real BK/Oxia test injects one failure before native runtime close and confirms two Broker close attempts followed
+by one completed native close. The final Broker close now waits for `partition.resign` before its BK session and client
+close, after the coordinator shutdown sequence; the current real two-case relocation suite passes with this path.
+A failure inside the BK session/SDK close remains outside the injected case. A real-test LSO=55
+observation also reproduced without that call: the old owner was HW=55/LSO=41 before shutdown. A controlled pause
+after `NereusUnifiedLog.truncateFullyAndStartAt(55)` observed the new log at HW=55/LSO=55 while its recovered
+producer state was not loaded and `nereusWritable` was false. Fetch now rejects that pending recovery before reading
+frontiers, and the relocation test waits for installed native ownership before asserting HW=55/LSO=41. The focused
+Fetch guard test passed; both real relocation cases passed before the later shutdown-retry adjustment, whose focused
+real close-failure case passed 1/1; the current two-case run with final-Broker `resign` passed 2/2. This establishes
+normal final-Broker durable owner closure for these tests, not M4 release. Per-partition metadata revocation fences
+and detaches the old log first. For group/share partitions it now waits for the same-key coordinator unload event to
+finish; for transaction partitions it runs the synchronous resignation callback. It then schedules the old native
+owner's `resign` and session/client close on the existing Provider executor. A rejected or failed coordinator unload
+leaves the owner fenced and retained for final Broker close, while the metadata fault handler receives the failure.
+The completion-aware unload also reports a shard `onUnloaded` failure that the legacy void unload path logs and
+swallows. A `FAILED` context retains that cleanup failure through its later `CLOSED` transition even though the
+shard has already been cleared; a newly built shard starts a distinct cleanup lifetime. Focused tests confirm
+failure does not invoke the native-close continuation, the `FAILED` to `CLOSED` no-op does not erase it, and a
+legitimate new shard does not inherit it. The legacy void path's existing exception case still passes.
+The current real BK/Oxia relocation suite passed 3/3, including a live-Broker move with the old Broker still running,
+recovered group offset and transactional writes on the new Broker. A subsequent focused live-Broker case passed
+1/1 at 2026-09-28 14:30:29Z with the new Broker's Oxia responses held. While it remained native-nonwritable,
+an independent direct BK/Oxia client observed the exact old epoch absent before relocation and its durable
+closed-owner archive present after the old Broker's resignation, before the new Broker could read owner admission
+or close the predecessor itself. Releasing the responses then allowed transaction and group-offset continuation.
+This establishes that online old-owner close path in this case; it does not establish M4 source release.
+
+The partition now counts each accepted read through its internal Provider completion, closes local admission on
+`fence`, and delays durable owner closure in `resign` until those reads finish. Caller cancellation of read or resign
+observers cannot terminate the internal drain. Concurrent resignation observers share an in-flight attempt; after an
+`OUTCOME_UNKNOWN` or failed drain, a later explicit resignation retries the same owner with admission still closed.
+A real BK/Oxia broker-read case covers the held read, lost close response and exact closure retry. This is only
+the owner-local lifetime without an M4 admission input. The explicit current-source isolated admission now
+persists a Binding M4 selector and installs a Broker Fetch owner whose native reads use its shared Cell slots,
+local admission epoch and hazard pool. A real three-Broker BK/Oxia test exercises that conditional path through
+Fetch and two cold relocations. It has not produced the full retirement batch, quiescence proof and RELEASED
+records needed to make historical runs eligible for physical deletion. Durable physical tickets apply to
+reference-admitting control operations, not each broker read.
 
 M5-C logical trim treats a retry as exact only when the stored frontier binds the same identity, predecessor,
 floor snapshot root, policy and owner/storage fences. An authoritative new snapshot at the same numeric floor
@@ -369,6 +3118,41 @@ expansion restore admission. Canonical byte quota is distinct from backend WAL/r
 quota, resident cache and work queues. The composition owner must exclude old/raw writers and assign a unique native
 route before initializing this profile. All-writer/native namespace admission, real deletion proofs, actual backend
 capacity provisioning, GC worker scheduling and all 17 source-bound acceptance obligations remain OPEN.
+
+#### Native member-history capacity (current implementation amendment)
+
+The configured physical namespace route now installs `GC_AND_PHYSICAL_MEMBERS_V2`. Its admission reserves the
+existing authority/entry capacity plus the native member key and the inventory's 8,554-byte maximum. Permanent
+DONE refunds only unused authority-value capacity; the member key and full inventory allowance remain charged,
+including when an admitted resource has not yet written its inventory. This is a conservative capacity bound,
+not exact occupied-byte metering or permission for unlimited historical resources. Members remain historical
+after physical deletion and cannot regain their reserved capacity by closing an Owner or reopening a client.
+
+The explicit profile has a distinct scope digest. Existing `GC_ONLY_V2` heads/entries are rejected by the native
+member route without mutation; the two-argument layout retains the legacy scope and charge. Without birth credits,
+the 272-byte head and 156-byte entry retain wire2. The Object birth extension above changes only participating heads
+to wire3; the resource entry remains unchanged. Legacy routes cannot expose the member registry. New
+profile initialization scans authority, quota-entry and member record families at their actual native depths and
+rejects an orphan member record before creating a head. No existing namespace is migrated or capacity raised.
+
+Actual Oxia checks cover profile mismatch, third-family orphan detection, capacity exhaustion, permanent member
+charge and native occupied-byte bounds. A write JVM and an independent read JVM retain the same server/container
+data across restart and verify the quota head, member bytes, native version and exhausted admission. These are
+metadata quota checks; their synthetic terminal facts do not establish physical Provider/BK deletion. The seven
+initial quota suites pass 39 cases over 458 unchanged inputs. Initial source `4893` and its default fresh legacy `4904`
+pass 181/109 cases over 751/731 unchanged inputs, but the following actual read-scope run reveals an old-layout
+reconstruction in `ResourceFact`. That constructor now uses the explicit member profile, with actual dual-endpoint
+and restart regression checks. The initial tuple does not qualify this correction. Corrected namespace `43787`
+passes six suites/29 cases over 741 unchanged inputs, including these actual dual-endpoint/restart reads, and its
+default fresh legacy `43798` passes 109 cases over 731 inputs. Corrected source/native qualification remains as
+recorded in the existing implementation log. Corrected source `60914` passes 181 cases over 751 unchanged
+inputs and revalidates that same current-turn 109-case legacy archive. Matching corrected 6/29/77 native cases
+pass on identical current 14-path inputs and six matching built/published/loaded JAR hashes, with zero
+failures/errors/skips and actual exit 0. The groups retain all 112 preceding cases and their separate owned
+datasets are removed. These regressions qualify the member profile and corrected resource-fact path within
+their recorded scope. Complete protocol namespace accounting, all-writer enrollment,
+whole member semantics and M5 authority remain unqualified.
+
 The [physical namespace projection](m5-physical-namespace-projection.json) adds an actual-backend binding for BK.
 Oxia provisioning conditionally creates one permanent M5NM marker at a fixed namespace-global key; operational
 reconnect must reread the expected instance, native version and marker hash and never recreates a missing record.
@@ -442,9 +3226,17 @@ fencing. The header-only read bypasses reader LAC because a newly quorum-written
 It validates exact native metadata, entry identity and bytes, then closes the handle; this observation is not ACK/quorum
 or current-owner admission proof. Publication requires the complete header binding and configuration; SEALED publication additionally requires closed
 native metadata and the exact terminal footer/end. This does not verify all DATA/index contents or current protocol
-ownership. The native fixture explicitly admits synthetic OPEN resource authority after actual ledger creation; the
-production root adapter never creates missing authority or expands quota implicitly. Root metadata quota, resource-birth
-admission, native source-cut/membership production, ordinary reads, all writer rows and physical deletion remain OPEN.
+ownership. The native fixture's lifecycle route now reserves an ID under the active native task, persists its
+unselected run-to-ledger choice and admits synthetic quota-backed OPEN before reserved-ID creation. The owner
+first seeds an empty Oxia birth inventory before its admission head becomes visible. Each run prewrite adds the
+exact winning run/ledger link before physical creation; after owner closure a fresh instance can enumerate
+selected and unselected roots. Closed-owner membership, rather than the root's `admitted` flag alone, determines
+selection when root promotion loses its response. Its separately
+prepared source helper still admits synthetic OPEN after creation. The production Broker adapter likewise
+establishes the exact OPEN bytes before native create; the root adapter itself never creates missing authority or
+expands quota. An unknown prewrite cannot start native create, and a retry of the same run adopts the durable
+ledger winner. Guarded cleanup of an unselected run with OPEN but no selected
+root, root metadata quota, native source-cut/membership production, all writer rows and physical deletion remain OPEN.
 The internal-topic cases exercise native run/header/DATA/footer/root lifecycle for `__consumer_offsets` and
 `__transaction_state`; complete internal message semantics and compaction/delete acceptance remain separate.
 
@@ -585,6 +3377,2664 @@ requires the fixed process-local Cell reservation below. Full protocol-owner pop
 result-cache/backend transport accounting and crash-ticket reconciliation remain OPEN. Existing service-restart
 cases do not prove reconstruction of this owner's local drain.
 
+The recovered immutable BK view now retains each data batch's first actual part/entry location and can select
+complete Kafka RecordBatch bytes across compacted gaps under a caller-supplied frontier and byte budget. The
+descriptor recovery unit case checks a gap, a strict isolation upper bound and first-batch budget behavior.
+`KafkaBookKeeperReadOwnerV2.readSelected` now captures the same M4 authority and hazard pool as its recovery and
+retirement methods, verifies the complete selected plan, and includes the cache read in its admission and drain.
+The focused owner case verifies this local selected read and denies a read after owner closure. The real BK
+callback-delay case now reads the verified selected cache under the successor authority after the old-generation
+native read drains; its M4 control and protocol source admission are still synthetic. The actual conditional
+Broker Fetch route uses `KafkaBookKeeperM4BrokerReadOwnerV2` rather than this compaction owner. Complete
+selected-history protocol-owner admission, retirement population and M4 RELEASED remain OPEN.
+
+Broker run birth now binds `reserveLedgerIdentity(configuration)` to the active native create task, writes the
+unselected Oxia run-to-ledger choice, reserves physical quota and rereads exact revision-one OPEN before invoking
+`createReservedRunLedger`. The lifecycle requires the same ledger identity for native create, header and selected
+root; a lost prewrite response can only adopt the native winner, and unresolved creation never reports a writable
+run. Owner close fences native creates. The birth-inventory current-source locked BK/Oxia run-roots and run-source
+receipts pass 66 and 146 archived tests respectively, with same-service restart and unchanged input manifests;
+the 66-test run additionally drops a successful native create callback and rediscovers the exact unselected ledger.
+The enabled Kafka Controller/three-Broker M4 admission case passed 1/1 with Fetch, transactional produce and two
+cold relocations against the current 146-test source receipt. Its exact suite-count admission was updated from 14
+to 15 after the added lost-create case. These focused receipts remain non-promotable; the owner-scoped birth
+inventory is durable and restart-readable. An OPEN/unselected physical
+orphan is now classified by closed-owner membership and an exact BK open as never-created or physically present.
+At that implementation checkpoint, closed-history recovery refused both unselected states before new owner
+admission. The later no-adoption takeover result is recorded below; real owner/eligibility/absence/DONE proof
+remains OPEN.
+The current-source run-roots receipt is
+`build/m5-kafka-run-roots/nereus-v2-m5-kafka-run-roots-31439` (9 suites/66 tests). The run-source receipt is
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-70814` (27 suites/146 tests). The source runner now builds
+each runtime JAR before recording its digest; the earlier 43166 receipt captured a stale Kafka BookKeeper JAR and
+was rejected by Broker admission. With the corrected receipt and matching local artifacts, the enabled real Broker
+case passed 1/1 with zero failures, errors or skips. It exercises the normal Fetch/transaction/two cold-relocation
+path, not a Broker create/OPEN failure. Neither receipt closes orphan GC or an M5 Final obligation.
+The running Broker now also reconciles an exception from its revision-one OPEN CAS with an exact Oxia reread before
+native ledger creation. A test-only response observer drops the callback after the real Oxia mutation completes;
+the current Java 17 Broker test then passes Produce and Fetch, while the normal two-relocation case remains green.
+The combined real Broker suite passed 3/3 with zero failures, errors or skips against the matching 70814 Nereus
+receipt. Its native-create fault drops the successful callback after a real BK create. Two successor Brokers then
+attempt takeover; fresh BK/Oxia observations retain the same exact physically present, unselected ledger and the
+closed owner head. The observer does not replace BK/Oxia I/O. This fail-closed result still requires the unfinished
+M5 orphan protocol and grants no delete authority.
+The subsequent focused Java 17 rerun passed the two affected Broker cases with zero failures, errors or skips.
+Each successor now reports its own completed native recovery failure naming that same physically created unselected
+birth before the test checks the closed head and physical ledger or triggers the next reassignment. The Broker's
+quota grant is outside OPEN response-loss reconciliation: a failed, exhausted or uncertain quota reserve stops
+before OPEN reread and native create, even if exact OPEN bytes already exist. A focused unit regression passed 1/1
+for that stage boundary. These checks do not establish orphan eligibility, deletion or aggregate M5 acceptance.
+The current native-scope checkpoint is the source-locked 68530 run-source receipt (27 suites/146 tests) and its
+68541 legacy terminal child (21 suites/84 tests), both non-promotable. The fixed initial native-create spec is the
+seed for every later run task, even across an intermediate scope. Before opening an unselected closed-owner birth,
+Broker requires the exact quota-backed revision-one OPEN and native namespace binding, then fences its already
+recorded native task and ledger reservation. A fresh-client real BK/Oxia test passed 1/1 for the intermediate-run
+seed and existing-task fence; the real Broker create-response-loss takeover passed 1/1 against the matching JARs.
+The task fence granted no writer terminal or physical deletion authority. At that checkpoint, successor activation
+remained blocked for the physically created unselected birth; old owners without a discoverable birth inventory
+remain blocked.
+The current in-progress closed-birth recovery also requires exact BK fenced recovery after opening a physically
+present unselected ledger. Only a matching recovery proof permits the `PHYSICALLY_CREATED_UNSELECTED` observation;
+unknown recovery fails closed. The prior source-locked 88530 receipt passed 27 suites/146 tests with a 21-suite/
+84-test legacy child and unchanged manifests. The Java 17 real Broker create-response-loss takeover passed 1/1
+with zero failures, errors or skips against the earlier 15441 matching JARs; it has not been rerun against this newer source.
+This closes the writer for that known ledger only. Full reference and writer
+membership, grace/rescan, quota settlement and physical orphan deletion remain OPEN.
+
+The exact BK 4.18.0 open mapper now reports `ABSENT` only for
+`NoSuchLedgerExistsOnMetadataServerException`. A generic `NoSuchLedgerExistsException` can also describe missing
+bookie data and therefore remains an unresolved Provider failure; it cannot produce `NEVER_CREATED` in closed-birth
+recovery. This preserves the fail-closed successor gate when physical absence has not been established.
+The exact-entry read mapper likewise treats either missing-ledger code as `PROVIDER_FAILURE`: an opened metadata
+record plus missing bookie data cannot resolve a response-unknown append as definitively absent. BK 4.18.0
+`LedgerHandle.readAsync` only issues a read at or below its confirmed LAC, so `NoSuchEntryException` there now
+also remains `PROVIDER_FAILURE`; only a durably closed ledger with a lower LAC proves that entry absent. The
+earlier 88530 source manifest contained 734 matching file hashes and six matching runtime JARs at capture time;
+both BK/Oxia restart phases passed.
+The BK append mapper now also keeps both missing-ledger error codes as `OUTCOME_UNKNOWN`: a failed bookie write
+callback does not prove that no other bookie accepted the entry. Its operation lease remains unresolved until
+exact read or fenced recovery; `IncorrectParameterException` remains a pre-dispatch definitive rejection.
+
+After exact native task fencing and metadata-absent observation, a `NEVER_CREATED` birth can no longer block closed
+history recovery. At that checkpoint, a physically created unselected birth still blocked successor activation
+after its exact fenced recovery. The locked BK/Oxia run-roots receipt 13545 passed 9 suites/67 tests, including one real reserved-only
+empty-history recovery, with 728 matching source hashes. The earlier run-source receipt 25291 passed 27 suites/
+147 tests with 734 matching source hashes, six matching runtime JARs, a 21-suite/84-test legacy child and both
+BK/Oxia restart phases. Against those exact published JARs, the Java 17 Controller/three-Broker
+reserved-but-never-created takeover passed 1/1 with zero failures, errors or skips. The successor recovered the
+closed owner, produced and fetched offset zero, while the old callback resumed without physically creating its
+reserved ledger. This grants neither orphan eligibility nor M4 RELEASED or M5 Final authority.
+The combined Java 17 Broker admission suite subsequently passed 4/4 with zero failures, errors or skips against
+the same 25291 source receipt and matching runtime JARs. It includes the still-blocked physically created
+unselected birth, OPEN response-loss recovery, cold relocation, and never-created successor activation.
+After the `NoSuchEntryException` read correction, the current source receipt 72023 passed 27 suites/147 tests,
+with 734/734 current source hashes, six matching runtime JAR hashes, a new 21-suite/84-test legacy child, and both
+BK/Oxia restart phases; it retains `m5FinalAuthority=false`. The six published development JARs match that
+receipt. The same Java 17 real Broker admission suite passed 4/4 against these newer JARs, with zero failures,
+errors or skips. Its test-owned containers were removed. This remains focused, non-Final evidence.
+These 72023/Broker results precede the subsequent missing-ledger append classification change.
+The preceding source receipt 91069 passed 27 suites/147 tests, with 734/734 matching source hashes,
+six matching published runtime JAR hashes, a new 21-suite/84-test legacy child, and both BK/Oxia restart phases.
+The Java 17 real Controller/three-Broker M4 admission suite passed 4/4 against those JARs, with zero failures,
+errors or skips and all test-owned containers removed. It remains non-promotable and does not grant orphan GC,
+M4 RELEASED or M5 Final authority.
+The Broker now acquires a durable M5 target writer ticket before the reserved-ID BK create. Its exact OPEN
+authority reread accepts later OPEN revisions only when the physical target and original enrollment still match;
+the closed-birth native fence applies the same check. A confirmed create with an exact handle reread settles its
+ticket; an unknown/lost callback retains it and vetoes CAS-1 until exact native birth recovery. The current
+source receipt 43230 passed 27 suites/147 tests, with 734/734 matching source hashes, six matching published
+runtime JAR hashes, a 21-suite/84-test legacy child, and both BK/Oxia restart phases. Its authority flags remain
+false. Against that receipt and the locked Oxia client, the Java 17 real Controller/three-Broker admission suite
+passed 5/5 with zero failures, errors or skips at XML timestamp `2026-09-29T01:49:20.383Z`; its owned containers
+were removed. The lost-create case sees one durable ticket before owner fencing, then zero after the successor
+fences the old task and proves the exact physical BK ledger recovered; at that checkpoint a second successor could not adopt the
+unselected birth. A separately confirmed create also leaves zero tickets. When a confirmed BK create is followed
+by an unresolved authority read during ticket completion, the Broker returns `OUTCOME_UNKNOWN` before writing the
+run header or selecting its root. The real fault case observes one durable ticket and one unselected physical
+ledger, then zero tickets after exact successor recovery without creating another ledger. An absent ledger releases the old ticket
+only after the native task fence and exact metadata absence observation. At that checkpoint, a physical unselected
+birth still blocked successor activation. No orphan grace/rescan, deletion eligibility, M4 RELEASED or M5 Final is
+established.
+
+Run-birth recovery now rejects an admitted root that the exact closed owner archive does not list as selected,
+before invoking the native fence or classifying the ledger as never created. This contradictory state cannot
+authorize takeover through the `NEVER_CREATED` branch. The focused negative regression and Java formatting/
+Checkstyle checks passed. Replacement locked BK/Oxia source receipt 15434 passed 27 suites/147 tests, including
+the new recovery regression in the full unit task, with 737/737 current input hashes, six matching published JAR
+hashes and both same-service restart phases. Its four M5 authority flags remain false. Against that receipt and
+those JARs, the real Controller/three-Broker admission suite passed 5/5 with zero failures, errors or skips at
+`2026-09-29T02:14:21.878Z`; test-owned containers were removed. This consistency check is not an unselected
+birth no-adoption terminal, grace/rescan proof or physical cleanup authorization.
+
+The Oxia closed-owner birth inventory now rereads each unselected root and its parent before recovery classifies
+the physical ledger. It rejects a root already marked admitted outside the archived selected set and a parent
+whose durable successor points at that supposedly unselected child. A focused 19-case Oxia root-authority suite
+covers both contradictions and the valid pending child, and its formatting/Checkstyle checks pass. Replacement
+locked real BK/Oxia source receipt 47228 passed 27 suites/148 tests with 737/737 source hashes, a 21-suite/84-test
+legacy child, six matching published JAR hashes and both same-service restart phases; all four M5 authority flags
+remain false. The Java 17 real Controller/three-Broker admission suite passed 5/5 against those artifacts at
+`2026-09-29T02:34:49.995Z` with zero failures, errors or skips; test-owned containers were removed. This
+inventory check supplies no persisted no-adoption terminal, grace, complete reference rescan or delete authority.
+
+A physically present, unselected birth no longer blocks successor activation when the closed owner archive and
+birth inventory exclude its initial link, its root remains unadmitted, its parent does not select it, the old
+native task is fenced, exact BK recovery succeeds, and the old writer ticket is reconciled. Run-birth recovery
+rereads the same closed inventory after native fencing and recovery; contradictory or changing authority fails
+closed. The closed-history walk retains the orphan run and ledger identities to reject reuse while replaying only
+selected runs. The archived owner membership is fixed before any successor can be selected: native root admission
+appends that membership before promoting the root or linking a parent, and a closed owner cannot append it later.
+The observed absence of the child from that archive is therefore recheckable on every restart without a separate
+terminal record. A caller that omits physical-birth writer-ticket reconciliation now fails closed. This takeover
+retains the same physical orphan, OPEN authority and permanent quota reservation; it does not settle quota or
+qualify deletion. Earlier veto observations in this document describe the older implementation checkpoints.
+
+The preceding locked BK/Oxia source receipt was
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-38209` (27 suites/148 tests, 737/737 input hashes,
+same-service BK/Oxia restarts). Its summary SHA-256 is
+`4e534c1d362bb9bd408c7f44c6798486e91b81cb8cfa9d1bd7f761bd8274abf3`; its legacy child is
+`nereus-v2-m5-bk-task-terminal-38220` (21 suites/84 tests). The Java 17 Controller/three-Broker admission suite
+passed 5/5 at `2026-09-29T03:29:07.388Z` against those JARs and the locked Oxia client. Both physical-create
+response faults now activate successors. One test holds the old callback until two takeovers and checks that it
+cannot select the orphan after they produce and fetch offsets zero and one. Both tests retain one exact physical
+birth, reconcile its old ticket to zero, and reread OPEN plus an unsettled quota reservation. The second takeover
+fetches the first successor's acknowledged record. All four M5 authority flags remain false; grace, complete
+reference/writer membership, guarded orphan deletion and aggregate M5 Final remain OPEN.
+
+The closed-owner birth reader now exposes the same validated inventory as versioned source facts: the archived
+owner, birth inventory, each exact run root and an unselected child's parent carry their native Oxia key,
+version and stored-value SHA-256. Ordinary run-birth recovery uses this view, so an absent archive, changed
+inventory, admitted excluded root or parent that selected the child still fails closed. These facts can be
+reread by a later M5-C scanner; they do not establish complete task/reference enumeration, authority-time
+grace, orphan eligibility or physical delete. The locked Oxia server stamps writes from the leader wall clock
+and replicates that timestamp in its WAL, but supplies no admitted cross-leader clock-error bound. Version
+timestamps alone therefore remain insufficient for M5-D grace authority.
+
+The replacement current-source BK/Oxia receipt
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-78829` passed 27 suites/148 tests and 737/737
+captured input hashes, including the real birth-fact key/version/value checks and both same-service restart
+phases. Its legacy child is `nereus-v2-m5-bk-task-terminal-78840` (21 suites/84 tests), and its summary
+SHA-256 is `34ba51033d806ddadc1e546275fbf93fb830258bbc3731c9b0d5eb6c06319d5b`. The receipt's M5
+Final, physical-delete and production-authority flags remain false. All six recorded runtime JAR hashes match
+their current local development-repository SNAPSHOTs. Against those exact artifacts and the locked Oxia client,
+the Java 17 Controller/three-Broker admission suite passed 5/5 with zero failures, errors or skips at
+`2026-09-29T04:01:14.596Z`; Kafka Checkstyle and SpotBugs passed as task dependencies, and its test-owned
+BK/Oxia containers were removed. This rechecks takeover and ordinary Broker Produce/Fetch, not a complete
+reference scan, grace, orphan deletion or M5 Final.
+
+For a known unselected BK ledger, the Broker's closed-birth path verifies the exact quota-backed OPEN, fences
+the existing native task and reservation, performs exact BK recovery, then rereads the native facts before
+reconciling the old writer ticket. `M5BookKeeperNativeCreateClientV2.readRecoveredScopeFacts` verifies the
+admitted namespace binding and actual `INSTANCEID`, exact old single-run task/spec, permanent revision-one
+create fence and revision-zero reservation/spec/ledger ID. It parses the raw ledger metadata bytes returned
+with the same ZooKeeper `Stat`, requires the exact CLOSED handle/configuration/quorum/digest and recovery LAC
+(including -1), and retains path, raw bytes/SHA, czxid, mzxid, version and ctime. The raw stored-value SHA and
+semantic metadata SHA remain distinct. Missing, malformed, mismatched or unresolved facts stop reconciliation
+and retain the old writer ticket. Reliable `NEVER_CREATED` recovery continues through its existing absence
+path. These are post-recovery source observations, and ctime grants no authority-time grace.
+The task znode at revision one proves only that further native creates are fenced. It is not an attempt-terminal,
+append/read-drain, or complete reference-membership proof. The archived closed owner, birth inventory, unadmitted
+root and unselected parent are independent no-adoption facts; the target's own mutable OPEN authority cannot be
+placed in its eligibility freshness vector because qualification and each later delete-state CAS change its
+version. The authority value now rejects this self-reference on construction and decoding, covering opening,
+qualification and eligibility refreshes.
+The same-key delete state machine already requires zero active writer tickets at qualification and
+identity-read preparation. Production has no `UNSELECTED_OUTPUT` eligibility producer or complete
+`MATERIALIZATION_OR_COMPACTION_TASK` reference adapter yet. Native task/reservation facts must also remain bound
+to their BK `INSTANCEID` and namespace during every later exact reread. The source observations do not establish
+task terminal, reader drain, every reference class or grace; these gaps keep orphan eligibility and dispatch closed.
+
+The authority-value self-reference check passed all 8 GC suites/99 tests. Its source-locked BK/Oxia checkpoint
+is `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-17969`: 27 suites/148 tests, 737/737 unchanged
+inputs, both retained-data service restarts and legacy child `nereus-v2-m5-bk-task-terminal-17980`.
+Summary SHA-256 is `f109e37c6f2c45f1df21879827df17a5b07876a2ce69f76b89317d1ff9ab8bec`; all four
+authority flags remain false. The test-owned BK/Oxia containers were removed. The Broker suite has not been
+rerun against this checkpoint. This checkpoint predates the post-recovery native-fact integration above.
+That integration passed the replacement source-locked run
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-71529`: 27 suites/148 tests, 737/737 current
+inputs, both retained-data service restarts and legacy child `nereus-v2-m5-bk-task-terminal-71540` (21 suites/
+84 tests). Summary SHA-256 is `f40230870236053424a9951d0faa5ceef853f298270943a37ec70b589740b22b`;
+all four authority flags remain false. All six published runtime JAR hashes match the captured run. The Java 17
+Controller/three-Broker admission suite passed 6/6 with zero failures/errors/skips at
+`2026-09-30T03:29:27.199Z`, including actual recovered native reads followed by a lost response: the old create
+ticket remains, the next Broker reconciles it, and Produce/Fetch succeeds. Kafka Checkstyle/SpotBugs and Nereus
+documentation checks passed; test-owned BK/Oxia containers were removed. The complete-reference, grace,
+orphan-delete and Final obligations remain OPEN.
+
+The next owned-reader integration is in progress. The real Cell session now retains each replaced/discarded
+handle and its actual close result before the opening/recovery operation can finish. Final session close also
+awaits these handles; failed or pending close is retained, and cancelling a returned close/drain observer cannot
+complete the internal lifecycle. The Cell-session unit suite passed 9/9 at `2026-09-30T04:04:05.969Z`, and
+real BK conformance passed 11/11 at `2026-09-30T04:07:18.757Z`, both without failures/errors/skips. The three
+new real cases cover held/failed/synchronously thrown replaced-handle close and observer cancellation.
+The Broker now gives unselected-birth recovery an isolated, owned session. Before native open/recovery, the
+current recovery owner acquires an independent `OWNER_WORKER_LEASE_HANDLE_PIN_V1` invocation; only that
+invocation's actual session close can release its pin. The old TASK context cannot release reader pins.
+Protocol observation and cleanup are separate: pending/unknown close retains the session, pin and two reserved
+Cell/Binding read slots, while native activation may proceed if its other work fits the remaining capacity.
+Reservation precedes session allocation and covers the opened and recovered SDK handles; full capacity rejects
+before another birth-reader session is created. Opened generations with the same BindingId/incarnation/storage epoch
+reuse one Binding semaphore, and normal native M4 reads share these Binding and Cell semaphores. A borrowed
+source is closed only after its owned birth readers close and their exact ticket cleanup completes. This does
+not supply fixed shares for other native reader families, cross-Broker process capacity or a complete reference
+adapter. Unknown/unwired reference producers continue to veto eligibility. Nereus focused recovery/read-owner
+tests and style checks, plus Kafka compile/main/test Checkstyle, passed. The replacement source-locked run at
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-83916` passed 27 suites/148 tests, 737/737 unchanged
+inputs and both retained-data BK/Oxia restart phases. Its legacy child `nereus-v2-m5-bk-task-terminal-83927`
+passed 22 suites/95 tests, including real Cell conformance 11/11 at `2026-09-30T04:41:56.415Z`. Summary SHA-256
+is `60d7a6c1d78a461f69ac557eab5eee82c4d42a09f23fcbd2c42cd6e1e2f90e9f`; archived XML/digests and all six
+published runtime JAR hashes were checked. All four authority flags remain false. Against this exact receipt,
+artifacts and locked client, the Java 17 Controller/three-Broker suite passed 10/10 at
+`2026-09-30T05:03:04.881Z`, zero failures/errors/skips; XML SHA-256 is
+`9a9e420215c91b274ede9bf6e575157df0d72b3dd85c444142eb7db7d664be80`. Held and unknown close responses
+retain the earlier reader pin through a later owner's cleanup and the delayed old create callback. With free
+capacity, both successors Produce/Fetch successfully. Under a two-slot Cell limit, held and unknown close
+both reject a same-Broker subsequent recovery before another birth-reader session allocation or ledger open/recovery.
+Native scope fencing and metadata observations remain separate. Held-close release
+then discharges only its original invocation; unknown close also requires source shutdown to fail explicitly.
+The first nine-case run had eight passing cases and an unknown-case teardown exception: production correctly
+refused source shutdown. The test now requires that exact exception, and the extra unknown-capacity case checks
+the independent failed-close capacity path. Kafka Checkstyle/SpotBugs passed; test-owned containers were removed.
+Checkpoint 71529 and the six Broker cases above predate this ownership integration. Complete task/reference
+terminal, fixed shares/cross-process capacity, grace, deletion and Final remain OPEN.
+
+Independent review of this batch found a remaining metadata cleanup defect: a confirmed native reader close
+followed by an unresolved pin-removal CAS/reread was cached as a permanent failure, so later source close could
+never confirm cleanup. The Kafka recovery admission now retains a typed cleanup exception containing the exact
+resource, reader Context, original invocation operationId and native close proof. Only a confirmed close can
+create this retry state. Opened final close consumes one `reconcileOperation` metadata-only pass; unresolved
+results retain the state, and exact confirmation removes only this reader. Native open/recovery/close and slot
+release are not repeated. A genuine native close failure remains non-retryable through this path. The Java 17
+Controller/three-Broker suite passed 12/12 at `2026-09-30T05:29:19.214Z`, zero failures/errors/skips; XML SHA-256
+is `77f4b3867f038b2fd12f959032436cb6f8f72f26343797facb3b06babdae82ef`. The two added cases lose the
+cleanup read or an actually committed removal CAS plus its response/reread. They hold a second owner's pin while
+the retiring owner consumes the original invocation's metadata-only retry, confirm that pin remains, and verify
+the original session open/recovery/close call counts stay at one. The actual old provider then closes normally;
+only afterward is the second reader released. The held/UNKNOWN native-close and capacity cases also pass.
+Kafka compile/Checkstyle/SpotBugs, documentation and both repository diff checks passed; test-owned containers
+were removed. Checkpoint 83916 still matches the unchanged Nereus source/JARs; the ten-case Broker result predates
+this correction. Independent review passed this exact local correction. The verifier/header follow-up below changes
+Nereus Java inputs, so checkpoint 83916 and its Broker results are now historical dependency evidence.
+
+The verifier/header lifecycle follow-up passed its real validation batch and independent review for that exact reader-lifecycle slice. The concrete session
+now offers owned unconfirmed entry-zero reads, retaining reader LAC=-1 semantics and its operation lease. The
+existing native-client header API delegates to one owned session per call, retains unresolved closes through client
+shutdown, and detaches result observers. The root verifier no longer caches handles across invocations: its standalone
+constructor owns each accepted session; production supplies an Opened read owner. Header/footer reserve one Cell
+and Binding slot; recovered-prefix verification reserves two for original/replacement handles. Both use the existing
+independent invocation pin and metadata-only cleanup retry. Opened stops verifier admission and drains owned readers
+before releasing the borrowed client. The standalone verifier and legacy client API own their sessions but do not
+independently supply production Cell/Binding reservations or durable pins; those require the production Opened owner.
+Header observation still supplies no quorum or commit proof. Other reference families, grace and all 17 obligations
+remain unclosed.
+
+The current Nereus follow-up checkpoint `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-1028`
+passed 27 archived suites/148 cases, 737/737 unchanged inputs and both retained-data BK/Oxia restarts. Its legacy
+child `nereus-v2-m5-bk-task-terminal-1039` passed 22 suites/99 cases; Cell conformance passed 15/15 at
+`2026-09-30T06:11:44Z`, including unconfirmed entry zero at reader LAC=-1, held/failed/thrown native close and
+cancelled close observers. The existing native-client header API also read the real open ledger in the native-create
+suite. Summary SHA-256 is `37016ee535ffa46557844f93333221179cd332b6594a7910d29ee7d881bbd71a`;
+archived XML digests/counts and all six current published JARs match. All four aggregate authority flags remain false.
+The first Java 17 three-Broker follow-up ran 17 cases with 16 passing and one capacity-case timeout at
+`2026-09-30T06:21:55.512Z`; it is not a passing receipt. The capacity rejection is converted by root authority to
+`OUTCOME_UNKNOWN`, so the test's direct internal-error match was invalid; its failure cleanup also waited for cluster
+close before releasing the held test response. Kafka now observes the actual rejected reservation separately,
+checks the two-handle peak and unchanged native-close count/pin, and releases held responses before cluster close
+even after assertion failure. The corrected capacity assertions completed in the next run, whose teardown still reported the observed expected
+capacity fault; its test now verifies that exact `OUTCOME_UNKNOWN` with the recorded reservation rejection. A third
+17-case run at `2026-09-30T06:37:33.470Z` passed the five new verifier cases but failed the existing native-facts
+successor case: current reader-pin removal raced closed TASK terminal reconciliation on the same authority. These
+16/17 results are not passing receipts. A deterministic real Oxia regression holds the second reader's actual close
+response, prepares a TASK-removal CAS, lets actual reader-pin removal commit, then submits the original TASK
+predecessor and requires `DEFINITIVE_CONFLICT`. Before the fix, the focused case failed at
+`2026-09-30T06:51:33.793Z` with unresolved physical-create tickets; red XML SHA-256 is
+`6f1b9a3d79585ec56f2f350773218050f55025df5d21ddff878df463f58118fe`. Closed TASK admission now makes
+one additional metadata-only reconciliation using the same already-verified terminal proof/Context. It neither
+repeats native I/O nor clears independent reader tickets; a second unresolved result still fails closed.
+
+The corrected Java 17 Controller/three-Broker suite passed 17/17 at `2026-09-30T06:56:12.324Z`, zero
+failures/errors/skips, against checkpoint 1028 and its exact six runtime JARs. XML SHA-256 is
+`573abf2d7b31cbeefcbd303a8055b85b54495f1b91215b69f856ccb6340ff3e1`. The five verifier cases cover held
+header close, held/unknown/thrown recovered close and capacity rejection before another native read. The recovered
+verifier reserves its two-handle peak. Current birth-capacity cases configure three slots: retained birth recovery
+holds two and publication header verification needs one; the next two-slot recovery still rejects. The deterministic
+TASK case confirms actual `DEFINITIVE_CONFLICT`, successful takeover and Produce/Fetch, zero remaining TASK/reader
+tickets and original session open/recover/close counts of one. Kafka compile, main/test Checkstyle and SpotBugs
+passed; test-owned Docker resources were removed. All 737 captured Nereus inputs and six current JARs still match
+checkpoint 1028. Independent review passed this exact reader-lifecycle slice; this batch does not qualify full reference production, grace,
+physical deletion, the 17 OPEN obligations or M5 Final. No commit/push has occurred.
+
+The selected closed-history reader follow-up is implemented and awaiting combined Broker validation. Production
+`Partition.open` supplies an Opened history read owner; the compatibility overload still borrows its caller-owned
+session and does not independently qualify production reservations or pins. Each selected run fences through an
+owned invocation with two Cell/Binding slots. After every legal run has fenced and that invocation has closed and
+settled, footer, checkpoint and replay phases each acquire one slot and an independent invocation pin before I/O.
+There is no per-run fence/replay interleaving. Recovery proofs and copied frames remain in the bounded history
+context; native handles do not remain cached on the primary writer session. Cross-run producer/transaction state,
+checkpoint fallback and offset validation remain in the existing recovery algorithms. Checkpoint decode/read
+fallback occurs inside the owned operation, so unknown reader close cannot turn into a successful fallback.
+Opened retains uncertain history readers and applies the existing exact metadata-only cleanup retry after confirmed
+native close. The existing real multi-run transaction/repeated-takeover case now uses owned phase sessions and
+requires no remaining active session after success. Broker regressions are being extended for held/unknown close,
+checkpoint-close uncertainty, replay close and pre-I/O capacity rejection with another owner's pin cleanup.
+Nereus compile/real-test compile/Checkstyle passed. Nereus Java inputs have changed, so checkpoint 1028 and the
+17-case Broker result above are historical for this follow-up; the replacement source/JAR checkpoint is recorded
+below and real Broker validation remains pending. No complete reference, grace, delete, Final or production authority follows; all 17 obligations remain OPEN.
+
+Current selected-history checkpoint `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-20264` passed
+27 archived suites/148 cases and both retained-data BK/Oxia restarts. Its legacy child `nereus-v2-m5-bk-task-terminal-20296`
+passed 22 suites/99 cases. The real root suite passed 16/16 at `2026-09-30T07:29:34.799Z`, including owned
+phase sessions through the existing multi-run transaction and repeated-history recovery test. Summary SHA-256 is
+`85f7b0442df1e99db409459fba58b8cd8c5eedbaa6043b473cc9b6a201bd2092`; all 737 current inputs, archived XML
+hashes/counts and six latest published runtime JARs match. All four aggregate authority flags remain false. The
+22-case Java 17 Controller/three-Broker batch is pending. Its checkpoint UNKNOWN case forces real same-owner
+rollover before takeover, ensuring an actual physical checkpoint is read. Independent review remains pending.
+
+The first configured 22-case Broker batch was stopped after repeated historical Fetch failures. Its partial XML
+at `2026-09-30T07:36:44.899Z` contains eight completed/started entries, four failures and one termination skip;
+XML SHA-256 is `1ba25091be33daa67deb5e3b88730028b57f8eddd6240aa1f40b8d67c7ba8dd3`. This is a failed,
+interrupted run, not a passing receipt. Existing two-takeover and birth-reader HELD/UNKNOWN/cleanup-read cases
+expected two consumed records but observed zero. The underlying dependency is `Partition.readNative`'s
+`KafkaBookKeeperTargetedReaderV1(session, 32)`: exact entry reads assumed the historical handles that the borrowed
+closed-history recovery previously cached on the primary session. Owned history phases now close those handles.
+Historical Fetch must acquire an actual bounded reader instead of relying on that cache. Its M4 admission already
+reserves one Cell/Binding slot; the necessary integration must avoid double charging and retain the actual close
+lifetime on UNKNOWN. Active-run reads still require their existing writer quorum/LAC view. Test failure cleanup now
+releases only injected held responses before cluster close; the original assertions remain. History UNKNOWN tests
+also require the first activation to fail, including the checkpoint fallback case. Checkpoint 20264 matched the first dependency run; the follow-up below changes its source/JAR inputs.
+The corrected combined Broker result is recorded below.
+
+The historical Fetch dependency now has an implemented and real-tested lifetime boundary awaiting coordinator review.
+The production M4 capture supplies one existing Cell/Binding slot. Targeted reads retain the current active
+WriteHandle path; each captured SEALED historical root is rechecked against its admitted owner/link/record and
+read through one independent native session and exact invocation pin. That session's confirmed close and ticket
+cleanup precede the next historical entry, so a sequential Fetch crossing runs cannot hide overlapping handles.
+The targeted reader retains its existing bounded index cache; captured readers share its cache lock.
+
+Fetch result and physical drain are separate: confirmed native close signals decrement the local handle count;
+a held or UNKNOWN close cannot finish the Partition read drain, M4 hazard clear or Cell/Binding release. UNKNOWN
+reports the read failure and causes later owner drain to fail while retaining the actual reader/pin/capacity.
+Metadata-only cleanup failures after confirmed native close retain their original exact retry state; no native
+open/read/close is repeated. The previous result-only M4 API preserves its completion behavior. Three focused
+lifetime tests cover held, UNKNOWN and cancelled observers, another owner rejected before dispatch at full shared
+capacity, and return of both slots/hazard only after confirmed close. This five-case M4 Broker read-owner unit
+suite, Nereus compile and Checkstyle passed. Nereus source/JAR inputs and the source runner's exact unit count have
+changed again, so checkpoint 20264 is now historical. Replacement checkpoint 87207 passed 27 suites / 151 cases,
+with legacy child 87218 passing 22 suites / 99 cases. All 737 current inputs and 717 legacy inputs still match;
+every archived suite XML and the six published runtime JAR hashes match. Both retained-data restarts passed.
+The run-summary SHA-256 is `dc5128ac2406f0fe6d867fdd7627e60ce28a2ef917b0305db93a2de041f86248`.
+Its four aggregate/Final/physical-delete/production authority flags remain false. The combined Broker result is
+recorded below. Broker compile/main-test Checkstyle passed after extracting only the shared reservation helper to satisfy
+NPath. The combined batch has 25 cases, including actual historical Fetch held/UNKNOWN/cancel.
+These start the real recovered Broker partition's M4 read, check the actual generation hazard and both existing
+semaphores remain charged across another Broker's cleanup, and then use ordinary Produce/Fetch to validate old
+and new records. Cancelled returned Fetch observers do not cancel the internal drain. The test releases held close
+responses before shutdown, while genuine UNKNOWN remains failed and retained.
+
+The first full 25-case Fetch/history Broker run completed 24 passing cases and one failed checkpoint-fixture case
+with no skips (`2026-09-30T08:30:38.740Z`, XML SHA-256
+`7e2452ed82d6f47fb5ebbb55cb6adf079c2dd23cb86b51d7eebd7f2b064c2ec5`, retained as
+`build/m5-owned-history-fetch-broker-checkpoint-red.xml`). The checkpoint fixture had reduced the run budget to
+1 MiB but omitted the existing small-run fixture's 4 KiB `message.max.bytes`; pre-offset DATA admission therefore
+rejected the default roughly 1 MiB batch upper bound before the checkpoint injection. Only that fixture setting
+was corrected. All three held/UNKNOWN/cancel historical Fetch cases passed in this run.
+
+The next 25-case run passed the checkpoint case but failed the fence-capacity fixture's final all-reader count
+(`2026-09-30T08:37:03.112Z`, XML SHA-256
+`cfa93ad814781eb96ddb8fb4637b98d51ff60bcc4623cc6307d978ff5d84e613`, retained as
+`build/m5-owned-history-fetch-broker-capacity-red.xml`). After the held close is released, the resumed recovery can
+create a subsequent independent pin on the same ledger between the fixture's two observations. The real Oxia
+probe now captures the held invocation's exact operation ID, requires that ID to remain across another owner's
+verification and capacity rejection, then waits for that same ID to disappear after confirmed close. A different
+invocation's transient pin cannot be mistaken for the held invocation. Production code and close/capacity protection
+are unchanged.
+
+The corrected full Broker gate passed all 25 cases with zero failures, errors or skips
+(`2026-09-30T08:44:23.790Z`, XML SHA-256
+`32b266bf7decb334a768d95a601ae192bb3ec084177824ce4c1ac0339c95c6e4`, retained as
+`build/m5-owned-history-fetch-broker-green.xml`). Its eight selected-history cases cover fence held/UNKNOWN/capacity,
+checkpoint UNKNOWN, replay held and actual historical Fetch held/UNKNOWN/cancel. The complete gate also reruns
+root verification, unselected birth recovery and prior ordinary Produce/Fetch/takeover scenarios. Broker compile,
+Checkstyle and SpotBugs gates passed. Afterward, all 737 Nereus input hashes and six published JAR hashes still
+matched checkpoint 87207. Coordinator review requested two related fixes before accepting this local slice:
+the supported no-M4-receipt entry still omitted historical Fetch ownership, and `Opened.close()` held its monitor
+while waiting for an admitted Fetch whose metadata continuation needed that same monitor. The 25-case receipt
+does not cover these paths. The existing no-receipt real cold-relocation entry and a deterministic actual-metadata
+reply/close race must reproduce and verify the fixes. The unchanged no-receipt
+`coldOwnerContinuesProduceFetchAndTransactionAcrossTwoNativeRelocations()` entry failed its focused real run
+(1 case, 1 failure, zero errors/skips, `2026-09-30T08:58:39.159Z`, XML SHA-256
+`716a64e433f1eb70338b8af6df721259c26b5e25d36a569c839a7a01ef715b1d`, retained as
+`build/m5-history-no-m4-red.xml`): the client could not determine the last committed offset within 30 seconds.
+This is the original no-receipt path, not a receipt-configured substitute. The deterministic close race now holds
+an actually completed `readAdmittedRun` reply before native admission, freezes admission through the real Opened
+close, then releases the reply and observes both close callers and the accepted Fetch. Its test hooks default to
+response passthrough/no-op and do not replace Oxia or BookKeeper I/O. This local slice remains unaccepted; all 17
+acceptance obligations remain OPEN.
+
+The close regression reproduced the old monitor hold in a focused real run (1 case, 1 failure, zero errors/skips,
+`2026-09-30T09:07:07.409Z`, XML SHA-256
+`ed05c0f09dd4dc62f9e5fc7cdd435aec8fe40ce49244e411b5c9c4a7d3920f5f`, retained as
+`build/m5-history-close-red.xml`). The first close observer timed out after the actual metadata reply was released;
+its suppressed failure also reports the original `Opened.close()` waiting on `storage.resign()`. A prior display-name
+filter attempt executed no tests and is not a RED receipt. The regression is now a separately named test, bringing
+the complete Broker gate to 26 cases.
+
+Both review fixes are implemented and verified pending coordinator re-review. The no-receipt production entry installs historical reads
+independently of M4; its Partition read uses the same result/confirmed-drain/UNKNOWN lifetime. Each serial owned
+native session reserves one Cell/Binding slot itself, while the M4 path continues to use its one outer Fetch slot.
+The active WriteHandle path remains unchanged. `Opened.close()` atomically sets draining and selects one shared
+close attempt under its monitor, then performs source fencing and actual storage/reader/session/source drain outside
+that monitor. Concurrent callers observe the same pending attempt. A failed attempt retains the existing exact
+metadata-only retry state; it cannot release UNKNOWN or redispatch an unconfirmed SDK close. The close regression
+requires one resource-close attempt, both close callers completing after the real metadata reply, no new SDK reader
+admitted after draining, returned Cell/Binding slots and a clean captured hazard before another Broker reads the
+original data. Checkpoint 87207 and the 25-case green receipt are now historical because these source/JAR and Broker
+inputs changed. Replacement checkpoint 65491 passed 27 suites / 151 cases with legacy child 65508 passing
+22 suites / 99 cases. All 737 current input hashes and 717 legacy hashes, every suite XML and the six published
+runtime JAR hashes match; both retained-data restarts passed. The new summary SHA-256 is
+`7d6dd0ddbed3093226778c944e28c4fa6f45f95a34c0673530397ed37d5fd7ba`; all four authority flags remain false.
+The original no-receipt cold-relocation/transaction test passed its focused real run (1 case, zero failures/errors/skips,
+`2026-09-30T09:30:21.947Z`, XML SHA-256
+`aad21128af5984c992dfb9ccdb879fbff0a53956aa59c00c173bfe4d438c4092`, retained as
+`build/m5-history-no-m4-green.xml`). The actual metadata-reply/concurrent-close race also passed (1 case, zero
+failures/errors/skips, `2026-09-30T09:30:45.544Z`, XML SHA-256
+`03dd8a977f384953d47032dfc1205077f7499830327a062fae222897a4cab451`, retained as
+`build/m5-history-close-green.xml`). The complete 26-case Broker gate also passed with zero failures/errors/skips
+(`2026-09-30T09:31:06.054Z`, XML SHA-256
+`e6e550933c42d38278216bbc78c5cb9a743034c043ebddc290ae348aa8d50404`, retained as
+`build/m5-history-review-fix-broker-green.xml`). This gate repeats the original 25 cases and includes the new actual
+metadata/concurrent-close race. Afterward, all 737 current source inputs and six published JAR hashes still match
+checkpoint 65491. Compile, Checkstyle and SpotBugs passed; test-owned native containers were removed. Coordinator
+re-review closed the two original P1 findings: the supported no-receipt entry is restored, and close no longer holds
+its monitor while awaiting Fetch drain. The coordinator independently checked these receipts without rerunning tests.
+At that re-review the local slice still required changes for a directly related M4 contract violation: ordinary historical
+Fetch performed remote owner/run rereads and persistent per-entry ticket acquire/release. ADR 0148, M4-A and the
+writer matrix retain ordinary capture's local epoch/pin-only contract. Source membership/owner verification and any
+required durable reference admission must move to existing source-generation activation/switch boundaries; ordinary
+Fetch must use that exact admitted local capture while retaining actual owned SDK close, UNKNOWN and cancellation
+protection. The 26-case receipt proves its executed data/lifetime paths, not this untested control-I/O contract.
+The candidate correction now admits the complete native source set at initial M4 activation and the existing
+rollover publication boundary. It acquires target-specific control invocation tickets before exact catalog/owner
+verification and selector publication, then verifies the durable selector before releasing that invocation. An
+immutable local historical reader callback is installed with the same root/view tuple and captured by each Fetch.
+M4 historical SDK open/read/close uses that callback and the existing local hazard/shared slot; it does not reread
+owner/run metadata or acquire per-entry tickets. The no-M4 compatibility path retains its independent guard.
+Confirmed control publication with unresolved ticket release retains the original metadata-only cleanup context;
+UNKNOWN publication retains its durable tickets. Nereus compilation, its focused five M4 owner cases and main style check passed. Kafka compilation and main
+style passed; its expanded real scenarios subsequently executed as recorded below. The replacement source gate 77256 passed 27 suites / 151 cases, with legacy child 77268 passing 22 suites / 99
+cases. Every archived XML, all 737 current and 717 legacy source hashes and all six published runtime JARs match;
+both retained-data BK/Oxia restarts passed. The summary SHA-256 is
+`e70b1c48bbb6076a82043113d5275ea1df5e3bbae0b221fbb089bcde090b7e3d`; all four authority flags remain false.
+Kafka compilation and main/test Checkstyle passed after the completed candidate. The first 28-case Broker gate completed 27/28 with no skipped cases, but is failed and not accepted. Its sole
+failure was HISTORY_FETCH_UNKNOWN before the fault/Fetch path: actual AdminClient createTopics failed because
+its network thread threw `OutOfMemoryError: Java heap space` in NetworkReceive/ByteBuffer allocation. It does
+not prove the intended UNKNOWN Fetch branch. The original XML/log are retained as
+`build/m5-local-history-control-broker-heap-failed.xml` / `.log`, timestamp `2026-09-30T10:42:03.340Z`, XML
+SHA-256 `6b95e49c7dd243627e144e0c9a8c93f59e7576d83b7f9d7dcdc14b108957881d`. The other 27 cases, including
+cross-run/cached-index zero-control-I/O and concurrent M4 close, executed successfully. Fresh-process focused verification of the same eight selected-history cases passed 8/8 with zero skips,
+including the actual UNKNOWN Fetch branch. Its XML is `build/m5-local-history-control-history-focused.xml`,
+timestamp `2026-09-30T10:49:56.038Z`, SHA-256
+`507d33744d8e7428959bf518d32f32a546d0c3ec527893ec3a142f92004e8391`. The subsequent full 28-case diagnostic run used
+the original heap/config/assertions; only HeapDumpOnOutOfMemoryError and a task-owned dump
+path were added. The full replacement run passed 28/28 with zero failures/errors/skips at `2026-09-30T10:50:52.427Z`; XML
+`build/m5-local-history-control-broker-diagnostic.xml` SHA-256
+`67266d18e49936739fea351eedd5366d22c091bc5b854ab68b9e4ffa1e46f45d`. Its actual worker retained `-Xmx512m`;
+the OOM did not recur and no heap dump was produced. The failed first run remains recorded; this is no claim
+that its heap exception was fixed or that heap lifetime is qualified. The original no-receipt cold-owner test also
+passed 1/1 at `2026-09-30T10:53:18.566Z`; XML `build/m5-local-history-no-m4-broker.xml` SHA-256
+`9d45b5eb1cd1b7f8439a9da406dddea494bbbb0632d47e9c887eaacf293c3d51`.
+After both runs all 737 current Nereus input hashes and six published JAR hashes still match source 77256.
+Kafka runtime SHA-256 is `75702871f53266f7a12525c63bdcc2c2894f8bd5601104aa9a72c0eecc42715c`;
+birth-writer admission SHA-256 is `5b7ba9ae1b9b7cdf9144521d4c9fae64e6a398780ff3c5341bac1555ffd17536`.
+Only task-owned Docker resources were removed; the original connector remains. Source-publication READ_FENCED
+and response-unknown retention are wired through the existing guard and its scoped tests; this run does not claim
+a new real Broker physical-delete fence or RELEASED/expiry qualification. Coordinator re-review independently confirmed the ordinary M4 Fetch correction and its receipts, without
+rerunning tests. The local batch remains unaccepted pending focused real Runtime source-admission failures:
+one persisted READ_FENCED target must reject publication/new source use; an actually unknown selector
+publication must retain the original complete-target invocation; confirmed publication with release uncertainty
+must retain and later reconcile only its original Context/opId/targets, without redispatch or sibling-nonce removal.
+An explicitly synthetic eligibility may provision the negative fence fixture only; it grants no production GC,
+M4 RELEASED, grace or physical-delete qualification. The requested fault branches subsequently executed as
+recorded below and the current local batch subsequently passed coordinator re-review. All 17 obligations remain OPEN and all
+four authority flags false; no commit/push or M6 work is authorized by these local receipts. The earlier 28-case
+Broker gate added cross-run/cached-index zero-control-I/O and concurrent M4
+owner close, keeps the metadata-held close race on the supported no-M4 entry, and reuses held/UNKNOWN/cancel.
+The actual Broker Oxia client rejects remote calls throughout ordinary M4 read lifetimes; actual owner-close
+metadata is permitted only after the local in-flight lifetime has drained. Durable catalog/physical resource/quota
+protection assertions replace only the forbidden per-Fetch nonce assertion; recovery/birth nonce assertions
+remain. Checkpoint 65491
+and the 26-case Broker gate are now historical and cannot qualify changed source/JARs or the zero-control-I/O
+contract. The durable catalog/selector remain references; absence of a publication ticket grants no delete authority. All 17 obligations remain OPEN;
+no M4 RELEASED, aggregate Final, physical-delete or production authority is inferred from the no-receipt path or
+these receipts. These changes do not qualify complete reference production, M4 RELEASED, grace or M5 Final.
+
+The focused real Runtime source-publication faults passed 3/3 with zero failures/errors/skips at
+`2026-09-30T11:50:11.461Z`; `build/m5-source-publication-fault-terminal.xml` SHA-256 is
+`40b9fad5bfe54283687adb55c842e28d1476f2b87b0d515ae39f761c40a17d16`. The subsequent current Broker gate passed
+31/31 at `2026-09-30T11:52:49.988Z`; `build/m5-source-publication-broker-current.xml` SHA-256 is
+`2e36df4f3757bbe6f58c94ce7563b70c3cca5af63c25562d665a42321e2ea54a`. It reran the original 28 cases and all
+three source-publication modes with the completed assertions. Compiler, main/test Checkstyle and SpotBugs passed.
+The worker retained Java 17 and `-Xmx512m`; only the existing heap-dump diagnostic options were added. No OOM or
+heap dump occurred in this run. The earlier 27/28 heap failure remains recorded and no heap-lifetime qualification
+is inferred.
+
+The negative READ_FENCED case persists both fixture-qualified OPEN and READ_FENCED by actual native Oxia CAS,
+then verifies the complete-target publication is not invoked, acquired no-dispatch nonces clear, the new local
+read callback is absent, and the prior selector, admitted catalog references and quota reservations remain. Its
+eligibility/observation semantics are explicitly synthetic. The UNKNOWN case commits the actual selector CAS,
+loses its reply and makes the exact reread fail; all complete-target original nonces remain, no local callback or
+new Fetch SDK session is installed, and the catalog/quota still retain every source. Restoring the real exact reread
+confirms that committed owner/view without clearing the unresolved invocation. The CLEANUP case confirms durable
+publication, rejects its release CAS and observes the retained original full target list, Context and opId in
+`sourceTicketCleanup`. A distinct same-Context invocation then acquires all targets. Actual Opened close retries
+only metadata cleanup: the selector publication count and native SDK operation/close counts do not increase,
+only the original nonce disappears, and the sibling nonce survives until its own terminal. Each mode holds an
+accepted old historical SDK close through reassignment; its local hazard stays PINNED and its observer stays
+pending until actual close. The old observer then reports the existing owner-fenced contract, and actual drain
+cleans that captured hazard. This does not promise successful DATA after native owner fencing.
+
+Kafka Runtime SHA-256 for this current gate is
+`9fdf184b7ae0882990f0d3f9dc1fae92811bd35511c62899559a4bab4da7cdd7`; writer admission remains
+`5b7ba9ae1b9b7cdf9144521d4c9fae64e6a398780ff3c5341bac1555ffd17536`. The source-fault scenario SHA-256 is
+`7f263b94c93f852bace85bcaa02dd3349e5d52c6dde3cddf79ace54fb8cb0e77`. Kafka compiles only the two existing
+Nereus synthetic test-fixture sources into its Java 17 test output; the ordinary Nereus fixture JAR is Java 21 and
+cannot be loaded by the Kafka worker. Initial fixture/selector-decoding/old-result assertion failures are retained
+as `build/m5-source-publication-fault-fixture-failed.xml` and `build/m5-source-publication-fault-refined.xml`; neither
+is an accepted native receipt. Production behavior and established test assertions were not weakened. Nereus
+implementation inputs and its six published runtime JARs remain unchanged from 77256; its 737 current and 717
+legacy hashes were rechecked. Only test-owned native containers are removed. This focused branch evidence grants
+no production eligibility, M4 RELEASED, grace, physical deletion or aggregate Final authority; all 17 obligations
+remain OPEN and all four authority flags false. No commit/push has occurred.
+Coordinator re-review independently confirmed this complete local history/Fetch/P1/source-publication batch
+and its current 31-case evidence. The next slice is real user-topic BK_ONLY input catalog and native owner/cut
+admission, using actual Produce/rollover sources before complete-input publication verification. Internal topics,
+all-writer/catalog admission and overall M5 acceptance remain incomplete.
+
+The native user-topic input slice is in progress. Partition `nativeInputSources()` captures the rollover membership
+with the actual coherent protocol snapshot. `NereusKafkaNativeInputV2` now binds the complete ordered nonempty
+sealed input set to the actual current owner admission, exact selected catalog records, closed owner archives and
+M4 predecessor selector. Local assignment/fence/source-generation and coherent frontier checks reject a changed
+cut; repeated remote checks run only in this M5 control capture, after the raw reader reserves its admitted byte
+budget. `Captured` cannot be imported or constructed by callers. Its publication `InputMembership` checks actual
+Binding/provider/owner, exact selector and real captured frontiers, then verifies the entire ordered extent and
+InputBatch lists against fresh native scans. Worker leases and the remaining complete compaction semantic roots
+and policies still require their separate real authority; this adapter does not manufacture or qualify them.
+
+The raw reader captures all input runs under one aggregate budget and uses an owned Runtime SDK session plus its
+exact cleanup observer. These sessions share the existing Cell/Binding read slots. Cancelled observers do not
+abandon the actual operation, UNKNOWN close retains ownership, and known SDK close with unresolved tickets keeps
+the exact typed metadata retry. Opened close first waits for accepted input operations without occupying their
+control executor. A necessary recovered-run extension preserves the actual `recoveryCut`, checks native closed
+LAC and archived closed-owner identity, and excludes only the exact fixed inert physical suffix from logical
+batches; all physical bytes remain in native length/format verification. A footer remains required for ordinary
+sealed runs, while a natively fenced recovered cut can prove a complete logical prefix without one.
+
+Nereus main/real-test compilation and main Checkstyle passed in `build/m5-native-input-recovered-compile.log`.
+Kafka main/test compilation, main/test Checkstyle and SpotBugs passed before the recovered-prefix extension in
+`build/m5-native-input-broker-compile-current.log`; the initial import-boundary failure is retained separately.
+Only the exact eight M5/M4 value imports were admitted at the existing native adapter boundary. New real Broker
+membership and cancelled-scan lifetime cases were implemented before the first execution. The first fresh source/legacy gate passed legacy 22 suites/99 cases and its real retained-data restarts,
+but the raw suite failed 1/13 because the new owned-session null check changed the established diagnostic from
+`native source session` to `session`. That text was restored without changing the test assertion;
+`build/m5-native-input-source-fixture-failed.xml` and the first log are retained. The corrected fresh source/legacy
+gate passed as `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-67335`: 27 suites/151 cases, plus fresh
+legacy 67346 with 22 suites/99 cases, zero failures/errors/skips and actual retained-data BK/Oxia restarts.
+Its summary SHA-256 is `bd412fc0439b72d592aaebfb961104c5fc06200806573537047a760c8df45838`. All 737 current and
+717 legacy input hashes and all six published runtime JAR hashes were matched before the Broker run. The corrected
+raw source suite passed 13/13; the failed initial XML SHA-256 is
+`62c6dd42777ed9dc7feb9f9c989d99f372d53e1b9a7590da229e99a74e7dbf45`. The final control adapter main compile,
+Checkstyle and SpotBugs also passed; Partition-lock checks run on the existing control executor, avoiding blocking
+an Oxia callback behind a rollover holding that lock. These source receipts do not yet verify the new native
+Broker adapter or its recovered-source composition; the first focused Broker execution failed both cases. MEMBERSHIP exposed a real integration defect:
+raw scan treated the client's initial create inventory as a historical-read whitelist, rejecting actual rollover
+runs before SDK reads; LIFETIME timed out waiting for its expected post-read close for the same reason. Its XML/log
+are retained as `build/m5-native-input-broker-create-scope-failed.*`, XML SHA-256
+`a08d1157ea0c9b9cba9c8a71904b8b956e6f95fb0a29bb3ee14c831c153dde1d`. Raw admission now requires the exact
+owned session capability/provider scope after existing selected catalog, Binding, namespace and physical-ticket
+checks, rather than granting read scope from a create inventory. Create/delete admission is unchanged. This new
+Nereus dependency change makes 67335 historical for the corrected adapter; the replacement full source/legacy gate
+passed as 84706 with 27 suites/151 cases plus fresh legacy 84717 with 22 suites/99 cases, zero failures/errors/skips,
+and real retained-data restarts. Summary SHA-256 is
+`4daab0ec85812a3e17f0df4e85ed0e4130dee07fd8b2c803fd11e7a74503e461`. All 737/717 input hashes and six newly
+published runtime JARs match. The subsequent actual Broker run passed LIFETIME, including cancelled observer/actual held SDK close/budget
+and ticket drain, but MEMBERSHIP failed because its five real writes created only one sealed run. Its unchanged
+multi-run assertion remains; the fixture now drives bounded real Produce until the actual directory contains two
+nonempty sealed runs and drives further Produce until the observed generation actually rolls over. It never
+supplies a hand-built membership or frontier. That 1/2 XML/log is retained as
+`build/m5-native-input-broker-single-run-failed.*`, XML SHA-256
+`63e709cb778c3aef83aa4b316ba830b8735ca3f06e61ed46a43c600ef6c0d5e9`.
+
+A related close-path gap was found: exact raw-ticket cleanup can fail after a guarded SDK factory is rejected,
+when no NativeReader exists to retain that exception, particularly after observer cancellation. Opened now retains
+such actual input cleanup exceptions independently until exact metadata-only close retry; existing NativeReader
+retries remove the same entry after success. An unknown close without an accepted read also remains strongly held
+unless the SDK close is known. A third CLEANUP real case extends the cancelled multi-run scan: the next nonempty
+source's factory is rejected during draining, its original no-session ticket release CAS remains refused until
+actual Opened close fails, and metadata-only close retry must then clear that same nonce without redispatching SDK
+work. The retained typed exception must name the actual draining factory failure, proving this is the branch in
+which no SDK session was created. The initial 3/3 execution at `2026-09-30T14:19:06.799Z` is retained in
+`build/m5-native-input-broker-focused-original.*`, XML SHA-256
+`505460be4f579dc062ef29f82efb910b20cf2effb41b581c181117a0a318472a`. After this proof refinement, fresh MEMBERSHIP,
+LIFETIME and CLEANUP execution passed 3/3 with zero failures/errors/skips at `2026-09-30T14:32:16.235Z` in
+`build/m5-native-input-broker-focused.*`, XML SHA-256
+`d008fbaca94a34c120c1b8a2c0204c87e43ac989f002c462856288941f3e9991`. The refinement first had a test compile failure
+from incorrect snapshot accessor names and a missing assertion import; its log is retained as
+`build/m5-native-input-proof-compile-failed.log`. No test result is attributed to that failed compilation. Kafka
+test compilation and main/test Checkstyle/SpotBugs gates passed with the fresh focused run. No heap dump was
+created in that focused run, and the test worker retained Java 17/`-Xmx512m`. Nereus inputs/JARs remain 84706.
+The complete shared close-path Broker task executed 34 cases but passed 33/34: RECOVERED_UNKNOWN timed out in
+createTopics after its AdminClient received an HTTP header as a Kafka frame length and attempted to allocate
+1,213,486,160 bytes. The failed XML/log are retained as `build/m5-native-input-broker-heap-failed.*`, timestamp
+`2026-09-30T14:34:38.929Z`, XML SHA-256
+`83a17a8cf1f66b3537d99ad47fb7fd593adbed66470a75465d3eefc8dee7a933`. The actual
+`build/m5-native-input-heap-diagnostic.hprof` is 271,094,419 bytes. Parsed HPROF proves the unique NetworkReceive
+had null payload buffer, requestedBufferSize `0x48545450`, and a four-byte size buffer containing `HTTP`; its
+KafkaChannel id 2 connected to 127.0.0.1:49317, while this test's reserved listener was IPv6 wildcard [::]:49317.
+The already running OpenCode process held 127.0.0.1:49317 and a read-only HTTP probe returned HTTP/1.1 401.
+The existing test-common prebound factory allocates wildcard sockets but TestKit advertises localhost endpoints.
+Actual Java 17 binding probes show macOS permits both IPv6 and IPv4 wildcard binding at this occupied specific
+address/port, while exact 127.0.0.1 binding rejects it. Increasing heap or an IPv4 JVM preference does not correct
+that endpoint aliasing. The necessary test-fixture correction changes only the existing prebound address to
+`InetAddress.getLoopbackAddress()`, matching TestKit's loopback endpoints. A real socket regression failed before
+that change at `2026-09-30T14:51:12.718Z` (1/1 failed), XML `build/m5-native-input-loopback-red.xml`, SHA-256
+`fa0927c0bcc2d98ffc64c888132baf44c4344e8ba187e5b8e241bbe8c4e0247f`; it passed after the change at
+`2026-09-30T14:53:12.744Z` (1/1, zero failures/errors/skips), XML `build/m5-native-input-loopback-green.xml`, SHA-256
+`5dcb333c56a838ebd35882c98dbf3d681eb06040fbb8009e78705e26ee34c6cd`. The regression connects an actual client to the
+exact reserved endpoint and checks the accepted peer; test-common compilation, main/test Checkstyle and SpotBugs
+passed. No heap/JVM address-family flag, production transport, assertion, or unrelated service was changed. The
+unchanged full 34-case Broker gate passed 34/34 with zero failures/errors/skips using this corrected test fixture,
+at `2026-09-30T14:54:53.367Z`. Its current XML/log are `build/m5-native-input-broker-current.*`, XML SHA-256
+`35c50a9eade086dd188008ea3cc161de692fb5c65d7e6d809d20dac102eec2b2`; main/test compilation, Checkstyle and core
+SpotBugs gates passed. No replacement heap dump was produced, the original heap/config/assertions were retained,
+and only task-owned BK/Oxia containers were removed (the pre-existing connector and OpenCode remain). This
+verified oversized foreign HTTP frame explains the present failure; the earlier OOM had no heap dump and is not
+retrospectively assigned the same cause or called proven fixed. Coordinator confirmed the narrow test fixture
+scope and red/green rationale, then independently accepted this native-input/owned-scan necessary dependency
+slice. That review checked actual current/closed owner and ordered catalog membership, M4 selector/current cut,
+aggregate budget, owned SDK lifetime/exact cleanup, recovered cut/LAC/logical prefix, all current XML/source/JAR
+matches and the unchanged OPEN/false boundaries; it found no related blocking defect and did not rerun the gates.
+This is not acceptance of a complete real CompactionPlan or native M5 publication. The next required integration
+must derive worker/task, topic policy and complete protocol/key/transaction/timestamp authority from the actual
+Broker/owner path, then invoke Captured.resolve through the real guarded publisher and selector. The current
+membership rejection test stops before a next-step callback and does not claim an executed full native plan/CAS.
+The overall M5 goal remains ACTIVE; this accepted dependency does not close any of the 17 aggregate obligations,
+authorize a commit/push, or qualify ε/grace/Object-source semantics.
+The diagnostic logs are `build/m5-native-input-heap-{diagnostic,network}.log` and
+`build/m5-native-input-loopback-family-{default,ipv4,literal}.log`. This diagnosed oversized foreign frame does not
+qualify general heap lifetime or attribute the failure to NativeReader leakage. All 737/717 source hashes and all
+six freshly resolved Maven snapshot JAR hashes still match. The previous 31-case/source-77256 receipts prove
+their earlier verified tuple. No fake worker lease,
+frontier, protocol/key/transaction root or Object interpretation is supplied. All 17
+obligations remain OPEN, all four authority flags remain false, and no commit/push has occurred.
+
+## Native Broker policy cut for the complete CompactionPlan (current necessary input)
+
+The actual `NereusListOffsetsLifecycle` now attaches its `NereusUnifiedLog` to the native Opened owner after the
+Controller RECOVERED acknowledgement and before request readiness. `Opened.captureM5Inputs` obtains the actual
+KRaft topic incarnation, feature level and effective topic policy together with the coherent native input sources.
+`NereusUnifiedLog.captureM5InputCut` takes the existing append/configuration guard, verifies the exact installed
+Partition and leader epoch, and requires its applied LogConfig values to equal the policy projected from that image.
+Initial shells and unversioned Broker-default updates acquire a policy stamp only after this check; the positive
+policy generation is that actual metadata offset plus one. The topic-config callback offset remains separate.
+Both configuration update paths invalidate the resident policy stamp. Revalidation compares the stamp, feature level
+and complete effective configuration; unrelated topic metadata alone does not replace the admitted policy.
+
+Metadata cache publication precedes dynamic configuration callbacks. The low-frequency
+`DynamicBrokerConfig.logDefaultsAtMetadataImage` projection therefore derives the expected defaults from the actual
+static configuration plus that image's cluster-default and per-Broker Properties, reusing Kafka's existing validation,
+synonym removal and override precedence. It applies no configuration or notification. The native log rejects a new
+capture and an older capture's revalidation while that image is ahead of the actual configuration callback. The
+projection runs before the native log guard, preserving the existing dynamic-config-lock to log-guard ordering.
+This work adds no control I/O to ordinary Fetch and does not coerce Kafka's PRODUCER compression policy.
+
+The current semantic plan now represents `PRODUCER` explicitly through `OutputCompressionPolicy`, alongside
+the five fixed codecs. The original fixed-codec Policy constructor/accessor and canonical V2 plan bytes remain
+compatible. PRODUCER uses a distinct V3 plan domain and discriminator, and binds its compression policy into output
+identity. Compilation and independent validation select each original batch's codec. This path preserves original
+base/last-offset headers and an existing tombstone delete horizon; the first retained tombstone sets that horizon
+to the captured cleaning time plus delete retention, and subsequent cleaning does not extend it. It does not use
+record timestamp as a deletion deadline. The native policy adapter maps actual Kafka GZIP and PRODUCER settings
+to these explicit policies; full native plan/task/Cell admission remains separate work.
+
+Seventeen semantic unit cases passed on the current source, including three added cases: sparse rewriting across
+GZIP/SNAPPY/LZ4/ZSTD/NONE compares exact bytes with the locked Kafka 3.9 `MemoryRecords.filterTo` oracle, including
+dropped batch tails; a wrong codec is rejected independently; first-clean/retained tombstone horizons match that
+oracle, and an altered horizon is rejected. The first oracle invocation used the newer Kafka method signature and
+failed to compile against the locked 3.9 client; the failure log is retained, and the corrected call uses its actual
+signature. Replacement source 74674 passed 28 suites/160 cases with 745 unchanged inputs; fresh legacy 74686
+passed 23 suites/107 cases with 725 unchanged inputs, including actual retained-data BK/Oxia recovery. All archived
+XML and input hashes match. Six newly published runtime JARs match that source, including KafkaBK snapshot 44
+(`001a7ca8bc897c3890e2a6a6de007f3e4ec1f2b3bd246a1a832a6883b30666d7`). The corresponding Java 17
+native Broker gate passed 36/36 with zero failures/errors/skips at `2026-09-30T23:44:55.834Z`, XML SHA-256
+`764019605e1f72bf938018a66e89b8009afc1d1f0a82989e332a2c47596aca55`, including actual GZIP-to-PRODUCER
+policy mapping. All owned backend services were removed. The exact rewrite oracle above is the locked 3.9 client;
+the Broker batch validates native policy/runtime integration and existing prerequisites. This does not qualify a
+complete native CompactionPlan, Cell reservation, task, publication or activation.
+Scoped coordinator review accepted this additional dependency on the 74674/74686/runtime-44/Broker-36 tuple,
+including source/JAR/XML agreement, the actual locked oracle and preservation of the fixed-codec plan identity.
+All 17 lifecycle obligations and the four aggregate/Final/delete/production authority flags retain their current
+unfinished/non-promotable state.
+A Controller acknowledgement may arrive after an Opened owner starts closing. Such an owner acquires no M5 log
+reference, and its existing input admission stays closed. Known owner termination clears the reference after the
+accepted input operations, native sessions and exact metadata cleanup have drained; UNKNOWN keeps the existing owner.
+
+The real BK/Oxia POLICY case creates a compact,delete topic with actual retention, ratio, lag and GZIP configuration,
+then changes retention and compression through Admin. It also holds the actual Broker configuration callback after
+an Admin default update has reached the metadata cache: new capture and old-cut verification fail before any input
+SDK session. Releasing the actual callback permits a new generation, preserves the topic override and returns the
+same physical input bytes. MEMBERSHIP additionally verifies unrelated-topic metadata does not invalidate its cut;
+its takeover now uses an actual successful ListOffsets request before capturing the new owner's policy/input state.
+The deterministic callback-window RED used the older applied-default lookup and failed 1 of 4 cases because capture
+incorrectly succeeded, at `2026-09-30T16:05:21.682Z`, XML `build/m5-native-policy-image-red.xml`, SHA-256
+`73897cd2b8490bd926221d04024d5ea28ec78aea48e807c41a6c2229b5a09730`. The corrected four-case run passed at
+`2026-09-30T16:07:28.032Z`, XML `build/m5-native-policy-broker-focused.xml`, SHA-256
+`99dd7f3325f70d6982adf5dc8260c556d18c14ce89413101c3a89c345bfa72bb`. The final six-case input/close run passed
+at `2026-09-30T16:17:24.370Z`, XML `build/m5-native-policy-close-focused.xml`, SHA-256
+`8a82a7f48c67f02c9bafd2540d12230c50a08019e7d9e2dcd4ab9e4cf9c622c1`. The stock-precedence unit case passed
+1/1 at `2026-09-30T16:09:06.733Z`, XML `build/m5-native-policy-projection-unit.xml`, SHA-256
+`34a5664bf3f0633439e7db865cc4587eb20ab2637724ea7591bbf0ad347bd177`; it covers static, cluster-default and
+per-Broker precedence, removal back to static values, and unchanged actual applied configuration.
+The current expanded Broker gate passed 35/35 with zero failures/errors/skips at `2026-09-30T16:19:41.794Z`, XML/log
+`build/m5-native-policy-broker-current.*`, XML SHA-256
+`1a2ac2b2a87a4a0cfcc0ca87f3477bf4f5680e744667dfe1222031ac38890eeb`. Compilation, main/test Checkstyle and core
+SpotBugs passed. The original Java 17/512 MiB heap, test timeouts and assertions remain intact; no new heap dump was
+produced. Task-owned BK/Oxia containers were removed, preserving the pre-existing connector.
+
+The earlier 3/4 attempt captured a moved owner's provider-open notification before its native log was installed;
+`build/m5-native-policy-before-ready-failed.*` retains that failure. The first full 35-case run passed 32/35: two
+existing owner-close cases exposed the late policy-attachment exception, and the cold-relocation case timed out in
+ListOffsets. Its XML/log remain `build/m5-native-policy-closed-owner-failed.*`, XML SHA-256
+`08f04e6bff16ce1444b9ae0edc54f1fe515747dfb43f4e0cb3dc7f8c3fa7eb7a`. The late attachment race is corrected;
+the separate timeout is not assigned that cause. The unchanged cold-relocation test passes in the replacement full
+run. Initial Checkstyle failures remain in `build/m5-native-policy-{checkstyle,callback-checkstyle,red-checkstyle}-failed.log`;
+no stale XML copied after failed compilation is counted as execution evidence. The intermediate successful topic
+and default-update runs remain `build/m5-native-policy-{topic,default}-original.*`.
+Nereus source inputs/JARs are unchanged from 84706 and fresh legacy 84717: all 737/717 source hashes and the six
+resolved published/built snapshot JARs were rechecked with no drift. The unchanged Nereus source gate was not rerun.
+
+This supplies the actual native policy/input cut. Worker/task admission, complete key/transaction/timestamp and
+protocol checkpoint authority, full plan construction, actual guarded publication, subsequent reads/recovery and
+M4 RELEASED/retirement/deletion combinations still require implementation and real aggregate acceptance. No worker
+lease, tombstone deadline, protocol root, ε/grace or Object-source interpretation is fabricated. All 17 obligations
+remain OPEN, all four authority flags remain false, the overall goal remains ACTIVE, and no commit/push has occurred.
+The coordinator independently reviewed the actual policy/configuration/attachment paths and tests, matched the
+current source/XML/JAR tuple and accepted this necessary input slice. The separate ListOffsets timeout remains
+unassigned; this scoped review grants no full-plan, publication, lifecycle, Final or production authority.
+
+### Native input preparation capacity (current implementation amendment)
+
+A complete native plan requires actual input bytes. `KafkaCompactionAdmissionV1` therefore also accepts a bounded
+preparation reservation before that scan, while retaining its existing K5AD wire 1 bytes. Installation of identical
+Cell caps preserves an occupied or advanced state. `replace` changes an exact preparation allowance to a complete
+plan/task allowance through one Cell CAS; a changed predecessor, a conflicting successor or exhausted capacity
+keeps the original reservation. This generic conversion does not independently qualify a native plan or task.
+An uncertain CAS followed by an old-value read remains `OUTCOME_UNKNOWN`. After its actual preparation owner stops
+all dispatch, `cancelPreparation` advances the same Cell generation even when the reservation is absent, invalidating
+an earlier CAS that may still arrive. An old-value read alone is not a no-apply terminal.
+
+The native Kafka route derives the Protocol Cell from the validated API-32000 aggregate and roots its exact admission
+key under the actual permanently bound Oxia namespace. All Bindings with that namespace and Cell share one key.
+The new Oxia factory admits only that exact Cell key; its shard route still rejects the Cell family. The Broker's
+retained-capture overload consumes operator-supplied finite resource allowances and rejects a scan exceeding their
+payload/batch/record limits. Each invocation has a distinct preparation identity bound to its actual owner epoch,
+source-map digest, namespace binding and attempt nonce. It reserves before the source catalog or native SDK scan.
+The existing configured concurrent-task limit is acquired before copying the native cut and also bounds unresolved metadata attempts.
+A confirmed Cell-cap rejection releases that local slot without dispatching input reads.
+
+The returned capture retains its durable reservation after the local SDK read share drains. Verification shares the
+same retained lifetime. Explicit discard closes further use and waits for actual accepted verification before release;
+cancelling an observer does not release the original operation. The raw reader reports a typed terminated failure only
+after this invocation has no unresolved native session or physical-ticket operation. A failed initial capture with that
+terminal releases its preparation reservation before returning failure; local validation after a successful raw scan
+has the same terminal boundary. Unknown native termination or ticket cleanup retains capacity until its actual
+Owner confirms native reader drain and exact ticket cleanup. Exact release runs on the existing control executor,
+outside native/Oxia response callbacks. Owner close then invalidates outstanding preparation
+CAS attempts and reconciles capacity before releasing its provider. The original two-argument capture is still the
+input diagnostic path, with the existing caller-owned retained-data responsibility.
+
+Twenty semantic/admission unit cases and nine exact Oxia transport unit cases passed. The admission additions cover
+same-cap reinstallation, atomic conversion, changed/over-cap conversion rejection, UNKNOWN old-value rereads and a
+late CAS rejected after terminal generation advancement. Current source 53489 passed 28 suites/163 cases with 745
+unchanged inputs; fresh legacy 53501 passed 23 suites/107 cases with 725 unchanged inputs. The existing user-topic,
+consumer-offset and transaction-state retained-server/fresh-JVM cases now also reread exact persisted Cell reservation
+hashes and preserve them through same-cap installation. These component fixtures retain synthetic protocol/plan
+qualification. That source/runtime tuple is historical after the termination correction: the added Broker gate
+failed 1/37 when an actual metadata-image change left an already reserved capture without a returned handle.
+The failure log/XML and exact native source manifest are preserved. Corrected source 18605 passed 28 suites/163 cases
+with 745 unchanged inputs; fresh legacy 18617 passed 23 suites/107 cases with 725 unchanged inputs. This includes
+the actual two-run catalog-failure termination assertion and retained-data restart. Six published runtime JARs match
+that source, including KafkaBK snapshot 46 (`5e22c0e8580bfe3edeae4b197808cab3eb39a5a8bd8004a8831038335531cc46`).
+The corresponding native Broker gate passed 37/37 without failures/errors/skips at `2026-10-01T01:27:20.172Z`,
+including actual failed-read capacity recovery and ticket-cleanup UNKNOWN retention. That tuple is historical after
+an additional no-dispatch correction: physical admission UNKNOWN now returns a source cleanup exception even when
+the SDK callback was never invoked. The guard supplies a privately constructed terminal cleanup holding the exact
+attempted tickets, their predecessor revisions and the actual native/no-dispatch terminal. An unchanged OPEN value
+without the ticket still leaves a possible late acquisition unresolved. Owner cleanup therefore cannot release
+capacity based on a broad same-operation absence scan. No persisted ticket bytes or identities changed, and the
+guard's original four-argument Result constructor remains available. Replacement source 53880 passed 28 suites/163 cases
+with 745 unchanged inputs; fresh legacy 53893 passed 23 suites/107 cases with 725 unchanged inputs. The real source
+case explicitly retains unchanged/absent acquisition uncertainty, delivers the original conditional CAS, and then
+cleans its exact ticket without native session dispatch. Six runtime JARs match the source, including StorageObject
+snapshot 26 (`4f7e70809deb81f5e479af83c7d322d5e5a90d5d3870aa67bc7d2c5743f4a693`) and KafkaBK snapshot 47
+(`3e6fd0623528b4da4b9d5773eb3076a2a6246f488b2bdf4417071a747a2761f0`). The native Broker gate passed 37/37 without
+failures/errors/skips at `2026-10-01T01:59:02.922Z`, XML SHA-256
+`13a4d1f3787a183bbb3400dd5e1e5c213e2ee6fc248c43c5a1d56b5fb6066e3c`. Its capacity case verifies actual same-Cell
+competition, known failed-read recovery, cancelled verification lifetime, post-read cleanup UNKNOWN and no-dispatch
+acquisition UNKNOWN through Owner close and the original late conditional write. All four native input hashes and
+six runtime JAR hashes match; owned services are removed. Scoped read-only coordinator review accepted this necessary dependency on the 53880/53893/runtime-26-and-47/Broker-37 tuple, independently checking source/XML/JAR agreement and the exact termination boundaries without rerunning tests. This acceptance does not qualify native inventoried-task conversion or the complete M5 lifecycle.
+
+This is native retained-input preparation and persisted capacity integration. The native raw sealed-prefix plan
+derivation below advances the required factory. The prepared-task amendment now connects immutable native task
+registration and atomic conversion; scheduling/configuration provisioning, all resource/UNKNOWN accounting,
+publication/activation/cold recovery and crash-orphan preparation reconciliation remain required.
+No source/owner/semantic/delete qualification is inferred from a resource allowance. All 17 lifecycle obligations
+remain OPEN/null; the aggregate, Final, physical-delete and production authority flags remain false. The full M5
+goal remains ACTIVE, with no commit/push.
+
+### Native raw sealed-prefix CompactionPlan (current implementation amendment)
+
+`Captured.preparePlan` now requires the actual retained Cell reservation, rechecks the complete native input through
+the existing source reader and obtains the actual worker proposal. It owns both verification and plan construction
+through the original capture/Owner lifetime. A cancelled observer does not terminate that work or release capacity.
+The proposal still admits no worker, task, output or publication. Diagnostic captures cannot take this path.
+
+The factory uses the actual sealed prefix from logical trim through the candidate end, its exact preferred-only
+selector and all ordered native source/batch identities. Bounded parsing precedes key-map construction. Completed
+transaction ranges come from the coherent native state, including producer ID, first offset, marker end, outcome and
+coordinator epoch. Transactional DATA without one exact closed outcome rejects the plan. Aborted DATA cannot become
+the latest committed key proof. Leader-epoch ranges come from the actual index; timestamps and the complete key-domain
+root bind the scanned record bytes. Producer, speculative, transaction, epoch, checkpoint and active-tail references
+are the actual coherent component digests. The enclosing protocol projection binds all nine native references,
+their generations, the exact partition fence, state version and six frontiers. The actual prefix checkpoint supplies
+the separately transferable recovery state, without original source locators.
+
+Policy identity binds the effective native LogConfig, its actual metadata generation and feature level, including the
+full IEEE cleanable-ratio value and min/max compaction lag. The existing integer ratio projection is not native
+scheduling or threshold authority. Cleaning time is observed by this factory; an existing tombstone deadline comes
+from the actual batch header. A raw tombstone without a horizon retains its conservative no-expiry state and receives
+its first-clean horizon only in the rewritten header. Record timestamp plus retention is not used as deadline proof.
+
+`NEREUS_NATIVE_KAFKA_BATCH_V1` additionally selects native header preservation for fixed output codecs. Its plan uses
+the distinct `NEREUS_V2_M5_B_NATIVE_COMPACTION_PLAN_V4` domain. Existing fixed-policy V2 and PRODUCER V3 identities and
+rewrite behavior remain unchanged. Independent validation checks the native base/last-offset headers and unchanged
+or first-clean horizon for this profile. The added fixed-GZIP unit case matches the locked Kafka filter bytes, including
+a dropped batch tail and tombstone, and rejects the older header convention. All 21 semantic/admission cases passed.
+
+Current source 60379 passed 28 suites/164 cases with 745 unchanged inputs, reusing fresh legacy 39956 after checking
+its 23 suites/107 cases and 725 unchanged inputs. Both retained-data BK/Oxia restart paths passed. Six published JARs
+match the source and built bytes; KafkaBK snapshot 48 has SHA-256
+`7e3b7646d0bd2f881fbec56e540d5653ad2622f39c79b920fc52daaae7ba8caa`. The Java 17 Broker gate passed 38/38 without
+failures/errors/skips at `2026-10-01T02:50:02.486Z`, XML SHA-256
+`a117a7f767d0d4cd7e3d49ea1a9c6db8ec9c68fed6918b008bafbba92281e93e`. Its new PLAN case uses actual transactional
+Produce/COMMIT/ABORT, a sealed raw tombstone and Kafka 4.3 `MemoryRecords.filterTo`; complete semantic output bytes match
+that native oracle. It checks actual component/checkpoint/coordinator provenance, rejects aborted key supersession,
+keeps preparation capacity through construction and discards it exactly afterward. Six captured native inputs have
+no drift. Compile, main/test Checkstyle and SpotBugs passed; the original heap/configuration/assertions remain intact,
+no heap dump was produced and owned services were removed.
+
+The first source run passed its native tests but its receipt step rejected the old 20-case literal after the new
+21st case was added; the exact count was updated and the current source path rerun. Initial native Checkstyle rejected
+three new materialization imports and the enlarged test method/class metrics. Only the exact used imports were added
+to the existing Nereus boundary, and the scenario's plan assertions were grouped with their existing nested-helper
+pattern. No rule, assertion or timeout was weakened. Failure logs remain in the build evidence directory.
+
+This preceding tuple validates native raw sealed-prefix plan derivation. The following amendment connects actual
+prepared-task registration and atomic capacity conversion. Worker/output execution, remaining source representations,
+native scheduling eligibility, all resource/UNKNOWN accounting, crash-orphan reconciliation, guarded publication/
+activation/cold recovery and the M4 RELEASED/lifecycle combinations remain required. All 17 obligations stay OPEN/null, all four authority flags stay false and the full goal stays ACTIVE.
+No complete native task/factory/publication, M5 Final or production authority is claimed; no commit/push has occurred.
+
+### Native prepared-task registration and capacity conversion (current implementation amendment)
+
+`Captured.prepareTask` now derives the complete plan from its actual retained native cut, compiles semantic output
+and constructs the existing BK physical layout with the independent recovery-state carrier. It uses the connected
+source client's actual namespace and capability, plus this preparation's nonce-derived nonnegative attempt ordinal.
+The native adapter composes the existing typed BK control store with immutable records under the permanently bound
+Oxia namespace and the exact raw Binding authority. Task/source Binding, namespace and Provider Scope checks remain
+at that typed boundary. K5AD and inventory-task wire formats are unchanged.
+
+The returned `NereusKafkaPreparedTaskV2` is privately constructed. Its immutable task binds the actual source-cut
+bytes, complete plan root, semantic output/validation roots, actual capability and ordered physical part plans. The
+layout includes actual chunk envelopes and recovery bytes in the output/index limits. A diagnostic capture cannot
+prepare a task; repeated task preparation on one retained capture fails locally. The factory retains the possible
+physical task ID before dispatching immutable registration, then requires an exact task reread and replaces the
+preparation row with that inventory Task ID in one Cell CAS. The complete original finite resource envelope remains
+occupied while the retained input, semantic output and layout belong to the task. There is no release/reserve gap and
+no reduction to estimates based only on compacted data size.
+
+The private phase exposes neither a worker grant nor an output SDK. Discard must still durably cancel and archive
+this task's selection before returning its capacity. Cancellation uses the exact current selector and leaves its
+projection byte-identical, including after native Produce/rollover invalidates the earlier source cut. A selected or
+unknown decision retains capacity. This logical pre-dispatch cancellation does not manufacture a native physical
+Task terminal, sealed-output facts or protocol deletion qualification.
+
+Lost registration/conversion responses retain the private task descriptor and both possible quota identities. An
+old preparation reread does not prove a delayed CAS cannot apply; a committed conversion whose reread is unavailable
+can already own the formal quota. Unknown capture operations still require actual Owner reader/ticket drain. Cleanup
+archives non-selection first, advances the formal Task ID's Cell generation even when that row is absent, and only
+then removes/fences the original preparation ID. Thus a late original conversion cannot consume a released slot.
+A late immutable task registration remains inert because its cancellation archive already exists. Unreadable Cell
+state or task cancellation prevents Owner completion and quota release until exact reconciliation succeeds.
+
+Current source 29383 passed 28 suites/164 cases with 745 unchanged inputs; freshly executed legacy 29396 passed
+23 suites/107 cases with 725 unchanged inputs. Both retained-server/fresh-JVM BK/Oxia paths passed. Six published JARs
+match the source and built bytes; Oxia snapshot 33 has SHA-256
+`40209051952fb3b7dcf639701ca59005ba58974e4d4ba9d5a3413ada81824eed`. The Java 17 Broker gate passed 44/44 without
+failures/errors/skips at `2026-10-01T03:38:06.318Z`, XML SHA-256
+`43b677ce9f4bfaad07edd6dcd55224a76be746f314b33ec2716be54e96398dbb`. Six new cases cover known registration/
+conversion, continued Produce/rollover, late task registration, an unchanged preparation after conversion UNKNOWN,
+an applied but unreadable conversion, and applied cancellation with an unreadable decision. Original delayed puts
+execute against real Oxia: late immutable registration succeeds as an inert task, while the original conditional
+conversion is rejected after terminal generation advancement. The native source is actual Broker Produce/BK input;
+no imported plan/owner qualification substitutes for it. Seven native input hashes have no drift. Compile,
+main/test Checkstyle and SpotBugs passed with the original heap, assertions and timeouts; no heap dump was produced
+and task-owned services were removed.
+
+This advances native prepared-task registration and quota ownership. Actual worker/output admission and SDK drain,
+remaining required source representations, native scheduling, complete resource/UNKNOWN accounting, crash-orphan
+reconciliation, guarded publication/activation/cold recovery, native Pulsar/Object responsibilities and the full
+M4 RELEASED/lifecycle combinations remain required. All 17 obligations stay OPEN/null, all four authority flags stay
+false and the full goal stays ACTIVE. No complete M5/native execution or publication authority is claimed and no
+commit/push has occurred.
+
+### Native raw-prefix Task eligibility and zero-length keys (current implementation amendment)
+
+`Captured.prepareTask` now checks the effective native cleaner policy after bounded parsing of the actual retained
+batch bytes and before semantic compilation, first-clean horizon creation, physical layout or immutable Task
+registration. Diagnostic `preparePlan` still grants no Task/worker/output authority. A failed local eligibility
+check leaves the original finite preparation reservation unchanged until confirmed discard; worker proposal and
+authority migration do not admit an output worker.
+
+This factory's current source profile is a complete, wholly dirty raw sealed prefix from logical trim to the active
+run boundary. Its cleanable ratio is exactly `cleanable / (clean + cleanable) = 1`; active and uncleanable suffix bytes
+are excluded. Native scheduling uses the effective IEEE `min.cleanable.dirty.ratio` and Kafka's strict `>` comparison,
+not the integer policy projection. Minimum lag rejects the complete candidate if any retained batch's max timestamp
+is strictly newer than `now - min.compaction.lag.ms`. Maximum lag uses the earliest positive first-batch max timestamp
+of the dirty non-active runs and the strict `< now - max.compaction.lag.ms` condition. A zero timestamp grants no
+maximum-lag override, and that override cannot bypass minimum lag. The observed eligibility time also supplies the
+plan's cleaning time. Selecting an earlier eligible sub-prefix requires its exact native protocol checkpoint and
+remains required along with actual scheduling; continuously produced younger runs cannot be treated as a completed
+native cleaner implementation by this whole-prefix gate.
+
+A zero-length non-null Kafka key is now a valid `LatestKeyProof` key. Null remains `Optional.empty` in `RecordValue`;
+the empty byte string is a distinct present key, occupies one distinct-key slot, and has ordinary supersession and
+tombstone retention semantics. No wire field, canonical plan domain or existing valid key encoding changes. The
+raw empty-key tombstone has no guessed expiry authority and receives its first-clean horizon through the native
+rewrite. Full BK output dispatch, worker/SDK termination, publication, source representations, Pulsar/Object and
+M4 RELEASED/lifecycle integration remain required. All 17 obligations stay OPEN/null and all four authority flags
+remain false; the full goal stays ACTIVE without commit/push.
+
+Preceding source 84771 passed 28 suites/165 cases with 745 unchanged inputs; freshly executed legacy 84784 passed
+23 suites/107 cases with 725 unchanged inputs. Both retained-data native BK/Oxia restart and fresh-JVM checks passed.
+The source summary SHA-256 is `a63ca72217a1b05506096c3f86e0c7b3c95c8ca2cdd4d4053e6f1dae54a9ec44`;
+legacy is `99317add1f7009d2266ecc1fabe2091693336b7a52488122263dc58a41d35253`. Six published JARs match the built
+bytes and source runtime expectations; KafkaBK snapshot 51 has SHA-256
+`1b3d906d8955dd805492abf2c0979d1f0af32a2cf22fe4deef89eaa95c8b7bda`. These files are recorded in
+`build/m5-native-eligibility-source-current.log` and `build/m5-native-eligibility-published-artifacts.json`.
+
+The Java 17 Broker gate passed 50/50 with zero failures/errors/skips at `2026-10-01T04:33:35.669Z`, XML SHA-256
+`9b32f3786e87a694db5d46eed03b4acd7ec9c2dd370a972c58dd7b5ff0c5cf45`, in
+`build/m5-native-eligibility-broker-current.*`. Six actual Broker Produce scenarios cover ratio 1 rejection,
+0.999999999 admission despite a 1,000,000 integer projection, positive oldest-first timestamp max-lag override,
+zero timestamp without that override, minimum-lag precedence despite an overdue oldest first batch, and empty-key
+supersession/tombstone output matching native Kafka filter bytes. Ineligible Tasks create no immutable Task or
+worker grant and retain preparation capacity until exact discard. Bypassing only the Task eligibility call produced
+the expected three Broker failures in `build/m5-native-eligibility-broker-red-current.*`; the other three cases passed.
+The old nonempty-key constructor likewise failed the new semantic regression in
+`build/m5-native-eligibility-empty-key-red.*`; all 22 semantic cases passed after restoration/correction. The native
+run also passed compilation, main/test Checkstyle and SpotBugs with unchanged assertions, heap and timeouts; seven
+native inputs have no drift, no heap dump exists and task-owned services were removed.
+
+### Native worker admission and physical output lifetime (current implementation amendment)
+
+The retained native `NereusKafkaPreparedTaskV2` now admits its actual Task only after re-verifying the complete raw
+input cut, exact effective policy/owner and full converted Cell reservation. It registers the same immutable Task,
+binds its complete source-cut SHA, semantic plan root and physical Task ID into `Proposal.admit`, and independently
+checks that durable worker through the real bound metadata route. Generic proposals or copied task bodies still
+provide no native output authority. A changed input/worker or unreadable admission dispatches no output session.
+
+One private Execution owns a separate `M5BookKeeperNativeCreateClientV2` with the actual native instance ID, Task ID,
+namespace and every planned Part configuration. The ordinary Produce client and active-run scope remain intact.
+All actual ledger IDs and immutable Part rows are reserved before resource quota/OPEN admission and one sorted
+writer invocation. The existing run-birth writer admission owns the unchanged bounded quota and exact OPEN reread
+logic for both paths. The existing compaction writer creates, appends, fences and seals each Part and compares every
+entry against the complete planned carrier, with exact native sealed metadata captured before/after validation.
+`materialize` returns only after the owned SDK session closes; completed output retains its private client and
+writer tickets until checked Task termination. No executor, timer, backend or configuration switch was added.
+
+Observer cancellation never completes the actual SDK operation. For an unpublished Task, discard waits for owned
+operations, fences the exact Task create scope, confirms SDK close, archives non-selection against the current selector, and invokes the
+existing native Task termination coordinator. Only its actual `TERMINATED_UNPUBLISHED` terminal supplies the Guard
+proof. The private original invocation's `TerminalCleanup` then reconciles its own attempted tickets, followed by
+actual client close and generation-fenced removal of formal/preparation capacity. SDK close, terminal or ticket
+UNKNOWN retains that capacity and permits exact cleanup retry; unrelated input/read UNKNOWN still requires Owner
+drain. Rollover cancellation preserves the current view/owner, and the parent retains its last worker grant. Write
+and close failures are both preserved. Pure local validation after confirmed input termination is classified before
+worker metadata operations; only confirmed no-dispatch setup can discard an old single-use preparation and retry
+with a fresh capture. Metadata mutation UNKNOWN never uses that retry.
+
+The nine real Broker cases cover known output, rollover after output, a lost reply for a complete one-entry DATA
+Part append, lost SDK-close reply, held actual-close reply with observer cancellation/Owner drain, applied ticket
+release UNKNOWN, applied worker-grant UNKNOWN, stale source before worker dispatch, and actual empty-key/tombstone
+output. Fresh native reads compare every Part entry; actual stored worker/TaskTerminal and physical ticket rows are
+checked. The corrected focused gate passed 9/9 in `build/m5-native-output-broker-faults-corrected-current.*`.
+The full Java 17 gate passed 59/59, zero failures/errors/skips, at `2026-10-01T06:08:46.693Z`, XML SHA-256
+`ac46ef2047edc5a60f5f4df4328a335474b073e7519fd31b234a7cb987ca484b`, in
+`build/m5-native-output-broker-corrected-current.*`. Eight native inputs in
+`build/m5-native-output-broker-corrected-inputs.json` remained unchanged. Compilation, main/test Checkstyle and
+SpotBugs passed with existing assertions, heap and case timeouts. The preceding 58/59 run and its matching input
+manifest are retained; its close-fault fixture had assumed output existence before checking the original failure.
+The corrected fixture requires the actual fault and full Part inventory and never retries a consumed preparation.
+
+Nereus source 84771 (28 suites/165 cases/745 inputs), legacy 84784 (23/107/725), and all six runtime JARs in
+`build/m5-native-eligibility-published-artifacts.json` were revalidated and reused without source/artifact drift;
+no new Nereus source run or publish is claimed. This is actual unpublished worker/output lifetime progress.
+Native eligible-prefix scheduling, guarded publication/activation/cold recovery, remaining native formats,
+complete quota/UNKNOWN/crash-orphan accounting and metrics, Pulsar/Object duties, M4 RELEASED and all lifecycle
+compositions remain required. All 17 obligations remain OPEN/null, all four authority flags false, with no M5
+receipt, Final, production/delete promotion or scoped coordinator acceptance claim.
+
+### Native preferred-prefix Fetch bridge (current implementation amendment)
+
+The existing K6 `KafkaBookKeeperTargetedReaderV1.readSequential` now accepts an independently recovered
+`KafkaBookKeeperReadViewV2` for a complete compacted prefix and the same coherent raw read snapshot. It requires
+the full output protocol carrier, matching partition/storage/binding identity, a current owner/leader fence at
+least as new as the source, and coverage within the durable frontier. The caller still owns exact selected M4
+authority, cache admission and both physical source lifetimes. This helper creates no selector or native grant.
+
+Offsets inside the complete cut use only the verified output batches. A deleted offset advances to the next
+retained batch or the post-cut raw tail; obsolete raw predecessor bytes never fill a compaction gap. Both segments
+share the captured isolation upper bound and one byte budget. The first oversized complete batch is allowed once
+for the whole Fetch; a raw tail cannot take a second exception after preferred bytes. Tail failure is preserved
+instead of returning a successful prefix. Aborted-transaction metadata uses the existing coherent K6 response
+logic. Prefix continuations remain disposable, and direct raw-tail reads retain the ordinary cursor checks.
+
+Returned `entryId` is the actual first carrier entry, including KBSC DATA entry zero. The ordinary NBKE2 locator
+still requires positive DATA entry IDs and validates its own header/index/frame identities. No stored descriptor,
+RecordBatch or cursor format changed. Fetch-owned exact reads use the existing K6 callback overload and cache.
+
+The actual native output fixture independently recovers every sealed Part through a fresh SDK, then combines
+those detached batches with the live owner's active writer handle, as ordinary native Fetch does. It compares the
+entire result against retained semantic output and an actual Broker raw-tail Fetch, checks a deleted prefix offset,
+first/combined byte budgets, isolation/LEO bounds and foreign-partition rejection before IO, and loses a response
+only after the actual raw SDK read completes. Task writer tickets and formal capacity remain held until the existing
+actual unpublished termination. That case validates bytes before publication and retains its raw Broker source map.
+
+Fresh source is `build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-20290`: 28 suites/165 cases and 745 unchanged
+inputs, summary SHA-256 `cca0cbfc25e07bc8af3e7766c433d88b4968aff92479195985ac03eb5d94524a`.
+Fresh legacy is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-20318`: 23 suites/107 cases and 725
+unchanged inputs, summary SHA-256 `85ae6d95d3754ac5414178d4ef272cc4fbfd6539558900b8a5ea64b61bf4018a`.
+Both include retained-data BK/Oxia service restart and fresh JVM recovery. The six locally published JARs match the
+built bytes and this source's runtime expectations in `build/m5-native-preferred-read-published-artifacts.json`;
+KafkaBK snapshot 52 has SHA-256 `664c9d91b197722eb65f8b5a32e2a5f319ae763f10c080fb75410584f31139cc`.
+
+The focused native worker/output gate passed 10/10 at `2026-10-02T03:57:45.476Z`, XML SHA-256
+`a29b1ebacc13a17fe855ffd8a8eb9739a5e8a64abd22a2e272cdebdba2a4dee5`, in
+`build/m5-native-preferred-read-broker-focused-current.*`. The first style rejection and 9/10 fixture failure are
+retained. The fixture failure used a separate fresh reader for the active raw tail; the corrected case uses the
+same actual live session as production Fetch and checks the original outcome before comparing bytes. No rule,
+assertion, SDK durability setting or timeout was relaxed. Native publication/activation/cold recovery, source-map
+rollover after selection, M4 RELEASED and the full lifecycle compositions remain required. All 17 obligations
+remain OPEN/null and all four authority flags remain false.
+
+The complete native Broker gate then passed 60/60 with zero failures/errors/skips at `2026-10-02T03:58:39.595Z`,
+in 268.467 seconds, XML SHA-256 `2e0a20cbb910200d5fcdeae232d003fb1563e31ec7314447cf553b161f23252e`, in
+`build/m5-native-preferred-read-broker-current.*`. All eight native inputs in
+`build/m5-native-preferred-read-broker-inputs.json` remained unchanged. Compilation, main/test Checkstyle and
+SpotBugs gates passed with existing heap/assertions/timeouts. This extends actual unpublished output verification
+with the Fetch byte prerequisite; it does not close a lifecycle obligation or promote M5 authority.
+
+### Native selected Task activation and cache ownership (current implementation amendment)
+
+`NereusKafkaPreparedTaskV2.publish` uses the same retained formal Task, successful complete native writer result,
+private worker grant and bound physical SDK. It creates KBSD3 from actual verified Parts and the captured independent
+protocol state. Publication stops local read/append capture before changing the remote selector; accepted writes
+must already be quiescent. Append rejection precedes offset allocation, and the marker prevents source rollover
+while the publication is unresolved. Native owner/policy/prefix/checkpoint checks run again at the final CAS.
+
+Every exact source protection is created through actual M4 control. Its first fallback-capable epoch is the new
+introduced read epoch. The existing publisher rechecks complete native input membership, holds actual sorted
+input/output tickets, verifies sealed output bytes/state, creates immutable descriptor/candidate records and uses
+the private worker token in the same raw-parent selector CAS. UNKNOWN retains the original Task, SDK, tickets and
+publication marker; a retry uses the same Task and durable original target membership.
+
+Only a known exact selected outcome can install the recovered cache. The local read owner requires its stopped
+exact predecessor and the actual admitting fallback-bearing successor, matching owner/read epoch, descriptor
+identity and source generation. Its typed source payload contains descriptor/raw metadata; the cache body remains
+owned by the partition. Ordinary native Fetch captures that same M4 authority and serves compacted prefix bytes
+plus the actual live raw tail through the existing K6 bridge. No new executor, timer, backend or configuration
+switch is introduced.
+
+A selected Task fences its actual finite create scope and confirms SDK close before releasing its original output
+writer tickets. Its in-memory terminal evidence binds the full native spec, verified descriptor and actual archived
+SELECTED decision. It never writes an unpublished `KafkaBookKeeperTaskTerminalV2`. Original invocation cleanup and
+actual client close remain required; no selected close/ticket UNKNOWN can discharge capacity. The formal Task
+charge remains with the installed cache, including a failed activation attempt that retained it. Discard therefore
+stays pending until actual partition read/hazard/SDK Owner drain clears the cache and fences the reservation IDs.
+This is local-owner cleanup evidence; it grants no crashed-owner termination or physical deletion authority.
+
+Fresh source 82571 passed 28 suites/165 cases with 745 unchanged inputs, summary SHA-256
+`ad2167ce46b9233bcc2f3e0a05e3b421bac0af4c7122a2d9fe071251afa8097a`. Fresh legacy 82604 passed 23/107/725,
+summary SHA-256 `21a69a5b1c18d75e4d039d81307a9151407d32cad19f1ad228bbbd260b946ba3`. Both actually restart retained
+BK/ZK/Oxia services and recover in fresh JVMs. All six locally published JARs match the built/source-qualified bytes
+in `build/m5-native-publication-published-artifacts.json`; KafkaBK snapshot 54 has SHA-256
+`95069bc8b40333239b159395b01dd9d48172ef89b9b231c218173bf13a94173d`.
+
+Three real native Broker publication cases passed 3/3 at `2026-10-02T05:10:34.480Z`, in 20.151 seconds, XML SHA-256
+`36a4cfb9d4f58ff7bfaca242d71805248ac2ec8e0ad2a8619643761f79d97c0a`, in
+`build/m5-native-publication-broker-focused-current.*`. They cover normal selection, applied selector response loss
+followed by exact retry, and actual SDK-close reply withholding with observer cancellation/Owner drain. Ordinary
+Broker Fetch is compared against complete selected output and real post-cut Produce bytes. The preceding 0/3 run
+is retained in `build/m5-native-publication-broker-protection-failed-current.*` with its matching native inputs; the
+adapter used the predecessor protection epoch and was corrected to the existing introduced-epoch contract. No
+validator, assertion, timeout or SDK durability setting was relaxed.
+
+The complete current native gate passed 63/63 with zero failures/errors/skips at `2026-10-02T05:11:06.471Z`,
+in 276.582 seconds, XML SHA-256 `e3e00798b989d3e2e63316e68243b0bfc3a0c7bd36adfe6d712964990c4256c9`, in
+`build/m5-native-publication-broker-current.*`. All eight native inputs in
+`build/m5-native-publication-broker-inputs.json` remained unchanged, and source/legacy manifests were rechecked.
+Main/test compilation and Checkstyle, SpotBugs and `v2DocumentationCheck` passed. The runner removed only its
+owned native services/volumes, preserving unrelated services and the existing heap diagnostic.
+
+Native selected-source rollover, cold recovery, repeated compaction/cache transfer, remaining required sources,
+complete quota/UNKNOWN/crash-orphan accounting, Pulsar/Object duties, M4 RELEASED and all lifecycle combinations
+remain required. All 17 obligations are OPEN/null; all four authority flags remain false. No aggregate/Final,
+coordinator acceptance, commit or push is claimed by this local publication/activation slice.
+
+### Native selected tail rollover and original source invocation ownership (current implementation amendment)
+
+A selected native partition now retains its original publication source projection separately from its current raw
+source map. The descriptor stays selected while actual raw-tail rollover appends the next native run and advances
+M4 source generation. Owner/read epoch, descriptor identity and the exact original fallback protection set remain
+unchanged. Existing sealed roots and read indexes must be an exact prefix of the successor; the original active
+run must retain its scope, run/ledger identity, creator/leader epochs, start offset and predecessor link when it
+becomes sealed. The complete successor hash still checks native root lineage, scope and every required read index.
+This is a local typed metadata projection, not another persisted format or a new source qualification grant.
+
+Rollover closes local capture before remote publication, qualifies every actual raw physical member under sorted
+original source-reference tickets and publishes the same-epoch M4 successor. Before ticket release, the native
+runtime compares the actual durable selector with its installed local source projection. Fetch compares the raw
+projection identity while retaining the selected descriptor cache; the existing preferred-prefix/raw-tail bridge
+therefore survives two actual native run switches. The selected Task/cache charge stays owned by the partition.
+
+Source publication now shares the existing Owner input-operation drain. Close cannot overtake the original
+qualification/CAS callback or miss the failed invocation it later hands back. A failed mutation retains its exact
+targets, Context, operation nonce and failure. It does not fabricate a successful publication or terminal Task.
+After actual Owner/read/SDK drain, cleanup may use confirmed no source CAS dispatch, or an actual monotonic durable
+selector observation that excludes the captured predecessor CAS. Absent, unchanged, unreadable or regressed
+observations retain tickets and cause Owner close to fail; they cannot release Task capacity. Initial native
+selector provisioning is bound to that exact caller-observed predecessor, so another advancement cannot silently
+retarget its original CAS. The first proven terminal facts are retained across cleanup retries. Reconciliation
+uses only the original nonce, without another publication/native reader or removal of a same-Context sibling.
+These local source-operation facts grant no M4 RELEASED, crashed-owner or physical-delete authority.
+
+Fresh source 25641 passed 28 suites/165 cases with 745 unchanged inputs, summary SHA-256
+`2d4f7863068c506baca72aace94f7d7c7a840746946cf925a6eb83fd516f73de`. Fresh legacy 25652 passed 23/107/725,
+summary SHA-256 `51d6651ed946ef53391ab54476177c5ef354eb66b709288ce998ffe03a2d2509`. Both actually restart retained
+BK/ZK/Oxia services and recover in fresh JVMs. All six publications in
+`build/m5-native-selected-rollover-published-artifacts.json` match built/source-qualified bytes. KafkaBK snapshot 57
+has SHA-256 `9184c9626854b70f650d6c958a1261457d2f0ec625dcd847df41f9e89466f1de`; Oxia snapshot 40 has SHA-256
+`8412f51ff7b7c5fb3cd7ca1902eb40722ddb782a08132788639ded49268caf16`. Earlier publication/activation tuples above
+are historical evidence; this extension uses the current tuple stated here.
+
+Five real publication cases passed 5/5 at `2026-10-02T05:49:56.386Z`, in 37.008 seconds, XML SHA-256
+`beafe3c03133a235358225804e4b0c216763ff98f4d6e5f26b558147bddb8d73`, in
+`build/m5-native-selected-rollover-broker-focused-current.*`. The new cases verify two actual raw-tail rollovers,
+unchanged descriptor/selection decision/read epoch/fallback membership, charged selected cache, complete native
+storage/Broker Fetch and a third applied source CAS whose reply is held then lost. Owner close is started while
+that reply is held, remains pending, then fails while selector reads are unknown. Original tickets and capacity
+remain; an actual reread and Owner-close retry clear only the original source nonce and then release the charge.
+
+The complete native gate passed 65/65 at `2026-10-02T05:50:45.892Z`, in 318.533 seconds, zero failures/errors/skips,
+XML SHA-256 `aea76e9a31fbe5cf072db12d8204bf381f4078b53afe76fe0b2191eda0f7087f`, in
+`build/m5-native-selected-rollover-broker-current.*`. It also extends the actual initial source-publication UNKNOWN
+case to original-invocation cleanup with a retained same-Context sibling. All nine native input hashes in
+`build/m5-native-selected-rollover-broker-inputs.json` and both source/legacy manifests remained unchanged.
+Main/test compilation and Checkstyle, SpotBugs and `v2DocumentationCheck` passed. The existing BooleanExpressionComplexity limit rejected
+one terminal-observation condition; it was split into explicit regression and no-advancement checks without changing
+semantics or weakening the rule. The earlier source run was deliberately stopped when the exact predecessor
+binding required a source change; its interrupted logs remain non-promotable. Owned services/volumes were removed,
+and the unrelated service and original heap diagnostic were preserved.
+
+Selected-owner cold recovery, repeated compaction/cache transfer, complete writer/catalog/quota/UNKNOWN/crash-orphan
+accounting, Pulsar/Object duties, M4 RELEASED and complete release/delete/lifecycle combinations remain required.
+All 17 obligations remain OPEN/null and all four authority flags false. The whole goal remains ACTIVE, with no
+aggregate/Final, coordinator acceptance, commit or push claimed by this local extension.
+
+### Selected-prefix closed-history replay (current implementation amendment)
+
+`KafkaBookKeeperClosedHistoryRecoveryV1.recoverSelected` accepts an independently verified KBSD3 view for the
+current complete raw-prefix profile. The enclosing native caller must still prove the exact durable selector,
+SELECTED decision, Task/Parts, namespace/capability and output read/cache capacity before invoking it. A verified
+carrier alone grants no Owner, M4 selection, source-reference or deletion authority. The ordinary raw recovery
+entry remains available for an actual raw selection.
+
+Recovery reanchors the full producer, transaction and leader-epoch components to an independently verified output
+Part handle at the cut end. It does not carry old raw locators or replace that state with a raw-tail checkpoint.
+The complete closed-Owner predecessor chain, closure digests and stable birth inventories are still discovered.
+Every nonempty covered raw root must match one exact descriptor source physical-resource digest and its complete
+coverage; all those source members must be consumed. Roots retain exact scope, creator/leader, initial selection,
+predecessor/successor and contiguous offsets. The cut must end at a sealed run boundary. Retired roots are permitted
+only in this completely verified covered prefix; an unselected birth still needs the existing actual fence and
+reconciliation, and an unreadable/retired suffix cannot be admitted by the seed.
+
+Covered roots are metadata lineage only: no raw admission read, native open, fence, footer or replay is dispatched
+for them. The result exposes their final sealed prefix anchor separately from the suffix admitted roots and read
+indexes. Native I/O and cumulative replay budgets apply to the admitted post-cut suffix. Covered metadata is
+processed iteratively, including empty sealed successors, so the existing 1024-run bound does not grow a synchronous
+callback stack.
+
+The focused unit run `build/m5-selected-seed-membership-unit-current.log` passed 24 cases: seven carrier/
+selected-prefix cases, fifteen takeover-recovery cases and two birth-recovery cases, zero failures/errors/skips.
+The new carrier cases use explicitly synthetic metadata and verified fixture bytes, retain complete independent
+state over a retired prefix, reject changed physical members, crossing cuts, missing births and wrong Owner closure,
+and exercise 1024 covered roots without SDK work. They prove recovery-algorithm boundaries only. The earlier failed
+unit assertion and bounded-fixture compile attempt remain in `build/m5-selected-seed-unit-failed.xml` and the
+corresponding logs; production checks and existing assertions were preserved. An intermediate source run was
+terminated before qualification for the bounded-iteration change, and its owned services were removed.
+
+The first stable source run 70861 reached the actual run-root suite but failed its existing
+`unknownSuccessorAttachmentRemainsInClosedMembershipAndCannotAllocate` case. Exact durable Owner membership can
+select an ACTIVE root while its separate admitted flag remains pending after a lost attachment response. The
+new unconditional flag check was removed; the actual Owner link and ordinary authority admission remain required.
+Covered roots remain SEALED and therefore cannot carry a pending flag by the root-record contract. The failed
+16-case/one-failure XML is preserved in `build/m5-selected-seed-run-roots-failed.xml`; it supplies no qualification.
+
+The corrected fresh source 85769 passed 28 suites/168 captured cases/745 source hashes, summary SHA-256
+`8fdb7558d327db0817b103e99fad6687cfc81ecf16fa52616f663f0ba79d74cb`; fresh legacy 85781 passed 23/107/725,
+summary SHA-256 `de293771d67c9c119746d01ef5d0c9b1dd71ce5bf98c2debb2355f3ad06512de`.
+Both include actual retained-data BK/ZooKeeper/Oxia restarts and fresh-JVM recovery. The unchanged UNKNOWN
+successor-attachment case passes in the real 16-case run-root suite. The source runner now requires the three
+new named algorithm cases and all seven carrier cases without skips. The six locally published JARs in
+`build/m5-selected-seed-published-artifacts.json` match their built JARs and source-qualified runtime digests;
+KafkaBK snapshot 58 is `bb8b8a0e6743bc5d9117749cb320a4e1be91917981a35829267ab63a756451c9`.
+These source/carrier regressions do not prove actual Broker execution of the new selected-recovery entry.
+
+The unchanged native sources were rebuilt against those current JARs. The selected publication/rollover subset
+passed 5/5 at `2026-10-02T06:43:14.051Z`, in 35.89 seconds, XML SHA-256
+`a3bbf3a619e7cc18afa9f31e716469b6e3412ae41e4d0986bcb722918a1e807a`; the complete existing Broker gate
+passed 65/65 at `2026-10-02T06:44:02.376Z`, in 297.008 seconds, zero failures/errors/skips, XML SHA-256
+`f2eb4e7ce18babdfc8fbd0fc5756c4ca3c14b26f4267264c27f18173606d6d82`, in
+`build/m5-selected-seed-native-broker-focused-current.*` and `build/m5-selected-seed-native-broker-current.*`.
+Main/test compilation and Checkstyle plus SpotBugs passed; all nine native input hashes and both source manifests
+remain unchanged. This rerun proves the existing native paths on current core bytes; it does not exercise the new
+selected cold entry. The normal successor writer also rejects a retired parent, so an all-covered retired prefix
+anchor needs separately qualified native birth/admission before the Broker can use it for a new run.
+
+Actual Broker selected-owner cold loading/takeover, output/cache admission, post-cut SDK replay and Fetch after
+prefix release/deletion are still unverified and must be integrated. The preceding native 65-case tuple used the
+preceding core bytes; it is not evidence for this selected-recovery entry. Repeated compaction/cache transfer,
+remaining providers/writers, M4 RELEASED and the complete M5 lifecycle/aggregate/Final remain required. All 17
+obligations remain OPEN/null, all four authority flags false, and the full goal remains ACTIVE without commit/push.
+
+### Selected-cache capacity provenance (current implementation amendment)
+
+Before its selected descriptor CAS, the native publisher persists an immutable KBCB1 cache budget on the actual
+Task's namespace-bound Oxia record route. The 202-byte value binds the exact descriptor digest, actual formal Task
+reservation and bounded RecordBatch decoding allowance. The typed route requires the original immutable Task;
+when the descriptor exists it also checks that exact descriptor. The budget bounds encoded Parts by the retained
+output plus index allowance, decoded selected bytes by output allowance, record counts by the retained record
+allowance, and the eight indexes plus independent protocol-state artifact by the index allowance. `dirtyBytes`
+retains its existing input meaning. This value supplies resource provenance only, with no selection, Owner,
+writer/read ticket, native identity, RELEASED or deletion authority.
+
+The publisher requires an exact authoritative reread of the same budget before stopping its raw predecessor or
+dispatching selector publication. Missing, conflicting or unreadable bytes preserve the actual Task capacity and
+writer ownership. A lost create response may be reconciled only by that exact reread. Budget bytes and resource
+identity remain stable on publication retry; no sibling record or new Task reservation discharges the original
+attempt. A later cold Owner must reserve an independent cache identity before opening output SDK handles or
+decoding, and must retain its charge until actual cache/read/SDK/ticket drain. Reusing the old Task reservation ID
+is rejected because actual Task/Owner drain may already have permanently fenced it. No Cell cap is inferred from
+this budget and no new cap installation is authorized by its presence.
+
+The actual native publication fixture checks the budget against the retained formal reservation and decoding
+bounds through the underlying Oxia client. Its added applied-create/lost-response/unreadable-budget case requires
+the selector to remain exactly at the raw predecessor while Task capacity and writer tickets remain held, then
+retries after authoritative reads recover and validates selected Fetch and actual Owner drain. These cases cover
+publication of cold-cache resource provenance; they do not execute selected cold loading or takeover. The actual
+Broker selected entry, fresh cache reservation, retired prefix anchor birth, raw-tail replay, M4 release and
+post-delete cold Fetch remain required alongside all other M5 obligations.
+
+Current source 41861 passed 29 suites/176 captured cases/746 unchanged inputs, summary SHA-256
+`d15fbb9e64d28f6503e4245f8da4953f66467a5b0d8a1f1db60c2d7957d73741`; fresh legacy 41872 passed
+23/108/726, summary SHA-256 `23c59cac384654add14241604c788072bba012acda4f49d7a9447a3f753bb6a3`.
+Both include retained-data actual BK/ZK/Oxia restart and fresh-JVM recovery. The source captures the eight-case
+typed cache/Task metadata suite and still requires all existing recovery cases. Six local development publications
+match their built and source-qualified JARs; KafkaBK snapshot 59 is
+`b095948029f90508ed00b3387f37242a627e6000a525fea1e3db19bd17d4d4d9`, Oxia snapshot 42 is
+`ae5e977a033f42d32b34ef24ccc29df98f6253c1243efebf81ab69ba4963ee4e`.
+These source/carrier results are prerequisites and do not establish native selected cold entry or complete M5.
+
+The native publication subset passed 6/6 at `2026-10-02T07:23:08.465Z`, time 42.575 seconds, zero failures/
+errors/skips, XML SHA-256 `c789c49116d2b5c0ad9b86268ee6d78542cc9afab0424394f7a1c8270b98f9b8`, in
+`build/m5-selected-cache-budget-native-broker-focused-current.xml`. The new UNKNOWN case uses actual Oxia/BK,
+checks the unchanged raw selector and a successful native raw read while budget rereads fail, keeps the actual
+Task charge and output writer tickets, then checks selected publication/Fetch and actual Owner drain on retry.
+This executes the resource-provenance publication path and does not execute a cold cache loader or new Owner takeover.
+
+The complete current-byte native Broker gate passed 66/66 at `2026-10-02T07:24:03.398Z`, time 319.746 seconds,
+zero failures/errors/skips, XML SHA-256 `0f8624bc5d1fc277ae79d859d140254ae219be230a243daab1bda2b18b59fd13`,
+in `build/m5-selected-cache-budget-native-broker-current.xml`. Main/test compilation and Checkstyle plus SpotBugs
+passed. All nine native input hashes and both source manifests remained unchanged. The owned native services and
+volumes were removed. This proves the existing raw, source/ticket, selected publication/rollover and new cache-budget
+publication paths on the current JARs. Actual cold loading/takeover, retired-anchor birth, fresh cache capacity,
+post-cut replay and post-release/delete Fetch remain open, as do the remaining providers and complete M5 obligations.
+All 17 acceptance obligations remain OPEN/null and all four authority flags false; no aggregate/Final is claimed.
+
+### Native selected-owner cold entry (current implementation amendment)
+
+The actual Broker open path now resolves its observed selected digest through the namespace-bound typed Oxia
+route. Before SDK dispatch it requires the immutable selected Task decision, KBSD3 independent recovery state,
+exact Task/Part inventory, current native capability and persisted KBCB1 decoding/resource budget. An admitting
+PREFERRED_ONLY or PREFERRED_WITH_FALLBACK selector may load that exact output. A descriptor-less raw
+PREFERRED_ONLY selector retains the existing raw recovery entry. Existing native source qualification remains a
+prerequisite for a Broker with a durable M4 selector.
+
+The new Owner reserves an independent cache identity under already installed actual Cell caps and retains that
+reservation in its existing Owner drain lifecycle. The old Task identity cannot be reused. Output reads acquire
+physical tickets for every actual sealed Part and reserve configured Cell/Binding SDK slots before opening.
+Part traversal closes each confirmed SDK handle before opening the next; all output tickets cover traversal,
+decoding and actual SDK termination. Decoding uses the existing M5 control executor, so a synchronous open does
+not queue its completion behind its own occupied recovery executor. No additional executor or inferred cap is
+introduced. The completed output is installed only after exact selector/assignment reread and confirmed SDK/
+ticket cleanup. Outstanding failures remain owned by the existing drain path; cold UNKNOWN combinations remain
+unverified.
+
+The verified output enters the selected-prefix closed-history algorithm. The complete durable raw catalog and
+Owner chain remain checked; SDK replay starts at the exact selected cut and reconstructs only the post-cut tail.
+The native read projection retains the descriptor and original fallback identities while representing that
+actual tail. A qualified M4 takeover preserves an existing fallback selector and its selected digest. The normal
+successor birth still needs an admitted live predecessor: all-covered retired-anchor birth remains open.
+
+Fresh source 75824 passed 29 suites/176 captured cases/746 unchanged inputs, summary SHA-256
+`7cb278a1cfef13bac0c8a1c9bb76190a7868b23ed51ffc08304ef84c7c49a412`; fresh legacy 75853 passed
+23/108/726, summary SHA-256 `cda4aa5e08484b5ae679d94c224a932113a4819ec72e8320fe5c63ebf8e6123e`.
+Both retained data across actual BK/ZK/Oxia restart and fresh-JVM recovery. All six local publications match
+those built and source-qualified JARs: KafkaBK runtime snapshot 60 is
+`d27e7045ee12d1c0a693f21e54541a1aa7c33fde5b5bba1a0b40ff5736110298`, Oxia snapshot 43 is
+`be1089a763d7477ad34280ad1e05f588a296f1aa2755d579dc421ba952434117`.
+
+The actual native publication subset passed 7/7 at `2026-10-02T08:05:13.858Z`, time 51.785 seconds, zero
+failures/errors/skips, XML SHA-256 `c3fff1e687e30ad9e9d7d176037002c6a63fd667d7755a2c94374c64560c91d9`,
+in `build/m5-selected-cold-native-broker-focused-current.xml`. TASK_OUTPUT_PUBLISH_COLD starts a real native
+Task, selects its independently recovered output, confirms old Owner/SDK/cache drain, uses an actual Controller
+reassignment to Broker 1 with one recovery executor thread, and checks a distinct charged cache identity. The
+new Broker's ordinary Fetch matches the compacted prefix and actual raw tail, subsequent Produce is readable,
+and actual new Owner drain releases the cache charge. The fixture rejects a covered raw predecessor SDK read.
+This establishes the confirmed-drain cold entry on current bytes. Crash/overlap/UNKNOWN cache accounting,
+multiple-Part cold fault combinations, cold tail rollover, repeated compaction/cache transfer, M4 RELEASED,
+retired-anchor birth, post-delete cold Fetch and the complete lifecycle/aggregate/Final remain required. All 17
+obligations stay OPEN/null and all four authority flags false.
+
+The complete current-byte native gate passed 67/67 at `2026-10-02T08:06:16.490Z`, time 323.349 seconds,
+zero failures/errors/skips, XML SHA-256 `81c3d5d0efccce0c54c6549492eebfa8c9c0941834b4ebc22ba6d5450d658a3e`,
+in `build/m5-selected-cold-native-broker-current.xml`. Main/test compilation and Checkstyle plus SpotBugs passed.
+All nine native input hashes and both source manifests remained unchanged, and the owned native services/volumes
+were removed. The new cold case ran in both subset and full gate. This supersedes the preceding cold-entry
+verification status for that confirmed-drain slice; it supplies no whole-M5 receipt or aggregate/Final authority.
+
+### Native fallback retirement after confirmed drain (current implementation amendment)
+
+`Opened.retireNativeM5Fallback` joins the actual current KRaft/Owner admission, selected Broker read actor and
+existing M5 control executor. The partition checks its exact selected cache and stable publication before fencing
+local read and append admission. The owned operation closes PREFERRED_WITH_FALLBACK to PREFERRED_ONLY with
+one next read epoch/source generation, the same Owner/descriptor and the original introduced fallback identities.
+The actual old actor remains fenced throughout metadata uncertainty and SDK drain. Append admission rechecks
+the publication fence under the final reservation lock, closing the preflight/reservation window before offsets
+or DATA quota can be allocated.
+
+Only confirmed completion of all accepted old-actor reads, SDK termination and exact hazard clears can construct
+the planned-drain terminal and deterministic canonical M4 proof. Release uses that old actor's hazard pool. The
+operation retains one exact terminal/proof across retries and requires authoritative RELEASED for every actual
+batch source before installing its privately constructed successor read actor. The successor uses the existing
+executor and configured Cell/Binding read semaphores. No replacement empty pool, observer cancellation, synthetic
+terminal/proof input or qualified-expiry shortcut establishes drain. Cancellation leaves the actual owned
+operation running; unresolved release leaves the cache charge and admission fence intact.
+
+The expanded actual native publication subset passed 11/11, zero failures/errors/skips, at
+`2026-10-02T10:27:37.593Z`, 72.696 seconds, XML SHA-256
+`a24dbab30aced0369ea5c8cadc15c2cd4227daaa88b90828eba1cde0ef293c82`, in
+`build/m5-native-fallback-release-native-broker-focused-current.xml`. Its four new RELEASE modes read actual Oxia
+terminal/proof/protection records. They exercise normal release; a held actual raw SDK read with no terminal/proof
+and retained PROTECTED records through observer cancellation, including ordinary Produce rejection with the
+coherent protocol root unchanged; an applied RELEASED response loss plus blocked
+reread, exact immutable retry and resumed Fetch; and actual Controller reassignment after release/old Owner drain.
+The new Owner uses one recovery thread, independent cache capacity and selected output plus actual raw tail, with
+covered raw SDK reads rejected. Subsequent Produce and confirmed new Owner cache release also pass.
+
+Fresh corrected source 56599 passed 29 suites/176 captured cases/747 unchanged inputs, summary SHA-256
+`4358a7687d4610fd06b5066860ad07eb5af5c965bef34852a4ee80e2e6121a3c`; fresh legacy 56636 passed
+23/108/727, summary SHA-256 `b60b214e7d196d36418209913905eb646c6bb46cbc1348ff92c6ed5f08b3e7a1`.
+Both include retained-data BK/ZK/Oxia restart and fresh-JVM recovery. All six local publications match those
+source-qualified built JARs. KafkaBK snapshot 63 is
+`b0f5447b42f834ae2159446cfc05a97d1a7f6a3d1715a12b54580ff6c2666912`; Oxia snapshot 46 remains
+`be1089a763d7477ad34280ad1e05f588a296f1aa2755d579dc421ba952434117`. These supersede the preceding
+cold-entry source/publication tuple for the current implementation.
+
+The complete current-byte native gate passed 71/71 at `2026-10-02T10:29:02.208Z`, 336.103 seconds,
+zero failures/errors/skips, XML SHA-256 `8b8e1a262989aa81421aab0690a3a0266a21aee9fdd3313382c7a81b9655a1c6`,
+in `build/m5-native-fallback-release-native-broker-current.xml`. Main/test compilation, Checkstyle and SpotBugs
+passed. All four new RELEASE modes ran again in the full gate. All ten native input hashes remained unchanged,
+and the owned native services/volumes were removed.
+
+This preceding tuple qualified confirmed-drain fallback release for its actual native Broker actor. Its hot raw
+Run/read-index projection remained; the current transfer is specified below. Authoritative physical-reference/grace/eligibility,
+native GC dispatch, post-delete Fetch/cold recovery, overlap/crash/SDK UNKNOWN reconciliation, repeated Task/cache
+transfer and the remaining Kafka/Pulsar/Object/Oxia duties remain required. All 17 obligations remain OPEN/null;
+all four authority flags remain false. This slice supplies no M5 receipt or aggregate/Final authority.
+
+### Native covered-source and checkpoint transfer (current implementation amendment)
+
+The actual fallback retirement now derives its successor from the selected descriptor's exact raw prefix. The
+original complete source map remains validated. Every non-empty covered sealed root must match one distinct
+physical ledger identity and exact source extent; the cut must end at a run boundary, without missing, repeated,
+foreign or partially covered members. Only that prefix is removed. The successor retains the complete raw tail
+and its read indexes, preserves the selected descriptor, and follows the same tail-start/lineage checks used by
+selected cold recovery. Original catalog roots, predecessor links and immutable source-cut provenance remain.
+
+Admission requires the actual append/speculative queue to have drained. The old read actor closes permanently;
+its confirmed SDK/hazard drain and authoritative M4 RELEASED precede the hot table switch. Held SDK completion,
+observer cancellation and release UNKNOWN keep the original raw tables and selected cache capacity. The privately
+owned retirement result alone can install the successor actor; exact retry does not repeat the transfer.
+
+The Owner-local K1 CAS preserves every logical frontier, the active tail, producer/transaction/leader-epoch
+components and their references. Only run/source/protection and recovery-checkpoint references advance. A covered
+checkpoint moves to the independently verified KBSD3 output's complete components and exact coverage; its original
+checkpoint digest must match that captured state. A later raw-tail checkpoint keeps its carrier and components,
+removing only the covered prefix's source locators. Live checkpoint capture remains available when the transferred
+raw sealed table is empty. No persisted format, durability requirement or recovery guarantee is relaxed.
+
+Focused protocol/coordinator tests pass 7/11 cases, with immutable XML and seven input hashes in
+`build/m5-native-source-transfer-unit-*`. Fresh source 6797 passes 29 suites/176 captured cases/747 unchanged inputs,
+summary SHA-256 `249a05fd2341a7ecf378bd0645d9ff0d9003f9ef9966744cd388d89c63517226`; fresh legacy 6832 passes
+23/108/727, summary SHA-256 `75347114f80fa3a8f1bb831a2f35f41535ce76625bb08c5a9831316268fb656c`.
+Both run retained-data BK/ZK/Oxia restart and fresh JVM recovery. All six published JARs match the source-qualified
+built bytes in `build/m5-native-source-transfer-published-artifacts.json`. KafkaBK snapshot 64 is
+`1deaa9a6eff92929ef5036d51345cac748e3233e1b105ac26bc51c1679c8a02e`; Oxia snapshot 47 is
+`be1089a763d7477ad34280ad1e05f588a296f1aa2755d579dc421ba952434117`.
+
+The actual Broker publication subset passes 12/12 at `2026-10-02T11:22:23.176Z`, 85.704 seconds,
+zero failures/errors/skips, XML SHA-256 `f492db5882ba7f7bedfbe03191a2646bf5d17b199c988c63c02405024dd0a88a`,
+in `build/m5-native-source-transfer-native-broker-focused-current.xml`. It verifies unchanged live protocol state,
+checkpoint reanchoring, later checkpoint locator pruning, retained raw sources through held SDK/release UNKNOWN,
+ordinary Fetch with covered raw SDK opens forbidden, actual cold relocation, and two real rollovers on each side
+of retirement. The complete current native gate passes 72/72 at `2026-10-02T11:24:01.154Z`, 360.342 seconds,
+zero failures/errors/skips, XML SHA-256 `43b2c63855f09705cbcdf8ef5d2cba482604472b6f91dfb66be2338115a5e559`,
+in `build/m5-native-source-transfer-native-broker-current.xml`. Main/test compilation, Checkstyle and SpotBugs
+pass; all ten native inputs remain unchanged. The runner removes only its owned native services/volumes.
+
+This removes the current hot reader/checkpoint dependency on that replaced raw prefix. Complete authoritative
+reference inventories, semantic-transfer/floor/grace producers, native GC dispatch, actual physical deletion and
+post-delete Fetch/cold entry remain required, along with the remaining Kafka/Pulsar/Object/Oxia M5 duties. All
+17 obligations remain OPEN/null, all four authority flags false. No aggregate/Final, coordinator acceptance,
+commit or push is granted by this focused transfer.
+
+### Native BK replacement semantic comparisons (current implementation amendment)
+
+The ticketed KBSD3 publisher now stores `KafkaBookKeeperReplacementSemanticsV2` before descriptor/candidate
+publication and selector mutation. Original native input bytes have been checked against the entire immutable
+plan; the independent output reader has verified every sealed native part, entry, semantic index and recovery
+artifact. The comparison value binds the exact Task, descriptor, source cut and durable original publication
+membership. It can exist for an unselected or subsequently cancelled Task; selected-generation authority remains
+a separate requirement.
+
+All eight applicable semantic aspects are compared from both sides. READ_RESULTS compares independently decoded
+output records and suppression gaps against the validated plan's normalized output. RECOVERY compares complete
+captured and independently read KBSD3 state. Producer, transaction and leader-epoch roots use the canonical
+profile-neutral components, excluding obsolete physical checkpoint locators. Timestamp lookup compares rebuilt
+and read indexes; index coverage compares all eight canonical index bodies. Native-source authority compares
+the actually verified input namespaces/provider scope with the verified output namespace/part scopes. Physical
+ledger IDs change during rewrite; namespace incarnation and provider scope must match. Exact source-cut provenance
+binds the logical scope. This does not supply the GC operation's fresh native Owner/fence authority.
+
+KBRS wire 1 is bounded, canonical and checksummed. It retains separate prior/replacement roots for each aspect;
+missing, repeated, reordered or unequal comparisons fail. `transfers` requires the exact descriptor and an actual
+metadata fact naming the comparison key and bytes. GC must capture and revalidate that fact with the remaining
+authority vector. No roots are copied between sides. Missing independent recovery state or native input membership
+cannot produce this proof; older KBSD2/unqualified publication does not acquire it by inheritance.
+
+Immutable comparison-write conflict or unresolved metadata response prevents selector publication. A known
+selected Task retry reconciles its original tickets and retains the original comparison, without reopening expired
+input admission. This additive metadata value changes no BK entry/checkpoint format and grants no physical-delete
+authority. Concrete reference/floor/grace producers, native dispatch, actual delete/post-delete recovery and the
+remaining Kafka/Pulsar/Object/Oxia duties remain required. All 17 obligations stay OPEN/null and all four authority
+flags false. Fresh source 4028 passes 29 suites/178 captured cases/748 unchanged inputs, summary SHA-256
+`a0c98079873a1eb53d48ddd52ccc96599abb8dfa7791e275b4d35974211791fe`; fresh legacy 4123 passes 23/108/728,
+summary SHA-256 `1959054701ddfa09c06b6a6b3465e8fd08aaf6980f546836f4f8d58594a1c98c`. Both actually restart retained
+BK/ZK/Oxia data and recover in fresh JVMs. The nine real publication-ticket cases include independent comparison
+fact capture and immutable same-Task cleanup retry. All six built/published JARs match source-qualified hashes in
+`build/m5-replacement-semantics-published-artifacts.json`. KafkaBK/Oxia snapshots 65/48 have SHA-256
+`4cbc170203b549842338f79f645028e9cc2204501081cb1f61fa03b844222a61` /
+`004f68cc72fbfd7a54f5d43bc0921534fb9dd50611916dcf3b480944b9349e98`. Actual Broker publication passes 12/12
+at `2026-10-02T12:33:50.035Z`, 88.249 seconds, XML SHA-256
+`26f7ef204d6e8989f1a878dc6c79dba723cb52421dffd13ef63154f601550758`; the complete current native gate passes
+72/72 at `2026-10-02T12:35:31.562Z`, 358.731 seconds, XML SHA-256
+`a8275fe95480c8bb67ab45f779d929393d0f4be3d3201a4c9ada4a7871210574`, in
+`build/m5-replacement-semantics-native-broker-focused-current.xml` and
+`build/m5-replacement-semantics-native-broker-current.xml`. Both have zero failures/errors/skips. Actual published
+Task cases read the comparison and original membership from Oxia, use its native version to bind all eight
+transfers, recheck the immutable fact and exercise ordinary Fetch and the existing UNKNOWN/release/rollover/cold
+combinations. Main/test compilation, Checkstyle and SpotBugs pass; all ten native hashes remain unchanged.
+Owned native services/volumes are removed. No aggregate/Final is claimed.
+
+### Native fallback Owner fact revalidation (current implementation amendment)
+
+`OxiaKafkaRunRootAuthorityV2.readOwnerAdmissionFact` reads the exact native Owner head through its closed route.
+The decoded admission and its native key, server version and stored-value SHA-256 travel together; scope/key and
+canonical value checks precede the return. This observation is not a lease, time authority or physical-delete grant.
+
+The native Broker captures that actual open admission before starting fallback retirement. It binds the original
+fact to the actual owned retirement attempt; an UNKNOWN retry cannot replace it with a newer head. After confirmed
+SDK/hazard drain and authoritative M4 RELEASED, the existing Task-control executor rereads the native Owner head.
+The exact original key/version/value must remain current, the admission must still be open for this native Owner,
+and actual KRaft assignment must still match before and after the read. Only then may the private retirement result
+transfer hot source and recovery-checkpoint references. A closed or changed head, including a same-value CAS with a
+new version, or an unresolved read leaves the original hot sources/checkpoint and selected cache capacity intact.
+Confirmed M4 release may already exist; a known unchanged reread resumes the same terminal/proof and transfer.
+
+The existing unit Owner-closure suite passes 19/19. Fresh source 1224 passes 29 suites/178 captured cases/748
+unchanged inputs, summary SHA-256 `f54d4b2bc41927f137706bd22d4afe00b8f75718c54857cc39e656a27fbde66b`;
+fresh legacy 1235 passes 23/108/728, summary SHA-256
+`4a7b609ddc3c5fcd41353a0a0a4c1a0ee430ed101804a8d327d69ff548d76240`. Both actually restart retained
+BK/ZK/Oxia data and recover in fresh JVMs. The real native Owner-closure case checks the returned key/value and
+changed server version. All six built/published runtime JARs match this source tuple in
+`build/m5-native-owner-qualification-published-artifacts.json`; KafkaBK/Oxia snapshots 66/49 have SHA-256
+`4cbc170203b549842338f79f645028e9cc2204501081cb1f61fa03b844222a61` /
+`9d7998f5d50790e51e4b1bf23b90dc858b3917e1bb7f0e472537a0f1bc572fd9`.
+The actual Broker publication subset passes 15/15 at `2026-10-02T14:19:02.935Z`, 96.415 seconds, zero
+failures/errors/skips, XML SHA-256 `d5abb8915c5e5b5a26cc1d330db8bcdb674f1c5531ac02af18f43b6076fba38e`,
+in `build/m5-native-owner-qualification-native-broker-focused-current.xml`. Added cases close or rewrite the actual
+Oxia head while a real raw SDK read is held, or make Owner reread UNKNOWN after actual RELEASED. They check
+unchanged hot sources/checkpoint and retained capacity; UNKNOWN recovery retains the original M4 terminal/proof
+and resumes ordinary Fetch. Same-value rewrite specifically checks native version freshness.
+The expanded complete native gate passes 75/75 at `2026-10-02T14:20:50.898Z`, 355.473 seconds, zero
+failures/errors/skips, XML SHA-256 `ebbedb943c1899342b8febdb056db175e099ff7fe0c1c02fcb9af804c4c89933`,
+in `build/m5-native-owner-qualification-native-broker-current.xml`. All three new Owner modes run again in that
+gate. Main/test compilation, Checkstyle and SpotBugs pass; all ten native inputs remain unchanged. The runner
+removes its owned native services/volumes.
+
+This qualification is confined to the actual native fallback attempt. Complete durable physical-read-scope and
+reference/floor/grace producers, all current writers/owners, native GC dispatch, physical deletion and post-delete
+recovery remain required alongside the remaining Kafka/Pulsar/Object/Oxia M5 duties. Oxia version timestamps still
+provide no admitted cross-leader clock-error bound and cannot supply grace. All 17 obligations remain OPEN/null,
+all four authority flags false. The preceding 4028/4123/65/48/12+72 tuple remains preceding-byte qualification.
+
+### Native read-scope transfer record (current implementation amendment)
+
+The privately owned fallback result now exposes a transfer observation only after the actual hot source/checkpoint
+switch. It verifies that the original actor's exact raw map became its validated tail-only successor, logical
+frontiers/fences and producer/transaction/leader-epoch state stayed unchanged, the local K1 version advanced once,
+and the resolved checkpoint retains no covered Run locator or carrier. Callers cannot construct that qualification.
+The ordinary data record constructor/decoder does not establish a native operation.
+
+`KafkaBookKeeperNativeReadScopeV2` binds that observation to the exact Task/KBSD3 descriptor, physical source
+membership, native scope, actual open Controller Owner and its Oxia key/version/value fact. It records before/after
+raw-map, coherent K1 root and checkpoint-content-reference hashes, and the actual M4 selector/batch/terminal/proof
+identities. KBNS wire 1 is canonical and checksummed, capped at 4,096 bytes and 64 physical ledgers. The immutable
+key includes descriptor, Owner epoch and closed read epoch. The typed route verifies the descriptor and exact
+authoritative terminal/proof/RELEASED membership; both closed native record routes admit only this new key family.
+
+The existing native Task executor writes the record after the actual transfer and rereads exact stored bytes before
+clearing the append publication fence. Owner fact and KRaft assignment are reread again after persistence. A lost
+scope response or unreadable scope retains the fence and selected cache charge. The transferred reader can still
+serve selected output plus the live tail. Retry consumes the original frozen transfer; it never reopens the drained
+raw actor, advances K1 again, changes the immutable record or invents another terminal/proof. Existing pre-transfer
+Owner/release UNKNOWN behavior keeps its original hot references.
+
+Fresh source 55200 passes 29 suites/178 captured cases/749 unchanged inputs, summary SHA-256
+`44b89afb4069c2ef2e783f21fa4aad74e7bb97e074784b98c9e5174c8761d64d`; fresh legacy 55211 passes
+23/108/729, summary SHA-256 `ddc5e9e75ef6606294da193f458dbc0dec3316f5b8363794a48769ec4369f11e`.
+Both perform retained-data BK/ZK/Oxia restart and fresh JVM recovery. All six built/published JARs match this source
+tuple in `build/m5-native-read-scope-published-artifacts.json`; KafkaBK/Oxia snapshots 67/50 have SHA-256
+`8eb88a51fd8f4ff9cb61611d8bd790d938a2538f0aa790ef215d8f02d7c86f33` /
+`c4dda7d0481ede02b64b39b465bbadf13a5ebc3fbed2f5e7868dd73346ee760c`.
+The corrected actual Broker publication subset passes 16/16, XML timestamp `2026-10-02T16:17:13.095Z`,
+108.933 seconds, SHA-256 `45bcbd909476a35dcae7f815941807355ce74f53cbfdfb019765c7516165bc02`.
+The full native gate passes 76/76, XML timestamp `2026-10-02T16:19:13.771Z`, 367.242 seconds,
+SHA-256 `c38c226759c785b2afe8ea1eb61180b2006ad41d7b4ec60d7aa10b88421eed5c`.
+Both report zero failures/errors/skips. The same run independently checks all 12 captured native inputs unchanged.
+The scope-UNKNOWN case loses an actual applied create response and blocks record rereads, then verifies ordinary
+selected Fetch, retained cache and append fence, followed by exact original record/version retry. The initial
+75/76 metadata-image-race run and its subsequent test-only correction remain recorded in the implementation log.
+
+This is one actual live actor's historical transfer observation. Complete active/cold/other-reader physical-scope
+inventory, complete references/floors/grace, native dispatch, physical delete and post-delete recovery remain required
+alongside all remaining Kafka/Pulsar/Object/Oxia M5 duties. A fresh GC scan must revalidate Owner/selector and every
+other authority fact; this record grants no future admission or time authority. All 17 obligations remain OPEN/null
+and all four authority flags false. The 1224/1235/66/49/15+75 Owner tuple qualifies its preceding bytes.
+
+### Native cold recovery read-scope record (current implementation amendment)
+
+The actual selected cold entry now captures its installed read actor before Broker request readiness.
+`KafkaBookKeeperPartitionV1.NativeRecoveryReadScope` has a private constructor and is available only for the
+selected prefix supplied to that partition's real recovery. It binds the admitted local M4 projection, exact raw
+source map, selected descriptor and coherent resolved checkpoint to the actual closed predecessor. Checkpoint
+carrier and read-index Run IDs must belong to the actual raw tail/active Run or selected Parts. Hot Task installation
+cannot create this cold qualification, and a changed actor/checkpoint fails its post-persistence check.
+
+`KafkaBookKeeperNativeRecoveryScopeV2` records the actual new open Owner and previous closed archive as native
+key/version/value facts, selected descriptor, native scope, M4 mode/epoch/source generation/core digest, initial K1
+snapshot and exact sorted raw/selected physical ledger membership. Raw members may not include a covered old input;
+selected members must be exactly the descriptor's sealed Parts. KBRS wire 1 is canonical/checksummed, capped at
+16,384 bytes, with the existing 1,024 history Runs plus active Run and 256 selected Part bounds. The closed key family
+is `views/<descriptor>/native-recovery-scope/<OwnerEpoch>/<ReadEpoch>`. It is one immutable initial observation per
+cold actor, rather than append/scan history. Both typed/native record routes admit the exact family only.
+
+The existing recovery executor persists and authoritatively rereads the exact record after installing its actual M4
+read actor and before `afterReady`. It then rechecks local state, exact selector, current Owner and immutable closed
+Owner archive. A response lost after actual create can reconcile only through exact authoritative bytes. Until
+confirmation, the actual selected-cache reservation remains retained and the Owner is not request-ready. This
+observation records both preferred-only and inherited-fallback cold entries; the latter still has its M4 fallback
+veto. The fact is an initial historical scope observation, not complete current reader inventory or future admission.
+
+The preceding qualified cold-scope tuple passes core compilation and main Checkstyle. Source 71612 passes
+29 suites/178 cases/750 captured inputs;
+fresh legacy 71623 passes 23 suites/108 cases/730 captured inputs. Both retain actual BK/ZK/Oxia data through service
+restart and run fresh-JVM recovery. All 52 XML digests, both complete input manifests, the legacy summary link and
+all six source/built/published JAR digests agree. The then-published development KafkaBK/Oxia snapshots are 68/51.
+The expanded publication gate passes 18/18 at `2026-10-03T03:18:17.427Z` (116.066 seconds), XML SHA-256
+`7312bb9fb02b575542639f19b6d647daaad1fa125867e02cf01b764cb0011776`; the full native gate passes 78/78 at
+`2026-10-03T03:20:48.810Z` (370.883 seconds), XML SHA-256
+`49057964d167f3bb29b030b0deab0ffcb5d5e4b138fb05d9842a36960a113120`. Both have zero failures/errors/skips,
+and all 12 captured native input hashes remain exact. The two phases use separate fresh owned BK/ZK/Oxia data
+with the same native quota. Their two new cold modes lose the actual applied scope response and withhold its
+confirmation before readiness, then resume the same invocation and ordinary Produce/Fetch. Complete
+other-reader/current-scope refresh, reference/floor/grace
+producers, all writer/namespace duties, dispatch/delete/post-delete and aggregate/Final acceptance remain required.
+All 17 obligations remain OPEN/null and all four authority flags false. The 71612/71623/68/51/18+78 and
+55200/55211/67/50/16+76 tuples qualify their respective preceding source bytes; neither qualifies the subsequent
+retired-anchor birth changes below.
+
+### Retired prefix anchor birth (current implementation amendment)
+
+The native Run verifier now has a default-denied retired-successor qualification. Its actual Broker implementation
+captures only the independently recovered selected cache, exact prior selector and native closed-Owner archive.
+The permission is confined to cold opening before storage activation, preferred-only selection, the exact closed
+tail at the selected cut end, and the new Owner's first Run. Asynchronous authoritative rereads check the exact
+closed archive, an OPEN Binding selector, and unchanged current native Owner key/version/value around that check.
+The native assignment must still be current. Selector change also fails before source activation. A standalone
+verifier and ordinary unqualified creation retain denial.
+
+The Oxia birth reservation and successor selection use that qualification for a retired parent. They require
+advanced Owner/leader epochs and preserve the retired flag and permanent successor choice in the existing wire.
+The parent supplies lineage only; its old SDK/read admission stays closed. Guarded publication reserves the child
+resource, and a canonical retired-parent representation keeps the same ticket Context through known retry. A
+selected child reconciles its original tickets even after the opening qualification has ended.
+
+Core compilation, relevant Main/Test Checkstyle and 20 Run authority unit cases pass on these changes. The new
+transport regression uses an explicitly synthetic qualifier and DONE fact; it proves denial, unchanged parent DONE,
+retired lineage, held child tickets after actual in-memory CAS response loss and metadata-only original cleanup.
+It does not prove native source eligibility or a Broker publish/release/delete/recovery combination. Fresh source
+45080 passes 29/179/750 and its freshly executed, rechecked legacy 23242 passes 23/108/730. The source gate requires
+the 20-case class and the named retired-anchor transport regression. All 52 XML digests, 750+730 input hashes,
+legacy link and six source/built/published JARs have been rechecked; KafkaBK/Oxia are snapshots 69/52.
+
+The native qualification now belongs to the existing `NereusKafkaReadScopeV2` helper. Its opening predicate reads
+draining under the Opened lock and is checked again after the asynchronous fact reads. Native compilation,
+Main/Test Checkstyle and SpotBugs pass with unchanged limits. Current native gates pass 18/18 publication cases at
+`2026-10-03T04:41:05.364Z` and 78/78 full cases at `2026-10-03T04:43:36.964Z`, with zero failures/errors/skips.
+The two phases use separate fresh owned backend datasets with the unchanged quota; all 12 native input hashes agree.
+Their XML SHA-256 values are `c7ef771689eb2e3aa0a0f7b14a63ac35996a05738e860313ff050f7bffccabb7` and
+`8034feb152bc87c5e039e49916be9ec7d7861d88ddf4928467580fe622d53952`. These existing cases retain actual post-cut
+tail data; actual positive all-covered retired-anchor Broker validation remains required.
+Whole M5, full reference/floor/grace production, dispatch and all 17 obligations remain incomplete.
+
+An additional actual Broker case forms the all-covered payload boundary without injecting a logical cut. Native
+pre-offset append admission performs rollover before timestamp validation; an intentionally future-dated Produce
+is then rejected with `InvalidTimestampException`. The case checks unchanged protocol frontiers, a distinct real
+active Run at that durable end, and the additional actual sealed root. Its published source cut reaches durable end,
+and the empty raw tail returns END_OF_SNAPSHOT without DATA. The existing Task publication, exact M4 fallback
+RELEASED, native source/checkpoint transfer, independently loaded cold cache, ordinary Produce/Fetch and final cache
+cleanup checks remain required. Other existing cases retain their FOUND post-cut-tail assertion.
+
+The single new case passes at `2026-10-03T05:01:41.394Z`, 14.064 seconds, with zero failures/errors/skips; XML SHA-256
+is `93a0ab5bc36bd8c3e010e67fa4a9ed95df2e8ead569ba84b6b098e542aee74b2`. Current native fixture manifest contains the
+same 12 paths, SHA-256 `655841db1cf18a1a5cb3dd1c7967457c1274a111b61fe121caef8f85a01f3041`; source 45080,
+legacy 23242 and the six 69/52 publications remain exact. The expanded full gate passes 79/79 at
+`2026-10-03T05:02:30.800Z`, 398.067 seconds, XML SHA-256
+`02acc7f996fc2400495f66ff24c6ded26a7eadb4693ea7f7acf9a123425cc23a`. Both phases have zero failures/errors/skips and
+use separate fresh backend data with the unchanged quota. Independent audit checks the 12 native hashes, both native
+XMLs, all 52 source/legacy XMLs, 750+730 source hashes and all six source/built/published JARs. Owned services/volumes
+and the completed runner are removed. This establishes an actual all-covered payload/empty-Run cold entry, not a
+retired marker or physical deletion. A fully retired final lineage anchor, complete eligibility/grace/dispatch and post-delete recovery
+remain required; all M5 authority flags remain false.
+
+### Native selected-generation and raw-tail capture (current implementation amendment)
+
+The actual native Owner can now capture its released stable preferred generation together with the adjacent sealed
+raw tail. `NativeSelectedInputSources` is privately issued by the installed partition actor and rechecks that actor,
+its exact descriptor, preferred-only selector and Owner Run directory. The directory retains actual admitted Run
+IDs after M4 transfers payload and checkpoint responsibility; removing old read tables cannot erase Owner membership.
+Capture requires exact current Owner admission before and after I/O. Selected capture uses the existing serialized
+native M4 control executor and tracked SDK sessions, with the existing physical-ticket cleanup observer.
+
+The mixed source charges retained selected results across the subsequent raw scan in the same configured Cell read
+budget. The combined batch, record and encoded-byte counts must fit the persisted capture allowance before exposure.
+Known semantic failure releases capacity only after actual session termination and physical-ticket cleanup; close or
+cleanup UNKNOWN retains it. Input revalidation includes every selected output part and every raw ledger. The plan
+binds the actual predecessor selected-view digest, complete key domain and all captured extents; dirty eligibility
+uses actual raw input bytes and dirty-batch timestamps. Selected-only input with no dirty bytes remains ineligible.
+
+Current core source 70513 passes 29 suites/179 cases/750 inputs; fresh legacy 70524 passes 23/108/730. Six published
+runtime JARs match the source manifest: API/SPI snapshots 48, Object 49, BK/Oxia 53 and KafkaBK 70 at
+`0.2.0-20261003.062037`. The new actual Broker case performs first Task publication, ordinary Fetch, M4 RELEASED and
+native source/checkpoint transfer, then actual tail rollovers and mixed capture, durable input preparation, worker
+proposal, dirty eligibility, semantic compilation, exact SDK membership revalidation and capture discard. It retains
+the first selected cache charge throughout. The case passes 1/1 at `2026-10-03T07:45:28.209Z` (16.302 seconds); the
+full native gate passes 80/80 at `2026-10-03T07:50:03.264Z` (400.701 seconds), both with zero failures/errors/skips.
+Their XML SHA-256 values are `562d35510b983bd3754faa888ec2880987eb85c5ee700949aabb07ccb43718ac` and
+`2d0fe0f93909a509da094c425a26c1601957ea097b115925a4443c6941a97c2a`; the 13-path native manifest SHA-256 is
+`a59d825bc13a7cf7cd89a075b401bbfcb211db5cb44fe882690bafa6a3d657c8`. Fresh owned backend data and the unchanged
+500,000,000-byte quota are used for each phase. Source/legacy XMLs and inputs, summary linkage, published JARs and
+native inputs have been independently rechecked.
+
+This current tuple supersedes the preceding 45080/23242/79 tuple for changed core/native bytes. Actual second Task
+publication, replacement-cache admission and old accepted-read/cache drain remain required, as do complete native
+eligibility/grace/dispatch, retired final-anchor deletion/recovery, Object/Pulsar combinations and aggregate acceptance.
+All 17 obligations remain OPEN and all M5 authority flags remain false.
+
+### Native repeated publication and cache transfer (current implementation amendment)
+
+The native publisher now composes actual mixed generation/raw input with a second Task publication. Initial raw
+publication keeps its existing accepted-read behavior. Replacement of a selected cache stops new captures and waits
+for the predecessor actor's actual SDK and hazard drain before selector CAS. A failed or UNKNOWN drain cannot
+construct its successor. The existing control executor installs the exact durable successor actor; a private
+activation result binds the new Task/descriptor and the actual replaced descriptor. Only that result can identify
+the superseded cache reservation. Capacity release also requires its retained operations and Task SDK/ticket cleanup
+to terminate. Retry preserves the result and held charges; observer cancellation cannot release them.
+
+New captures still require a released admitting stable actor. An already privately qualified input can finish
+publication revalidation while its exact predecessor actor is locally stopped for that owned publication. Scope,
+source map, Owner/fence, complete Run directory, descriptor and durable predecessor selector must still match.
+After replacement that old qualification fails. The publication source projection retains the actual predecessor
+descriptor and adjacent raw tail; M4 retirement removes only the raw prefix represented by the new cut. The old
+generation is represented by its complete physical Part membership and independent descriptor provenance.
+
+KBNS wire 2 adds the predecessor descriptor SHA to the same bounded native read-scope record. Its physical member
+list contains every actual predecessor Part plus every retired raw ledger. Construction uses the private live
+source/checkpoint transfer. The metadata route rereads the immutable predecessor descriptor, checks exact generation
+identity/coverage/namespace and complete physical membership, then requires the existing authoritative terminal,
+proof and all M4 RELEASED identities before storing the record. Raw-only records retain exact wire 1 encoding;
+the 4 KiB and 64-member limits remain unchanged. A data record alone still grants no native operation or deletion.
+
+Current source 62995 passes 29 suites/180 cases/750 inputs, with freshly executed and independently rechecked legacy
+56654 at 23/109/730. Six runtime JARs match source/built/published hashes: API/SPI 50, Object 51, BK/Oxia 55 and
+KafkaBK 72 at `0.2.0-20261003.094047`. The new actual Broker case passes 1/1 at `2026-10-03T09:48:11.075Z`,
+19.0 seconds, zero failures/errors/skips; XML SHA-256 is
+`2b8278dfbdc6cdf0be683569d512c2520a8c3555c361d2f0cbb11809644dd2ee`. The 13-path native manifest SHA-256 is
+`4bb8b6520d53dd63007e000fc6f615e7b9e05466afb10ef64e01e22f3d547216`. The case withholds an actual old-actor
+raw-tail SDK callback, checks stopped admission and unchanged durable selector/two held charges, cancels both
+observers, and verifies that only callback completion permits publication and old-cache release. It then exercises
+ordinary Broker Fetch, second M4 RELEASED, source/checkpoint transfer and all generation/raw protection identities.
+The freed local slot admits another actual generation-only capture; Task preparation rejects it specifically for
+having no cleanable bytes. Current cache capacity remains held until actual Owner drain. The expanded full native
+gate passes 81/81 at `2026-10-03T09:52:26.448Z`, 441.106 seconds, zero failures/errors/skips, XML SHA-256
+`9063089201cbf46ac146a0f361c6f2f1dca52c42bca7947e03cd00ccc3119e6e`. Both phases use separate fresh owned backend
+data and the unchanged 500,000,000-byte quota. Independent final audit rechecks all 52 source/legacy XMLs, 750+730
+input hashes, legacy linkage, six JAR tuples, 13 native input hashes and both native XMLs. Owned services/volumes and
+the completed runner are removed; the protected original heap is unchanged.
+
+The preceding 70513/70524/80 tuple qualifies its preceding bytes. This current warm two-publication slice does not
+close repeated-publication cold/crash/UNKNOWN combinations, fully retired final-anchor deletion/recovery, complete
+native reference/floor/grace/dispatch production, Object/Pulsar integration or aggregate M5 acceptance. All 17
+obligations remain OPEN and all M5 authority flags remain false.
+
+### Native repeated-publication cold recovery (current implementation amendment)
+
+The native cold opening now carries a privately constructed `SelectedPrefix`: the independently read current
+KBSD3 output and its immutable predecessor descriptor when the source cut begins with a compacted generation.
+Qualification reads that descriptor through the actual Binding/namespace metadata route and checks canonical
+bytes, source identity, content address, physical key, length/body hash, exact coverage, Binding, namespace and
+capability. Exactly one complete generation may precede the raw sources. The existing raw-view opening entry
+remains available; it cannot admit an unqualified generation. This value alone grants no native admission or GC.
+
+Closed recovery still discovers the complete bounded closed Owner, birth inventory and raw Run lineage. Roots
+covered by the generation must form the same contiguous sealed prefix and end exactly at its verified boundary;
+the remaining covered raw sources must match their individual physical identities and coverage. A missing or
+crossing boundary fails before suffix replay. Independent protocol state comes from the current output Parts;
+covered raw data and predecessor Parts are not read to restore it. The existing native root authority validates
+each stored root's configured physical namespace and Provider Scope before closed-history recovery consumes it.
+
+Cold KBRS wire 1 and its 16 KiB bound remain unchanged. Its descriptor SHA already binds the predecessor source
+identity and root. The actual cold actor supplies the qualified predecessor to scope construction. The metadata
+entrypoint independently rereads it and applies the same qualifier before storing the scope. Physical membership
+must contain every current selected Part and must exclude every direct covered raw ledger and predecessor Part.
+Current/closed Owner facts, native snapshot, actual actor observation and selector checks remain required. New Owner
+readiness waits for exact immutable scope confirmation; response loss cannot free its retained selected cache.
+
+Current source 65945 passes 29 suites/180 cases/750 inputs with freshly executed legacy 65956 at 23/109/730.
+Summary SHA-256 values are `8af6c5bc9e308abed42cb6dc3ce0f504f725cfa845d4343ce0ee43ad25948fd5` and
+`fa65712b08e3bbdeaf616970a0f5e92f2817f5e04131f6de7fcb7e075b06ebef`. All 52 XMLs and source manifests were
+independently checked. Six source/built/published JARs match at `0.2.0-20261003.112117`: API/SPI 52, Object 53,
+BK/Oxia 57 and KafkaBK 74; KafkaBK SHA-256 is
+`dedf7f14444e52190901a0b7578e7497e715ea43d3436d56d215639b402bd9db`.
+
+The expanded repeated-publication Broker slice passes 3/3 at `2026-10-03T11:26:36.330Z`, 50.204 seconds,
+zero failures/errors/skips, XML SHA-256 `220eb5e9a339a05a8f6948d0685ff67c64b9fb348af325d5447d8454baf0a3cc`.
+Its 13-path native manifest SHA-256 is `a947e108bfbdc858d19a731b980ebd5989cc69dea82b6e05e2d9784b8dfda2d8`.
+The actual second descriptor/semantic output now drives cold verification. The new Broker cannot read raw data
+covered by either publication; ordinary Broker Fetch and subsequent Produce preserve the current output and live
+tail. It reserves a distinct new Owner cache identity and frees it only after actual Owner drain. The held cold
+scope case applies the real Oxia PUT, loses its response and blocks confirmation GET while readiness remains
+pending and cache capacity remains charged. Releasing the exact response permits readiness and the same checks.
+The warm repeated case also independently rereads its KBNS2 body and predecessor descriptor to verify all actual
+generation/raw retirement members. The expanded full native gate passes 83/83 at `2026-10-03T11:33:16.958Z`, 451.216 seconds, zero failures/errors/skips; XML SHA-256 is `70505944a47d058d28410e148e0a48abf9b5a9407ac0819b6e37f24a33792507`. Focused and full phases use separate fresh owned backends and the unchanged quota, with identical 13-path native manifests. Their owned services and volumes and completed temporary runner are removed after actual terminal success. Independent final audit rechecks all 52 source/legacy XMLs, 750+730 input hashes, legacy linkage, six runtime JAR tuples, 13 native inputs and both 3/83-case XMLs. The protected original heap is unchanged.
+
+The first actual cold run rejected generation input in closed-history recovery; after that correction, a second
+run reached cold scope persistence and exposed its raw-only membership assumption. Both 3-case/2-failure XMLs,
+native input manifests and backend logs remain diagnostic evidence. Source 33793/KafkaBK 73 qualified the
+intermediate prefix implementation and does not qualify the changed cold-scope bytes. The preceding 62995/72
+warm tuple likewise qualifies its preceding source. No historical receipt or frozen document is rewritten.
+The following slice qualifies second-selector UNKNOWN and live KBNS2 response loss on the same core bytes.
+Overlapping crash/recovery, retired final-anchor deletion, complete native reference/floor/grace/dispatch,
+Object/Pulsar combinations and aggregate acceptance remain required.
+All 17 lifecycle obligations remain OPEN and all M5 authority flags remain false.
+
+### Native repeated-publication selector and live scope UNKNOWN
+
+The actual repeated-publication fixture now loses the second selector CAS response only after the real Oxia
+write applies its exact SELECTED Task/descriptor decision. Authoritative selector GETs are then unavailable.
+Both predecessor cache and second Task charges remain reserved, output writer tickets remain present, the old
+actor admits no new reads and ordinary Produce remains fenced. Retrying the same prepared Task after confirmation
+becomes available selects the already applied descriptor without changing its selector projection. The existing
+held old SDK read and cancelled observers still cannot bypass the drain or release either charge.
+
+The second live KBNS2 case likewise applies the real immutable scope write before losing its response and blocking
+confirmation. Selected Fetch remains available, append stays fenced and the selected cache remains charged. The
+original retirement retry confirms the same scope version and bytes. Independent body/predecessor verification
+checks every actual generation Part and direct raw retirement member. Cold variants then reopen the actual second
+output on Broker 1, forbid covered raw SDK reads, preserve ordinary Fetch and further Produce, and reserve/drain
+a distinct new Owner cache. The combined live/cold scope case independently loses both actual responses.
+
+A test-mode suffix initially triggered the preexisting rollover UNKNOWN path before either new warm fault could
+run; its matcher now names that exact existing rollover mode. A metadata image change also preceded the selected-only
+no-dirty Task assertion. That test now captures again only after the previous attempt has actually discarded its
+capacity; it retains the exact no-cleanable-bytes rejection and final cache checks. Production metadata fencing
+and all static-check limits are unchanged. The first 7-case run's 3 failures and compile/style diagnostics remain
+unqualified diagnostic evidence. No production code or core input changed in this slice.
+
+Focused native validation passes 7/7 at `2026-10-03T16:34:52.896Z`, 109.852 seconds, zero failures/errors/skips.
+XML SHA-256 is `68e7608846af93d25e7e25529b003ac20049dfae640011987c17e71a09d77ed1`; its 13-path native
+manifest SHA-256 is `1b07cc46b285877f341a86ffb695131612c78bec32fedbceb539e2b2818445d1`. That slice uses source
+65945, fresh legacy 65956 and the six locally published runtime JARs at `0.2.0-20261003.112117` are unchanged:
+29/180/750 and 23/109/730, KafkaBK/Oxia snapshots 74/57. Independent audit checks all 52 XMLs, every current
+input hash, exact legacy linkage, all six source/built/published artifacts and the unchanged original heap.
+The expanded full native gate passes 87/87 at `2026-10-03T16:39:04.478Z`, 508.497 seconds, zero failures/errors/skips;
+XML SHA-256 is `ccedf73d19d5027d1b71b2a7e3f7e82501a8c6869bf6127bda584c269b68fb0c`. Focused and full
+native manifests are identical. Both phases used separate fresh owned backends and unchanged quota. Their owned
+services/volumes and completed temporary runner are removed after actual terminal success. Final audit rechecks
+both native XMLs and all 13 native inputs alongside the exact core/legacy/runtime tuple above.
+
+This establishes these second-publication response-loss/retry slices. Crash/overlap accounting, cold tail rollover,
+fully retired final-anchor deletion/recovery, complete native reference/floor/grace/dispatch, Object/Pulsar
+combinations, all 17 OPEN obligations, five current-source children and exact aggregate acceptance remain required.
+All M5 authority flags remain false.
+
+### Native per-resource replacement fact capture
+
+`KafkaBookKeeperReplacementSemanticsV2.sources` maps every original physical input in the actual KBPT publication
+membership to its exact source extent. Raw members use the extent's physical ledger identity SHA-256; a previous
+selected generation uses every Part in its independently read immutable descriptor. Missing, extra, repeated,
+foreign-namespace or output-as-input members are rejected. Every resource carries the eight previously independently
+compared KBES semantic roots with that source's complete protocol coverage. KBES/KBPT/KBSD3 wire formats are unchanged.
+
+The concrete Oxia compaction route now exposes exact versioned reads. Its opaque version binds the qualified native
+Cell/key and actual backend version ID. The M4 route likewise returns the complete OPEN Binding authority fact and
+exact protection facts. The owned Broker control path captures the installed private native selected actor, actual
+KBSD3/KBES/KBPT bytes, any immutable predecessor descriptor, all exact M4 RELEASED bytes and their versioned authorities.
+It rejects a candidate still present in the current raw-source map, active Run or selected output. It rereads stored
+facts and the complete Binding and Owner authority versions, and checks the current native actor and assignment.
+This observation grants no delete intent; namespace/member, all reference/floor/grace and dispatch facts remain required.
+
+The real second-publication test holds an actual immutable GET while the real Oxia client CASes the Binding to the
+same bytes at a new backend version. Capture rejects that version change, retains the selected cache reservation and
+subsequently succeeds with freshly observed facts. Cold PREFERRED_WITH_FALLBACK rejects replacement qualification
+without releasing the cache, while the existing ordinary Fetch/continued Produce checks remain. Cold PREFERRED_ONLY
+captures the real RELEASED facts for both initial and repeated publication.
+
+That slice uses source 41931 at 29 suites/180 cases/750 inputs and fresh legacy 41943 at 23/109/730. Their summary hashes
+are `98075ec8371b0324d42b95247d267b1808144dfb3e1820e61b282088c5faaa7e` and
+`a51f3c2382a2b23ebc970b49f7d169c59d5c102eb8060ecae40f1e16fc31ba21`; input manifest hashes are
+`d0ffa69c2abb97a6ed21bfa2e786cedd6454852ae41a6c299d46cb05a87557b6` and
+`2f662f1cce3cfae64b6d8977ed843633ee701c7b5743033508d689bc0e8a762d`. All 52 XMLs, current inputs, legacy linkage
+and six source/built/published JARs are independently audited. Runtime publication timestamp is `0.2.0-20261003.182843`;
+KafkaBK/Oxia snapshots 75/58 have SHA-256 `965f51d81a27f3448c1a7c09216142fe9ef0f68739fa94bd1b1f31846f06254d` and
+`473c6978668d3247e5d422c60934845aace08f9b4511e83e0a25072356a23313`.
+
+The corrected native runs pass 8/8 at `2026-10-03T19:06:20.637Z` (123.541 seconds, XML SHA-256
+`5c93969fc66b2f54a0655c7cff0bf5de67d9e80d4b542d5577b7a2ec01f94241`) and the remaining 80/80 at
+`2026-10-03T19:10:16.604Z` (408.874 seconds, XML SHA-256
+`3b574941254f2d26863bfe5a5c021ed315eb29203f8321a8eb6157f3867a9f79`). Both have zero failures/errors/skips and
+identical 13-path manifest SHA-256 `7e033be55fe162667dbfe5785b779a178e2e199a1c2f143e371838dd91dafd0b`. Their disjoint
+case sets exactly cover all 88 current native cases on separate fresh owned backends, with unchanged 500 MB quota.
+
+The initial shared-backend 88-case run failed five cases: two applied RELEASED-only capture to protected cold entry,
+one retried the same already-started Task preparation, and two hit actual permanent quota exhaustion during startup.
+The corrected preparation performs each Task preparation once and retries a fresh capture only after confirmed
+original cleanup preserves the predecessor cache. Diagnostic XML SHA-256 is
+`8fbe0d72a5808f17d83a88b537355a53687a211a4ebf7c56273738586f70c1ba`. The shared-backend gate remains unqualified;
+the separated runs establish individual behaviors and do not close persistent namespace capacity or physical cleanup.
+Main/Test Checkstyle and SpotBugs pass with unchanged limits; the two new contract types are explicitly allowlisted.
+Owned services/volumes are removed and the original heap is unchanged.
+
+Complete reference/floor/grace/dispatch production, actual final-anchor deletion and post-delete recovery, namespace
+capacity and cleanup, crash/overlap and cold rollover, Object/Pulsar combinations, all 17 OPEN obligations, five evidence
+children and exact aggregate acceptance remain required. All M5 authority flags remain false.
+
+### Native released read-epoch and Binding reference facts
+
+The actual owned Broker control capture now retains the versioned M4 proof head, exact RELEASED protection rows,
+proofs and terminals for each source's complete inline retirement batch interval, and capability rows referenced
+by those proofs. An intersecting folded interval includes all 32 proof entries needed for the existing fold verifier.
+Epoch enumeration uses bounded offsets; the current head may advance beyond the historical release head. Missing
+batches, invalid/unknown facts, incomplete interval verification or changed versions reject capture. Verification
+runs after fact capture and every returned fact is then reread exactly, alongside the existing final Binding,
+Owner and private actor checks. The actual M4 closure proves the original M4 readers; complete Task, recovery and
+other SDK handle qualification remains required.
+
+For each original physical ledger or predecessor generation Part, capture also returns three current-Binding
+`ReferenceObservationV1` rows: `MANIFEST_SELECTED`, `MANIFEST_FALLBACK` and `SOURCE_PROTECTION`. They bind the exact
+physical resource identity and source extent to the actual OPEN Binding or RELEASED authority version/value.
+Current source/output exclusion and complete immutable original membership precede these observations. No row is
+manufactured for another reference class; cross-Binding physical membership and the complete 15-class registry,
+10-class floor registry, audit grace and dispatch qualification remain separate required work.
+
+Source 75108 and fresh legacy 75119 pass 29/180/750 and 23/109/730, with 52 XMLs and all current inputs independently
+verified. Summary hashes are `6f54d0e55adee8b580d9156dd997af55e4b5fa1a8af8b7d3cf40ecaad2f4738c` and
+`78f6f59aac26da1a42641b7f3aa97a8f018ac26dc26160ffc6ccfbf3be1b3227`. Six matching JARs are published locally at
+`0.2.0-20261003.202311`; KafkaBK/Oxia snapshots are 76/59. The actual native repeated-publication group passes
+10/10 at `2026-10-03T20:30:55.495Z`, 156.091 seconds, with zero failures/errors/skips. XML SHA-256 is
+`1c8c6c65a67a2c540b76381496d2a1f6f80c738857951df04c5ac25ef22328ae`; the 13-path manifest SHA-256 is
+`1d5db5c9faa9365e3eda7895a571bb0276334abe4f1902af0bbe5211766d54c3`.
+The real client changes the proof to identical bytes at a new backend version while the old GET response is held;
+capture rejects the stale revision. A separate case loses the completed actual proof GET response and confirms
+that the proof exists. Both preserve selected cache capacity and subsequently permit fresh capture. The existing
+Binding refresh, publication/scope UNKNOWN, old-reader drain and cold recovery checks remain. Remaining native
+regressions pass 80/80 at `2026-10-03T20:36:12.190Z`, 421.995 seconds, zero failures/errors/skips, with the identical
+13-path manifest. XML SHA-256 is `36761f671b164aef0af38dc809f315c5df8a4ddf85d2bfdd589807233470eeb7`. The two actual
+terminal exits are 0; their disjoint case sets match all 90 current cases on separate fresh owned backends. Those
+owned services and volumes are independently confirmed removed. These individual behaviors do not qualify the
+shared-backend gate, persistent capacity/cleanup or aggregate M5. All 17 obligations remain OPEN and all M5 authority
+flags remain false.
+
+### Native physical authority predecessor facts
+
+The owned replacement capture now retains the actual permanent physical-to-Oxia namespace assignment and exact
+version/value facts for each original resource's durable quota reservation and physical authority. The concrete
+bound route validates the native namespace before and after reading, decodes the typed reservation/resource,
+rejects missing, mismatched, settled or terminal facts, and rereads reservation and authority exactly. The Broker
+accepts only OPEN with no active physical tickets, then rereads all captured physical facts before its final
+Binding and Owner checks. The existing current actor, complete original membership, semantic transfer and M4
+RELEASED interval verification remain required.
+
+These physical authority values are predecessor observations for the existing same-key qualification/fence CAS.
+They do not enter `DeleteEligibilitySnapshotV2.authorityFacts()`; the existing self-reference rejection remains.
+Empty active tickets do not establish complete reader absence, cross-Binding membership, all writer enrollment,
+the closed 10-floor/15-reference registries, authority-time grace or dispatch eligibility. Capture creates no
+eligibility, intent, DELETE_DONE, quota settlement or external deletion.
+
+Actual Oxia faults change a captured physical authority or reservation to identical bytes at a new backend
+version; capture rejects the stale revision and keeps selected cache capacity. A separate fault loses a completed
+actual physical GET response, confirms the stored resource still exists and retains the cache. Fresh capture
+then succeeds. Existing proof/Binding refresh, actual old-reader drain, second publication, M4 release and
+cold/UNKNOWN checks remain.
+
+Current source 47408 and fresh legacy 47439 pass 29/180/750 and 23/109/730. All 52 XMLs, current inputs, retained-data
+server restarts and fresh JVMs are verified. Summary hashes are
+`b272aa563a8e7145ee580851434d7072dda7fd9294370277ddc34c4aa28cc327` and
+`aca3b93e969d146d3d87ee05fb9ef9b66f373d8e1995ba86ff3f702aaaed5b92`.
+Six source/built/published JARs match the local tuple `0.2.0-20261003.211341`; KafkaBK/Oxia snapshots are 77/60.
+The current 13-case repeated-publication group passes at `2026-10-03T21:40:22.341Z`, 197.247 seconds, zero
+failures/errors/skips, actual terminal exit 0. XML SHA-256 is
+`7e4607586a44f63a3f764122b20264cfa0ab527d7a0cad4d3e934012bfefc2c9`; the 13-path native manifest SHA-256 is
+`deef1def582b589fefa41348addc6e246f2afa719fb454d78251de9e231856db`. Its owned backend is independently confirmed removed.
+The remaining 80-case group passes at `2026-10-03T21:46:00.675Z`, 402.518 seconds, zero failures/errors/skips and
+actual terminal exit 0. XML SHA-256 is `0dfaafccd3920f3e779338ffa36a08f2f16f03b326a5543a0a775c13fbee178c`;
+its 13-path manifest is identical. Independent case comparison proves that these disjoint groups cover all 90
+preceding cases plus the three new physical/quota cases, 93 in total. Both owned backends and volumes are removed.
+These are individual behaviors on separate fresh backends; the shared-backend gate, persistent namespace cleanup
+and aggregate M5 remain unqualified. All 17 lifecycle obligations remain OPEN and all formal M5 authority flags
+remain false.
+
+### Native Cell compaction Task directory observations
+
+Native replacement capture now reads the actual shared Protocol Cell K5AD reservation key through the existing
+closed Oxia route. It retains the raw stored bytes, native version and digest. Every persisted reservation is included,
+with the independently read immutable BK Task record when present. The record key and content-addressed Task ID
+must match that exact reservation; bounded canonical K5AD/Task decoding remains required. A missing Task record
+remains an unresolved preparation/cache observation. It is never converted into a terminal Task or an ABSENT
+physical-reference row. The existing scan-byte limit bounds retained directory and Task bytes.
+
+The owned control operation rereads every Task key, including captured absence, and the complete K5AD key before
+returning. Same bytes at a different native version reject capture. Missing/unreadable Cell state, a changed Task
+record, an invalid immutable identity or an uncertain GET rejects capture and preserves the selected cache charge.
+Current native assignment/Owner, installed selected actor, M4 closure, Binding authority and physical predecessor
+checks still apply. No new key family, persistent encoding, Cell capacity or writer admission is introduced.
+
+These facts describe the persisted capacity directory; they do not establish complete physical membership, native
+Task SDK termination, all live/cold readers or adoption closure. They create no MATERIALIZATION_OR_COMPACTION_TASK
+ABSENT row and no DeleteEligibilitySnapshotV2. Complete Task/reader/member, 10-floor/15-reference, grace and dispatch
+producers remain required, with all 17 lifecycle obligations still OPEN and every receipt/authority flag false.
+
+Current source 63828 passes 29 suites/180 cases/750 inputs, with freshly executed legacy 63856 passing
+23/109/730. Their summary SHA-256 values are `8f0f41611d05419ba63b2750891005de4ae306bedfbab8cc2d87470e57f28591`
+and `0f46b4fc9f2ac37d03c666a222792eecb36732fa1bf8b098dd480f2539085d02`; manifest SHA-256 values are
+`e152e4416523820b974dd4e52067510afd8cf729af71174ec6501d8874193516` and
+`21eeffac6b2971fa59eb089eac79fa3257de454e84581014d88fbfd1d679602c`. Six source/built/published runtime JAR hashes
+match; KafkaBK/Oxia are snapshots 78/61. The existing exact Cell-route unit suite passes 9/9.
+
+The current 16-case repeated-publication group passes at `2026-10-03T22:43:41.759Z`, 237.051 seconds, zero
+failures/errors/skips and actual terminal exit 0. XML SHA-256 is
+`8a37b82fe5200af40db86930fbe1ac64e913a918737f4bb4b946f49f800e19e3`; its 13-path native manifest SHA-256 is
+`1629ec1348ad0f4db07df8e4aa81d21eec8a94af9a8fd1d8e9996e4cc7924dc6`. Actual same-value K5AD CAS refresh,
+completed K5AD GET response loss and completed immutable Task GET response loss reject stale/unknown capture and
+retain the selected cache. Fresh capture subsequently succeeds. Existing physical/quota/proof/Binding refresh,
+repeated publication, actual old-reader drain, M4 release and cold/UNKNOWN cases remain. Its owned backend resources
+are removed. The remaining 80-case regression passes at `2026-10-03T22:50:10.612Z`, 416.837 seconds, zero
+failures/errors/skips and actual terminal exit 0. XML SHA-256 is
+`130101bf5842b1c30957bed635d8acd6a23cc4147215f4356ca8f4866e94d1fd`; its 13-path manifest is identical to the
+16-case group's. The existing selected-input case observes an actual second live preparation: both persisted
+reservations are returned and the missing Task inventory remains explicitly unresolved. Discard preserves the
+predecessor selected cache charge. Independent case-set comparison covers all 93 preceding cases plus the three
+new directory/inventory cases, 96 total. These phases use separate fresh owned backend datasets and unchanged
+quotas; all owned services and volumes are removed. The protected original heap remains unchanged.
+These individual runs do not qualify the shared-backend gate, persistent namespace cleanup or aggregate M5.
+
+
+### Native Task reference observations and existing create fences
+
+This amendment extends the preceding directory-only capture. For each inventoried native Cell reservation, the
+owned Broker operation now reads the actual immutable selection archive, cancelled Task terminal and, for SELECTED,
+the exact published descriptor. Binding, Task ID, descriptor Task and selection outcome must agree. A cancelled
+terminal is never manufactured for a selected output. Absent inventory or decision, an inert cancellation without
+physical termination, or an unresolved cold cache reservation remains a PRESENT, incomplete Task reference.
+
+The existing owned BookKeeper connection reads the full Task create scope directly from native metadata. Reads
+validate the exact encoded configuration, native instance, permanent namespace binding and OPEN/version-zero or
+FENCED/version-one state, then reread those facts. They never open a Task client to recreate a missing scope and
+never advance its fence. Selection archive alone and native create fencing alone are insufficient for Task closure.
+The native profile additionally requires the actual empty input ticket cut already captured through physical
+authority, the fenced scope, and the exact selected descriptor or cancelled SDK terminal. Every persisted Cell
+reservation is examined. Any unresolved reservation vetoes Task absence for all captured predecessor resources.
+
+The returned MATERIALIZATION_OR_COMPACTION_TASK rows bind the directory and every retained immutable Task,
+decision, terminal and selected descriptor revision. They are ABSENT/complete only at the qualified native Cell
+Task cut; otherwise they are PRESENT/incomplete. All observed presences and absences are reread, alongside the
+native scope and existing Owner/actor/Binding/physical checks. Same-value decision CAS or an uncertain decision
+or terminal GET rejects capture without releasing cache capacity. Native admission facts grant no grace time.
+These observations grant no READ_GENERATION absence, complete cross-provider writer/member enumeration, full
+15-class reference scan, DeleteEligibilitySnapshotV2 or dispatch authority. Those producers, all 17 obligations,
+Object/Pulsar composition and aggregate/Final acceptance remain required; all formal authority flags remain false.
+
+Current source 75261 passes 29 suites/180 cases/750 inputs, linked to fresh legacy 75272 passing 23/109/730.
+Summary SHA-256 values are `5afd48d3827e416d4aa5ecf003b5f25f9ff0eda7740f815eb66b0606c835422a` and
+`aae0f7c466de0542ac322be76941b7796da830392f9e7652fd300860939ed149`; manifests are
+`6d785a2dea09f5dcf8e0b7062198b55ff5dd85dce910bf02fbeee4cac3a42d9e` and
+`d680181cd194cb9b6ad0c4eb884f1f3466becc1b8d77bbb1435bf732e7df928f`. The six matching runtime JARs are at
+`0.2.0-20261003.235700`: API/SPI 57, Object 58, BK 62, KafkaBK 79 and Oxia 62. The 19-case native group passes at
+`2026-10-04T00:23:23.081Z`, 287.821 seconds, zero failures/errors/skips and actual exit 0; XML SHA-256 is
+`46018997ba37149016cf642f81702c919c13f5902b2f237454943a6acec24193`. Its 13-path manifest SHA-256 is
+`34087f98df585e8aea0c7eeb6fd34cc49b7a91a60f71b316c8a6e18f4928153d`. Direct Oxia bytes/version and native
+ZooKeeper bytes/version independently agree. Main/Test Checkstyle and SpotBugs pass with unchanged limits.
+The remaining 80 cases pass at `2026-10-04T00:32:35.395Z`, 412.479 seconds, zero failures/errors/skips and
+actual exit 0; XML SHA-256 is `68c463911c17571d7d840566f4cd98d897c7b355b8819441945cddef0fa33199`. Its 13-path manifest is identical to the focused group. The
+preparation case independently checks both its missing inventory and its subsequently registered, undispatched
+Task: PRESENT/incomplete rows remain, native scope remains absent, discard records its exact cancellation without
+a fabricated SDK terminal, and the predecessor selected cache keeps its charge. The two disjoint groups cover all
+96 preceding cases plus three new cases, 99 total. Their backends are separate fresh datasets with unchanged quotas.
+All owned services/volumes are removed. This does not qualify the shared-backend gate or aggregate M5.
+
+### Native live and cold reader reference capture
+
+The owned replacement operation now reads the persisted native live-transfer and cold-recovery scopes through the
+existing compaction record route. Lookup epochs come from the exact M4 retirement batch and current selector.
+Both present and absent scope keys are reread. Live scope must name the exact Task, descriptor and predecessor
+physical members, actual native Owner route, retirement batch's successor selector core and captured M4
+terminal/proof interval. Later raw-tail admission can advance the current selector; its privately installed actor
+and physical member cut are checked independently. Cold
+scope must name the installed preferred-only descriptor, selector epochs, selected/raw member cut and actual
+closed predecessor. The current Owner's Previous closure hash and tail must match that exact archived admission.
+
+Owner facts stored inside a scope describe its installation. Capture separately reads the actual current Owner
+and, for cold recovery, the current backend revision of the closed archive. The immutable closure bytes and native
+route must match the historical scope; no copied admission or synthetic version is substituted. A same-value
+revision change during capture rejects that cut. A later fresh capture binds the current revision only after the
+exact closure bytes and Owner predecessor chain still agree. Scope, Owner, archive, M4 interval, selector, physical
+ticket cut and privately installed actor are rechecked before return.
+
+READ_GENERATION_PIN_OR_OPEN_HANDLE rows bind those actual scope/Owner/archive and M4 authority dependencies. They
+are ABSENT/complete only for this enrolled native Binding's qualified reader cut, alongside its current actor and
+empty input ticket cut. Missing both live and cold evidence yields PRESENT/incomplete rows. A failed or uncertain
+read rejects capture and preserves cache capacity; capture never creates a missing scope or archive. Task references
+remain independently unresolved when preparation or cold cache ownership has no terminal inventory.
+
+These native observations do not establish complete cross-Binding/provider member or writer enumeration, all 15
+reference classes, ten floors, grace, final eligibility, dispatch, physical deletion, Object/Pulsar composition or
+aggregate/Final acceptance. All 17 obligations remain OPEN and all formal authority flags remain false.
+The preceding 26-case repeated-publication native group passes at `2026-10-04T01:46:15.209Z`, 406.39 seconds, zero
+failures/errors/skips and actual exit 0. XML SHA-256 is
+`e614371be918978783f6842231f7fb4064dd08413a046d03d6b4472861958d3e`; its 13-path manifest SHA-256 is
+`8870430a317d3a0c3584abc677a21347266feab3e97b01d8a67a85ed9f4651b4`. This includes live/cold scope and
+closed archive same-value CAS, completed GET response loss, missing live evidence and independent actual metadata
+bytes/versions/member checks. Main/Test Checkstyle and SpotBugs pass with unchanged limits. Its owned backend
+resources are removed. The remaining regression exposed the later-tail selector comparison corrected above;
+the corrected remaining 80 cases pass at `2026-10-04T02:30:10.521Z`, 413.379 seconds, zero failures/errors/skips
+and actual exit 0. XML SHA-256 is `75716fe2cd8a5b8faa2867d7544f7501cae870d13fac71ca3aa12ebc4b088a0b`;
+the corrected 13-path manifest SHA-256 is `66a12bed5dbd9240e5cd0a67918ee4951b4eaaa0e715a526b2103f42d6c08b32`.
+The corrected repeated-publication group passes 26 cases at `2026-10-04T02:40:30.653Z`, 405.024 seconds, zero
+failures/errors/skips and actual exit 0. XML SHA-256 is
+`12647a610d40ff8a581e61a2711de6098ce48f7b7150517fea7181810778e550`. Its 13-path manifest matches the
+remaining group exactly. The two disjoint groups cover all 99 preceding cases plus seven reader cases, 106 total.
+Both owned backend datasets are removed; their quotas and validation limits are unchanged. These separate
+datasets do not qualify the shared-backend gate or aggregate M5. Preceding results remain historical evidence.
+
+### Native recovery checkpoint reference capture
+
+The privately constructed selected-input qualification now exposes `recoveryInputs()` for the low-frequency
+replacement operation. Under the existing partition lock it compares the actual coherent protocol/source/checkpoint
+state with its captured state, rechecks the installed selected actor, and requires the checkpoint carrier and every
+durable read-index locator to belong to the current raw or selected physical cut. The same carrier check protects
+the existing cold actor. The ordinary retained-input `requireCurrent()` contract is unchanged; compaction preparation
+can still retain its accepted source prefix while unrelated tail data advances.
+
+Replacement capture checks this recovery cut before reading its dependencies and again after the final selector
+reread. Its evidence carries the actual immutable native snapshot. A changed protocol/checkpoint cut rejects the
+capture and does not release selected-cache capacity. No protocol generation is converted into an Oxia metadata
+version. `RECOVERY_CHECKPOINT_OR_SNAPSHOT` observations bind the actual selector, immutable recovery semantic
+verification record, current Owner, optional closed archive and validated live/cold scope records. Missing reader
+scope keeps these observations PRESENT/incomplete. ABSENT/complete is scoped to this enrolled native Binding's
+current qualified recovery actor; it does not establish the remaining protocol classes or other Binding/provider
+registries.
+
+The retained-input adapter also classifies failure of its local coherent log/metadata-image observation as
+terminated local validation. That getter dispatches no native or Oxia operation. A metadata-image change before
+the selector GET therefore does not leave a false unresolved read reservation. Selector/Owner GETs, Task
+registration and physical ticket cleanup remain outside this classification; uncertain completion still requires
+confirmed cleanup or Owner drain. The existing bounded fresh-preparation retry first requires exact discard and
+unchanged predecessor cache capacity. A discard failure preserves the original preparation failure and stops retry.
+
+Fresh matching source and legacy runs recheck 29 suites / 180 cases / 750 inputs and 23 suites / 109 cases /
+730 inputs, respectively, with actual same-backend restarts and fresh JVM recovery. Six local runtime JARs match
+the source summary and actual native loads. The corrected repeated-publication group passes 27 cases at
+`2026-10-04T04:11:19.970Z`, 399.524 seconds; XML SHA-256 is
+`3941489ad23bf708c397a6f7c4768837a571c287e23e7b23c29a839ca3de3b84`.
+The remaining 80 cases pass at `2026-10-04T04:21:17.670Z`, 403.055 seconds; XML SHA-256 is
+`585bb9e83c317f46e9ea736915af192f0b47fb4aeb484d654b2bc49ed1eea947`.
+Both have zero failures/errors/skips and actual exit 0. Their identical 13-path manifest SHA-256 is
+`d99db07110b2ce6e5a193a2e0627bfd5e85d2bd91b556876a4c161bdefea5035`.
+The disjoint union retains all preceding 106 native cases plus one recovery race, 107 total. Independent actual
+checkpoint/physical carrier and metadata version checks cover hot/cold/later-tail captures, missing scopes,
+same-value CAS, completed GET response loss and Produce during a held actual proof read. Rejected/UNKNOWN capture
+preserves capacity; fresh qualified capture succeeds. Main/Test Checkstyle and SpotBugs pass with unchanged
+limits and quota. All owned datasets are removed. The diagnostic failures and local metadata-image classification
+repair are retained in the implementation log.
+
+Full member enumeration, all reference/floor classes, grace, delete composition, the shared-backend gate, the 17
+lifecycle obligations and aggregate/Final remain unqualified. The source and native validation for this amendment
+is recorded in the implementation log below the preceding reader slice.
+
+### Native producer and transaction physical references
+
+Replacement capture now includes `KAFKA_PRODUCER_RECOVERY` and `KAFKA_TRANSACTION_OR_ABORTED_RECOVERY` observations
+for the same privately qualified native Binding actor. Its exact coherent snapshot contains the entire committed
+producer table and ongoing/completed/aborted transaction state. These records name logical offsets; their old
+physical carrier must be replaced through the independently read `PRODUCER_STATE` and `TRANSACTIONS` semantic
+transfers and the actual checkpoint/raw/selected carrier cut. Equal transfer roots alone do not qualify an actor.
+Capture still validates actual scope/Owner/descriptor/M4 dependencies and rechecks the complete native recovery
+snapshot after the final selector reread.
+
+Each class binds its actual immutable semantic verification record, selector, current Owner, closed archive when
+present and validated live/cold scopes. Missing both scopes keeps both classes PRESENT/incomplete. A nonempty
+speculative queue also keeps both classes PRESENT/incomplete: its pending assigned writes cannot be discharged by
+the durable checkpoint observation. No protocol generation becomes a synthetic metadata version, and observation
+does not release cache capacity. Native replica/leader-epoch, group, other Binding/provider registries, complete
+member/floor/grace and delete authority remain independent obligations.
+
+The matching core source/legacy tuple and six runtime JARs are unchanged from the preceding checkpoint amendment
+and are revalidated. The current repeated-publication group completes 27 cases at `2026-10-04T05:03:00.487Z`,
+417.84 seconds, zero failures/errors/skips and actual exit 0. XML SHA-256 is
+`52b9ffe743dc91743ab6d68c22aa8568e8ee8dc9d112af59ea712ba893c58548`; its 13-path manifest SHA-256 is
+`d564db72ed1053f29dc3542d8855035c2ce678b6507c202db1cbf0f03d59740c`.
+Actual idempotent Produce populates the checked producer table. This preceding run does not establish nonempty native
+transaction/aborted history or the pending-speculative branch. The remaining 80 cases complete at
+`2026-10-04T05:18:37.255Z`, 419.529 seconds, zero failures/errors/skips and actual exit 0. XML SHA-256 is
+`96b81cced3ad7a5f39ce84f06c437ce455168a4aea2aa385fc1063cdfe31107e`; the 13-path manifest matches the
+focused group exactly. The two disjoint sets retain all preceding 107 cases. Both owned datasets are removed;
+core source/legacy/XML and six built/published/loaded JAR hashes remain matched. Whole M5 and its shared-backend/
+17-obligation/Final authority remain unqualified.
+
+### Actual native transaction history and pending appends
+
+The current native Task fixture additionally uses the real Kafka transaction coordinator and producer to commit
+twelve DATA records at offsets 0 through 11, commit marker 12, abort six DATA records at offsets 13 through 18 and
+abort marker 19. Ordinary superseded DATA also reaches the sealed input. The same existing two-publication/M4
+RELEASED/cold-Owner path now checks both completed transaction ranges, the aborted range and actual checkpoint state
+in the privately installed actor and replacement observations. Native raw batch equality retains control and
+transactional batches; the ordinary `read_committed` Fetch oracle excludes control batches and the independently
+checked aborted interval while requiring all twelve committed values through publication and cold recovery.
+
+The existing native response observer also exposes a default identity `afterAppend` observation. Its test override
+decodes and withholds only one completed real NBKE2 DATA append response before ordered commit; header/checkpoint
+appends and production responses retain their ordinary path. The actual cold actor captures a one-entry speculative
+queue with unchanged durable end and committed producer state. Both protocol reference classes must remain
+PRESENT/incomplete and the selected cache charge remains held. Delivering the original response acknowledges its
+exact offset and invalidates the captured qualification. A fresh capture then observes the advanced durable end,
+empty queue and ABSENT/complete protocol references, with the same cache charge. Subsequent ordinary Produce/Fetch
+and confirmed Owner drain continue through the existing cold test path. Observation creates no protocol state,
+proof, metadata version or deletion authority.
+
+The current repeated-publication group passes 29 cases at `2026-10-04T06:35:52.330Z`, 440.932 seconds, with zero
+failures/errors/skips and actual terminal exit 0. XML SHA-256 is
+`1245dc37ee7c614356e1ee4723ac546b659920bc6cc3e72aada18723c5db5904`; the 13-path manifest SHA-256 is
+`eb262f43353f8e559060790fffb7f9b779251edf65dc05b071de49751a980ca2`. The matching core source/legacy and six
+runtime JARs are unchanged and revalidated. This establishes the previously unexecuted nonempty transaction and
+pending-speculative branches for the enrolled native actor. Complete cross-provider/member/floor/grace/delete
+composition, the shared-backend gate, 17 lifecycle obligations and whole-M5 aggregate/Final remain unqualified.
+The remaining 80-case regression passes at `2026-10-04T06:45:35.758Z`, 393.618 seconds, with zero
+failures/errors/skips and actual terminal exit 0. XML SHA-256 is `1b608d0421ac7a61704f8b4780c1b577a8f3f5e28cb8354b39855ab7a032670f`.
+Its 13-path manifest matches the focused group exactly; the disjoint 109-case union retains all preceding 107 cases.
+Both owned datasets are removed, with unchanged validation limits and quota. The corresponding implementation-log
+entry records the exact current tuple and retained first-run diagnostics.
+
+### Native leader-epoch physical references
+
+Replacement capture additionally produces `KAFKA_REPLICA_OR_LEADER_EPOCH_RECOVERY` observations for the current
+native Binding actor. `NereusListOffsetsLifecycle.current` checks the actual KRaft topic identity, leader and leader
+epoch, sole replica and ISR, exact Broker epoch, unfenced registration and shutdown state. The existing owned capture
+checks that predicate and the actual open Owner before and after its full fact cut. The private selected actor still
+requires the actual descriptor/source map, transferred checkpoint carriers and exact final recovery reread.
+
+The new class binds the independently stored `LEADER_EPOCH` semantic transfer plus actual selector, current Owner,
+closed archive when present and validated live/cold scopes. Missing scopes or a nonempty speculative queue keep its
+rows PRESENT/incomplete, with unchanged cache capacity. Together with producer and transaction recovery, these are
+three protocol classes among nine observed reference classes for this actor. The source's actual logical epoch table
+is checked against Owner/leader fences and every checkpoint epoch boundary. An Owner epoch or Storage Epoch is not
+substituted for a Kafka leader epoch.
+
+The existing actual cold pending-append mode now requires the new Owner's Kafka leader epoch to be newer than the
+last committed index entry. Its held real DATA response preserves the preceding index. Delivery adds exactly one
+epoch boundary at the acknowledged DATA offset; the fresh private capture then closes all three protocol classes.
+The initial 13-path repeated-publication group passes 29 cases at `2026-10-04T07:29:28.550Z`, 439.811 seconds, with zero
+failures/errors/skips and actual terminal exit 0. XML SHA-256 is
+`b05f2c53907678cf33548f506610993896d8f7f4007ef1e1d553ae27953219aa`; 13-path manifest SHA-256 is
+`bb901944cb09bf059759b29469bbb7606f9a986d2658a98d6dfbc554a42bca11`. Core source/legacy and six runtime JARs
+are unchanged and revalidated. Complete cross-Binding/provider/member/writer/floor/grace/delete composition,
+the shared-backend gate, 17 lifecycle obligations and aggregate/Final remain unqualified. The implementation-log
+entry records the matching remaining regression and exact current tuple.
+
+The current source lock additionally captures
+`core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala`, the actual assignment predicate dependency.
+Its SHA-256 is `54d6ad2e6a241234d969ff2efde6a371f3c2fdb11f8842f811fa98c1c841b772`; the other 13 captured
+native files retain their exact preceding hashes. This 14-path manifest is SHA-256
+`ad9513381c5434325a580b21fb1d601a2ddeb993daa675eaeb1935a763ae172a`. The repeated-publication run completes
+29 cases at `2026-10-04T08:03:25.044Z`, 455.669 seconds, with zero failures/errors/skips and actual exit 0.
+XML SHA-256 is `74d54c60cad1c2cfb52a4f34f0253b561ec80103302f8b3b1eb8c3cf601c91db`. The extra verification
+locks the replica/ISR/leader/Broker predicate used by this reference qualification; no runtime code, gate limit,
+quota or case is changed between the 13-path and 14-path runs. The matching remaining regression completes 80 cases at `2026-10-04T08:14:39.861Z`, 390.659 seconds, with zero
+failures/errors/skips and actual exit 0. XML SHA-256 is `2ab9b6a007b5cf915005651b3c998a689165b6e0f7e3b08dde0e68781b9b8f13`; its 14-path manifest matches
+exactly. The two disjoint groups retain the same 109 cases as the preceding native protocol validation. Both owned
+datasets are removed and all captured hashes remain current; the implementation-log entry retains both the initial
+13-path and current 14-path observations. Complete member/floor/grace/delete and whole-M5 authority remain unqualified.
+
+
+### Native sealed source metadata (current implementation amendment)
+
+The owned native Kafka replacement capture now observes the actual sealed identity of every replaced raw ledger
+and predecessor compacted Part. `M5BookKeeperNativeCreateClientV2.readSealedScopeFacts` reads the admitted namespace
+binding, permanent INSTANCEID, exact creating Task, permanent reservation and raw CLOSED ledger metadata through
+the existing owned connection. It repeats the complete cut and requires identical stored bytes, versions and native
+creation/modification identity. Missing, ephemeral, changed, foreign or unsealed records fail the capture without
+creating a scope, fencing a Task, recovering a ledger or manufacturing a close proof.
+
+A sealed ledger may belong to an exact OPEN creating Task. That observation grants no create/writer termination:
+the existing Task reference closure still requires its actual permanent FENCED revision and terminal decision.
+Full Task configurations are checked against the owned capability; the particular ledger's reservation binds the
+complete encoded Task scope, ledger ID and permanent reservation version. CLOSED metadata must match its actual
+run/provider/configuration, quorum, digest and credential identity.
+
+Raw source capture additionally observes the exact selected Oxia run-root value/version and the actual creating Owner
+admission value/version that selects its immutable run link. Both dependencies must survive the final reread. Its source identity is
+recomputed with the same stable root encoding, actual native LAC/length and frozen extent format/body hashes used
+by the original protected source read. The root must name the exact physical resource and sealed offset coverage.
+Each predecessor Part instead requires the complete actual sealed target to equal its original descriptor target,
+including metadata CToken and digest. Final replacement capture rereads all these native facts and raw roots along
+with the existing selector, Owner, private source actor, recovery, M4 and physical-authority cut.
+
+The initial bound core source run `93682` passes 29 suites/180 cases over 750 captured inputs, with default fresh
+legacy run `93713` passing 23 suites/109 cases over 730 inputs. Both retain their actual BK/Oxia containers and data
+through restart. The first native run exposes a missing creating-Owner version dependency in that initial tuple;
+the corrected fact captures it and preserves the reader observation order. Current verification requires a new core
+source/legacy tuple and six newly published local artifacts;
+the implementation log records the corrected tuple and actual terminal results. Corrected source `24804` and
+fresh legacy `24846` retain 180/109 passing core cases with 750/730 source locks. Native focused/remaining groups
+pass 29/80 cases on identical 14-path inputs, with zero failures/errors/skips and actual exit 0 for each group.
+Their separate owned datasets are removed; these runs do not qualify the shared-backend gate. These observations supply sealed-source identity
+prerequisites. Complete physical membership, all writer/reference/floor/grace qualifications, real cross-provider
+delete/UNKNOWN composition, the shared-backend gate, 17 lifecycle obligations, five M5-E children and aggregate/Final
+remain unqualified. Historical source tuples and receipts remain preserved.
+
+### Native physical member registration (current implementation amendment)
+
+The same actual registry now gates raw Run source-reference publication. The owned native publisher checks each
+canonically ordered resource's admitted member fact against its actual protocol Cell and native Binding identity
+before acquiring source-publication tickets. The registry is append-only, and the subsequent existing physical
+ticket guard excludes a concurrent physical delete. Missing, unavailable, changed or foreign member observations
+reject publication; this path never registers or repairs a missing source member during a read. Member identity
+construction is shared with actual native creation admission. Six actual source-publication failure cases pass,
+including native missing/unavailable/refreshed members and the unchanged three preceding source-ticket modes.
+The preceding 29 read-scope and remaining 77 cases pass on their same 14-path native input lock and six
+source-summary/built/published/loaded JAR byte hashes. The later member-history quota amendment uses its own
+current source/JAR qualification; earlier native executions do not qualify that changed profile. The groups are disjoint, preserve all preceding 109 cases
+and add exactly three member failure modes; all have zero failures/errors/skips and actual exit 0. All three
+separate owned datasets are removed. These checks qualify this source-member admission path; complete membership,
+namespace accounting, writer enrollment and whole M5 authority remain unqualified. The preceding native tuple
+below remains historical evidence for registration and replacement capture.
+
+The owned Kafka raw Run and compacted Part creation paths register their actual Binding before native ledger
+creation. They use the existing namespace-bound physical route and `REFERENCE_SHARED_PHYSICAL_MEMBER_V1` ticket;
+registration never initializes a missing GC authority or imports an unregistered resource during a fact scan.
+`OxiaPhysicalMemberInventoryV2` persists one bounded append-only inventory per physical resource, with its resource
+SHA, Protocol Cell SHA and sorted protocol-domain/provider/Binding identities. Owner changes and proof refreshes
+do not add a member. Joining another Cell fails. The wire is checksummed and bounded to 64 members (8,554 bytes).
+Historical members remain in this record; ordinary Owner close does not remove them.
+
+Actual native create/CAS response loss is reconciled through authoritative member presence under the same original
+ticket Context. Unavailable reconciliation retains the ticket. A later exact observation can clear that original
+ticket without another member mutation. Capture requires the resource's admitted route and exact native key, value
+and version, then rereads both the inventory and route. The Kafka replacement cut captures these facts after its
+existing Reader and sealed-source observations and rereads every inventory before returning. Missing registration,
+wrong Cell/Binding and same-value native version changes cannot be silently substituted.
+
+These are member observations for the enrolled creation paths. Complete membership requires every applicable
+reference-admitting writer to use this registry and every recorded member to supply its own semantic/floor/reference
+qualification. The configured native quota profile now reserves the member family's permanent capacity as specified
+in the native member-history amendment above; this does not establish complete protocol namespace accounting.
+Preceding registration verification retains source `54025` and default fresh legacy
+`54053` pass 181/109 core cases over 751/731 inputs, including the actual applied-member-write/unavailable-read
+regression and original-ticket reconciliation. Six matching published/loaded JARs support 29/80 disjoint native
+Broker cases on one identical 14-path source lock, with zero failures/errors/skips and actual exit 0 for both groups.
+The independent native oracle verifies each captured member inventory against actual Oxia bytes/version and its
+resource, Cell and Binding. Both separate owned datasets are removed. Complete writer enrollment, member semantic
+qualification, floor/reference/grace/delete dispatch, Object/Pulsar composition, shared-backend and whole M5 authority
+remain unqualified. The preceding sealed-source 109-case tuple is preserved as historical evidence.
+
+### Worker admission and the native storage fence (current implementation amendment)
+
+M5R1 wire 4 adds one optional `M5MaterializationWorkerV1` grant to the existing Binding authority value.
+Versions 1/2/3 retain their exact encoding; all ordinary selector, history-fold, retirement, ticket and decision
+transitions preserve the last grant. Its strict M5WC wire 1 body is 424 bytes: the existing IdentityEnvelope plus
+native worker/namespace identities and exact predecessor-selector, source-cut, complete-plan and task digests.
+The parent authority checksum binds these bytes. Missing/unknown versions, trailing bytes, noncanonical presence,
+zero identities/fences, clearing the grant, epoch rollback and scope/storage changes fail closed. No historical
+freeze/projection/receipt is rewritten by this additive implementation amendment.
+
+The worker epoch starts at the first durable grant and advances by exactly one for each replacement on the same
+selector authority key. It is independent of Owner Epoch. A proposal only predicts that epoch; it grants no work.
+`Proposal.admit` CASes the exact captured authority and returns its privately constructed Admission only after an
+exact authoritative reread. A competing CAS, unchanged predecessor after an unapplied UNKNOWN, or unreadable state
+never manufactures admission. Keeping the last grant after it becomes stale preserves the next epoch through
+restart without accumulating a lifetime list or introducing timers/threads.
+
+The native Kafka adapter first validates the actual API-32000 aggregate through the existing canonical mapper.
+Its positive storage fence is `epochOrdinal + 1`, accompanied by the unchanged exact Storage Epoch ID in BindingIdentity.
+The current foundation admits only ordinal zero; no later Storage Epoch behavior is inferred. The Protocol Cell is
+encoded from the actual validated deployment/Cell IDs, Provider Scope comes from the actual active root, native
+worker identity hashes the actual owner/leader/Broker ID/Broker Epoch/metadata offset, and namespace identity hashes
+the existing permanent physical-to-Oxia namespace binding. These are stored authority facts, not invented worker
+IDs, owner-as-worker counters, marker hashes truncated to longs or assumed fence constants.
+
+`Captured.proposeWorker` re-verifies its complete native input membership and exact owner before preparing these
+facts on the owner control executor. Its migration/metadata work stays inside an owned operation until completion.
+It remains a package-local preparation path: the native complete CompactionPlan, durable Cell reservation and
+registered task must still be composed before actual task admission. The generic coordinator/record constructors
+and a proposal do not independently qualify native source, owner, budget, output, M4 RELEASED or deletion.
+
+The new BK publication overload requires the durable Admission and compares the entire identity, canonical source
+cut SHA, complete plan root, exact inventoried task ID and independent protocol state. It requires physical tickets.
+It captures the raw worker-bearing authority before the final policy/fence reread; replacement worker and publication
+therefore compete on one native CAS even if the projected selector is unchanged. The route also rejects selection
+of another worker's task through the unbound selection API. A prior exact SELECTED decision still reconciles to
+EXISTING_EXACT after that worker becomes stale only once its original durable writer tickets have reconciled;
+worker replacement does not erase already selected authority or discharge unfinished cleanup.
+
+Read-only coordinator review found that the first worker-stale fast return could skip UNKNOWN ticket cleanup after
+SELECTED changed the predecessor. The corrected worker/terminal dependency slice passed scoped coordinator
+re-review on the 92335/92381/runtime-43/Broker-36/worker-44509 tuple. A new bounded,
+create-only KBPT wire 1 value binds the exact original canonical physical target set to task, descriptor and source-cut
+SHA before any publication tickets are acquired. Its typed route requires the exact registered task and all output
+inventory parts. Known irreversible SELECTED/CANCELLED retries read this original metadata and use the existing
+`reconcileTerminal`, without re-resolving expired native input admission or opening data SDK sessions. Missing or
+unconfirmed original membership retains UNKNOWN. Worker staleness without a terminal decision retains UNKNOWN
+and tickets until native task cancellation/termination proves non-publication. The existing same-publication Context
+terminal covers prior JVM/concurrent attempts; different task/descriptor/Context and live readers remain protected.
+The proposed per-nonce registration draft was removed after tracing those existing responsibilities; the shared guard
+is byte-identical to the prior source manifest. The two new Admission/actual-guard BK/Oxia regressions passed on the
+corrected path. Isolating the original stale fast return reproduced both intended assertions: UNKNOWN cleanup was
+reported EXISTING_EXACT, and stale/no-terminal work was reported CANCELLED_STALE. Corrected retries resolve expired
+input membership zero times, preserve the different-Context held sibling, retain unapplied cleanup UNKNOWN, and
+finish only after actual metadata ticket reconciliation. Native selector bytes and version remain unchanged on retry.
+The first green group passed seven existing cases but the two new cases stopped at inapplicable total selector-CAS
+counts, which include worker admission; those assertions now compare exact native values/version. The red, failed-
+green and final two-case green XML/logs are retained under `build/m5-native-worker-terminal-*`. The initial red
+harness had an invalid JDK path and executed no case; its environment failure is preserved separately. Twenty related
+typed-store/descriptor unit cases passed, Real BK test compilation and Main/Test/Real Checkstyle and Spotless passed
+on their recorded sources. Fresh source 92335 passed 28 suites/157 cases with 745 unchanged inputs and fresh
+legacy 92381 passed 23 suites/107 cases with 725 unchanged inputs. Their actual BK/Oxia retained-data recovery
+includes both publication-ticket JVM phases and the same-Context concurrent held publisher. The first corrected
+source attempt 83476 stopped while archiving the seven passing typed-store cases against the old six-case gate;
+its failed log remains preserved. Required counts now include the actual added typed-store and two publication
+cases. Six freshly published local runtime JARs match source 92335, including KafkaBK snapshot 43 and MetadataOxia
+snapshot 26. Loading these JARs, the real Java 17 Broker gate passed 36/36 with zero failures/errors/skips at
+`2026-09-30T22:52:10.339Z`; XML SHA-256 is
+`e458a14ce2fe927264e270aa4fe38a550743fcf051a42fc8539d485a43265b81`. Its owned backend services were removed.
+These native Broker cases verify the worker proposal and existing input/recovery prerequisites, while the guarded
+publication tests use synthetic source/owner qualification with actual BK/Oxia storage and terminal decisions.
+
+Before the terminal-retry correction, focused verification covered six worker cases, the seven existing task-selection cases, fifteen history
+cases, 119 retirement cases, thirteen M4 coordinator cases, eight lifecycle-route cases, four task-selection-route
+cases and seventeen BK descriptor/carrier cases: 189 cases with zero failures/errors/skips. Main/Test Checkstyle,
+Oxia integration compilation and the three affected modules' Spotless checks passed. The initial style failure
+(three missing test braces) remains in `build/m5-native-worker-unit-style-failed.log`; the final check is
+`build/m5-native-worker-unit-current.log`, with XML archives in `build/m5-native-worker-focused-unit/`.
+The worker component restart archive `build/m5-native-worker-oxia/nereus-m5-worker-oxia-84158/` passed both
+independent JVM phases with 439 unchanged input hashes. The same actual Oxia container retained its data; the second
+JVM read worker epoch 2 from metadata and advanced it to 3. Only route/key/hash/version crossed the JVM boundary.
+The first component attempt 79798 passed its write phase but did not execute the read suite after Docker reassigned
+its random host ports; the corrected harness refreshed those ports, and both attempts remain preserved. Source,
+owner, namespace and plan qualification inputs in this component are synthetic. After the terminal-retry route
+change, replacement component archive `build/m5-native-worker-oxia/nereus-m5-worker-oxia-44509/` again passed both
+JVM phases with 439 unchanged current inputs, same-container retained data and worker epoch 2 to 3. Write/read XML
+SHA-256 values are `892bb21c93e5eb12c7de3e3537b53a88221b2081e38485ce5f462fcc798eab0d` and
+`cee823ea155ce5308c725651579431cf10b64ac1d13ff654f847276610565aa6`. The earlier 84158 receipt remains
+bound to its recorded source; qualification remains synthetic and component-only. Source 87849 (28 suites/155 cases,
+744 inputs), fresh legacy 87877 (23 suites/106 cases,
+724 inputs) and the six SHA-matched local runtime JARs, including KafkaBK snapshot 42, passed before the terminal-
+retry correction. They are historical for these subsequently changed sources. The first Broker invocation ran no
+native suite because Kafka Checkstyle rejected a missing exact coordinator import and excess runtime coupling;
+`build/m5-native-worker-broker-style-failed.log` is preserved. Moving Protocol Cell encoding into the existing
+aggregate qualification component and adding only the coordinator import passed Kafka compile/style with unchanged
+checker limits. The accepted worker/terminal source/runtime/Broker tuple is recorded above. The preceding 79447/79476/JAR-41/
+36-Broker artifact tuple likewise proves only its recorded source.
+The six worker control fixtures are synthetic qualification inputs. All 17 obligations and full native task,
+publication/activation/cold-recovery composition remain OPEN; aggregate/Final/production authority is absent.
+
+### Independent protocol state in sealed BK output (current implementation)
+
+The BK layout now writes the complete `KCRS1` state as an independent physical artifact after the eight semantic
+indexes. Its chunks use explicit `KBCE` version 3/kind 3 and a separate logical artifact ordinal; they occupy
+inventoried INDEX parts without changing the existing inventory wire or treating protocol state as a ninth semantic
+index. DATA and semantic INDEX chunks retain version 2. Complete chunk identity, order, length and SHA-256 checks
+apply to all three artifact phases, and duplicate, reordered or unfinished recovery artifacts are rejected.
+
+`KBSD3` (`SEALED_BK_COMPACTED_RUN_V3`) binds the recovery artifact's exact first part/entry, chunk count, length and
+SHA-256 together with the complete existing task, sealed-part fingerprints and eight semantic index locators. The
+full KBSD3 digest is the selected view identity. The 1 MiB descriptor cap remains in force; full protocol sections
+are stored in BK. KBSD2 retains its original wire and represents no independent recovery state. The shared typed
+descriptor/codec explicitly distinguishes versions 2 and 3 and rejects a mismatched kind, unknown version,
+truncation, trailing data or noncanonical encoding.
+
+The recovery artifact must match the source cut's Binding/incarnation/storage identity, owner epoch, exact
+exclusive-end coverage and checkpoint root; layout and publication also check the plan's checkpoint root.
+KBSD3 creation and publication compare the complete encoded state with the enclosing caller's captured state,
+including independently reread BK bytes before selection. The original publication overload rejects KBSD3 so a
+claimed checkpoint digest alone cannot authorize a changed component table. Selected recovery decodes only the
+stored artifact, checks its reconstructed locator against the selected descriptor and exposes the full state;
+this data grants no native recovery, worker, writer, source-plan or deletion admission by itself.
+
+Focused unit verification passed 31/31: four new artifact cases, thirteen existing descriptor cases and fourteen
+semantic cases. The larger fixture encodes 1,760,329 protocol bytes across 27 chunks and nine sealed parts, with a
+3,607-byte descriptor. A real locked BK/Oxia case also passed using fresh clients and the actual stored selector;
+a missing protocol-state ledger is rejected. The source cut, protocol state, policy and M4 capability in those
+component tests are explicit synthetic fixtures. Fresh legacy 79476 passed 22 suites/99 cases with 721 captured
+inputs and actual retained-data BK/ZooKeeper/Oxia restarts. Its KBSD3 read phase runs in a fresh JVM, receives only
+task/authority identities and hashes, and reconstructs 20,001 producer sessions plus marker/abort/epoch state from
+the stored artifact. The state SHA-256 remains
+`3aa486fbfc9b33bc5821c6ae614295b61003e6da9d2d706d2f9b2b0aa99cc16b`; the read XML at
+`2026-09-30T20:17:05.153Z` has SHA-256
+`95704c75987faf0d06f4ec0c875a80a39e5c04229e097ee01e1c07550493055c`. The same testcase retains KBSD2 restart
+coverage and asserts no recovery metadata creation or selector CAS. Replacement source 79447 passed 28 suites/155
+cases with 741 inputs; fresh legacy 79476 passed 22 suites/99 cases with 721 inputs. Both input manifests rehashed
+with zero drift at that verification. Source summary SHA-256 is `1998eff5b6ce95ba60946299cfafb51d79860ff2f92af4eb75e8b643abd49175`;
+legacy summary SHA-256 is `af9a26d19d9e79961d4f3a4d89601c3c8be09a8ff144ed503d3181ded72ec53a`. The locally published
+Kafka BookKeeper `0.2.0-20260930.202345-41` JAR matches the source runtime artifact at
+`e50509d01b52fb37ab26071a5d9de6f2436aab388a7055c58d78732d05a7f314`. All six runtime modules named by the source summary match their corresponding published and built JARs. The current Broker gate passed 36/36 at `2026-09-30T20:25:36.037Z`, zero failures/errors/skips,
+XML SHA-256 `2aef82865bd10ab646582b276f117b8764d1efe2049ea10ec7c1951dd6ca743e`. It uses Java 17, the original 512 MiB
+worker and timeouts; Main/Test compilation and Checkstyle plus SpotBugs passed. Actual cold-relocation Broker
+metadata advertised `127.0.0.1:64200`, `:64201`, `:64202`. No new heap dump was produced and owned native containers
+were removed, preserving unrelated services. The coordinator accepted this physical-carrier/selected-view recovery
+prerequisite after read-only review, including the actual retained-server fresh-JVM state recovery and the final
+source/JAR/Broker tuple. The two trailing spaces in the static descriptor validator and this documentation were
+corrected after the archived receipts; those receipts retain their original captured-input provenance. Java
+production/test sources and runtime JARs are unchanged by that cleanup. Lightweight validator/documentation/diff
+checks apply to those later edits. This acceptance grants no complete native admission or M5 lifecycle authority.
+Tuples 28963/28991 and
+pre-server-state 52497/52510 remain preceding evidence.
+
+The actual Broker input factory already captures full checkpoint components. Connecting that factory to a real
+worker/task/full CompactionPlan, guarded output publication and native Broker protocol recovery remains required.
+All 17 lifecycle obligations remain OPEN/null; this physical carrier adds no M4 RELEASED, reference-release,
+replacement/delete/UNKNOWN aggregate, M5 Final or production authority. No original-input physical locator,
+worker fence, ε/grace value or Object-source interpretation is fabricated.
+
+### Independent compaction recovery state (current necessary carrier)
+
+`KafkaCompactionRecoveryStateV1` carries the complete producer duplicate window, marker/coordinator epochs and
+timestamps, transaction/abort state, leader-epoch state and one aligned recovery boundary. Capture checks the
+existing K7 checkpoint component digest against the actual coherent root, including the original checkpoint's
+vector and read-index data, before projecting its protocol components. `NereusKafkaNativeInputV2.Captured` derives
+this value from its actual resolved checkpoint. The resulting carrier contains the source partition fence and input
+checkpoint digest as provenance; it contains no input run ID, ledger ID, Provider Scope or physical read locator.
+Reanchoring the decoded state requires the same partition/incarnation/storage epoch and an output owner/leader
+fence at least as new as the captured fence. This operation constructs data and grants no read/write/selection
+authority.
+
+The independent carrier uses the explicit `KCRS1` wire with strict version, field bounds, EOF and canonical
+re-encoding checks. It reuses the existing producer/transaction/epoch section codecs; physical source locators are
+rejected by the component decoder. Each section remains bounded by 2 MiB, and the complete carrier is bounded by
+6,291,961 bytes. The existing NBKE2 checkpoint and KBSD2 descriptor wires remain unchanged. The shared component
+coverage validator preserves the prior checkpoint bounds, including marker and transaction-end coverage.
+
+Current focused unit evidence is 21/21 (3 recovery-carrier, 7 original checkpoint-codec and 11 coherent coordinator
+cases), with zero failures/errors/skips. Tests verify exact duplicate results, marker/abort state, foreign/older
+output rejection, escaped coverage, strict decoding and rejection of source locators; the coherent case verifies
+the actual repository K7 checkpoint digest and rejects an earlier root. Replacement source 28963 passed 27 suites/151 cases with 740 input hashes; fresh legacy 28991 passed 22 suites/99
+cases with 720 inputs. Both manifests were rehashed with zero drift, including actual retained-data BK/Oxia/Cell
+restarts. Source summary SHA-256 is `d4c8f4caac9224643dc1df52df80e8f71e07331abf9a66d5e7d81ccc6f7c55e7`; the locally
+published Kafka BookKeeper `0.2.0-20260930.182412-40` JAR matches the source summary at SHA-256
+`ba9198bb1ba435ea2ba0b8a9ac0eeb24c170c9282488202c64ceb5f9d00b3529`. The earlier native-focused run passed 5/5 at `2026-09-30T18:28:37.309Z`, XML SHA-256
+`094c60216aa1cb76a7fafe42ea738dcf7fcecc201ca61011ceae3f39832b8009`; its test helper predates the final deadline and
+endpoint corrections below. The first full run passed 34/36, with actual metadata-image replacement conservatively
+rejecting a positive post-takeover input recheck and a fresh post-policy-change capture. The failure XML/log remain
+`build/m5-native-recovery-state-image-recheck-failed.*`, XML SHA-256
+`4ad14fb9780c6ea37723e3e2823b66ccb3a70da135b0656259dd4700818ac275`. Positive fresh capture and same-Captured
+input verification now wait only for that exact direct-cause error, within one monotonic 30-second deadline; every
+other exception or assertion ends the wait and is rethrown once. Negative policy/root/owner/fence/UNKNOWN/cleanup
+calls remain direct, and production checks are unchanged.
+
+A subsequent 35/36 intermediate run had one original cold-relocation last-committed-offset timeout, retained as
+`build/m5-native-recovery-state-cold-relocation-failed.*`, XML SHA-256
+`a2a3d76d877b8740914d47637979ad6e0d8b77c0a74eea3dc7f2e41b6c8049e5`. Its real consumer/transactional-producer
+logs dialed a non-loopback address resolved from `localhost`, while the actual reserved socket bound loopback;
+current macOS resolver output confirms this possible endpoint mismatch. The final-deadline, pre-endpoint-fix run
+passed 36/36, retained separately as `build/m5-native-recovery-state-before-endpoint-fix.*`, XML SHA-256
+`7c84f29375acee9f52156385ae79a595084ae53bec100aedb93556cc7d97062d`. That pass does not prove every historical
+cold-relocation timeout had the same cause.
+
+`KafkaClusterTestKit` now uses the prebound socket's concrete loopback address for default listeners, static quorum,
+dynamic quorum bootstrap/initial voters and Broker/Controller bootstrap. Existing explicit listener/advertised
+property overrides are preserved. Existing TestKit protocols are PLAINTEXT/SASL_PLAINTEXT; no TLS hostname or
+production DNS/retry mechanism is introduced. The 16-case TestKit class and Main/Test Checkstyle passed; XML
+`build/m5-native-recovery-state-endpoint-unit.xml`, SHA-256
+`7693b952df6d03fe2b9c6f0cbe7bee54c99b7f0c9052abc0680f709948ce80a1`, at `2026-09-30T19:03:13.756Z`. Its actual
+stock Broker/Admin metadata and Broker/Controller socket connections use the same numeric loopback. The original
+prebound socket test remains, and the explicit-listener test preserves exact typed configuration. The intermediate
+15/16 test-only LIST value/getString accessor error remains in `build/m5-native-recovery-state-endpoint-type-failed.*`.
+The native cold-relocation test additionally verifies and records real advertised Broker endpoints. The framework-only intermediate 36/36 run remains separate in
+`build/m5-native-recovery-state-endpoint-framework.*` (XML SHA-256
+`2e426460cf62e1a385a50d0788a402982bc133b3df4826d2d50ad77e6f4ce3d8`). Inspection of its output exposed that the
+new native address assertion was initially placed in a similar warm method outside this gate; only that added block
+was moved to the actual cold path. Final verification passed 36/36 at `2026-09-30T19:12:44.224Z`, zero failures,
+errors or skips, XML/log `build/m5-native-recovery-state-broker-current.*`, XML SHA-256
+`6adf43261939e584476f027db87b696cb218d9b795529e0460fb21e2a319ddaf`. The actual cold path records all three
+advertised Brokers at numeric loopback, and the original complete cold recovery/transaction/offset assertions pass.
+The original Java 17/512 MiB and timeout bounds remain. The loaded TestKit runtime JAR SHA-256 is
+`2b8f579661ea620042b04dd09c07f6d74992bf8b774ae88017aa77df7c33a7f3`; all six latest Nereus published/built JARs
+match. Both 740/720 input manifests were freshly rehashed with zero drift. No new heap dump was produced, and all
+owned native containers/volumes were removed. The coordinator independently matched the final source/JAR/XML tuple, read the actual cold assertion and helper/endpoint paths, and accepted this necessary carrier/endpoint slice. This acceptance supplies no physical output, full-plan publication, M4 release, deletion or aggregate M5 authority.
+
+This is an input/carrier prerequisite: the complete native plan, physical output
+carrier, descriptor/selector binding, actual publication and selected-output recovery are still incomplete. The
+29780/29791 and 36-case receipts below predate these Java changes. All 17 lifecycle obligations remain OPEN/null;
+there is no M4 release, deletion, Final or production qualification from this carrier.
+
+### Resolved native recovery checkpoint (current necessary input)
+
+`NativeInputSources` now also resolves the actual recovery checkpoint named by its coherent root while holding the
+existing Partition rollover boundary. `KafkaCoherentCommitCoordinatorV1.captureRecoveryCheckpoint` requires the
+supplied root to remain current and resolves its exact repository reference; it does not rebuild or substitute a
+checkpoint. A fresh unsealed run exposes no resolved checkpoint, so its bootstrap seed supplies no checkpoint
+authority. The native M5 input requires an aligned checkpoint at the active run's start. The root-named checkpoint
+component and the reconstructed locators in `NativeReadSources.sealedReadRuns` remain separate frozen inputs;
+actual native input-to-output protocol-state transfer is still required before original-source retirement.
+
+The coherent coordinator suite passed 11/11 with zero failures/errors/skips at `2026-09-30T16:50:10.379Z`, XML
+`build/m5-native-checkpoint-coherent-focused.xml`, SHA-256
+`3ae7cac5f7ba4bd99d63704199de1316750669eff6797775c52c44220bd29a39`. Its new unit case verifies unavailable
+bootstrap-seed rejection, superseded-root rejection, exact producer duplicate state, and a resolved checkpoint's
+survival after replacement. The actual Broker CHECKPOINT case uses transactional Produce, COMMIT and ABORT markers,
+rollover, read-committed Fetch and owner reassignment. It verifies three completed/two aborted ranges, rejects a
+sealed candidate beyond actual LSO before an input SDK session, round-trips the actual checkpoint sections, and
+preserves producer/transaction/epoch state and reconstructed read locators after takeover. MEMBERSHIP also verifies
+an earlier captured checkpoint remains unchanged after subsequent rollover.
+
+The five native-input cases passed at `2026-09-30T17:21:05.199Z`, XML
+`build/m5-native-checkpoint-broker-focused.xml`, SHA-256
+`f94162e5603ffb10b279cb0598310f922963ebe939070d2b752bda134a7d6813`. The final helper additionally ensures Kafka's
+TestUtils cannot retry other thrown failures: only the existing conservative metadata-image-changed rejection
+permits a fresh capture within the original timeout; other exceptions are returned from the wait and rethrown once.
+The current full Broker gate includes that helper and passed 36/36 with zero failures/errors/skips at
+`2026-09-30T17:23:56.793Z`, XML/log `build/m5-native-checkpoint-broker-current.*`, XML SHA-256
+`888ef5cdd67fb570a8573c99537e06f542206b467320e5519ae0e48f15ade318`. Compilation, main/test Checkstyle and core
+SpotBugs passed. Original Java 17/512 MiB, timeouts and assertions remain intact, no new HPROF exists, and task-owned
+BK/Oxia containers were removed while preserving the existing connector.
+
+Two intermediate 4/5 runs remain separate: `build/m5-native-checkpoint-component-expectation-failed.*` assumed
+recovered locators were necessarily in the checkpoint component, while the actual recovery cut carries them in
+`sealedReadRuns`; `build/m5-native-checkpoint-image-changing-failed.*` records a conservative rejection during actual
+metadata-image replacement. The corrected case checks the real locator carrier and actual Fetch results. No broader
+UNKNOWN/fencing failure is retried. The initial test-complexity failure remains
+`build/m5-native-checkpoint-checkstyle-failed.log` and generated no fresh test XML.
+Fresh current source 29780 covers 27 suites/151 cases and 737 inputs, with fresh legacy 29791 covering 22 suites/99
+cases and 717 inputs. Both source manifests were rehashed with zero drift; summary SHA-256 is
+`e3ad15ea39f30af8e3ff2b2490a5c5aa751f3b1a66aa1ab8078fdff0bc84bf32`. The six resolved published/built JARs match;
+Kafka BookKeeper is now `0.2.0-20260930.170403-39`, SHA-256
+`d2b740083d194798aa75f023df97451f58951d36c013cf8c69b221d9423b74b7`, matching the new source summary. The
+84706/84717 and 35-case tuple above remains evidence for the preceding accepted policy slice.
+Complete plan/task/publication, independently recoverable output and all 17 lifecycle obligations remain OPEN/null;
+all four authority flags are false, the full goal remains ACTIVE, and no commit/push occurred. The coordinator
+independently reviewed the actual checkpoint/locator sources and exception handling, matched the current 36/5/11
+XML and 29780/29791 source/JAR tuple, and accepted this necessary input slice. That scoped review does not close
+full-plan publication, independent output recovery, M4 release, physical deletion or aggregate M5 acceptance.
+
 `KafkaBookKeeperReadCellBudgetV2` fixes a Cell's admitted Binding shares before use. Full Binding identity includes
 BindingId, incarnation and storage epoch; a changed epoch or foreign Cell cannot consume another share. At most
 1,024 configured Bindings share at most 65,536 owners/read slots. The sum of reserved shares must fit the Cell hard
@@ -653,3 +6103,4592 @@ V2-KAF-DATA-012/013/022 native broker/controller activation and Fetch/compaction
 M7 owns planned operational handoff and M8 owns native parity, deployment scale and noisy-neighbor qualification.
 M5 composition and bounded failure/capacity tests remain required in this task. Production deployment and the
 previously paused benchmark campaign have no authorization from this amendment.
+
+First cursor revalidation run887dc25b0d89389fc571148652591867c862928d84176be13705951e54f4c4fa is terminal runner/Gradle1,
+16 fresh suites169 cases1 failure0 errors/skips: a second complete observation exhausts the actual Binding Owner
+capacity. Failure/source/cleanup preserved; original containers unchanged/owned backend absent. Revalidation now
+uses the original retained workspace with one bounded pass, instead of consuming another Owner slot. The parent
+keeps its charge until the original SDK reread and cleanup end; temporary close cannot refund that reservation.
+Corrected compile/style/runtime validation pending. This is no permission to increase Cell capacity or bypass admission.
+
+Corrected same-workspace revalidation5081392721b26ee2a278f5327fe8bc4ea80d0fda859c0542353e426d74f32f92 is terminal
+runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,publication65,namespace1).
+All three actual cursor observation phases revalidate unchanged with exact charge return, and a normal SDK durable
+mark-delete changes its checkpoint so the old observation is rejected. Original mixed publication/repeated outside-cut
+versions/cold bytes/drain remain green. Original containers unchanged/owned backend absent; all632 archived inputs
+verified. BK35 matching UP-TO-DATE, other Owner/Native429 excluded. Source-matched actual Owner XML and raw receipts
+are recorded in the projection. The existing65 now adds an accepted-but-delayed reread: completing its observer cannot
+finish original close or refund workspace before the original SDK work ends. That added check is pending and not
+covered by the508139 archive. Full writer/reference/fence/retirement/delete/UNKNOWN/whole M5 remain open.
+
+Final original-observer revalidation source632/archive a16f2abe033c0881a82ae7b1ca778375c20100048d3e11297107adc3a38dee71
+is terminal runner/Gradle0,4 fresh suites12 cases0 failures/errors/skips (Native5,Provider5,Owner65,namespace1). Unchanged
+observations pass in all three phases; actual SDK checkpoint advance rejects the old observation. An accepted reread
+is delayed, its public observer is completed externally, and parent close/charge remain held until the original task
+and SDK cleanup finish. All632 current/archive inputs match; original containers unchanged/owned backend absent.
+Module158/BK35 matching UP-TO-DATE, other Owner/Native429 excluded; earlier170-case tuple remains source-scoped and is
+not counted as fresh here. Same-workspace compile/style pass18s; observer-test compile/style pass15s. This closes the
+focused observation ownership boundary, not complete Native writer/freshness-at-fence/reference/retirement/delete/
+permanent-UNKNOWN/current-combination/five-child qualification. All17 OPEN/null/full Goal ACTIVE; no commit/push.
+
+Actual predecessor source632/archive172db72143daa1d2a60c4a81a81c4740e6a5d46f55a38b3f926459771e2e2262 is terminal
+runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,guarded-factory25,namespace1).
+Same-backend predecessor bytes/version/create-time match the independent original read; returned-byte mutation
+changes only a clone. Foreign scope and undersized bounds reject without PUT. Existing actual ACK/clear-UNKNOWN,
+applied/delayed no-dispatch cleanup, definite SDK version rejection, native births/members and original actor closing
+remain green. All632 current/archive inputs match; original containers unchanged/owned backend absent. BK35 matching
+UP-TO-DATE, publication65/UNKNOWN66/other Owner/Native429 excluded. Native/Nereus affected compilation/style pass19s
+after the one-line-width correction; original failure retained. Exact original-value data is now available, but full
+physical reference resolution/target tickets/all writers/reference proof/retirement/delete/permanent UNKNOWN/full
+combinations/children remain required. All17 OPEN/null/full Goal ACTIVE; no whole-M5 authority or commit/push.
+
+Current checkpoint metadata writer source632/archivef55e869cd4e7edede4e3836ac58cf956227f959a6a1660f7f212ab31338a7af3
+is terminal runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,guarded-factory25,
+namespace1). Actual held SDK/modified observer keeps original D/C operation; applied D-clear lost reply retains
+original workspace and metadata-only recovery does not repeat PUT. A second enrolled real writer changes the
+original metadata version while first D admission response is held; the first unconditional proposal then rejects
+changed predecessor before SDK dispatch. Oversized declared cursor decoding rejects before ticket/PUT. Actual owned
+observation reference is removed through the original writer; Native cursor closing keeps its original Stat. All632
+current/archive inputs match; original containers unchanged/owned backend absent. Native/Nereus affected compile/style
+passed20s. BK35 matching UP-TO-DATE excluded; publication65/UNKNOWN66/other Owner/Native429 not run. This qualifies only
+checkpoint metadata writer's focused Native behavior. Complete ManagedLedger data/Object/materialized references,
+all writers, exact reference-free/retirement/delete/permanent UNKNOWN/full combinations/five-child qualification
+remain required. All17 OPEN/null; full Goal ACTIVE, no commit/push.
+
+### Native plain data metadata references (2026-10-13, focused actual pass)
+
+NPMW4 source commitment extends actual old/proposed cursor checkpoint targets with actual Native plain-data ledger
+IDs from ManagedLedgerInfo; incomplete offload still protects its BK data. Completed-offload Object/fallback and
+materialized mapping resources are not claimed by this step and remain required. Parent and cursor compression
+metadata/declared decoded sizes are checked before parsing. The same C/D/member/Owner/SDK-terminal ownership applies
+to plain-data metadata writes. Writer paths never initialize missing target authority.
+
+Explicit sealed-source admission is separate from SDK mutation: same-backend parent raw bytes/Stat and exact P1
+properties, two actual SDK header/version observations, sealed state and original namespace/Binding are required.
+An original admitted observation workspace is acquired before reading. The actual candidate vector enters NPSA1
+and an original C ticket; only then are resource OPEN/reservation and append-only membership established on the
+actual namespace route. Existing fenced/deleted/different-enrollment authority is rejected. No Native ledger is
+created, retagged or assigned another ID. Unknown source admission/clear holds its original workspace; original
+metadata-only reconciliation/closing must finish before SDK scope and Cell refund. Successful source buffers are
+cleared on confirmed refund. This is actual implementation pending verification, not complete source migration,
+all-writer or permanent-UNKNOWN/delete qualification. All17 OPEN/null, full Goal ACTIVE.
+
+Source admission's readonly header recognition uses the actual stored quorum of a sealed legacy Native source.
+It validates format3/CRC32C/password, exact Native metadata keys and managed-ledger Binding and records the complete
+actual SDK header in its source digest. Current guarded create/update spec remains exact and unchanged. A stored
+legacy3/2/2 source is not rewritten into current3/3/2 write metadata. Tagged sources from a different original SDK
+Owner scope and complete permanent recovery remain unqualified. Revised actual verification passed4 fresh suites12 cases on current source633/archive
+b8bdd7aeceaad10ae41a8a0fe1371205dc9d334b979426f011ec7fdc26fd7bad.
+
+Current plain-data metadata source633/archiveb8bdd7aeceaad10ae41a8a0fe1371205dc9d334b979426f011ec7fdc26fd7bad is
+terminal runner/Gradle0,4 fresh suites12 cases0 failures/errors/skips (Native5,Provider5,guarded-factory25,namespace1).
+All633 current/archive inputs match; original containers unchanged/owned backend absent. Actual closed legacy3/2/2
+headers are identified separately from current3/3/2 writes; parent raw bytes/Stat and SDK headers/version stay exact,
+source admission adds zero Native PUT/birth, actual original members exist and observation charge is refunded.
+Subsequent actual parent C/D writes/clear UNKNOWN, definite rejection, no-dispatch cleanup, checkpoint D cases,
+original factory/SDK/Cell draining remain green. Existing post-create-fence enumeration keeps exactly2 new births;
+fence behavior is unchanged. Module158/BK35 matching UP-TO-DATE excluded; other Owner/Native429 not run. Compile/style
+passed20s after LightProto getter correction; readonly source-quorum revision20s, observer assertions17s, exact
+fence-phase correction16s. This is focused plain data/checkpoint evidence; full offload/mapped targets, tagged old
+SDK Owner sources, source permanent recovery, all actual writers/reference/retirement/delete/UNKNOWN/full current
+combinations/five children remain required. All17 OPEN/null, goal ACTIVE, no commit/push.
+
+### Stored Native physical reference resolution (2026-10-13, focused actual pass)
+
+PulsarNativeM4SourceMapV1 resolves one selected typed data slice from complete SHA-bound stored source bytes, not a
+separate resource summary. Actual Binding and metadata/physical namespaces are checked. Plain sources resolve exact
+BK namespace/id and actual frontier; NPRV1 offload source resolves original BK fallback plus immutable Object root/
+data versions, NPRV2 preferred source resolves only the actual two immutable Objects. NPMV2 recipe chooses the
+actual current or retained predecessor payload and rejects a range crossing selected source boundaries. Native
+retained source bytes keep their original physical identities. A logical ledger ID is not treated as a physical
+BK resource after rewrite. The production cursor data-reference path now uses this persisted-byte resolver.
+
+Mutable Native metadata writer still requires complete selected-map/backend-route/ticket integration for Object/
+mapped references; this resolver alone grants none. Actual initial/preferred/repeated cold Owner verification passed17 fresh suites170 cases on current
+source633/archive259b6142df7a68055b3b2e0bed63aef09ff8aaea8cb8fe34214f9d0f38161c2f. Existing close/floor/native namespace/physical-source ownership remains required; all17 OPEN/null.
+
+Stored-reference revision is terminal runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,
+Native5,Provider5,publication65,namespace1). All633 current/archive inputs match; original containers unchanged/owned
+backend absent. Actual Owner65 still checks each retained entry's exact physical resource against independently
+selected map/output and actual Native members. Initial fallback, preferred source after exact M4 RELEASED, repeated
+rewrite's old outside-cut payloads and cold recovery pass through the stored-byte resolver; actual cursor namespace/
+checkpoint/floor/SDK freshness/observer-close/charge and original drain assertions remain green. BK35 matching
+UP-TO-DATE excluded, guarded-factory25/UNKNOWN66/other Owner/Native429 not run. Corrected compile/style passed17s.
+This remains stored reference resolution/cursor evidence only. Complete mutable Object/mapped reference writer
+backend routing/target tickets/SDK lifetime/recovery, other actual writers/namespace closure, retirement/delete/
+permanent UNKNOWN/full combinations/five children remain required. All17 OPEN/null/full Goal ACTIVE; no commit/push.
+
+### Native mixed physical target Contexts (2026-10-13, model and Native BK focused pass)
+
+The existing sorted multi-target guard now freezes a distinct immutable Context per target before acquiring any
+ticket. One invocation nonce is bound to the entire sorted resource/Context vector; all targets still precede one
+original SDK dispatch. Existing common-Context callers retain the same contract through the new entry point.
+Known-terminal cleanup retains original attempted tickets/predecessors; mixed-context reconciliation filters one
+original operation and each resource's original facts, preserving siblings. Native metadata writer now consumes
+this entry point; its current BK targets retain their original capability/Owner/source Context. Complete actual
+Object route/profile/member resolution and mutable mapped source-map integration remain required. The model test
+is algorithm evidence only. Actual affected Native BK writer verification passed17 fresh suites170 cases on current source633/archive
+a4630523f643bc2cf1339e061afb71a7fbcc1188928bfa6996aa6d99a448ca3e; all17 OPEN/null.
+
+Mixed-context current source633/archivea4630523f643bc2cf1339e061afb71a7fbcc1188928bfa6996aa6d99a448ca3e is terminal
+runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips (module158,Native5,Provider5,guarded-factory25,namespace1).
+All633 current/archive inputs match; original containers unchanged/owned backend absent. The actual installed Native
+BK metadata adapter passes old-source admission/current writes, original SDK ACK/clear-UNKNOWN, definitive rejection,
+no-dispatch reconciliation, held checkpoint SDK/observer ownership, physical-clear UNKNOWN, actual sibling/predecessor
+mutation and factory/SDK/Cell closing. Target Context variation/sibling filtering is a separate10-case model; actual
+Object profile/route/member/mapped-reference writer integration remains required and is not proved by this run.
+BK35 matching UP-TO-DATE excluded; publication65/UNKNOWN66/other Owner/Native429 not run. Exact compile/model/style
+passed21s. All17 OPEN/null/full Goal ACTIVE; full writer/reference/retirement/delete/UNKNOWN/required combinations/
+five children and authorized delivery remain unfinished; no commit/push.
+
+### Native mutable metadata source selection (2026-10-13, focused actual capture pass)
+
+The installed Native metadata writer captures actual selector absence or the exact selector and selected source-map
+or manifest values with their same-response opaque versions. Direct selected manifests are decoded and checked against
+the actual Binding and selector digest; their full read recipe still uses the existing materialization recovery path.
+NPMW5 binds source kind and those facts to the original mutation; before SDK dispatch
+it rereads both the Native metadata predecessor and that source selection. Snapshot bytes and opaque versions count
+against the existing pending writer byte cap, and unresolved original operations retain their admitted lifetime.
+Current parent metadata updates with a selected source map fail before C/D admission because the actual Object
+profile/route/member scope is still incomplete; logical Native IDs cannot substitute for selected physical resources.
+This gate is not Object writer qualification or an atomic lease on selection. Complete raw-offload/mapped mutable
+writer integration, all-writer closure, reference-free proofs, permanent recovery, retirement/delete and required
+compositions remain unfinished. All17 lifecycle obligations remain OPEN/null; no current child or Final is promoted.
+
+Current source633/archive d96733cc5109365c431c31e6c1f2aa74f33f158aa6c10b587dd3f6ae9f39039c is terminal
+runner/Gradle0,17 fresh suites171 cases0 failures/errors/skips. The original Native writer25 and publication65
+(ordinary map, preferred map, repeated cold manifest selection) passed; all633 current/archive inputs match and
+owned backend cleanup passed. Owner XML187a68383cdd26e3fb0f01ff88e76586fee57fe369e1bb20642cd0b7758ce124;
+resulta67bb19708d17f92f04cd30a73d85271baee73123e66071ffb6bd10ae02bbdde. BK35 matching UP-TO-DATE excluded,
+Owner66/other Owner/Native429 not run. A real selection-change-before-dispatch fault and selected-parent gate
+remain unqualified by this positive run. Actual Object/mapped mutable writer integration and full M5 remain open.
+
+### Native metadata writer Object scope (2026-10-13, focused actual scope pass)
+
+The installed Native writer can borrow its supplied original configured S3 connection, admit that connection's
+complete actual Provider profile and reopen the existing assigned Object quota. It does not initialize or expand
+quota. Original admission and subsequent profile/quota validation futures stay private; when configured, every
+Native SDK metadata dispatch checks that scope. Factory close first drains Native mutations, then reconciles the
+original profile metadata and closes the original SDK loan, then refunds the writer lifetime. The existing actual
+guarded-factory25 fixture now explicitly provisions Object quota before opening, supplies the actual configured
+SDK profile, and verifies offloader close waits on the metadata writer's loan. Compile/format passed15s/10s;
+actual guarded-factory25 verification passed17 fresh suites170 cases,0 failures/errors/skips on633 current/archive
+inputs44c7dfc8376c5cb750773abc9e5eb660526b74bd9ea55f45d9b28d67cb5e3288; runner/Gradle0, exact inputs
+and owned backend cleanup verified. Owner XML76d9e5ee904b43d8ab773ca2df15d72dac484566cb1a7c47e86f1be08f22a1d0;
+resultb46b87fc520704bde2979ae2d899c84b39794778f972f64eedc856478de29624. Actual original offloader close waits
+until metadata writer loan return. BK35 matching UP-TO-DATE excluded,65/66/other Owner/Native429 not run on
+this later scope revision. Profile-admission UNKNOWN/restart are not qualified by this positive run.
+Object root/data/mapped target resolution and member/D-ticket integration remain
+incomplete; selected parent mutations remain fenced. All17 OPEN/null and whole M5 remain incomplete.
+
+### Native raw-offload metadata physical references (2026-10-13, focused actual pass)
+
+Native parent mutations now resolve old/proposed completed offloads through the supplied original SDK, retaining
+the actual root/data immutable versions, UUID, namespace, metadata name, SDK frontier and length commitments.
+NPMW6 binds actual physical resources and their SDK facts. The BK fallback remains a physical target until its
+actual stored deletion state retires it. Per-invocation exact keys route BK and Object authorities to their
+original quota namespaces; original members and each actual capability Context precede one Native SDK dispatch.
+No multi-key transaction is synthesized. The original sealed-source admission also imports complete offloads
+from actual parent/SDK facts under the original C ticket, without creating/retagging Native ledgers or Object PUT.
+Original readonly SDK openings close before workspace refund; unresolved original closure retains admission.
+Compile/format passed14s/13s/10s. Actual guarded-factory25 verification on source634/archive
+e53a14bf3f6f8b4a162c8bfe180d4cf7babf2ee127b654c27d57ded47270eb08 is running: independent S3 HEAD
+versions/members, held actual parent PUT with simultaneous BK/Object tickets and Object-clear response loss
+are covered by the existing scenario. Completed mapped-parent references remain fenced; mapped integration,
+permanent UNKNOWN/restart, all writers/reference closure/retirement/delete and all compositions remain incomplete.
+All17 OPEN/null; no child/Final promotion or commit/push.
+
+The initial raw-offload source634 run stopped at one121-character Checkstyle line before the Owner phase; its
+failed archivee53a14bf3f6f8b4a162c8bfe180d4cf7babf2ee127b654c27d57ded47270eb08 and cleanup are retained.
+The line is fixed; original SDK handles now drop their large decoded-root reference only after confirmed close,
+and source admission rechecks the actual Provider profile before physical metadata admission. Compile/format/
+Checkstyle passed16s. Source634/archive77d7afd374b25beccb44eb56e0115afd951336079cd89db058c14d0076121b58
+is running the same real25 scenario; no runtime qualification is granted while it is nonterminal.
+
+Current raw-offload source634/archive77d7afd374b25beccb44eb56e0115afd951336079cd89db058c14d0076121b58
+is terminal runner/Gradle0,17 fresh suites170 cases0 failures/errors/skips. All634 current/archive inputs match;
+original containers unchanged/owned backend absent. Actual25 independently verifies root/data S3 versions and
+members, no source metadata/SDK header retag, simultaneous BK/Object tickets with different actual capability
+Contexts under one invocation/root, held actual parent PUT/observer completion, Object-clear response loss and
+original metadata-only reconciliation without PUT replay. SDK/factory/Cell close remains passing. Owner XML
+02e3b04e7db8fecfba062c0ccc4be69fdac1cb28d9d56f887bc26bac7d80cd5f; result
+715355a92240e994c6b5463fd8e15d26c232caf0d5c54d2cc874bb696496dd4e. BK35 matching UP-TO-DATE excluded;
+65/66/other Owner/Native429 not run on this revision. Mapped parent integration, permanent restart/UNKNOWN,
+all-writer/reference closure/retirement/delete, required combinations/five children and full M5 remain unfinished.
+All17 OPEN/null; no source-child or Final promotion or commit/push.
+
+### Native mapped metadata physical references and output admission (2026-10-13, focused actual pass)
+
+NPMW7 now binds actual selector/source facts and the full selected materialization fact vector. Parent mutation
+capture resolves whole ledger rows from current rewrites, retained predecessor payloads and outside-cut Native
+sources; it cannot substitute logical ledger IDs for rewritten entries. Unknown new Native rows still require
+the existing actual SDK/member path. Active plain-tail growth keeps its actual same BK member; sealed sources
+retain their captured frontier. Full manifest/Plan/credit/source decoding uses the original control executor and
+an admitted mapped workspace; retained facts and their opaque versions are revalidated before SDK dispatch.
+The writer's own C ticket changes the physical P1 envelope, so that row uses the existing exact immutable NTA
+projection/source-version validation while all other source versions remain exact.
+
+Before selector dispatch, the original Native Task now admits D authority and actual members for its independently
+verified ASSIGNED outputs, including still-selected predecessor payloads. Metadata-only retries retain original
+credits; unresolved admission prevents original Task close/refund. This is no SDK PUT retry or all-writer C closure.
+Compile/format/Checkstyle passed23s/17s/15s. Source634/archive
+4c7fb0a349b89d13c29f303d1242dbe8ecb280909b08a66f810f2c0a3f18a4f2 is undergoing actual25/65/66:
+raw writer, whole-ledger/per-entry physical union in three publication/cold phases, actual assigned-output D/member
+facts, original selector UNKNOWN/handoff and real source reads. A complete mutable mapped-parent SDK writer
+scenario, all-writer C integration, physical-admission UNKNOWN/restart and complete M5 remain unqualified.
+All17 OPEN/null; no child/Final promotion or commit/push.
+
+Initial mapped source634/archive4c7fb0a349b89d13c29f303d1242dbe8ecb280909b08a66f810f2c0a3f18a4f2
+passed raw25 and publication-UNKNOWN66, but65 exposed an incomplete whole-row oracle: an empty Native tail
+contains no entry yet remains an actual SDK ledger reference. The production resolver retains that BK member.
+The oracle now checks its actual SDK metadata/name and includes that reference independently of per-entry union;
+no data assertion or production reference was removed. Failed archive/result/cleanup are retained. Format/
+compile/Checkstyle passed16s; source634/archive3570c90c3aeb6d881f91cff9e0b6fa80f6f5ec47965bacd25424e3361a9d6051
+is rerunning actual25/65/66. Full mutable mapped-parent SDK and all-writer C qualification remain incomplete.
+
+The empty-tail revision passed25/66, while65 additionally confirmed that SDK reopen creates a new Native tail
+outside the immutable old Plan chain. The resolver intentionally returns absence for that new row; the installed
+writer's existing raw SDK/member path is required rather than inventing an old mapped route. The scenario now
+checks old-Plan absence and independent actual SDK header/name/BK identity, keeping whole-row union assertions
+for every mapped row. Failed634/archive3570c90c3aeb6d881f91cff9e0b6fa80f6f5ec47965bacd25424e3361a9d6051
+and cleanup are retained. Format/compile/Checkstyle passed17s; current634/archive
+565d16749da9690df14337cb695288e37de0618b142a06d3ec75213632423ae0 is rerunning actual25/65/66.
+
+Current634/archive565d16749da9690df14337cb695288e37de0618b142a06d3ec75213632423ae0 is terminal
+runner/Gradle0,4 fresh suites14 cases0 failures/errors/skips (Native SDK5,Provider5,Owner25/65/66,namespace1).
+Module158/BK35 matching UP-TO-DATE are excluded from fresh; other Owner/Native429 not run. All634 current/
+archive inputs match and owned cleanup is verified. Actual65 covers original/preferred/repeated-cold whole-ledger
+physical unions, original/retained rewritten payloads, empty/new Native tail SDK identity and actual ASSIGNED
+output D/member facts; actual66 preserves original publication UNKNOWN/handoff without another SDK PUT. Raw25
+continues passing actual mixed BK/Object tickets and cleanup. Owner XML
+e30f08bda32c9502f8cceb0c27c268ba4bcc4f76c8034b525f34697311a79166; result
+6626698877108fdae01391bb52a26b638310a3e384ef7268c93ee306efd4aa31. Full mutable mapped-parent SDK,
+physical-admission UNKNOWN/restart, all-writer C integration, retirement/delete/all required compositions and
+complete M5 remain unqualified. All17 OPEN/null, no child/Final promotion or commit/push.
+
+### Native mapped parent original SDK path (2026-10-13, focused actual SDK pass)
+
+The existing repeated-materialization/cold65 scenario now creates an actual guarded BK/fresh Native factory,
+enrolls the actual C writer and installs its guard before that factory's first stored mutation. It supplies the
+original configured Object profile, observes actual source admission and uses MetaStoreImpl.asyncUpdateLedgerIds
+for both parent updates. Expected targets come from the actual selected current/retained mapping and Native
+SDK paths. Held server PUT ACK verifies simultaneous actual tickets and mapped workspace retention despite
+observer completion; Object-clear reply loss verifies original metadata reconciliation without another PUT.
+Original SDK/metadata connections remain available through cleanup. Compile/format/Checkstyle passed12s/17s/15s.
+Source634/archive5ad67aeea4334e9d9e97d6bffa454905a42bd4c3ad9d26a01c0490214c7527fe is running
+actual25/65; the full mapped SDK path is unqualified while nonterminal. All17 OPEN/null; complete C writer
+closure/permanent recovery/retirement/delete/required compositions/five children and full M5 remain unfinished.
+
+The initial mapped-parent source634/archive5ad67aeea4334e9d9e97d6bffa454905a42bd4c3ad9d26a01c0490214c7527fe
+passed actual SDK parent dispatch/ticket holding but correctly failed the UNKNOWN assertion: its new C response
+wrapper did not wrap the original Binding's Object route, so Object clear actually succeeded. The existing
+Binding response wrapper is now carried through the cold scenario to the SDK writer; no expected UNKNOWN
+assertion is weakened and both source/result/cleanup remain archived. Compile/format/Checkstyle passed16s.
+Source634/archive1234f464a448ce5e0a99ad074324da38def61d3515e5b1995ad678f7b6845da3 is rerunning25/65.
+
+Current mapped-parent source634/archive1234f464a448ce5e0a99ad074324da38def61d3515e5b1995ad678f7b6845da3
+is terminal runner/Gradle0,4 fresh suites13 cases0 failures/errors/skips (Native SDK5,Provider5,Owner25/65,namespace1).
+Module158/BK35 matching UP-TO-DATE excluded,66/other Owner/Native429 not run on this revision. All634 current/
+archive inputs match and original containers/owned cleanup are verified. Actual cold repeated65 uses the installed
+original factory MetaStoreImpl.asyncUpdateLedgerIds with real P1/C enrollment, original guarded BK/Object scopes,
+current/retained mapped physical targets, simultaneous original tickets and held server PUT ACK. Observer ending
+retains its admitted mapped workspace; Object-clear response loss retains original operation/workspace until
+metadata-only reconciliation, with exactly two independent updates and no replay. Factory/SDK/Cell closing
+continues passing. Owner XML4c33f06307f8718d96ba689fc959286d1f747d2cdf5e875156a2b336847187e7;
+result8895eca38daf79592b0bc7d2272883a1d02fe25266882d14abd0f3276ba03127. This qualifies that mapped
+parent SDK path only; selection-change-before-dispatch fault, physical admission UNKNOWN/restart, permanent
+SDK UNKNOWN, all-writer C closure/retirement/delete/required compositions/five children and complete M5 remain
+unqualified. All17 OPEN/null; no child/Final promotion or commit/push.
+
+### Native mapped SDK selection race (2026-10-13, focused actual pass)
+
+The actual installed-factory SDK scenario now holds a server-applied Object ticket acquire response before
+dispatch, rewrites the actual Oxia selector with identical bytes/a new opaque version, then releases that original
+response. MetaStoreImpl.asyncUpdateLedgerIds fails with actual source-selection predecessor change; Native PUT
+count stays unchanged, original parent bytes/Stat stay exact, all original physical tickets and mapped workspace
+settle without a SDK replay. This tests exact version provenance, not only changed decoded selector content.
+Source634/archiveb9bb67a2bf37dc0dabed277262996403ee8e2959a6c23549fa179766c145eed5 is terminal
+runner/Gradle0,4 fresh suites12 cases0 failures/errors/skips (Native SDK5,Provider5,actual65,namespace1).
+Module158/BK35 matching UP-TO-DATE excluded,25/66/other Owner/Native429 not run on this revision. All634
+current/archive inputs match; original containers unchanged/owned backend absent. Owner XML
+acd83533a488ef7eb89bf335bbdcda1fbfb0e35a6da53e8a1bf13de710086478; result
+bc21c61a3c76fb4c8822d07b64c5c6270cb70e80f251125bdb72293dba55e0c9. Format/compile/Checkstyle
+passed18s. Complete C writer enrollment/runtime closure, physical admission UNKNOWN/restart, permanent SDK
+UNKNOWN, retirement/delete/all required compositions/five children and full M5 remain unfinished.
+All17 OPEN/null; no source-child/Final promotion or commit/push.
+
+
+### Native control source-protection C writer (2026-10-13, focused actual evidence)
+
+PulsarNativeM4ControlV1 can install its original C writer before its first mutation, after exact P1 source-version
+and enrolled-writer validation. Its original Native Cell actor bounds 128 pending operations/1 MiB of pending
+inputs. NPCW1 binds full Binding/namespace/key, original raw predecessor/opaque version and candidate; the original
+C guard surrounds the actual versioned Oxia mutation and readback. UNKNOWN retains the original actor/ticket;
+known terminal cleanup retries metadata only, with private observer copies and drain before Cell refund.
+Actual65 uses a source identity from the published materialization plan. The held server-applied C acquire reply
+leaves the protection absent; after release, the original control PUT applies. Losing the C-clear reply retains
+the actor; original cleanup leaves the protection's bytes and opaque version unchanged and clears that ticket.
+Source635/archive8296aff14f07a09a4fe2d588b96ff80fee1d05fd046972882f66bfe632c5512b passed runner/Gradle0,
+4 fresh suites12 cases, zero failures/errors/skips (Native SDK5, Provider5, actual65, namespace1); module158/BK35
+UP-TO-DATE excluded. Owner XMLd63e640acf0e5dfd75f9110591a326be64ff3deb2217f1da71c9318c23357309;
+resultadfc73602d26b1e1ca90d9607d9a41ef3683f56ff40266ded460cbf8ce61e5d2; backend cleanup passed.
+Initial635 source17d3c245bd755d2c0e3d40076c2a8b75c045d28c12ff900a6bc11a6e8e124d5d failed Spotless before
+Owner; its receipt/archive remain preserved. A subsequent change captures synchronous pre-dispatch Cell-check
+failures in the original future's cleanup; actual validation of this latest revision is pending. This evidence
+qualifies neither selector publication nor physical D reference admission, all-writer closure, permanent recovery,
+retirement/delete, required compositions/five children or whole M5. All17 OPEN/null; no commit/push.
+
+The synchronous-admission revision is now terminal runner/Gradle0 on source635/archive
+b7bbfd6e86714d2180eec85bfb52ef27ff385c6e0af20c559eb5a6ffc7015976: 17 fresh suites170 cases,
+zero failures/errors/skips (module158, Native SDK5, Provider5, actual65, namespace1; BK35 UP-TO-DATE excluded).
+Owner XML2dd808eb8613c614265842fd6d1ea184cf14d9ae6de3a6c1eb39eb89a6d20115; result
+83c9d84b9bce0448d3d16df17cc649ea3c399d0b14456c2073dd7d9e1dd9985a. All635 current/archive inputs
+matched at completion; original containers unchanged/owned backend absent. Format/compile/Checkstyle passed16s.
+This supersedes only the pending validation note above; the stated selector/D/all-writer/whole-M5 limits remain.
+
+
+### Native Task/selector C integration (2026-10-13, actual run pending)
+
+The installed original control writer now also wraps the existing materialization task, worker and Cell-admission
+metadata routes. Selector mutations use the registered MANIFEST_SELECTED writer; Task/worker/admission records
+use the actual Native Task's MATERIALIZATION_OR_COMPACTION_TASK declaration, and existing M4 protection records
+retain SOURCE_PROTECTION. The original Task stop/selector dispatch boundary remains in place. Actual65 enrolls
+and installs the original C control actor before first Owner/control mutation; the existing SDK metadata factory
+subsequently requires the same enrolled registry instead of creating a second enrollment. During actual manifest
+selector PUT reply hold, the test requires the original MANIFEST_SELECTED ticket to remain visible.
+Format/compile/affected Checkstyle passed21s. Source635/archive69d7214ba60415827285a8cb77e5dabd498b9675287595d8897955cfd7250761
+is running actual65; no terminal result is claimed. All cold controllers, physical D admission, all-writer closure,
+permanent recovery, retirement/delete, complete combinations/five children and whole M5 remain unqualified.
+All17 OPEN/null; no commit/push.
+
+The first actual Task/selector candidate69d7214ba60415827285a8cb77e5dabd498b9675287595d8897955cfd7250761
+failed at the real cursor-observation admission: adding the original C actor exhausted the test's three Owner slots
+(resultb3b08dff25fadd41f00b75059e5ac39ea6e5b59741996bd789b871c1c5818739). Its receipt/archive are preserved.
+Only actual65 now explicitly provisions a fourth slot for that real C actor; other capacity/negative scenarios
+retain the original configuration and all production capacity checks. The accepted C actor captures its original
+Native owner before reservation and can finish original metadata/cleanup while Cell close waits; it never borrows
+a new owner during drain. The controller is drained before Cell closure. Format/compile/Checkstyle passed19s.
+Source635/archivee42aa8e3a8383444e11df59f7578191c90e0e9fbaf010bddfd8c389aab375562 is the current actual65
+rerun, still pending; prior source-protection evidence remains scoped/historical, with whole-M5/all-writer limits.
+
+The second actual candidatee42aa8e3a8383444e11df59f7578191c90e0e9fbaf010bddfd8c389aab375562 reached
+publication and ordinary mapped-read recovery, then failed the old reader-only zero-usage oracle while the
+independent original C actor correctly retained exactly one Owner/24 MiB. Result624e5901c357441941c199d36eac614618a91723b45c78aebf775a07fda37b75
+and source/archive remain preserved. The actual reader test now independently requires precisely that C charge
+before/after reader drain, an additional reader Owner while the Entry remains held, and exact zero total usage
+only after controller drain. The original C cleanup observer is explicitly completed during the held acquire
+reply; original actor usage must remain unchanged. The current source revision is awaiting actual revalidation;
+no failed candidate is promoted and all whole-M5 limits remain.
+
+Third candidate9275b4c848c55bb355479db64e33678011295223f685efd233bb4e6c474571ef passed the ordinary-reader
+C-charge oracle, then reached repeated Task drain's remaining old zero oracle. Result63bf6d667fed8761f10c32dfc63e399e2191d386e7e0548d8f5bf74c95fa5527
+and archive remain preserved. That boundary also now requires exactly the independent C actor's one Owner/24 MiB;
+controller drain still requires exact zero. The original Native owner is bound in NPCW1 and revalidated again after
+C acquire, immediately before actual SDK dispatch, using the original captured identity. Source635/archive
+148d38f622b14d7e9e5672dbd1cbac9375243b0a10d70bfe23e2cc182a2c2151 is the current actual65 run.
+No terminal or whole-M5 qualification is claimed while it runs; no commit/push.
+
+The current actual Task/selector C candidate is terminal runner/Gradle0 on source635/archive
+148d38f622b14d7e9e5672dbd1cbac9375243b0a10d70bfe23e2cc182a2c2151: 17 fresh suites170 cases,
+zero failures/errors/skips (module158, Native SDK5, Provider5, actual65, namespace1; BK35 UP-TO-DATE excluded).
+Owner XML41e8ff32747f4be0a56e14c3180bef2436b1814b62b0da9dd0c0fccac9131e05; result
+4b7eb8cbdbe205542e81ff29b12b6648c08cb3df569addbdd5b93dd56e79cb3b. All635 current/frozen inputs match;
+original containers unchanged/owned containers/networks/volumes absent. This original C controller is used by
+actual publication, ordinary SDK reads, exact M4 RELEASED, repeated materialization and cold recovery. The
+actual selector PUT reply hold observes the original MANIFEST_SELECTED ticket. Source-protection cleanup
+observer completion cannot end the original actor; original known-terminal metadata cleanup finishes during
+Cell-close wait without another protection PUT, then controller drain leaves exact zero usage. All mapped SDK
+parent ticket/selection-race and semantic-data assertions remain. Three prior failed candidates are preserved.
+This is focused C integration for these actual paths. Physical D admission for all control references, every
+other writer/floor and runtime, permanent recovery, retirement/physical delete, complete required combinations,
+five evidence children and whole M5 are still unqualified. All17 OPEN/null; no source-child/Final promotion,
+commit/push or next-stage work.
+
+
+### Native manifest physical writer tickets (2026-10-13, actual run pending)
+
+The original PublicationRun now holds MANIFEST_SELECTOR_GENERATION_REPRESENTATION D tickets for all current and
+retained readable output versions, through its supplied actual profile quota route. NPPW1 binds original Native
+Owner, complete plan/manifest/map and exact independently verified ASSIGNED credits. The original Native Owner,
+profile and worker are rechecked after ticket admission before publication metadata. The existing executor runs
+that callback without waiting on itself. Known success captures the actual selected receipt; D-clear UNKNOWN
+keeps the original Task and operation until original metadata-only cleanup. An ambiguous selector response is
+resolved only after the exact original candidate is observed; the existing coordinator recognizes that selector
+and completes its original Task row without another selector or output PUT. No-dispatch ticket cleanup retains
+the original guard's private terminal evidence.
+Actual65 now checks all output tickets share one operation/root during the held actual selector reply, loses one
+D-clear reply, requires original actor usage retained, then retries that original publication and requires unchanged
+selector bytes/opaque version plus empty output ticket lists. Actual66 retains its applied-selector UNKNOWN and
+original Cell-close scenario. Format/compile/affected Checkstyle passed19s. Source635/archive
+34fd12affc565f734d17869d4e948c3a724072fd670479fc2329f7af8cdfb643 is running these actual cases.
+Raw BK/native fallback control references, all other control/reference writers, full recovery/retirement/delete,
+all combinations/five children and whole M5 remain unqualified. All17 OPEN/null; no commit/push.
+
+Current physical manifest publication candidate34fd12affc565f734d17869d4e948c3a724072fd670479fc2329f7af8cdfb643
+is terminal runner/Gradle0: 17 fresh suites171 cases, zero failures/errors/skips (module158, Native SDK5, Provider5,
+actual65/66, namespace1; BK35 UP-TO-DATE excluded). Owner XML5f16b51e0452f8288cf09f439f9417c6c8b62e3f0f4d6572f069bc9996b21b33;
+resultb84001c3cb88bf57bf92f8fbaafe0cab361bec2ce69fe6a4b90c9a5668b1585a. All635 current/frozen inputs match,
+original containers unchanged/owned backend absent. Actual65 holds original C and output D tickets during selector
+reply hold, loses the D-clear reply, retains original Task usage, then clears original operation metadata with
+unchanged selector bytes/opaque version. Actual66 applied-selector UNKNOWN completes the original Task terminal
+and D cleanup through Cell-close wait. Semantic reads, exact M4 RELEASED, repeated/cold paths remain covered.
+This qualifies only these publication output paths; raw BK/native fallback controls, all writers/floors, complete
+recovery/retirement/physical delete/combinations/five children and whole M5 remain unqualified. All17 OPEN/null.
+
+
+### Native publication D no-dispatch reconciliation (2026-10-13, actual run pending)
+
+A repeated actual Task now injects a server-applied manifest D-ticket acquire reply loss. The original guard
+retains its private no-dispatch terminal cleanup and cannot call the metadata publisher after failed admission.
+Only after that original operation is conclusively drained may this same actor retry with new tickets, reusing
+its verified outputs. An invocation whose metadata dispatch is unknown never takes this retry branch. Actual
+checks require selector bytes and opaque version unchanged on the admission failure, then compare complete
+untruncated Provider version vectors before/after retry so another output PUT cannot be hidden by a reused credit.
+The prior publication/D-clear/applied-selector UNKNOWN candidate remains historical scoped evidence. Current
+source635/archive865cf21e258ffd640890e9553bcc6f43de1a65327a169f87b854a06298a323cd is running actual65/66;
+format/compile/Checkstyle passed16s. No current terminal result, full controller-reference, raw BK/fallback,
+retirement/delete/combination/five-child or whole-M5 qualification is claimed. All17 OPEN/null; no commit/push.
+
+The no-dispatch candidate865cf21e258ffd640890e9553bcc6f43de1a65327a169f87b854a06298a323cd is terminal
+runner/Gradle0: 17 fresh suites171 cases, zero failures/errors/skips (module158, Native SDK5, Provider5, actual65/66,
+namespace1; BK35 UP-TO-DATE excluded). Owner XMLdcff777b9d982fbd0e47c2fa1e6cbfb60d0781f2447cbeaf23588600edc35c52;
+result0a0a9d5a0a234c897284dc6bbbfd66949c5b2408ad7f98fe57ae2259ea7c81ff. All635 current/frozen inputs matched
+at completion and owned backend cleanup passed. The actual repeated Task's D acquire reply loss leaves selector
+bytes/version unchanged; original no-dispatch reconciliation allows a new ticket operation with the same verified
+outputs, and the complete untruncated Provider version vectors remain equal.
+
+### Native stop before selector D drain (2026-10-13, actual run pending)
+
+Stopping after publication metadata preparation but before selector dispatch must not retain tickets forever or
+release them before its original Task is terminal. Once that callback has ended without a selector dispatch,
+original close now confirms Task quarantine (or its already selected exact original publication) before clearing
+that original D operation. Quarantine's versioned terminal excludes late original immutable/verified transitions.
+The new actual67 scenario holds a server-applied D acquire reply, closes the original source, confirms retained
+actor usage, releases that reply, and requires unchanged selector bytes/version, actual QUARANTINED Task, empty
+output D tickets and only the independent C actor charge after Task drain. Compile/format/Checkstyle passed16s.
+Source635/archive67463de73c8aef92641bd876fb779ad8b174bf0e6a65b2681c0badd9b0cf10d5 is running actual65/66/67.
+No current terminal, full control-reference/raw BK/fallback, physical-delete or whole-M5 qualification is claimed.
+All17 OPEN/null; no commit/push.
+
+The first stopped-path source67463de73c8aef92641bd876fb779ad8b174bf0e6a65b2681c0badd9b0cf10d5 was
+terminal runner/Gradle0, but archived JUnit names contain only actual65/66 (17 fresh suites171 cases); actual67 was
+excluded by the existing fixed Owner-task include list. Resultb217b4742014ae993e2eedd5818c898daa327685a2484a5f4a08b4cc66da8e49
+is retained only for those executed cases and grants no stopped-path qualification. The Owner-task filter now
+explicitly includes the new real scenario. Source635/archivef9dbac5d7209341cd586a1abea05220fa3576320140da8b65124b3fb92458733
+is the current actual65/66/67 run; JUnit testcase names/counts must prove actual67 execution before qualification.
+All whole-M5/physical-delete limits and17 OPEN/null remain.
+
+The registered runf9dbac5d7209341cd586a1abea05220fa3576320140da8b65124b3fb92458733 actually executed
+65/66/67. Real67 completed its quarantine, unchanged-selector, output-ticket drain and remaining C-charge checks,
+then failed the outer zero-total oracle while the separate C actor was still open (result6e58a2b8233fb41cbcc3647bc284358ec54f38ad58eaf071a5b314e2f2243494).
+The failed archive/receipt are preserved. The scenario now explicitly closes that C actor and requires exact zero
+before returning to the unchanged outer oracle. Source635/archive74e1698d3c499d774c8a9676923accffbc76a14b8dce2e82221d19adc4ea4409
+is the current actual65/66/67 rerun; format/compile/Checkstyle passed16s. No stopped-path qualification until terminal
+JUnit proves all three cases. Whole-M5 limits/17 OPEN/null/no commit-push remain.
+
+Current stopped-publication candidate74e1698d3c499d774c8a9676923accffbc76a14b8dce2e82221d19adc4ea4409
+is terminal runner/Gradle0. Archived JUnit explicitly contains actual65/66/67, all passing: 4 fresh suites14 cases
+(Native SDK5, Provider5, three actual Owner scenarios, namespace1), zero failures/errors/skips. Module158/BK35
+UP-TO-DATE are excluded from fresh evidence on this revision. Owner XML856091dbc33e368971d31a8309a5c10885393a2e2697c93b34cd13d904126b66;
+resultc58084f70d55fee63ce365b53ae6221847aedca7d448e842fcfbc581e7952e5b. All635 current/frozen inputs match;
+original containers unchanged/owned backend absent. Actual67 confirms the original source close waits through
+held D acquire, the metadata callback ends without selector dispatch, the real Task becomes QUARANTINED, the
+selector bytes/opaque version stay unchanged and all output D tickets clear. Task drain leaves only the independent
+C charge; C drain leaves exact zero. Actual65/66 keep original publication, D-clear UNKNOWN, no-dispatch ticket
+retry without additional Provider versions, applied-selector UNKNOWN, semantic reads/M4 RELEASED/repeated/cold
+recovery coverage. The unexecuted67 and failed C-drain candidates remain preserved without qualification.
+This is current focused publication/output evidence. Raw BK/native fallback/control references, all remaining
+writers/floors/runtimes, permanent recovery, retirement/physical delete, all required combinations/five children
+and whole M5 remain unqualified. All17 OPEN/null; no commit/push or source-child/Final promotion.
+
+
+### Native sealed cursor checkpoint source admission (2026-10-13, actual run pending)
+
+Integrating guarded Native factories requires their existing cursor-checkpoint BK sources to be admitted, as well
+as the parent data/offload rows. The original readonly source-admission actor now captures the actual cursor
+directory and raw row bytes/Stat, parses within the existing bound, verifies the actual CLOSED SDK BK header and
+exact pulsar/cursor name, and includes those candidates in the same C-ticketed physical admission. NPSA3 binds
+parent/cursor snapshots and canonical physical candidates. Metadata-only/absent checkpoint IDs add no BK resource.
+Total parent/cursor raw bytes plus names are bounded by the original8MiB workspace admission, and directory/row
+bytes and Stat are reread before physical admission. Original SDK sources are never created or retagged.
+Actual65 now independently verifies existing stored checkpoint ledger IDs against SDK headers, OPEN D authorities
+and exact actual Binding/Cell provider-scope members after admission. Format/compile/Checkstyle passed16s.
+Source635/archive6c6a2e6930be2d46aa5cbbdc8b6dfe1f8dc567d1ba5483e96ce62c9af6d9b5e2 is running actual65.
+No terminal, OPEN/old-tagged cursor, all-control/raw-BK/fallback, retirement/delete/full-combination/five-child or
+whole-M5 qualification is claimed. All17 OPEN/null; no commit/push.
+
+First actual cursor-admission candidate6c6a2e6930be2d46aa5cbbdc8b6dfe1f8dc567d1ba5483e96ce62c9af6d9b5e2
+reached the independent positive check but had zero checkpoint references: normal clean SDK close had correctly
+flattened the cursors into metadata-only rows. Result5e848cb6c8ab1a4e560d4b6b0c7c888187b8af851dfe3f6266403ccdd535f429
+and archive remain preserved. Actual65 now uses the real cursor individual-ACK API to retain a gap, with the existing
+SDK unacked-range metadata-store threshold set to zero throughout only that scenario's cold factories. SDK close
+therefore writes real PositionInfo into the cursor ledger and closes its actual BK header, retaining the checkpoint
+row; no fabricated cursor/source record or weakened positive assertion. Other scenarios/configuration remain.
+Source635/archive9b180d431d9c8ca8cc18ec8de7f32cf24102f992f2ff4e188d3523a144a5d445 is running actual65;
+format/compile/Checkstyle passed18s. All scope/whole-M5 limits and17 OPEN/null remain.
+
+Second cursor candidate9b180d431d9c8ca8cc18ec8de7f32cf24102f992f2ff4e188d3523a144a5d445 still found zero
+checkpoint rows at the late SDK helper: a recovered cursor ledger is readonly, so later clean close correctly
+flattens its checkpoint into metadata-only state regardless of that range threshold. The SDK source at
+ManagedCursorImpl.shouldPersistUnackRangesToLedger/persistPositionWhenClosing confirms the condition. Failed
+resultf2b4c6cd1d02ca021772b99623c2e54c552cb1a943c8a63e22647a63a7f9806b/archive are preserved.
+The positive admission now runs immediately after the original SDK checkpoint ledger close, before next cold
+cursor recovery. It uses the same actual creation/metadata writer/profile admission and independently verifies
+at least one real closed checkpoint source. Subsequent metadata-only recovery rows remain valid no-reference
+observations. No SDK record/header is forged and the positive assertion remains. Source635/archive
+de91b2b4204d0051b7d02d4b6f048781cf73854f7dd14409dc6540440d2542f6 is running actual65, style/compile18s.
+All current scope/whole-M5 limits remain;17 OPEN/null/no commit-push.
+
+Third candidatede91b2b4204d0051b7d02d4b6f048781cf73854f7dd14409dc6540440d2542f6 still reached zero
+checkpoint sources because the existing cursor-observation testcase later moved checkpoint-observation's mark
+delete through its ACK gap (actual SDK close log records markDelete34:2). Its existing behavior must remain.
+Result5193f6c5272004b4e439df58e43a002edcf996d796535551bf50354ab56c25e8/archive are preserved. An independent
+real SDK cursor, sealed-checkpoint-import, now retains the individual-ACK gap; the existing observation cursor is
+unchanged. The positive admission stays before next recovery and still requires real SDK header/authority/member.
+Source635/archivedf5644b9664ad4483d857c5456e9205e0ef8945612e3f5c2b6ad79e15403dabe is running actual65,
+format/compile/Checkstyle17s. No current qualification until terminal; whole-M5 limits/17 OPEN/null remain.
+
+Current original sealed cursor-admission source635/archivedf5644b9664ad4483d857c5456e9205e0ef8945612e3f5c2b6ad79e15403dabe
+is terminal runner/Gradle0: 4 fresh suites12 cases, zero failures/errors/skips (Native SDK5, Provider5, actual65,
+namespace1; module158/BK35 UP-TO-DATE excluded; other Owner scenarios not run). Owner XML
+a4bb7ae2dc620124b48eba7cf6b6e9b6a48db86cace69e7d8c4ca7330f1b9463; resultd7d8d55845d802d412015866fc8b679dfda639dce17b2408ee32f9b6370ac53f.
+All635 current/frozen inputs match; original containers unchanged/owned backend absent. Actual65 retains the
+independent real cursor ACK gap through original SDK close, then admits that real CLOSED checkpoint BK source
+before next cursor recovery. Its SDK cursor-name header, actual stored checkpoint ID, OPEN D authority and exact
+Binding/Cell/provider-scope member independently match. Later metadata-only recovery remains supported; existing
+SDK parent/mapped tickets, publication UNKNOWN/no-dispatch, M4 RELEASED, repeated and cold data checks remain.
+Three failed candidates/archive receipts are retained without qualification. Style/compile/Checkstyle passed17s.
+This closes only the original sealed checkpoint admission dependency. All control-reference D guards, OPEN/old
+tagged checkpoint sources, raw BK/fallback transfer, full writers/floors/runtimes, recovery/retirement/delete, all
+required combinations/five children and whole M5 remain unfinished. All17 OPEN/null; no commit/push or promotion.
+
+### Guarded Native SDK factory recovery (2026-10-13)
+
+The current actual65 scenario opens the selected managed ledger through the original guarded Native SDK factory,
+creates a durable cursor, performs mark-delete, and closes both cursor and ledger. The metadata writer is installed
+before factory open; tail and checkpoint headers must match the actual Native creation spec (including its quorums).
+Affected test compilation and Checkstyle passed. The real BK/MinIO/Oxia run is pending against 635 archived inputs,
+manifest `3f9ac87d1722be50b4a9a48a3d6284e381f6219dd9a5a489a09df7b161d6344f`.
+This is a focused factory recovery check; the 17 lifecycle obligations and whole M5 qualification remain open.
+
+The first factory candidate failed at new-tail ID reservation: the earlier original SDK scope had been permanently fenced on close. Its failed receipt is retained. Factory lifecycle now runs within the first still-live original creation actor; later reopening remains read/reconciliation only. The production creation fence is unchanged.
+
+The second candidate opened the actual guarded SDK factory and verified its new-tail header, then failed the premature cursor-checkpoint assertion: SDK cursor creation initially stores a metadata-only row and creates its BK checkpoint lazily on mark-delete. Header verification now follows that real persistence operation, with both data and cursor quorums set to the existing actual creation spec. The failed candidate `f8f1f1920d6168e32fa873dde5e3832144741d46018637e75178eedca88f8103` remains archived.
+
+Factory recovery completed against manifest `cc66d448f9c2af807707237796e5996af772e9c5b6be47fd72b94f6523b8cf1d`: 635 current/archive inputs matched; four fresh suites and 12 cases passed without failures, errors or skips (SDK 5, provider 5, actual65 1, namespace 1). UP-TO-DATE module/BK tests are excluded. The actual first creation actor opened the guarded factory, created and verified its tagged tail and persisted cursor checkpoint, performed mark-delete and closed; subsequent mapped reads, repeated materialization and cold recovery passed. Both failed candidates are retained. Backend cleanup passed. This result is limited to that integration; all 17 obligations and whole M5 remain open.
+
+### Native control applied UNKNOWN reconciliation (2026-10-13)
+
+The next focused check loses the actual source-protection PUT response and all observations of that key, then
+restores reads and requires cleanup of the original C ticket without another source-protection PUT. It verifies
+unchanged stored bytes and opaque version after cleanup. Real candidate `d8e5d3bb36754c4218f1d2828b3496438f110f67c8cecc0682e693bd2eb914e9` failed with
+original SDK UNKNOWN cleanup retained; the outer Cell close timed out. Its original log and failed receipt remain.
+The implementation now rereads the original route after the original attempt settles and requires the original
+candidate plus a metadata version distinct from the captured predecessor before EXISTING_EXACT ticket cleanup;
+real validation is pending. different candidate, unchanged version and cold restart remain outside this check.
+All lifecycle obligations and whole M5 qualification remain open.
+
+Current applied-UNKNOWN candidate `083747287e6398808dbe0d676b6f22d6113302640704cdbdd0219074b9c2c73c` completed: 17 fresh suites/172 cases, zero failures/errors/skips; actual65/66/67 names are present in archived JUnit. All 635 current/archive inputs matched; backend cleanup passed. The restored original source-protection candidate cleared only its original C ticket, preserving candidate bytes/opaque version and a single original PUT. The private actor and Cell drained; existing publication UNKNOWN, D no-dispatch and stop cleanup checks passed. Source-protection disagreement, unchanged predecessor, cold restart and all-writer/reference-free/physical-delete/whole-M5 qualification remain unqualified. The red receipt is retained.
+
+### Prior guarded Native sealed source admission (2026-10-13)
+
+Native source admission can now resolve a tagged CLOSED ledger belonging to a prior SDK Owner on the same actual
+namespace, Cell, Binding and provider configuration. The original SDK connection reads and rereads the prior
+permanent create fence, birth head, exact index/reservation and raw ledger header; OPEN scopes and foreign facts
+are rejected. Admission requires the existing original OPEN physical authority and actual member, preserving
+its enrollment. It never creates or retags the old ledger or initializes a missing prior physical authority.
+NPSA4 binds these prior SDK facts into the original C-admission root. The real guarded-birth scenario now checks
+OPEN-scope rejection and admission by a new actual Cell Owner after the original actor drains, with old SDK bytes
+and metadata version unchanged. Compilation/style and real validation are pending. Profile migration, all
+reference writers, physical deletion, the 17 lifecycle obligations and whole M5 remain unqualified.
+
+First real candidate `6e7bac9ea9344589289ea52e998a1c52a7d2c140ee5b7ed22b832be60869b8b0` confirmed the prior birth from a new SDK/Cell Owner, then rejected full parent admission because its completed offload rows had no original Object scope. The failed receipt remains. The new actual reader now supplies its own configured Object connection. Already-admitted legacy rows require the original CLOSED-header/P1 digest and member; their original physical enrollment is preserved. Real retry remains pending.
+
+The second candidate `1daf55aefa2e6a1fb62d6aa5ea1413a7e184ac38f3887867a9ff70bf94d0fd22` failed legacy source comparison. Ticket completion replaces `proofSnapshotDigest`, so it cannot witness the original import. Legacy source admission now stores its stable namespace/resource/CLOSED-header/P1 digest in the existing immutable enrollment policy field under the original C ticket. Cold admission verifies that field and the existing member; absent/incompatible witness is rejected. Tagged SDK births keep their original scope policy and require original reservation/fenced-birth facts. No extra metadata row or durable quota profile is introduced. Real retry is pending; both failed candidates remain archived.
+
+Current source `beb4280d9ab0d0fce5e9c63bb5a504b285dfc9ccc9776d30001eae334e1342d1` completed 17 fresh suites/171 cases with zero failures/errors/skips: module158, SDK5, provider5, actual25/65 and namespace1. UP-TO-DATE BK35 is excluded. Archived JUnit confirms both Owner names. All 635 current/archive inputs matched; backend cleanup passed. Actual25 rejects an OPEN prior scope, drains its original Cell/SDK actor, opens a new actual Cell Owner, verifies the prior fenced birth and admits the full legacy/guarded/offload parent. Original SDK header bytes/version remain unchanged and final Cell usage is zero. Actual65 retains ordinary guarded factory, publication, M4 RELEASED, repeated materialization, cold reads and original UNKNOWN cleanup checks. Both failed candidates remain. This qualifies these source dependencies only; raw BK/fallback D control references, complete writer/floor/runtime closure, physical deletion, all 17 obligations, five children and whole M5 remain unqualified.
+
+### Native publication original source references (2026-10-13)
+
+The original PublicationRun now resolves its exact source-cut ranges through the captured Native/mapped view,
+unions those physical resources with current/retained readable outputs, and requires each existing authority
+and Cell/Binding/provider member. NPPW2 binds the ordered resource set alongside the original plan/manifest/map
+and assigned credits. One original mixed-route D guard uses actual BK and Object capability contexts; its
+original no-dispatch/terminal cleanup remains the dispatch boundary. Missing source quota, authority or member
+rejects publication and must be supplied through actual source admission. This is implemented and real validation
+is pending; active-tail/read-pin/full writer coverage, physical deletion and whole M5 remain unqualified.
+
+The initial e0ea31d997a027485d2e44f668167e429d9283dd2fb50c379810464464884183 candidate failed before selector dispatch. Diagnostic candidate 059cbada19eed08f29cbd88390fcc6898bcac58df4b74b934402ed05afc49dec confirmed the cause: physicalDataReferences read the active directory after original Owner drain. Publication now freezes its exact source-cut physical set before drain and only checks existing routes/authority/member afterward. Current real retry is pending; neither failed run grants qualification.
+
+Frozen-source candidate 14378618d18516d64680674fc81259bb70705d91865d5d4c464c550189c83546 passed the directory lifetime boundary but the actual publication failed with `authority lacks a permanent quota reservation` at original-source requireActiveResource. No selector was dispatched. This is an actual source-admission gap, not a passing publication gate. Source authority/member must be admitted through their actual quota and original C/writer boundary before D publication. The failed tuple and all cleanup evidence remain archived; current source adds bounded capture and resource diagnostics, with runtime publication qualification false. Whole M5 and all17 obligations remain open.
+
+### Native publication source physical admission (2026-10-13)
+
+PublicationRun freezes its actual source-cut physical set before Owner drain. Each original SOURCE_PROTECTION
+C Mutation admits quota-backed source authority/member, then acquires independent mixed-route D tickets using
+M4_SOURCE_PROTECTION_RELEASE_V1 before its original SDK conditional PUT. NPCW2 binds the admission root.
+After D acquisition it revalidates actual Owner, Binding, provider profile, immutable enrollment, full Cell/domain/
+provider/Binding membership and CLOSED BK header bytes/version. Admission retains bounded initial descriptors,
+rather than whole mutable authority ticket lists. Existing SDK births keep their original enrollment. Task reopens
+an existing BK quota; fixture namespace setup explicitly initializes it. No new thread or queue is introduced.
+
+Original SDK UNKNOWN retains both original ticket operations and actor. Conclusive native candidate observation
+or original no-dispatch/terminal cleanup settles D before original C cleanup; it never redispatches the SDK write.
+Diagnostic source 87545b86e7f9c562e790e4ddc462508efdc6b4388cf542939fa664e9dd06e30e reached the expected
+publication D-clear UNKNOWN, then failed because temporary diagnostic message text changed an existing exact
+assertion. The original exception text is restored; the failed receipt remains archived. Current source
+8ca104eb446ff0e0cb472815e8a7a3642e66be5ebe4e527035b7919ed0911a4b compiled with affected style checks in22s.
+The 8ca104 source's actual65/66/67 run failed: repeated materialization needed the prior captured recipe's
+birth credit, mode66 lacked its now-installed C writer's close before Cell drain, and mode67's diagnostic cause
+changed the established terminal exception. These are repaired without removing the original assertions. Original
+member reconciliation is now explicitly metadata-only and refuses missing members. Per-original physical context
+descriptors are charged to the existing C pending-byte cap. Current source ecd7048ee1adf73bbf0d7365900ccd1ba1eecb69e3ea52e14624c200f6d59259
+compiled with affected formatting in17s. Its actual65 additionally holds the original source-protection SDK reply,
+reads actual C and mixed BK/Object D tickets, and checks active tickets veto CAS-1. Real actual65/66/67 is running
+with 635 frozen inputs. That ecd704 source completed 17 fresh suites/172 cases with zero failures/errors/skips,
+including actual65/66/67 and namespace1; UP-TO-DATE BK35 is excluded. Actual source-protection SDK response hold
+confirmed its C ticket plus same-operation mixed BK/Object D tickets and the active-ticket CAS-1 veto. Repeated
+materialization, applied publication UNKNOWN handoff and stopped original operation cleanup passed; owned backend
+cleanup and all 635 archived inputs matched. Source ecd704 is a focused dependency pass, not whole qualification.
+Current source 7e60034f22cfd9eb574cf6dcb5fd1755610336843831c7ccbc4a549025d6adbb reuses the already-parsed selected
+map for prior birth descriptors, and requires existing untagged legacy enrollment policy to match its original
+namespace/resource/CLOSED-header/P1 import witness. Compile/affected formatting passed14s; real65/66/67 is running.
+The 7e600 source also completed actual65/66/67 plus prerequisites/namespace1: 17 fresh suites/172 cases,
+zero failures/errors/skips, 635 current/archive inputs exact and backend cleanup passed. This closes the focused
+immutable source-import/read-descriptor dependency. Current source 9ac821a250fb6ae55ff1b0ff75add82476e5994dbead281b82e67a61e99fd2ed
+adds a real original source-protection applied-SDK reply-loss check: while native candidate reads are unavailable,
+original D tickets and actor charge must remain; native candidate/version observation must then clear the original
+D and C tickets without SDK PUT replay or candidate/version replacement. This new check compiled in12s and is
+running. Its first 9ac821 run passed actual66/67 but actual65's new UNKNOWN assertion expected an enum-derived
+message while M4 propagated the injected candidate-read TimeoutException; that failed tuple remains. Current
+source 059367e60cd92e8ea6a032cf3c3a93cbcdb053bb2e8143415e3ad6393cdda1da asserts that exact injected exception,
+compares the original C ticket throughout unavailable observation, and requires C and D to clear only after the
+same native candidate/version is observed. Compile/affected formatting passed18s; actual65/66/67 is running.
+Current source 059367 completed 4 fresh suites/14 cases with zero failures/errors/skips: SDK5, Provider5,
+actual65/66/67 and namespace1. UP-TO-DATE module158/BK35 are excluded. Original source-protection SDK reply-loss
+retained the exact original C ticket, mixed-source D tickets and actor during unavailable native observation;
+exact native candidate/version observation cleared original D then C without SDK PUT replay. Independent SDK
+candidate/version and attempt count remained unchanged. Actual65 also retained repeated rewrite, original
+publication D UNKNOWN, ordinary mapped reads and M4 RELEASED; 66/67 retained handoff/stop checks. All 635
+current/archive inputs matched and backend/Pulsar path cleanup passed. Result SHA256 is
+b4e0806f0be8cc7e59338a4e9dcb20ae27d14e9f36a1c80fcf5fd7b684d39b59; Owner XML is
+2171fdedec9f0a3ac5fe33b0700caf6bc688d4b1743528e450713e9c87510653. The held SDK check establishes actual
+C/D tickets and the state-machine CAS-1 veto only; it does not qualify complete native delete races. Permanent
+admission UNKNOWN/cold restart, M4 RELEASED physical-reference D composition, all-reference/writer/floor closure,
+physical deletion, all17 obligations, five children and whole M5 remain unqualified.
+
+### Native materialized M4 RELEASED physical writer (2026-10-13)
+
+Materialized fallback retirement now freezes the exact predecessor cut's BK/Object data resources and every
+current/retained readable output. It requires their existing quota reservation, immutable enrollment and complete
+Cell/domain/provider/Binding member; retirement never imports resources or appends members. NPMR1 binds the
+original/preferred views, predecessor selector, actual Native owner, admitted preferred-reader provider profile
+and ordered physical enrollments. It reuses that original SDK connection and the existing control executor.
+Each original C Mutation owns separate D operations: source-map/selector use manifest representation tickets,
+protection/terminal/proof use M4 source-protection tickets. Native source-map creation now uses the original
+C actor and exact native key/value/version instead of an unguarded direct CAS. Physical descriptors remain under
+the existing C pending-byte cap. A retry first reconciles original C/D operations without SDK redispatch.
+
+Current source 1dd6ae272836450019f2b37a39efeabd3be16c0b6afd69babcf46d8ca50ac21b compiled with affected formatting
+in13s. Real actual65/66/67 is running with 635 frozen inputs; actual65 holds the original RELEASED SDK response,
+checks original mixed D and C tickets, cancels an observer, loses the applied SDK reply, and then requires original
+candidate/version-preserving cleanup and no SDK replay. These new checks are not passing evidence yet. Complete
+M4 writer/runtime closure, cold original-operation recovery, physical deletion, all17 obligations, five children
+and whole M5 remain unqualified. Prior focused source-publication receipts remain historical dependency evidence.
+
+First M4 release candidate 1dd6ae completed 15 fresh prerequisite suites/168 cases with zero test failures, but
+Main Checkstyle rejected one 122-character comment before Owner dispatch. Its failed tuple/cleanup remains
+archived. The comment is corrected; current source da05b12f1ce1f8ef71ad3bfb9e477832c6803b1d07633a52586113bca94eed82
+passed compile/Main style18s, and actual65/66/67 is running. Documentation/lifecycle design gates passed20s;
+none of those results qualify the pending native M4 release composition or whole M5.
+
+Second candidate da05b1 passed SDK5/Provider5 but stopped before Owner on one 125-character test output string.
+The string is split; current source d32a31f679095236e4be18aacb0fb09c02dfd76e1b09af04b0637862fb5fd5b6 passed
+compile, Main/test Checkstyle and affected Spotless in16s. Actual65/66/67 is running with 635 frozen inputs;
+both failed gate receipts and exact source archives remain. No native release or whole-M5 qualification is inferred.
+
+Current M4 release source d32a31 completed 4 fresh suites/14 cases with zero failures/errors/skips: SDK5,
+Provider5, actual65/66/67 and namespace1. UP-TO-DATE module158/BK35 are excluded. Actual65 held one original
+RELEASED SDK response and independently observed its original C ticket and same-operation mixed BK/Object D
+tickets; cancelling a second observer did not finish the original attempt. Lost applied response retained the
+original C ticket and actor; retry first observed and cleaned original D/C without SDK redispatch, preserved the
+exact RELEASED candidate/version, and registered the preferred-only successor. Existing source-protection
+UNKNOWN, publication/stop, repeated materialization, ordinary reads and cursor metadata checks remained passing.
+All 635 current/archive inputs matched and backend/Pulsar path cleanup passed. Result SHA256 is
+01bcdf0f13add3ab7fe430f60e34ebe3c3deb68ae3d97d65c05378a394246105; Owner XML is
+8b310b89e86904550ac221cd86f22b0b7bb636c942e5934edf0e59d55e575e3b. This establishes the materialized
+M4 RELEASED C/D dependency only. Complete control-reference/runtime closure, cold original-operation recovery,
+reference-free physical deletion, all17 lifecycle obligations, five children and whole M5 remain unqualified.
+
+### Native materialized reader C/D lifetime (2026-10-13)
+
+Existing Cell reservation records Binding/usage but not a complete physical read footprint. Materialized reader
+registration now uses its original C READ_GENERATION_PIN_OR_OPEN_HANDLE ticket and sorted D
+OWNER_WORKER_LEASE_HANDLE_PIN tickets for all selected/retained outputs, applicable predecessor fallback sources
+and actual Native view members, including the active tail. The private lifetime completes only after SDK cleanup,
+callbacks, Entry aliases and source preparation drain; D cleanup precedes C cleanup and Cell actor release.
+Neither observer mutation nor a general control reconciliation releases a live reader. Control-writer close waits
+for original read lifetimes; ordinary cleanup skips still-live readers. There is no per-message metadata ticket.
+The existing actual readonly namespace/enrollment helper is shared by retirement and reader registration; missing
+quota/authority/member rejects admission and is never read-repaired. Current source
+8a8b3a42670da63317db87885fcc895ca599182121af51cf41f65888ca7fbda0 compiled/Main style22s; real65/66/67 is running
+with 636 frozen inputs. Complete floor/reference adapters, every factory/runtime writer, actual deletion, all17
+obligations, five children and whole M5 remain unqualified. This implementation has no passing runtime claim yet.
+
+The first reader candidate 8a8b3a failed actual65: ordinary SDK reopen had no permanent quota reservation for a
+reader dependency. Candidate rejection occurred after cold grant attempt, so its budget could not be safely
+released; final cleanup timeout masked that original cause, which is retained in archived stderr. Actual66/67
+passed. Cold reader resource admission now precedes grant. A production-owned Native M5 factory installs the
+guarded BK scope and actual metadata writer before first SDK mutation, reopens existing Object scope and original
+sealed/cursor sources, and closes SDK factory, writer, then original guarded SDK scope. Mapped ordinary restart,
+fallback retirement and post-rewrite cold read use that exact SDK namespace. Old scopes close before opening the
+next factory, without importing unguarded active tails. Fixture actor cap6 is finite and accounts for control,
+SDK scope, metadata writer, preparation, reader and cursor observation; encoded/decoded byte caps are unchanged.
+Current source 6d96129b410ab48283808c4fe617e5776617cbb1245153f6481a1d04fdb2a5ab compiled/Main/test style22s;
+actual65/66/67 is running with 637 frozen inputs. These changes have no passing runtime qualification yet.
+
+The guarded-factory candidate 6d96129b410ab48283808c4fe617e5776617cbb1245153f6481a1d04fdb2a5ab is terminal failed:
+actual66/67 passed, while actual65 could not allocate the reopened SDK tail because the deterministic create
+scope was already permanently fenced by the original factory. Result b3b219abeb325230dfc212740f9599925cf98b52c3d3cedacc5ae7a5d991827b
+and all637 source/archive inputs remain retained; owned backend cleanup and original backend preservation passed.
+Each production-owned factory now allocates one immutable UUID in the private create-scope v2 descriptor. Exact
+legacy v1 bytes remain readable/unchanged, physical namespace/member identity is unchanged, and original UNKNOWN
+operations retain their original scope. A successor factory cannot reuse a permanently fenced allocator scope.
+Compilation/Main/test style passed21s; codec compatibility and corrected real65/66/67 validation remain pending.
+Reader lifetime, complete writer/reference/floor closure, physical deletion and whole M5 remain unqualified.
+
+Legacy/private-factory codec compatibility2 cases and affected compile/Main/test style passed13s. Corrected actual65/66/67 is running on 638 frozen inputs, manifest e69c3bd03d348510456b4e6a170133f350334d3c2eb72ff1c96954a205e7ef41. Runtime and cleanup qualification remain pending.
+
+Factory-instance source e69c3bd03d348510456b4e6a170133f350334d3c2eb72ff1c96954a205e7ef41 is terminal failed,
+24 fresh suites/208 cases with actual66/67 passing and actual65 failing prior CLOSED source metadata comparison.
+Result98a74c3c4b552f8d44798afed45448ac4cb9531dd1aba2c67f04e907856f86a2 retains638 exact source/archive inputs;
+backend cleanup passed. The actual failure is format-3 custom-row serialization order, not prior factory identity.
+Prior birth scope/Cell/Binding/profile/permanent-fence checks remain; SDK fields now compare parsed original bytes,
+including create token, ctime storage semantics and custom byte values, followed by exact original raw/version
+rereads. Compatibility/order/token/mutated-row unit3 cases and compile/Main/test style passed18s.
+Successor read-hold registration now composes asynchronously on the existing single control executor; waiting
+on work scheduled to that same executor is removed. Actual65 now independently observes original C/D tickets
+while a real SDK Entry is retained, cancels a second drain observer, checks ticket stability, then checks exact
+cleanup after alias release. These new runtime checks are pending. Documentation/lifecycle design gates passed31s.
+All17 lifecycle obligations, all children and whole M5 remain unqualified.
+
+Corrected real65/66/67 is running on 638 frozen/archived inputs, manifest 0c3c9612dd8531e79348fe08c25fe9f39797017f78c229a42d378d52803484ec; affected compile/style passed16s. Original read-hold runtime and cleanup remain pending.
+
+Original-ticket-drain source0c3c9612dd8531e79348fe08c25fe9f39797017f78c229a42d378d52803484ec is terminal
+failed:24 fresh suites/209 cases, actual66/67 passing, actual65 rejected by exact drain admission configuration.
+Resultee721fcc368a7373e65030682d2b303c3d0dcee282b206fa917d28bd753111cc and638 source/archive inputs retained;
+owned backend cleanup passed. Prior CLOSED parsed metadata admission passed. The native fixture used3/2/2 while
+the actual guarded SDK factory's fixed capability/create scope is3/3/2. Fresh actual SDK drain conformance and
+Owner fixtures now both use that exact3/3/2 configuration; write quorum increases and durability is not weakened.
+Production factory rejects a supplied data quorum mismatch instead of silently overriding it. Exact configuration
+receipt verification remains unchanged; prior3/2/2 receipts cannot qualify the corrected execution. All read
+lifetime/runtime assertions, complete writer/reference/floor closure and whole M5 remain pending/unqualified.
+
+Exact3/3/2 real65/66/67 and fresh SDK/provider conformance is running on 638 frozen/archived inputs, manifest 1254f24ef5a4893c60f5b4a498c44a1df5be2ae14d306591eb62d6dd72b8041d; affected compile/style passed19s. Actual runtime and cleanup remain pending.
+
+Exact3/3/2 candidate1254f24ef5a4893c60f5b4a498c44a1df5be2ae14d306591eb62d6dd72b8041d is terminal failed
+before Owner dispatch: SDK5 cases/3 failures (two unsupported v3 batch-read paths, one dependent publication hold).
+Resultc20e7fbda66e2e00345b1ccd79d4915cdb2211fe4831dd938e8c4e32bae965bd and638 exact source/archive inputs retained;
+owned backend cleanup passed. BK4.18 LedgerHandle permits batch reads when ensemble=write quorum by default,
+but PerChannelBookieClient rejects that operation on v3. The existing mandatory-v3 client projection now explicitly
+disables this unsupported request so the SDK uses normal range reads. Actual Native v3 fixture clients project the
+same configuration; wire protocol, quorum, persistence and correctness semantics remain. No performance claim.
+Affected unit/runtime validation remains pending; no read-lifetime or whole-M5 qualification.
+
+Mandatory-v3 configuration3 and codec/header3 unit cases pass; compile/style16s plus actual-fixture compile/style17s pass. Fresh real65/66/67 and SDK/provider conformance is running on 638 frozen/archived inputs, manifest 151e51f1216c4d57c671878b228fbb7f9f61018edffc93731bfa5c412d6ffd02. Runtime and cleanup remain pending.
+
+Mandatory-v3 range-read source151e51f1216c4d57c671878b228fbb7f9f61018edffc93731bfa5c412d6ffd02 is terminal
+failed before Owner dispatch:9 fresh suites/43 cases,38 BK component cases pass; SDK4 pass and one offload NPO1
+assertion still expected the old write quorum2 although the actual sealed header correctly records3.
+Result927f1ab827c08bc243df3c5ad84717573ddcdb77f0fa59a71c6a527707803db1 and638 exact source/archive inputs retained;
+backend cleanup passed. The sealed-header assertion now requires the configured write quorum3; all data/version/
+bytes/persistence/drain assertions remain. Actual v3 unsupported-batch errors are absent. Fresh complete SDK5,
+Provider5 and Owner65/66/67 validation remains pending; no full runtime/whole-M5 qualification.
+
+Corrected sealed-header quorum assertion compile/test style15s passes. Fresh SDK5/Provider5 and real25/65/66/67 run on 638 frozen/archived inputs, manifest c4c7c0061f176dfc2edbc6d70031468538a5c9bfeb06f781539159455eb78ddd. Case25 adds actual guarded-factory regression for the shared v3 configuration change. Runtime/cleanup pending; no whole-M5 qualification.
+
+Sourcec4c7c0061f176dfc2edbc6d70031468538a5c9bfeb06f781539159455eb78ddd completed SDK5/Provider5 and module158.
+Owner25 failed an obsolete quorum-mismatch assertion; Owner66/67 passed. Owner65's fixture leaked its retained
+Entry after attempting to recapture a fencing SDK connection, then parked indefinitely in offloader.close.
+The exact owned worker was terminated after recording its thread dump and original Gradle binary output/results;
+runner is terminal1 with16 fresh suites/172 cases,1 failure/1 skipped (65 is not passing evidence), result
+9c177a8b6afe93abd6a9428714213a4156e70598e9af68da81110301828b5b78. Backend cleanup and638 source/archive match pass.
+The fixture now captures the original metadata route before fencing and always releases the Entry in finally;
+metadata-only ticket observations never reopen or borrow the SDK connection. Old legacy source assertions verify
+absence of Native create tags and unchanged current SDK header fields despite matching3/3/2 quorums. All actual
+read-lifetime/cleanup/retirement composition and whole-M5 qualifications remain pending; no skipped case is used.
+
+Original-route/finally fixture compile/test style16s passes. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest 4ec6ac4371a0948b00b6ea77996ffb2b53d603b8ce0efe083e51db6e637e4701. Runtime and cleanup remain pending.
+
+Current original-route source4ec6ac4371a0948b00b6ea77996ffb2b53d603b8ce0efe083e51db6e637e4701 is terminal
+runner/Gradle0:4 fresh suites/15 cases,0 failures/errors/skips (SDK5,Provider5,Owner25/65/66/67,namespace1).
+Module158/BK38 are source-matched UP-TO-DATE and excluded. Actual65 independently observes original C read-pin
+and same-operation mixed D lifetime tickets, keeps the exact tickets while a real SDK Entry alias blocks drain,
+cancels a second observer without completing original work, then releases the alias and observes exact D/C cleanup.
+Both cold factory restarts, original RELEASED SDK-response loss/no replay, preferred-only successor, actual cursor
+metadata and repeated materialization/cold full bytes pass. Actual25 also passes legacy no-retag admission and
+original guarded SDK/metadata close under the corrected3/3/2 mandatory-v3 normal range-read configuration.
+All638 current/archive inputs exact; original containers/Pulsar-owned paths unchanged and owned backend absent.
+Resultaa7dd9707a8bbc8143667db03da6ce199f723e3bca1baed8304afe36e1bfd658; Owner XML
+8e5013493003ee14f61518c0d97ce8a4890472af70b25ee989eb7fe6e67df8eb. This qualifies the focused materialized read
+lifetime and existing M4 RELEASED composition only. Actual read-lifetime UNKNOWN cleanup, all factory/runtime
+writer references, complete10-floor/15-reference adapters, cold original-operation recovery, physical deletion,
+all17 lifecycle obligations, five children and whole M5 remain unqualified. No submission/push or coordinator
+whole-program review occurs at this dependency milestone.
+
+The focused read-lifetime milestone's documentation/lifecycle gates pass24s. The same actual65 now extends its
+second cold reader drain with one real applied C-ticket cleanup response loss and blocked candidate reads. The
+new assertion requires original Cell reader ownership until metadata-only original-operation reconciliation,
+unchanged original candidate/version and no C mutation replay before durable drain publication. SDK Entry release
+remains in finally; no additional actor/thread or physical import is introduced. This UNKNOWN extension is pending
+compile/runtime validation and does not borrow the previous source receipt. Cold original-operation recovery,
+D-cleanup UNKNOWN, complete writer/reference/floor closure, deletion and whole M5 remain unqualified.
+
+C-cleanup UNKNOWN extension compile/test style18s passes. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest 9a0552026af09f8df7f9df800ef6669811348045a7e594267c23af4a0335cb3e; actual UNKNOWN runtime/cleanup remains pending.
+
+C-cleanup UNKNOWN source9a0552026af09f8df7f9df800ef6669811348045a7e594267c23af4a0335cb3e is terminal1:
+3 fresh suites/14 cases, actual25/66/67 and SDK5/Provider5 passing;65 fails the new exception-message assertion.
+The real applied C cleanup response is lost and candidate GET is blocked; the implementation propagates that
+actual TimeoutException unchanged rather than wrapping it in the expected synthetic cleanup message. Assertion
+now requires the exact injected timeout; remaining original Cell-retention/candidate-version/no-replay checks
+remain pending. Result4127ee7344539a32439e8d40fe587c696a46351dcfa943d2c92b2a02b6a26971 and638 exact source/archive
+inputs preserved; original backend/Pulsar paths unchanged and owned cleanup passed. No UNKNOWN qualification.
+
+Correct original timeout assertion compile/test style17s passes. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest cbc871a4b3c34bcd1270790fd5efdb4fd689e62184e97d57fa2b279e3d9d644d; original C-cleanup UNKNOWN runtime and cleanup pending.
+
+Original C-cleanup UNKNOWN sourcecbc871a4b3c34bcd1270790fd5efdb4fd689e62184e97d57fa2b279e3d9d644d is terminal
+runner/Gradle0:4 fresh suites/15 cases,0 failures/errors/skips, actual25/65/66/67 plus SDK5/Provider5/namespace1.
+Resultb8689858dd378afd053be89c1467df6fd548a6f09a19469337cc511266e032c5; Owner XML
+32499025367c46df6743c84fe55dae882c3284a2d26d3124ed35277e1660d062. Original read C cleanup applied but response
+loss/candidate GET block leaves the exact Cell reader actor charged. Restored observation permits metadata-only
+original-operation cleanup without C redispatch, preserves the original candidate/version and refunds only after
+confirmed reconciliation; durable drain publication follows. All638 source/archive inputs and backend cleanup pass.
+BK38/module158 UP-TO-DATE excluded. The actual65 first reader now also injects D cleanup loss, checks the original
+C ticket remains through that unknown D result and requires original D candidate/version/no-replay reconciliation.
+Case25 restores its prior3/2/2 legacy seed against the new3/3/2 guarded SDK factory, preserving cross-quorum/no-retag
+coverage. This D extension is pending validation and borrows no prior runtime authority. Cold descriptor recovery,
+complete writer/reference/floor closure, physical deletion, all17 obligations/five children and whole M5 remain open.
+
+C/D original cleanup and cross-quorum legacy extension compile/test style17s passes. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest e63160346cb926afc12e3fed87d99cc543dae01e4b97f6cee3308967fd109c96; D UNKNOWN and complete current composition runtime/cleanup pending.
+
+Current C/D cleanup sourcee63160346cb926afc12e3fed87d99cc543dae01e4b97f6cee3308967fd109c96 is terminal
+runner/Gradle0:4 fresh suites/15 cases,0 failures/errors/skips (SDK5,Provider5,actual25/65/66/67,namespace1).
+SDK Entry aliases keep original C/D tickets and second-observer cancellation does not finish the private drain.
+Actual D cleanup applies then loses its response; an independent read sees the original C ticket still present.
+Both D and C unknown cleanup retain the exact Cell reader actor, recover through metadata-only original-operation
+reconciliation, preserve original cleanup candidate/version and issue no duplicate mutation. Durable owner drain
+follows confirmed cleanup. Actual25 again seeds3/2/2 legacy source before the3/3/2 guarded factory and verifies
+no retag/unchanged raw metadata. Original M4 RELEASED loss/no replay, cursor metadata, repeated materialization and
+cold full-byte reads remain passing. All638 current/archive inputs exact; original containers/Pulsar-owned paths
+unchanged and owned backend absent. Module158/BK38 source-matched UP-TO-DATE excluded. Result
+d4b36d1e31c24a006b6ca49033a01e26da68649e417180e3445113ac1b6a19ff; Owner XML a245d561a3641b774fff2dcbbd651dd9229f593e5c070d57d45b185e09df7848.
+This qualifies focused materialized read lifetime, warm original C/D cleanup and the existing RELEASED composition.
+It does not qualify cold Java-descriptor reconstruction, every SDK factory/runtime writer reference, complete
+10-floor/15-reference adapters, physical deletion, all17 lifecycle obligations, five children or whole M5.
+Artifact review removed the exact unused task formatter(1691 bytes) and redundant stderr extraction(12762 bytes),
+with no open handle/tracked path/source-input/doc dependency. All11 source archives(311025970 bytes) and failed/
+interrupted receipts/diagnostics remain for evidence dependencies. No staging/commit/push/coordinator whole review.
+
+The final focused C/D milestone's documentation/lifecycle gates pass24s. Next actual source tracing finds the
+current SDK ManagedLedgerFactoryImpl.shutdownAsync collects ledger close futures but does not await them and
+swallows closeFailed before shutting down its executor. Production-owned M5 factory now keeps exactly its opened
+ManagedLedger handles and waits their original asyncClose futures before SDK factory shutdown, metadata writer
+close and original BK scope close. Any ledger close failure propagates and retains original SDK/writer lifetimes.
+The existing actual65 adds a final fresh guarded-factory SDK-tail Entry read; a retained real Entry must block
+factory close and keep original charges, cancelled observer must not complete it, and actual release must precede
+actor refund. This factory dependency is pending compile/runtime; no SDK shutdown return is used as whole-writer
+quiescence or physical deletion authority. Existing read C/D receipts remain bound to their archived source.
+
+Owned factory ledger-close dependency compile/Main/test style21s passes. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest 047d70d4432f8ed9348ac5cba234b34c481bb7f674de5ba7fecead1204040854; actual factory lifetime runtime/cleanup pending.
+
+Factory-owned ledger source047d70d4432f8ed9348ac5cba234b34c481bb7f674de5ba7fecead1204040854 is terminal1:
+16 fresh suites/172 cases,1 failure0 errors/skips. Existing C/D UNKNOWN, RELEASED, repeated materialization,25/66/67
+pass; the final new factory check tries opening after verifyMappedParentOriginalSdk already closes the Cell and
+is correctly rejected before SDK creation. The check moves to before that existing Cell-close test. Original
+admission rejection is preserved, not bypassed. Result46345d8471d5f4b514df3946dc31dfb9abb871981fc672b4101d588f524e3c1f
+and638 exact source/archive inputs retained; backend cleanup passes. Factory ledger-drain validation remains pending.
+
+Factory-owned ledger check before Cell close compiles/test style17s. Real25/65/66/67 and fresh SDK/provider conformance run on 638 frozen/archived inputs, manifest e562888657c3a6687b5ab9c169f14d4c43cbaecc899bddac519646285d053584; actual factory lifetime and cleanup pending.
+
+Current owned-ledger sourcee562888657c3a6687b5ab9c169f14d4c43cbaecc899bddac519646285d053584 is terminal
+runner/Gradle0:4 fresh suites/15 cases,0 failures/errors/skips (SDK5,Provider5,actual25/65/66/67,namespace1).
+Actual65 opens a fresh production-owned factory, appends/reads one actual SDK tail Entry, keeps that real Entry
+retained while factory close remains unresolved and original SDK/metadata charges remain unchanged, cancels a
+second observer without finishing original closure, then releases the Entry and observes confirmed ledger-close,
+factory shutdown and original actor refunds. Existing C/D warm UNKNOWN/no redispatch/candidate-version checks,
+M4 RELEASED, cross-quorum legacy/no retag, cursor metadata and repeated materialization/cold bytes remain passing.
+All638 current/archive inputs exact; original containers/Pulsar paths unchanged and owned backend absent. Module158/
+BK38 source-matched UP-TO-DATE excluded. Result87b3e390e32f04a718a338a21d1bdefeafc0f9cf039d362e9d368bfec6ce0bee; Owner XMLfad2abced4f6d8a86e01b0757d65e0b6e3eb2a1e2085d9eaee64803e47011363.
+This qualifies the focused factory-owned ledger close dependency and current tested read/RELEASED composition.
+Full SDK writer/reference closure, cold original-operation recovery, complete10-floor/15-reference producers,
+actual physical deletion, all17 lifecycle obligations, five children and whole M5 remain unqualified. No staging,
+submission or push. Exact unused formatter(366 bytes) removed after open-handle/input/Git/doc-reference checks;
+two factory archives(56581207 bytes) and both runtime receipts retained. Prior11 read archives remain retained.
+
+Final current factory/read composition documentation and lifecycle design gates pass24s. All validation handles are terminal; all17/whole M5 remain open/unqualified.
+
+### Native factory SDK metadata recovery reference (2026-10-14)
+
+Actual SDK metadata mutations already have per-operation C/D tickets, but the production-owned factory's live
+SDK birth/recovery metadata scope lacked a durable C lifetime reference. The existing closed registry assigns
+RECOVERY_CHECKPOINT_OR_SNAPSHOT to PulsarNativeMetadataWriterV2. New factory starts one original C reference
+before Object/source admission or SDK ledger work, binding its actual immutable SDK create-scope SHA (namespace,
+Cell/native owner, Binding, capability, quorums and factory UUID). The fixed descriptor occupies4096 bytes inside
+the existing metadata actor pending-byte cap; no new actor/thread/per-message metadata ticket is introduced.
+Close ordering waits owned SDK ledgers/factory, prepares original metadata/Object cleanup while SDK is still live,
+fences SDK creates and drains actual metadata callbacks, closes that original SDK client, then clears only the
+original C reference and refunds metadata/SDK actors. UNKNOWN retains original reference/charges and uses only
+original-operation metadata reconciliation. SDK metadata-scope closure does not prove every data append writer
+has terminated and grants no physical-delete authority. Actual65 now requires the original scope reference during
+Entry-held factory close and absence after successful close; existing READ and RELEASED assertions preserve that
+independent SDK reference. Compile/Main/test style21s and updated actual test style17s pass. Runtime/cleanup
+pending; all SDK writer/reference/floor producers, cold recovery, all17 obligations/five children and whole M5
+remain unqualified. Prior factory/read receipts stay source-bound historical dependencies.
+
+Actual SDK metadata recovery-reference run25/65/66/67 and fresh SDK/provider conformance are running on 638 frozen/archived inputs, manifest 608c32c68c43100daaa888e6f52590407ae96f82de58e7e9ec86d03c34a7b5ad. Runtime/cleanup qualification pending; no whole-M5 authority.
+
+SDK metadata recovery-reference source608c32c68c43100daaa888e6f52590407ae96f82de58e7e9ec86d03c34a7b5ad is terminal
+runner/Gradle0:17 fresh suites/173 cases,0 failures/errors/skips (module158,SDK5,Provider5,actual25/65/66/67,namespace1).
+BK38 source-matched UP-TO-DATE excluded. Actual65 independently observes one actual scope-SHA-bound recovery
+reference before SDK work and unchanged during Entry-held factory close; confirmed original SDK metadata close
+precedes its disappearance/refunds. READ/RELEASED retain that independent reference and existing C/D UNKNOWN,
+legacy cross-quorum, cursor metadata and repeated materialization remain passing. Result
+18040f0dc5c847577a533621877a37d7caa33baed438ccd11aadd18ab48c8ec0; Owner XML
+6e13e82bd3b793edf9d0fa94acc8d4e9b47fcf7d01f4ed967d715eaadec1d552. All638 inputs/source archives exact and
+backend cleanup/original backend/Pulsar preservation pass. The new SDK-scope C cleanup response-loss case is being
+added to the same actual factory close check; pending validation. SDK metadata closure is not all data-writer
+quiescence, cold descriptor recovery, physical-delete authority or whole-M5 completion/all17 closure.
+
+SDK recovery-reference cleanup UNKNOWN extension compiles/test style16s. Actual25/65/66/67 and SDK/provider conformance run on 638 frozen/archived inputs, manifest 43aadc0bd975c02bd5f2e94e8caee4c39ef77e198b29875deade24519b68352b; original cleanup/refund and backend cleanup pending.
+
+SDK recovery-reference UNKNOWN source43aadc0bd975c02bd5f2e94e8caee4c39ef77e198b29875deade24519b68352b is terminal
+runner/Gradle0:4 fresh suites/15 cases0 failures/errors/skips (SDK5,Provider5,actual25/65/66/67,namespace1).
+SDK metadata client is already closed when the applied recovery-reference clear response is lost; blocked candidate
+reads retain both original SDK and metadata actor charges. Restored observation reconciles only the original
+C operation, preserves exact original candidate/version, emits no duplicate mutation/reopen and only then refunds.
+Scope reference is independently observed through actual SDK Entry-held factory closure. Existing read C/D
+UNKNOWN/RELEASED, legacy cross-quorum/no retag, cursor metadata, repeated materialization/cold bytes remain passing.
+All638 source/current archive exact; original backend/Pulsar paths unchanged and owned backend absent. Module158/
+BK38 UP-TO-DATE excluded. Resultfbbdde87a2552717ebfa20458fff8ec6fe0e0c374d239f3c03aafa575c4016c9; Owner XML
+d06a14147ac70a78353774380be2aa02b3f030b020b8b93308eb70532c424296. Qualifies the focused SDK metadata recovery
+scope reference plus warm original cleanup only. All data-writer quiescence, cold Java descriptor recovery,
+complete10-floor/15-reference producers, physical deletion, all17 obligations/five children/whole M5 remain
+unqualified. Exact unused task formatter(534 bytes) removed after open-handle/source-input/Git/reference checks;
+two SDK archives(56603968 bytes) and runtime receipts remain. No staging/commit/push/coordinator whole review.
+
+Current SDK metadata reference/UNKNOWN composition documentation and lifecycle gates pass24s. All validation handles terminal; all17/whole M5 remain open/unqualified.
+
+### Native factory SDK metadata-handle D lifetime (2026-10-14)
+
+The factory-instance v2 SDK scope now acquires one original D OWNER_WORKER_LEASE_HANDLE_PIN ticket per tagged
+BookKeeper metadata handle before its first metadata CAS. Its root binds the actual SDK scope, immutable ledger
+resource and native owner. At most1024 handles are retained; their4096-byte descriptors are charged in both encoded
+and decoded bytes to the existing SDK Cell actor. No new actor, thread or per-message metadata ticket is added.
+Original create fencing, metadata callback drain and SDK client closure precede handle D cleanup; all original
+D cleanup precedes clearing the SDK recovery C reference and refunding SDK/metadata actors. Unknown cleanup
+keeps the original operations and charges and permits only their metadata reconciliation. The partial v1 API
+has no factory-lifetime grant. This metadata lifetime does not prove physical data-append writer quiescence or
+permit deletion. Actual65 observes the original D ticket during retained Entry/factory closure and its absence
+after SDK metadata closure. Compilation/style confirmation and real25/65/66/67 composition are pending. Older
+read/factory/RELEASED/reference receipts remain archived-source evidence; current-source qualification is pending.
+All17 lifecycle obligations, complete10-floor/15-reference producers, cold original-operation recovery, five
+children and whole M5 remain unqualified. No staging/commit/push or whole-M5 coordinator review.
+
+SDK metadata-handle compile/Main/test Checkstyle confirmation is terminal0 (9s, source-matched UP-TO-DATE). Real25/65/66/67 plus SDK/provider conformance are running on638 frozen/archived inputs, manifest 5fffdc6fb670c1b955803b60d777918d1f0f6123142c2d567ff1cd34cd2736fe; runtime and cleanup pending.
+
+SDK metadata-handle source5fffdc6fb670c1b955803b60d777918d1f0f6123142c2d567ff1cd34cd2736fe is terminal runner/Gradle1:24 fresh suites/210 cases,1 failure0 errors/skips. Actual65 reaches final post-close D observation, whose test route incorrectly uses the now-closed SDK namespace client; native INSTANCEID read correctly fails. The assertion will use the original still-live bootstrap connection to the same immutable namespace, retaining namespace gates.25/66/67 and module158/BK38/SDK5/Provider5 pass. All638 current/archive inputs exact; backend cleanup and original backend/Pulsar preservation pass. Result96ef9ce53d5061a5e6ab91e3ca7c36c1fc90ce3f29efb15cab4e017d0e41ebca. Current qualification remains pending. The original SDK metadata-handle D cleanup UNKNOWN path is added before revalidation.
+
+The post-close D observation now uses the original live bootstrap connection with exact namespace equality. Actual65 separately loses applied D-handle cleanup and applied C-reference cleanup responses, checks original candidates/versions/no mutation replay, and requires C recovery reference plus both original actors through D UNKNOWN. The test extension initially used a String as an atomic reference and failed compile; corrected compile/style15s and final behavioral-branch compile/style checks pass. Real current composition remains pending.
+
+SDK metadata-handle D/C UNKNOWN composition real25/65/66/67 plus SDK/provider conformance run on638 frozen/archived inputs, manifest d3a28b653a12f2f4db08c203703cddfd224915529880d707d52181f34ed4d88e; runtime/cleanup qualification pending.
+
+SDK metadata-handle D/C UNKNOWN sourced3a28b653a12f2f4db08c203703cddfd224915529880d707d52181f34ed4d88e is terminal runner/Gradle0:
+4 fresh suites/15 cases,0 failures/errors/skips (SDK5,Provider5,actual25/65/66/67,namespace1). Actual65 observes
+one original D metadata-handle ticket while a real SDK Entry prevents factory closure. Its two independent
+factory closures lose applied D-handle and C-recovery-reference cleanup responses respectively; both retain the
+original SDK and metadata actor charges, and D UNKNOWN also retains the original C recovery reference. Restored
+observation reconciles only the original operations, preserves exact original candidate/version, emits no extra
+PUT or SDK reopen, and refunds only after D then C confirmation. Final D absence uses the original live bootstrap
+connection with exact physical namespace equality; production namespace checks remain unchanged. Existing read
+C/D UNKNOWN, M4 RELEASED, legacy3/2/2 to3/3/2 no-retag admission, cursor metadata and repeated materialization/cold
+bytes pass. All638 current/archive inputs exact; original backend/Pulsar paths unchanged and owned backend absent.
+Module158/BK38 source-matched UP-TO-DATE excluded. Resultd37ee8561721c0e241795e51326cabafd3178bb11e944be5dfe61fa92aa5ae46; Owner XML
+c871cc662777eb57cd1a03e37012145e3f54b2e4c9473845e562431bb5081d04. Qualifies focused SDK metadata-handle lifetime and warm original
+D/C cleanup composition. It does not prove all physical data-append writers quiescent, cold Java descriptor
+recovery, complete10-floor/15-reference producers or physical-delete authority. All17 obligations/five children/
+whole M5 remain unqualified; no staging/commit/push or whole-M5 coordinator review.
+
+Current SDK metadata-handle D/C UNKNOWN composition documentation/lifecycle design gates pass20s. Exact unused formatter and two transient live stack captures removed after ownership/Git/input/reference/open-handle checks (261214 bytes); both source archives (56627722 bytes), failed compile/runtime receipts and passing runtime receipts retained. All handles terminal; all17/whole M5 remain open/unqualified.
+
+Remaining data-writer termination prerequisite: read-only inspection of the locked BookKeeper4.18 revision
+cd06340851d6d657b7c7546df01df365c18980de confirms ReadEntryProcessorV3.getReadResponse starts fenceLedger but
+its ENOENTRY/ENOLEDGER catch paths return without observing fenceResult; LedgerDescriptorImpl only confirms
+fence persistence through its original journal callback. Thus empty-ledger missing-entry responses, metadata CLOSED,
+SDK shutdown, or an unverified force follow-up cannot qualify durable physical writer fencing. No BookKeeper
+source/image change or substitute deletion proof is implemented here. The unrelated current turbo-bk checkout
+(30377492f4a71c066364e6dfc7ce1fb6f31516b4) remains untouched. Data-writer termination, including empty ledgers,
+is still an implementation prerequisite; the qualified SDK metadata-handle slice does not close it.
+
+### Original Native SDK data RPC lifetime (2026-10-14)
+
+The production factory-instance SDK now substitutes only its ClientContext BookieClient port, retaining the same
+actual client, configuration, allocator, executors and metadata driver. Successful original guarded metadata
+admission registers each writable ledger in the original driver before a LedgerHandle can dispatch data. Data
+add, explicit LAC, force and single-entry fencing RPCs are tracked before actual dispatch; readonly RPCs retain
+the original port. The fixed profile rejects deferred-sync data writes. Its existing SDK Cell actor reserves
+8MiB offered data bytes plus256 original operation descriptors of512 bytes in both byte accounts; the wrapper
+copies no payload and creates no thread, queue or per-message metadata ticket. SDK data admission closes before
+its original operation cut drains. Only actual OK callbacks settle those operations; timeout/error/empty-fence
+responses retain the originals and fail closure before SDK client close, D-handle cleanup, C-reference cleanup
+or actor refund. No new SDK dispatch reconciles them. Recovery of an already-unknown physical RPC still needs
+an independent native terminal/fencing proof and is not qualified by this change. The initial direct context
+implementation failed compile because BK4.18 ClientInternalConf is package-private; a small SDK-package context
+bridge now delegates the original state and only substitutes the data port. Compile/style and actual25/65/66/67
+composition are pending; actual65 observes data RPC counts and admission closure as well as existing original
+D/C lifetimes. Prior metadata-only receipts remain historical source-bound evidence. No full SDK reader/writer,
+cold descriptor recovery, physical-delete, complete floor/reference producers, all17 or whole-M5 qualification.
+
+Original SDK data RPC lifetime compile/Main/test style16s passes. Actual25/65/66/67 plus SDK/provider conformance run on640 frozen/archived inputs, manifest 85e73121e51fa5860e091f10667c637012d530c5f4f95885d278c394adf15eb0; runtime and cleanup pending.
+
+Original SDK data RPC source85e73121e51fa5860e091f10667c637012d530c5f4f95885d278c394adf15eb0 is terminal runner/Gradle1:24 fresh suites/210 cases,1 failure0 errors/skips. SDK5/Provider5/module158/BK38 and actual25/66/67 pass; actual65 rejects the second replica of a valid4MiB entry because the initial8MiB offered-wire cap omitted three write-quorum replicas and their headers. SDK retries then exhaust the existing birth bound and propagate -999. The cap will cover the admitted actual frame/write-quorum footprint, retaining both Cell byte charges; no fixture payload/quorum/durability is weakened. Also remove nested data/driver ownership locks. Result404be9e8bac0e2b2eb827662695d6964c51a7dfb3427309e82a671978ebc6299; all640 current/archive inputs exact and backend cleanup/original backend/Pulsar preservation pass. Current runtime qualification stays pending.
+
+The SDK offered-wire reservation is now32MiB, covering the admitted5MiB frame limit with3 write-quorum replicas (including the actual4MiB framed records); both original Cell byte accounts retain that full bound. Payload/quorums/default durability are unchanged. Driver membership is monotonic and queried outside the data lock, avoiding metadata callback/data dispatch lock inversion. Compile/Main/test style21s passes. Current real composition pending.
+
+Budget-corrected original SDK data RPC actual25/65/66/67 plus SDK/provider conformance run on640 frozen/archived inputs, manifest ed3fce4784b70c284377ba9c6bbf05517327af75ca095a23b58632c68333fbd5; original callback drain/refund and backend cleanup pending.
+
+Budget-corrected original SDK data RPC sourceed3fce4784b70c284377ba9c6bbf05517327af75ca095a23b58632c68333fbd5 is terminal runner/Gradle0:
+25 fresh suites/211 cases,0 failures/errors/skips (module158,BK38,SDK5,Provider5,actual25/65/66/67,namespace1).
+Actual65 independently observes at least3 actual add RPCs from its original production factory SDK port. At each
+confirmed factory close, data admission is fenced, all dispatched add/LAC/fence/force RPCs have actual successful
+original callbacks, and unresolved count/retained bytes are zero before original SDK/metadata actor refunds.
+Existing Entry-held SDK closure, observer cancellation, original D-handle and C-reference applied-response UNKNOWN,
+no-replay/candidate-version checks, M4 RELEASED, legacy3/2/2 to3/3/2 no-retag admission, cursor metadata and repeated
+materialization/cold bytes remain passing. All640 current/archive inputs exact; original backend/Pulsar paths
+unchanged and owned backend absent. Result93bca24856fad8f24216bc64479f0d7c8baf743a843c8c7487ee9ca9f186af6a; Owner XML
+53968544f730228d1b4d1d25d1b2b8cf7f2053793a6552c74c3b903433ddc144. This qualifies original successful data-RPC lifetime/closure
+composition, including actual configured32MiB wire workspace and no nested driver/data locks. Physical RPC UNKNOWN
+retention is implemented but its real failure/recovery qualification is pending; no independent fencing proof is
+manufactured from an empty response or metadata CLOSED. Full SDK reader/writer references, cold descriptors,
+complete10-floor/15-reference producers, physical-delete authority, all17/five children/whole M5 stay unqualified.
+No staging, commit, push or whole-M5 coordinator review.
+
+Exact unused task formatter(1028 bytes) removed after ownership/Git/input/reference/open-handle checks. Both SDK data source archives(56669307 bytes), initial compile/runtime failures and corrected runtime receipts remain. All17/whole M5 remain open/unqualified; no staging/commit/push.
+
+Current successful SDK data-RPC lifetime documentation/lifecycle design gates pass20s. All validation handles terminal; real physical-RPC UNKNOWN recovery and all17/whole M5 remain unqualified.
+
+### Original Native SDK append UNKNOWN fencing recovery (2026-10-14)
+
+Original failed data-RPC descriptors now retain their actual ledger, bookie address and operation kind under the
+existing fixed workspace. A subsequent original close pass can reconcile failed append packets without replaying
+them: data admission must already be closed; the actual tagged SDK header must be CLOSED with the original scope,
+quorums and recorded bookie in its ensembles; native v3 read-with-fencing must return a nonempty successful response;
+and exact header version/all fields plus immutable native namespace assignment must remain current before removing
+that original descriptor. The original failed RPC future/result is unchanged; independent fenced completion is
+counted separately from native successful replies. Empty/error fencing responses and failed non-append RPCs retain
+UNKNOWN. No alternate SDK client/actor/thread or original data-write dispatch is introduced. Cancelled observers
+cannot cancel the private original reconciliation. Actual65 adds a third real factory closure: drop one actual
+4MiB append ACK on its original SDK channel, verify actual stored bytes on that bookie independently, observe the
+SDK timeout and retained C/D/actors, drop a real successful fence response to retain them again, then restore
+observation and require independent durable fence/no extra append before the existing C UNKNOWN cleanup/refund.
+Only test-owned wire response interception uses SDK channel introspection; production has no fault hook. Compile,
+real data/fence response-loss and cleanup validation pending. Prior640-input successful-RPC receipt remains
+historical. Full cold/non-append UNKNOWN, all SDK reader/writer references, complete floors/reference producers,
+physical-delete qualification, all17/five children/whole M5 remain unqualified.
+
+Original SDK append/fence response-loss recovery compile/Main/test style21s passes. Actual25/65/66/67 plus SDK/provider conformance run on640 frozen/archived inputs, manifest 45944b2e55f2148e576edfbed93cc9a37ffd36b909664465ea2874cdf40d6466; runtime and cleanup pending.
+
+Original append UNKNOWN source45944b2e55f2148e576edfbed93cc9a37ffd36b909664465ea2874cdf40d6466 is terminal runner/Gradle0:25 fresh suites/211 cases0 failures/errors/skips. Actual65 drops a real successful append ACK, independently reads the exact4MiB stored payload from that bookie, observes original SDK timeout with original C/D/two actors retained, drops a real successful durable fence response and retains again, then restores observation and settles one separately counted fenced packet without any extra append. Existing D/C cleanup UNKNOWN/no replay/version preservation, Entry-held closure, M4 RELEASED and repeated materialization pass. All640 current/archive inputs exact; backend cleanup and original backend/Pulsar preservation pass. Result9aa3fa6ac8177402fada80a2c7cdbcbdd26a5f8c7908b3835ba1b6fc7d8bc547; Owner XML03e16f99cfd25987a83c26866283a127b390a7d8b0c6abb910f799f35effb756. Warm original nonempty append response-loss recovery passes; a metadata-version-change rejection is being added before current qualification. Empty/non-append/cold recovery and whole M5/all17 remain unqualified.
+
+Actual65 append-UNKNOWN metadata-version extension now holds a real successful fence response, performs an original guarded SDK same-value CLOSED-header CAS, observes its new native version, then requires exact-version rejection with original C/D/actors retained before a fresh fencing retry. Initial test-style line125 was rejected and split; compile/test style17s passes. Current runtime qualification pending.
+
+Original SDK append/fence UNKNOWN plus actual header-version race run25/65/66/67 and SDK/provider conformance on640 frozen/archived inputs, manifest fd92a5ce9d099ec3f95cd60aabc47e2ce85dccb42f1e3650b661a2f3d7db20b3; runtime/cleanup pending.
+
+Current original append UNKNOWN/header-race sourcefd92a5ce9d099ec3f95cd60aabc47e2ce85dccb42f1e3650b661a2f3d7db20b3 is terminal runner/Gradle0:
+4 fresh suites/15 cases,0 failures/errors/skips (SDK5,Provider5,actual25/65/66/67,namespace1). Module158/BK38
+source-matched UP-TO-DATE excluded. Actual65 drops a real successful append ACK on the original SDK channel,
+independently reads the exact4MiB applied payload from that bookie, observes SDK timeout while original SDK/C/D/
+actor charges remain, loses a real successful durable-fence response and retains again, then holds a second
+successful fence response while the original guarded SDK CAS writes identical CLOSED metadata with a new native
+version. The stale fence observation is rejected before removing the original packet; C/D/actors and its byte
+reservation remain. A fresh same-version/full-field/namespace-bound native fence settles exactly one separately
+counted original packet, never changes its failed RPC result, emits no extra append, and precedes SDK metadata
+close, existing C UNKNOWN reconciliation and confirmed refund. All640 current/archive inputs exact; original
+backend/Pulsar paths unchanged and owned backend absent. Result4f1d43711736bac9aa67a840f3817b30ee3f5100f38175a220e5e98ac621f5ec; Owner XML
+052ac4e2e1e03d531c1e6566e85b36e589168ab1e3b8fdc625d042ff9d78ecd9. Qualifies warm original nonempty append UNKNOWN recovery,
+fence-response loss and metadata-version freshness with existing read/SDK/D/C/M4 RELEASED composition. Empty,
+non-append and cold physical RPC UNKNOWN remain unqualified, as do full SDK reader/writer references, complete
+10-floor/15-reference producers, physical-delete authority, all17/five children/whole M5. No staging/commit/push
+or whole-M5 coordinator review.
+
+Exact unused formatter(696 bytes) removed after ownership/Git/input/reference/open-handle checks; both append UNKNOWN source archives(56716799 bytes), runtime receipts and initial style failure retained. Generic all-physical-RPC UNKNOWN qualification remains false; only warm nonempty append retention/recovery is qualified. All17/whole M5 remain open; no staging/commit/push.
+
+Current warm original nonempty append UNKNOWN/header-race documentation and lifecycle design gates pass22s. All validation handles terminal; empty/non-append/cold recovery and all17/whole M5 remain unqualified.
+
+### Original Native SDK force UNKNOWN no-resource-effect completion (2026-10-14)
+
+Locked BK4.18 source cd06340851d6d657b7c7546df01df365c18980de has BookieImpl.forceLedger call only its journal;
+Journal.forceLedger enqueues a null METAENTRY_ID_FORCE_LEDGER marker and Journal.run excludes that marker from
+serialized ledger writes. It does not obtain/create a ledger handle or change its payload/reference/identity.
+The original factory data reconciliation now processes resource-mutating failed packets before failed force
+packets. A failed force can be proved harmless only after original data admission is closed and no non-force
+packet remains, with the original tagged CLOSED header, bookie membership, exact native version/all fields and
+namespace checked before removing its descriptor. The old failed result is unchanged, no force is replayed,
+and harmless force completion is counted separately from original successful replies and independently fenced
+appends. This does not treat force as a substitute for actual persistence success or qualify empty append/LAC/
+fencing/cold UNKNOWN. Actual65's existing real channel fault also drops one actual successful force response;
+original SDK timeout is required, both append/force descriptors remain through lost fence and header-version
+rejection, and each original append/force request count must stay1 before eventual D/C/actor refund. No new client,
+actor, thread, queue, payload copy or metadata ticket. Compilation and current real composition pending; prior
+append receipts remain archived-source evidence. All17/five children/whole M5 remain unqualified.
+
+Original force/append response-loss composition compile/Main/test style20s passes. Actual25/65/66/67 plus SDK/provider conformance run on640 frozen/archived inputs, manifest b4a408d9ededa7ba16d2b0a148303856b4b00abe612346748c9884a00ec5cd41; runtime and cleanup pending.
+
+Original force/append UNKNOWN sourceb4a408d9ededa7ba16d2b0a148303856b4b00abe612346748c9884a00ec5cd41 is terminal runner/Gradle0:
+25 fresh suites/211 cases0 failures/errors/skips (module158,BK38,SDK5,Provider5,actual25/65/66/67,namespace1).
+Actual65 drops both a real successful append ACK and a real successful force ACK on the original SDK channel,
+requires the original SDK force timeout, retains both descriptors/C/D/two original actor charges through lost
+native fence response and guarded same-value CLOSED-header version refresh, then fences the original append
+before proving the original force harmless. One independently fenced append and one no-resource-effect force
+are counted separately; original failed results remain unchanged and native request counters for each stay1.
+Only after current header/bookie/namespace checks and original SDK metadata close do D then C cleanup and actor
+refund complete. Existing read/SDK metadata C/D UNKNOWN, M4 RELEASED, cursor/legacy cross-quorum and repeated
+materialization/cold bytes remain passing. All640 current/archive inputs exact; original backend/Pulsar paths
+unchanged and owned backend absent. Result83e9971674262e241027d214f58d17559826da3f6ad627823f62ea885f01350e; Owner XML
+b164bbdd5d1bde3549ee0a4cd41a7c5c7445510efc8c36e3492c58edc110ebfc. Qualifies warm original force UNKNOWN no-resource-effect
+completion with original append/header-race composition. This is not force persistence success or a replacement
+for append durability. Empty append, LAC/fencing/cold RPC UNKNOWN, all SDK reader/writer references, complete
+10-floor/15-reference producers, physical-delete authority, all17/five children/whole M5 remain unqualified.
+No staging/commit/push or whole-M5 coordinator review.
+
+Exact unused force task formatter(611 bytes) removed after ownership/Git/input/reference/open-handle checks; source archive(28366539 bytes) and runtime receipts retained. All17/whole M5 remain open; no staging/commit/push.
+
+Current warm original force UNKNOWN harmless-completion documentation and lifecycle design gates pass20s. All validation handles terminal; remaining LAC/fencing/empty/cold and all17/whole M5 stay unqualified.
+
+### Original Native SDK fencing-RPC UNKNOWN recovery (2026-10-14)
+
+BK4.18 LedgerDescriptorImpl.fenceAndLogInJournal keeps ledger fencing monotonic and waits the original journal
+fence result or retries a failed journal record; repeated native fencing cannot un-fence a ledger. Original
+failed fencing packets now use the same original-scope/nonempty-successful-native-fence/header-version/all-fields/
+bookie/namespace validation as original failed appends. Their failed RPC results remain unchanged; independent
+fenced completion is counted separately. Deterministic original packet ordering is append, LAC, fencing, force;
+force still requires every resource-mutating packet terminated first. Empty/error native fence responses remain
+UNKNOWN. Actual65 also drops one actual successful original tracked fencing-RPC response and requires its SDK
+timeout. Append, fencing and force descriptors/C/D/actors remain through unavailable recovery fence and header
+version refresh; two independent durable fenced packet completions must precede one harmless force completion
+and D/C/refund. No added actor, client, thread, payload copy or metadata ticket. Compile/current real composition
+pending. LAC/empty/cold RPC UNKNOWN, all SDK references/floor producers, physical-delete authority, all17/five
+children/whole M5 remain unqualified. Prior receipts remain archived-source evidence.
+
+Original fencing/append/force UNKNOWN composition compile/Main/test style17s passes. Actual25/65/66/67 plus SDK/provider conformance run on640 frozen/archived inputs, manifest c933d6280faba4de67289d66bd135d7e418e93754e822f2fc6aa25dfdf19157f; runtime and cleanup pending.
+
+Original fencing/append/force UNKNOWN sourcec933d6280faba4de67289d66bd135d7e418e93754e822f2fc6aa25dfdf19157f is terminal runner/Gradle0:
+25 fresh suites/211 cases0 failures/errors/skips (module158,BK38,SDK5,Provider5,actual25/65/66/67,namespace1).
+Actual65 drops real successful append, force and original tracked fencing responses on the original SDK channel;
+SDK force and original fencing callbacks must time out. All3 original descriptors/C/D/two actor charges remain
+through unavailable recovery fence and guarded same-value CLOSED-header native version change. Fresh valid
+nonempty native fencing/header-version/full-field/bookie/namespace observation then terminates2 independent
+original packet holds before1 original harmless force completion and original SDK metadata close/D/C/refund.
+Original failed results stay unchanged and original append/force request counts remain1. Existing read/SDK C/D
+UNKNOWN, M4 RELEASED, cursor/cross-quorum legacy and repeated materialization/cold bytes remain passing. All640
+current/archive inputs exact; original backend/Pulsar paths unchanged and owned backend absent. Result
+d5ffd0c1af47b76a9314eedb815aefa1c59e218139ce764f647370ef7bc84efb; Owner XML2482ab72d1f6d976bfe66292364ae8edeff9a25dd9e8f41e405af00234e6d0db. Qualifies warm original nonempty
+fencing-RPC response-loss recovery with the append/force/header-race composition. LAC, empty and cold physical
+RPC UNKNOWN, full SDK reader/writer references, complete10-floor/15-reference producers, physical-delete authority,
+all17/five children/whole M5 remain unqualified. No staging/commit/push or whole-M5 coordinator review.
+
+Exact unused fencing task formatter(520 bytes) removed after ownership/Git/input/reference/open-handle checks; source archive(28369836 bytes) and runtime receipts retained. All17/whole M5 remain open; no staging/commit/push.
+
+Current warm original nonempty fencing-RPC UNKNOWN documentation and lifecycle design gates pass20s. All validation handles terminal; remaining LAC/empty/cold and all17/whole M5 stay unqualified.
+
+### BK4.18 explicit-LAC fencing boundary (2026-10-14)
+
+Current actual65 now verifies the locked backend boundary through the original guarded SDK data port:
+after a real successful native fence whose reply was lost, it writes two legal explicit-LAC values (1 then0)
+and independently reads/digest-verifies each actual bookie value. This checks whether late older LAC packets
+can still mutate the explicit buffer after fencing. Only observed original successful callbacks may release
+these two packet holds; existing append/fencing/force UNKNOWN holds must remain unchanged. Runtime pending.
+Production LAC UNKNOWN still retains its original descriptor, C/D references and SDK actor charges; no
+read-back, CLOSED metadata or append fence is accepted as LAC termination. No backend/profile changes.
+All17/five children/whole M5 and physical-delete authority remain unqualified.
+
+BK4.18 explicit-LAC boundary sourceff0e121842680f445bdfb5b92ce1effa6287dbc53eb97354d4cd786fa7279aa8
+is terminal runner/Gradle0:4 fresh suites/15 cases,0 failures/errors/skips. Actual65 confirms successful LAC1
+then LAC0 after native fencing, with independent digest-verified readback of1 then0. Original two LAC callbacks
+succeed; existing3 append/fencing/force UNKNOWN descriptors remain until their independent proofs. All640
+source/current/archive inputs exact; original backend/Pulsar unchanged, owned backend removed. Result
+bbf88c9b13738a67baed8e91997416b6c29d3b1e3a1a032a2dbd8752dc05ef8d; Owner XML
+abf8ad4ebd67d94d708712886c989496a9994cf9acfa8f780360762eb3200784. This proves the backend limitation,
+not LAC UNKNOWN recovery. Prior source archives remain evidence.
+
+Locked BK4.18 recoveryAddEntry also bypasses the native fenced check. Original SDK append descriptors now retain
+the actual FLAG_RECOVERY_ADD bit; a failed recovery append cannot use the ordinary append-fence proof and keeps
+its original hold. Successful recovery callbacks still drain normally. Actual65 additionally resends the exact
+stored original entry0 through the guarded SDK with RECOVERY_ADD after fencing and requires native success,
+without changing the stored payload or ordinary failed append result. Updated runtime pending. This is a local
+safety correction; recovery-add UNKNOWN/cold termination and all17/five children/whole M5 remain unqualified.
+
+Recovery-add sourceef11f50b4757642a8501572b9b19f406cec451eedbf1a589fe7b7e9eddc54a07 ended with1 failure
+in24 fresh suites/210 cases. The new raw v3 ADD probe supplied a ByteBuf instead of the required ByteBufList;
+its original descriptor stayed UNKNOWN and later Cell cleanup timed out. Runtime logs also exposed duplicate
+ordinary-read buffer release in the relevant original fencing callbacks. Locked BK4.18 ReadCompletion invokes
+the callback with a borrowed slice then releases it. Production fence proof now only inspects that borrowed
+slice. The probe retains its raw-read slice across callbacks and transfers it to the required ByteBufList;
+related synchronous test reads no longer release SDK-owned slices. Failed evidence remains archived; owned
+backend cleanup passed. The preceding LAC test's zero JUnit failures did not establish clean asynchronous buffer
+ownership: its raw log contains4 IllegalReferenceCountException occurrences. Corrected runtime pending.
+No physical-delete or whole-M5 authority is granted.
+
+Corrected original SDK recovery-add/buffer ownership source8ebf6e332b4c32be19242b5be4b8011e3e3cd322a33cea317e3c746275d79106
+is terminal runner/Gradle0:25 fresh suites/211 cases,0 failures/errors/skips (module158,BK38,SDK5,Provider5,
+actual25/65/66/67,namespace1). Actual65 independently reads the original entry0, retains its borrowed SDK
+slice and sends the exact packet in a v3 ByteBufList with RECOVERY_ADD after fencing; native EOK and original
+callback/counter completion are observed. Fenced LAC1 then0 readback also passes. The failed ordinary append,
+original fencing and force descriptors still retain C/D/two actors through lost recovery fence and same-value
+CLOSED-header version change, then2 independent fenced completions and1 harmless force precede SDK metadata
+close/D/C/refund. The complete archived JUnit stdout/stderr has0 IllegalReferenceCountException occurrences.
+All640 current/archive inputs exact; original backend/Pulsar paths unchanged and owned backend removed.
+Resultffb3bd8af09aaebbbeb2274abdc0f0949751d9ff3eda4c2183410578377e104e; Owner XMLbad9921eaeb1c9eaf99f1d189f7dcd2a8b8c67e1f9ce8263d835ada473a3592e.
+Production descriptors preserve RECOVERY_ADD and reject ordinary-fence reconciliation for that failed packet.
+This run validates the actual backend boundary, successful recovery callbacks, ordinary UNKNOWN composition
+and borrowed-buffer correction; it does not test a lost recovery-add response or qualify LAC/recovery-add/empty/
+cold UNKNOWN termination. Complete SDK references,10-floor/15-reference producers, physical-delete authority,
+all17/five children/whole M5 remain unqualified. No staging/commit/push or whole-M5 coordinator review.
+
+### Original recovery-add and explicit-LAC UNKNOWN retention (2026-10-14)
+
+Actual Native cases68/69 use separate real P1/Cell/SDK factory scopes and source-native BK/Object quota/birth/
+reference admission. They drop one actual successful recovery-add or explicit-LAC response at the original
+SDK channel, require the original SDK timeout, then independently obtain a nonempty durable native fence.
+Repeated factory close must reject ordinary-fence reconciliation and retain the exact original descriptor,
+C recovery reference, D metadata handle and both local/durable SDK actor charges. Observer cancellation cannot
+drain the Cell; another allocator must reject its still-active original owner. Test transport shutdown is
+only thread cleanup and cannot settle M5 actors or create a cold termination/absence proof. Existing successful
+SDK RPC and ordinary append/fencing/force UNKNOWN composition remain applicable. Current runtime pending;
+all17/five children/whole M5 and physical-delete authority remain unqualified.
+
+Cases68/69 source72cce3d9e794d9364f94af1ce99ade8d99c6473ffbe80bda304e992b1a144ba7 is terminal
+runner/Gradle0:4 fresh suites/13 cases0 failures/errors/skips. Both actual EOK reply losses cause SDK timeouts;
+independent nonempty durable fencing cannot clear the original descriptor/C/D/two local and durable actors.
+Cell close observer cancellation leaves closure pending and another allocator rejected. Owner XML
+5bffbfd2b16271b39794eacb3221050e1dd22a017963ffd2244236c3f9f54ffd; result
+96dfab5fbfd7af4c9a706449e1952b6cb31467b4bb18d9e3dc30d6be2289f4f9. All640 current/archive inputs were exact
+at completion; owned backend removed and original backend/Pulsar unchanged. Source now additionally asserts
+C/D/descriptor/local and durable actors remain after actual test transport shutdown. Recovery-add rejection
+is temporarily disabled only for a source-archived counterexample run of actual68; current counterfactual
+has no M5 qualification and the rejection will be restored after its terminal result. Updated runtime pending.
+All17/five children/whole M5 and physical-delete authority remain unqualified.
+
+The recovery-rejection-disabled counterfactual source16bbfa489a706bcbc2831122a631b5d91952e27d3ca8136c0d8fbfbde46600b8
+stopped before Owner68 at SDK source formatting:23 fresh suites/206 cases have no JUnit failures, but Gradle1.
+Resulta454e7bf9329dd2a01a68041f0935f87418e462661354fa4cbc5ccc7a0ec008b. This is not a runtime red reproduction.
+All640 frozen/archive inputs exact and owned backend cleanup passed. The original rejection was restored
+before preparing a separately formatted counterfactual. Correct runtime red/green evidence remains pending.
+
+Formatted recovery-rejection-disabled sourceb93ad7d208851f63df555bfe160fa415a3dbdd16b0a0df016bb7670432cb1848
+is a real runtime red:24 fresh suites/207 cases,1 failure in actual68. After original successful recovery-add
+ACK loss and SDK timeout, independent nonempty durable fencing lets the unguarded factory close return success.
+The assertion requiring continued original SDK UNKNOWN fails at the second factory close (not setup, transport
+or cleanup). Result8e5a4429881f220057e244afc3556cc3447528293d4b74585ef406136836cd18; Owner XML
+009176cdee46b714054ca5ebb8af9b76816ee8cddbbe3c6e7fabe97d3d02eb5b. All640 frozen/archive inputs exact;
+owned backend removed and original backend/Pulsar unchanged. Original guarded DataClient source restored exactly
+to SHA54816dc2f2cfd3d484fc8e73da69449ccd198dba733533d9b825c2cea5b2273f.
+Current tests also assert the actual CLOSED SDK header and original OWNER_WORKER_LEASE_HANDLE_PIN D class;
+original C/D/descriptor/local and durable charges must remain after actual SDK transport close, with Cell
+closure still pending and another allocator still rejected. Current combined25/65/66/67/68/69 green pending.
+This is UNKNOWN retention, not UNKNOWN termination or physical-delete authority; all17/five children/whole M5
+remain unqualified.
+
+Original unfenceable SDK UNKNOWN sourcec3823059337fd9accc2af23c9ffac7f4f53e2595ac9d25a1153dee5e5d82c669 is terminal runner/Gradle0.
+25 recorded suites/213 cases have0 failures/errors/skips:4 freshly executed runtime suites/17 actual cases
+(SDK5,Provider5,Owner25/65/66/67/68/69=6,namespace1) plus21 cached module reports/196 cases(158 offload,38 BK).
+Cached reports are reused exact-dependency results, not newly executed tests. Actual68/69 require real applied
+recovery-add/LAC response loss and original SDK timeout, actual CLOSED native SDK header and independent nonempty
+journal-confirmed fence. Repeated factory close retains the original descriptor, C scope-bound recovery root,
+OWNER_WORKER_LEASE_HANDLE_PIN D ticket, and both local/durable actor charges. Cancelled Cell-close observer cannot
+settle the original close; another allocator remains rejected. Actual SDK transport shutdown still leaves the
+original descriptor/C/D/local and durable charges retained, Cell closure pending and allocator replacement
+rejected. Original native packet count stays1; no append/LAC redispatch. Existing source publication/M4 RELEASED,
+cursor/legacy cross-quorum/repeated materialization and ordinary append/fencing/force UNKNOWN remain passing.
+All archived runtime logs have0 IllegalReferenceCountException occurrences. All640 current/archive inputs exact;
+original backend/Pulsar paths unchanged, owned backend removed. Result6bdb77ff9a15fd71d581e3ce2f7141d07531480be59d6e0a9409d98479aeb1f1;
+Owner XML8eead50f358e20ce1f7bad126169547f596e94a0e9a77c98af3511496e1262b1. Guarded SDK source remains exact restored SHA
+54816dc2f2cfd3d484fc8e73da69449ccd198dba733533d9b825c2cea5b2273f. Red68 versus current green68 proves the recovery
+flag exclusion; green69 proves LAC retains UNKNOWN independently. This qualifies original warm UNKNOWN retention,
+including after transport stop, not LAC/recovery-add UNKNOWN termination, process-death takeover, physical
+absence/delete, complete SDK reader/writer closure,10-floor/15-reference producers, all17/five children/whole M5.
+No staging/commit/push or whole-M5 coordinator review.
+
+### Native typed reference-proof coverage prerequisite (2026-10-14)
+
+M5-C reference ordering and wire previously called scalar coverage endpoints, so actual ledger-keyed Pulsar
+coverage failed before producers could enter the reference pipeline. Three focused logic tests reproduced
+scalar getter failure in proof encoding and adapter ordering, plus acceptance of a foreign typed Binding.
+Current M5RF uses wire2 only for typed Pulsar: full canonical M5PulsarCoverageV2 is encoded once in the parent;
+all observation rows inherit that exact context. Typed observation roots use a distinct M5RO/2 domain and one
+exact common coverage. Ordering compares full typed values without numeric flattening; request/proof reject
+foreign Bindings. Version1 encoding and legacy observations remain unchanged, with the existing deterministic
+Kafka proof byte SHA973cd75ef32ab259e95e9eeb27f336a0934d8b51f8be9d93c3a32c99ca8bc84f pinned from pre-change
+execution. Unknown versions, modified typed ranges and mixed typed observation contexts reject. Existing byte
+caps remain. This is a codec/assembler dependency, not a native floor policy, complete15-reference scan or
+physical-delete grant. Focused assembler71 and retirement122 logic cases, Main/Test checks pass15s; broader
+nested eligibility/history checks pending. Real production adapters and typed floor snapshots still require
+implementation. All17/five children/whole M5 remain unqualified; no staging/commit/push.
+
+Typed reference-proof nested regression gate is terminal Gradle0:4 logic suites/218 cases0 failures/errors/skips (assembler71,retirement122,history15,eligibility10),13s. Scoped8-input archived manifest0dd80183b985a665e46898bb25783bc7a29c731c38a34c3598740cab9d415b17; Main/Test style gates pass15s. This is serialization/logic evidence with synthetic test facts, not actual Native adapter/retention/eligibility or whole-M5 qualification. All17/five children/whole M5 remain open; no staging/commit/push.
+
+### Native cursor/checkpoint reference veto producer (2026-10-14)
+
+PulsarNativeCursorMetadataV2 now exposes its actual captured ledger-keyed chain/coverage and a direct reference
+scan query plus the existing ReferenceAdapterV1 entry point for PULSAR_SUBSCRIPTION_OR_REPLICATION_CURSOR and
+RECOVERY_CHECKPOINT_OR_SNAPSHOT. Requests must match the original Binding/chain and contained native ranges.
+Every query rereads the retained catalogue/checkpoints through the original SDK workspace. Known matching
+physical cursor-data/checkpoint resources fail proof construction with a privately constructed typed veto
+carrying actual resource witnesses and original NPCS snapshot bytes. Empty/unresolved cursor policy/positions
+remain uncertain; missing targets require closed writer/directory evidence and cannot produce ABSENT. No new
+Actor/client/thread, virtual metadata authority or synthetic floor/trim/grace facts are introduced. Actual65
+checks all real checkpoint witnesses, resolved data-resource witnesses, missing-target rejection and rejection
+after real cursor mark-delete changes. Current runtime pending. Full absence producers, typed floors, all15
+reference classes, physical-delete and all17/five children/whole M5 remain unqualified.
+
+Native cursor reference-veto source14985c35ec1a92654ad36c9f04f1c1c3262c1b53c5619a7d4a1de5f986b4e091 is terminal runner/Gradle0:
+17 fresh suites/175 cases0 failures/errors/skips (offload158,SDK5,Provider5,actual25/65/66/67/68/69=6,namespace1).
+BK38 is matching UP-TO-DATE and excluded from fresh counts. Actual65 confirms2 real checkpoint resource vetoes
+and14 real cursor-data resource vetoes with exact typed native coverage, private original NPCS bytes/resource
+witnesses and a fresh SDK reread each time. Real mark-delete changes invalidate the retained scan; missing
+checkpoint targets reject rather than produce ABSENT. Existing original workspace/observer drain/charges,
+source publication/M4 RELEASED and append/fencing/force/recovery-add/LAC UNKNOWN remain passing. All runtime
+logs have0 IllegalReferenceCountException occurrences. All640 current/archive inputs exact; original backend/
+Pulsar paths unchanged and owned backend absent. Resultc0ad32b065f2023753a8c891e5a1ed6433f426180e2c1df55dcd83fb385d7318;
+Owner XML1942347209cc1874d42b0dcbc36ae0a40737fac82f558fbcc62a42e3d74e342f. This qualifies the common real Native veto query;
+full proof requests, closed directory/writer absence, typed floors and all15-reference registration/scan remain
+unqualified. No synthetic floor/trim/grace facts or metadata authority were added. Physical-delete authority,
+all17/five children/whole M5 remain open; no staging/commit/push or whole-M5 coordinator review.
+
+### Native typed floor/trim wire and consumers (2026-10-14)
+
+RetentionFloorObservationV1 now carries an optional ledger/entry floor; typed RetentionFloorSnapshotV1 binds
+one exact M5PulsarCoverageV2 and typed trim predecessor. Every constraining row must use that chain/Binding;
+explicit complete non-vetoing policy rows remain supported. M5SF/M5TF use wire2 for typed Pulsar only; old
+scalar constructors and wire1 layout remain unchanged. Scalar getters reject typed values. The assembler
+preserves context and rereads all original version/value authorities. Planner, logical-trim CAS/exact retry
+and nested expiry eligibility compare captured ledger order without flattening. A changed captured chain
+currently rejects: rollover/replacement chain handoff still needs source-bound implementation. Expiry requires
+every target ledger range to cross trim and every floor, independently of mandatory M4 RELEASED evidence.
+
+Terminal Gradle0:4 logic suites/222 cases0 failures/errors/skips (assembler72,retirement124,history15,eligibility11).
+Coverage includes ledger91 then7 with restarted entry IDs, monotonic advancement/exact retry, regression and
+changed-chain rejection, typed/scalar/foreign Binding rejection, complete policy rows, fresh authority reread,
+wire roundtrips/unknown-version rejection and partial-range expiry veto. Main/Test style gates pass14s; final
+scoped format/check/test gate passes11s (Main UP-TO-DATE from that successful check). Scoped18-input source
+archive manifestd4cbd4094b89b00430f188a8c9acb81f1302d6a62bd25e8b3159a944e9db9511 is exact.
+This is pure logic/serialization evidence with synthetic facts. No current-source real Native run, closed
+ten-floor producer registration, complete15-reference absence or physical deletion is qualified by it. All17
+lifecycle obligations/five children/whole M5 remain open; no staging/commit/push or coordinator final review.
+
+### Native production writer ownership registry (2026-10-15)
+
+PulsarNativeWriterRegistryV2 now defines the fixed concrete owner mapping for the closed ten-floor/fifteen-reference
+inventory. It builds declarations from exactly seven controller-supplied implementation source identities. Native
+factory, metadata-writer and M4-control installation validate that mapping before SDK/workspace/ticket admission;
+a structurally complete registry assigning cursor floors or fallback references to another class is rejected.
+The real fixture now hashes actual current source files and uses this production builder, rather than defining
+ownership in test code. Source hashes still need independent qualification: this builder does not attest callers'
+hashes, implement floor policy, enumerate references, or make declarations into complete native qualification.
+
+Three focused ownership/entry-point cases and P6 compilation pass19s. Removing only the factory admission check
+produces3 cases/1 failure at the original SDK-creation call; its source archive manifest is
+2a764452ee98951645f4dbd196cf04aa132dcc9921c8d92cb0590d272968bdeb. The factory was restored exactly to
+29764ffdaf9a08e182b041600b78e38c22b76d95783a2c37ab51738f54efeb22. Main/Test/P6 style checks pass16s after
+correcting one comment length. The real642-input source archive
+280e6627c72bbe7cc8d2abdefe216168f56683da3c970652bfd927207ca04e2c is terminal runner/Gradle0:18 fresh suites/178
+cases0 failures/errors/skips (module161,SDK5,Provider5,Owner25/65/66/67/68/69=6,namespace1). Matching BK38 is
+UP-TO-DATE and excluded from fresh counts. Publication65, publication-UNKNOWN66 and stop-before-selector67 reject
+a wrongly assigned control registry, verify unchanged actual C authority and Cell budget, then install the correct
+registry and finish the existing publication/drain paths. Guarded birth25 and original recovery-add/LAC UNKNOWN68/69
+also pass; the latter retain original SDK references. Fresh XML contains0 IllegalReferenceCountException occurrences.
+All642 current/archive inputs exact; original containers/Pulsar paths unchanged and owned containers/networks/volumes
+absent. Resultce5eb3626c339f79ffc39c0d04f695bd788ed4d4138faced96a3ba75aae8f4cd; Owner XML
+beed05f8f55795dbb5b4f1fcc3b8ccd3e4efd97134d4f6d90fc20f5f097e3a70. Complete native floor/reference producers,
+chain handoff, physical delete and all17/five children/whole M5 remain open. No staging/commit/push or coordinator
+final review. This result qualifies fixed production ownership validation, not complete closed-writer/floor policy
+or reference-absence authority.
+
+### Typed retention records on the native Binding metadata route (2026-10-15)
+
+OxiaBindingLifecycleMetadataStoreV2 now accepts the existing canonical floor-snapshot, trim-frontier and
+reference-free-proof keys when the actual Protocol Cell is supplied. Stored values must decode canonically and
+match the route's full Binding/Cell and content-addressed key; snapshots/proofs are immutable create-only values.
+Trim requires its exact stored floor snapshot, a planner-identical minimum/predecessor/generation and a fresh
+version/value reread before native CAS. Retention records are separated from the common materialization prefix
+through validation and mutation admission. Existing four-argument M4/history routing and scoped version tokens
+remain unchanged. This is metadata routing/storage, not a native floor policy or reference-absence producer.
+
+Removing only retention-key acceptance makes both new focused cases fail; red2/2 source manifest
+91bf8d52c8d163258c462f75fe2fccf20dbd5f9aff6427ee2e59f02dbd37d3c6. The original route was restored exactly
+to46c4a7401ee378d20adcf32d9faad9cdb998a11e2edce9825510788423a94e7d. Main/Test/integration style and three
+route suites/26 logic cases pass14s. The current591-input archive
+fb8ff0480df8e5a643436cc5e0e73cd23ea17ac96b192b3853222a1b5e9fcb5d is terminal runner/Gradle0:8 fresh suites/
+250 cases0 failures/errors/skips (metadata26,shared retention/history/eligibility222,real Oxia storage2),13s.
+Real Oxia verifies exact native stored bytes, applied write with lost reply, reconnect, exact retry and a second
+scoped version CAS across declared ledger91 then7; the existing materialization-plan/Cell reconnect case also
+passes. Protocol floor/reference values are declared fixtures, not actual Native cursor/closed-writer facts.
+Original containers remain unchanged and owned Oxia is absent; all591 current/archive inputs match. Result
+3014f44d5c93492559f545e72328ffd0c3ea726692044144cb67568a612b1d27; real XML
+1620c80240c676c99c9f118f467f6df8e24fb6b3489c65fa23e576ae1a8d57e4. No current-source Pulsar/BK/Object
+combination was run for this route change. Complete native floor/reference producers, chain handoff, physical
+delete and all17/five children/whole M5 remain open; no staging/commit/push or coordinator final review.
+
+### Durable Native cursor reset C/D admission (2026-10-15)
+
+A real guarded Native reset rewound the cursor after a durable BK append while cursor metadata bytes/version
+and C authority version0x1a stayed unchanged. The new assertion failed under the archived642-source candidate
+49a99dcad7c33807ada75f14855c5f71f82d442d82dd1f62e60ecc1927a125db (Owner1/1 failure; SDK/Provider10 pass).
+Resultad23219c84825cba227f62c2e1aff32fe6ac405b34e2b6a56fa46b5ad3601d32; Owner XML
+20ef81250b0b754e0dbb3ba83be040271b1698e5b276a99c129a83158058d599. Earlier attempts stopped at style checks
+and are not runtime red evidence. Their original backends were cleaned and original containers/Pulsar paths preserved.
+
+The installed Native StoredMutationGuard now covers durable asyncResetCursor through the original metadata writer.
+Its immutable request binds requested position/force mode, cursor ledger/version, parent version and the Native
+ledger-info digest. The writer independently reads actual predecessor bytes, resolves checkpoint plus current
+BK/Object data targets and acquires existing C/D tickets before original SDK dispatch. Parent/cursor/local facts
+are rechecked on the existing ordered executor. Ordinary metadata commitments retain NPMW7; reset commitments
+use NPMW8. No second SDK client, new executor or per-message metadata admission is added. Unguarded legacy and
+non-durable cursor paths retain their existing behavior. Known successful completion comes from the original
+Native durable callback. An unchanged znode never proves a failed reset was not applied. A typed Native
+not-dispatched failure covers changed local source/closed dispatch executor; other reset failures, including
+metadata fallback errors after a possible BK write, retain original tickets and cannot redispatch.
+
+The final current642-source archive
+6a835ba5bc91921eff7496b421d1596489089effe6e2dabb8a255eaaa282c691 is terminal runner/Gradle0:18 fresh suites/178
+cases0 failures/errors/skips (module161,SDK5,Provider5,Owner25/65/66/67/68/69=6,namespace1). Matching BK38 is
+UP-TO-DATE and excluded from fresh counts. Actual25 now observes C version invalidation across the durable reset
+while the cursor metadata row remains exact. Existing publication/M4 RELEASED/drain and recovery-add/LAC UNKNOWN
+retention cases also pass. Original containers/Pulsar paths are unchanged and owned backend absent; all642 current/
+archive inputs exact and fresh XML has0 IllegalReferenceCountException occurrences. Result
+372c2ae1e6307120df4a8cce3147ac1cb234a4adb64a198322b7c994450a799f; Owner XML
+aeffb1ee254d88ec82c55531abe4200da52d1215b38e9e8abd4d7fac88d30b52.
+
+Native reset/metadata regressions17 cases pass (cursor9,MetaStore8), including source change before deferred reset
+dispatch with unchanged cursor state. Native and adapter Main/Test style checks pass; final adapter preparation16s.
+This qualifies the acknowledged reset C/D path and local source-change no-dispatch contract. Reset-specific wire
+reply loss, closed-executor reconciliation and cold UNKNOWN termination are not qualified by these runs. Full
+Native floor/reference production, trim serialization, physical delete and all17/five children/whole M5 remain
+open; no staging/commit/push or coordinator final review.
+
+### Native cursor reset reply-loss retention (2026-10-15)
+
+The real Native reset now has a fault-path test: each original BK add success reply is dropped after the
+cursor checkpoint is stored, then the actual metadata fallback fails before its PUT. Independent raw reads
+from all three bookies verify the earlier PositionInfo and its original digest. Cursor metadata bytes/version
+remain unchanged. The original reset and fallback retain both C mutation tickets and checkpoint/data D tickets;
+factory close fails, SDK transport close does not refund those tickets or Cell capacity, and every original
+bookie received one add request. Offloader/provider close remains pending on the original workspace. Test
+teardown observes that pending lifetime and closes only test-owned transports; it does not settle the actors.
+
+Current642-input archive e61e1f29fe3bce7b9644fbe634c73312eb99ade0ab2f2068f2fac004d050e1a5 is terminal
+runner/Gradle0:4 fresh suites/18 cases0 failures/errors/skips (SDK5,Provider5,Owner25/65/66/67/68/69/70=7,
+namespace1). Unchanged module161 and BK38 are UP-TO-DATE and excluded. Main/Test/P6 checks passed; scoped final
+P6 preparation15s. All642 current/archive inputs match, fresh XML has0 IllegalReferenceCountException, original
+containers/Pulsar paths remain unchanged and owned containers/networks/volumes are absent. Result
+97266733f17c31b104f8cec5abef14cd3e8360a39074232ddde5aa10d2104d2c; Owner XML
+3a7e66a1bdba4b82b1367e3c8e6b06f866b2d55251512de2a16a5ea414ec9d54. Earlier attempts were blocked by
+test selection/provisioning; a third reached all behavior assertions but hung in unconditional offloader close.
+Its thread/binary diagnostics and source archive are retained; its terminated/skipped result is not a pass.
+
+This qualifies actual reset wire-loss retention and warm transport-stop behavior only. Closed-executor
+reconciliation, cold UNKNOWN termination, complete Native floor/reference producers, trim serialization,
+physical deletion and all17/five children/whole M5 remain open. No staging/commit/push or coordinator final review.
+
+### Logical trim freshness race (2026-10-15, initial red evidence)
+
+A deterministic production-route regression now holds the original native trim create after both the logical
+coordinator and Oxia Binding route have reread all floor/fence facts. An actual route CAS advances the bound
+owner/floor authority version, then the original create resumes. The old implementation still publishes the
+91:3 frontier and returns APPLIED_EXACT. The new safety assertion fails (one executed case/one failure, no
+errors/skips); this is a concurrency defect, not a valid trim qualification. The earlier real Oxia storage and
+lost-reply runs remain scoped storage evidence and do not prove this serialization property.
+
+The locked Oxia client/server has no conditional multi-key transaction. Existing M5-C single-authority fences
+cover retirement; the Pulsar aggregate fence additionally requires a DELETED selector, so it cannot fence an
+active Binding's logical trim. A repeated pre-read or a later stale result cannot undo visibility already
+advanced. Native floor integration must not promote that path. Extending the single authority with a distinct
+trim scan/commit state and persisted frontier, including compatible decoding/migration, was explicitly
+authorized by the user on2026-10-15. The initial fix was the Pulsar aggregate wire3 path; the later Binding route implementation and validation
+are recorded below. This authorization is not runtime evidence. All17 lifecycle obligations/five children/whole
+M5 remain open, with no staging/commit/push or coordinator final review.
+
+### Authorized Pulsar single-authority logical trim (2026-10-15)
+
+The user explicitly authorized extending the existing single authority for active-Binding logical trim,
+including compatible persisted formats. M5PA wire3 adds LogicalTrimStateV2 (optional committed frontier and
+optional attempt/snapshot/OPEN-version fence); legacy wire1/2 retain their byte layout and decoding. Normal
+successors preserve the new state and original NTA1 bytes/source version. The distinct
+LOGICAL_TRIM_SCAN_FENCED_V2 state requires complete writer enrollment and zero original reference tickets.
+It is independent of the DELETED-selector retirement fence. This first implementation conservatively requires
+all existing tickets to drain; it does not introduce a read-only-ticket exemption.
+
+M5PulsarLogicalTrimCoordinatorV2 fences the original OPEN CAS, revalidates the floor/fence vector under that
+fence and atomically stores the frontier while reopening admission at the same aggregate key. The fence's
+own OPEN fact is checked against its original predecessor; other facts are actually reread. The exact final
+CAS rejects a competing abort or writer transition. Abort preserves the old frontier and fences delayed commit
+CAS. An applied commit is recognized after later ordinary authority changes only when its exact frontier is
+still stored. No separate frontier key becomes visible. PulsarNativeBindingV1 exposes this coordinator using
+the original P1 aggregate key and Oxia client. This API does not qualify any caller-supplied floor values.
+
+Four added logic cases cover both ticket/fence orders, same-cell frontier publication, unchanged NTA/source
+projection, applied reply loss, unknown fence retention, exact abort versus delayed commit and changed external
+floor veto. The128-case retirement suite includes all124 previous cases. Current593-input source archive
+df18577450cf37127278d64d5afa50a3192cca2d8cb18d41f3d7d3d4ae99defc is terminal runner/Gradle0:5 fresh suites/
+227 cases0 failures/errors/skips (retirement128,assembler72,history15,eligibility11,real Oxia1). The real test
+applies the original fence CAS, loses its reply and two rereads, verifies actual stored fencing/ticket rejection,
+reconnects and commits/retries the same attempt with unchanged original NTA bytes. Its ten floor values and
+coverage are declared protocol fixtures, not real Native producers. Result
+8b8c88dbbae3f32e9eea94184886ab4a16c4bc0d7d1e4af02160055c3a3ae870; real XML
+5326f16ee3851bac948d60f583643a4535f2d544fd4e9c290dabe71b58be340c. All593 current/archive inputs match;
+original containers remain unchanged and owned Oxia is absent. Object Main/Test and Oxia integration checks
+pass11s; Native API compilation/Main/scoped format checks pass16s. No fresh Pulsar/BK/Object combination was run.
+
+At that Pulsar-only source snapshot the separate Binding route still used the racy frontier-key path. The
+subsequent authorized Binding extension is recorded below. This earlier receipt keeps its original source and
+scope; it does not qualify the later implementation or whole M5.
+
+### Authorized Binding single-authority logical trim (2026-10-15)
+
+The authorized extension now also uses the existing Binding selector authority. Binding wire5 appends the
+shared trim state and a bounded inventory of original external-write tickets; wire1-4 decoding and their
+existing layouts remain. Pulsar wire3 retains its layout. The two concrete coordinators share the same
+fence/commit/abort implementation. Each successful final selector CAS stores the frontier and reopens
+admission together. Retirement still requires its separate reference-free protocol.
+
+The Oxia Binding route admits mutable floor/reference writes at that same selector CAS before sending the
+original external conditional request. An existing ticket vetoes trim; a trim fence rejects new writer admission.
+Immutable, content-addressed, unselected bytes remain detached until their root is published. UNKNOWN keeps
+the original durable ticket. Reconciliation reads the original target or advances its exact predecessor version
+with an unchanged-value CAS to exclude a delayed original request; it never redispatches the original payload.
+An absent create target alone cannot settle an UNKNOWN create. Cancelling an observer cannot release admission.
+This metadata exclusion does not prove that an original SDK callback, buffer or parent Task/Cell owner drained.
+
+A quiescent enrolled authority can migrate an existing separate frontier into its inline state without changing
+the frontier bytes. The legacy physical key remains stored, but this route rejects writes to it; readers use
+readLogicalTrimFrontier rather than a synthetic key/value projection. Deployment still requires qualification
+and drain of all old writers: enrollment declarations alone do not establish that condition. Generic trim now
+requires either this serialized backend or an actual atomic transaction containing every floor/fence condition
+and the frontier predecessor. Other backends return UNSUPPORTED; pre-read plus an independent CAS is removed.
+
+The deterministic replacement for the retained red regression holds the final inline commit after freshness
+reads and verifies that the competing floor writer is rejected with its bytes/version unchanged. Complementary
+cases cover an already-admitted delayed writer, a version barrier, same-value unchanged-version ambiguity,
+observer cancellation, applied reply loss, reconnect and legacy-frontier migration. The source-locked actual
+Oxia campaign is terminal runner/Gradle0 (12m49s):9 fresh suites/273 cases,0 failures/errors/skips. These include
+129 retirement,72 assembler,15 history,11 eligibility,19 Binding route,4 Task route,9 canonical control,
+5 real retirement/trim and9 real history cases. Actual history completes1,026 folds, preserves a990-byte
+selector, reconnects and rejects old BatchIds. The original final inline commit is held after freshness reads;
+the actual competing floor writer rejects without changing its native bytes/version. An applied floor write
+with its reply and two reads lost retains its durable ticket; reconnect clears it without redispatching payload.
+The floor values themselves remain declared protocol fixtures, not Native floor production.
+
+All599 live/archive inputs match manifest42d5cc0cc3dda94290530549ae20c6005b6a11e8e0c51903c7b525ab457971e3;
+result7fb36549a115a9acf7cf4f59294cb07382378327387f85e87101c389427ac43f. Real retention/trim XML
+00f0571d8811a77bc2e11267e829c4a6d31bf2d351ca6dfb9f1de2a8191438cb; real history XML
+e9e821789ac7e45fb422af548678747594ef5661647b3df346e28b4d80a052cb. Original containers are unchanged and
+the owned Oxia is absent. The original red source/XML remains retained; this campaign does not replace its
+historical source or turn declared floor facts into qualified producers.
+
+Native compatibility validation at the unchanged648-input source is terminal runner/Gradle0:18 fresh suites/
+179 cases,0 failures/errors/skips (SDK5,Provider5,Owner7,namespace-negative1,module161). The7 owner cases
+exercise durable birth/member creation, actual manifest publication after drain, uncertain publication handoff,
+stop-before-selector cleanup, recovery-add UNKNOWN, explicit-LAC UNKNOWN and cursor-reset UNKNOWN. Original
+UNKNOWN ownership remains retained where terminal proof is unavailable; this run does not grant deletion or
+Native floor authority. BK38 cases are UP-TO-DATE and are excluded from the fresh count. Manifest
+5b83fe3fe18eb6b7bbf1884d8c61876aa841870a1af41adc51c82f91961754b0; result
+c0e49e0a85e6b590278f4c91dda87a9c0e8f0f6d34150327cd7aac61a86d8ef4; Owner XML
+4ac14e4bf8a4c0387b0319143982407438e2838cd0542f08f60e96767325db09. All648 live/archive inputs match;
+owned BK/Object/Oxia are absent and original containers are unchanged. Native compilation/Main/Test/Provider
+style checks pass. Current Object/Oxia format and Main/Test/integration style checks, v2DocumentationCheck
+and v2M5LifecycleDesignCheck pass22s; the design gate explicitly supplies no runtime authority.
+
+The exact current red/green source archives and terminal XML/logs remain retained. Three task-owned,
+unreferenced interim logs were removed after checking Git ownership/references (4,510 bytes reclaimed);
+the two new final source archives are retained (35,205,569 bytes combined). No original workspace file or
+pre-existing artifact was removed.
+
+These changes do not qualify Native floor producers, trim-aware resolver visibility or post-trim mutation
+admission, storage-chain handoff, physical deletion, the five independent combinations or any of the17 OPEN
+lifecycle obligations. Whole-M5 acceptance remains false; no staging/commit/push or coordinator final review.
+
+### Native reset admission against committed logical trim (2026-10-16, focused pass)
+
+The original Native cursor-reset path held its P1 reference ticket while dispatching the BK/metadata reset,
+but did not check the inline committed trim frontier. A new real Native
+case installs a declared floor fixture through the actual single-authority fence/commit, opens the original
+guarded factory and resets an actual cursor before that frontier. Runtime logs show the old implementation
+successfully resetting to the earlier position. The corrected terminal RED executes1 case/1 assertion failure,
+0 errors/skips: the old implementation raises no rejection. Red648-input manifest
+b4494e19d5de1a5202475e6107d9f52f16c7006e1ce0a8c92daef745eb0618c3; Owner XML
+49321b574dbd60cbfead09e181639f8adfd630c826c12ccafad65d19c4f4c2bb. Initial compilation, selection,
+sealed-cut fixture and teardown attempts are not qualification or passing evidence.
+
+The implementation now checks the exact stored P1 frontier inside the existing original ticket before reset
+SDK dispatch. The existing parent version/value is still reread, and position order comes from that actual
+Native ledger directory. No new queue, policy switch or persisted wire format is added. Appended writer tails
+remain ordered by the current validated directory. A committed frontier whose ledger is missing from that
+directory rejects pending explicit chain handoff; no committed frontier preserves the prior reset behavior.
+
+The terminal actual-backend GREEN is runner/Gradle0:4 fresh suites/13 cases,0 failures/errors/skips
+(SDK5,Provider5,Owner2,namespace-negative1). The new case creates a real cursor checkpoint after a normal
+append/mark-delete, then rejects the below-trim reset with unchanged znode bytes/version and cursor ledger
+extent. An independent actual BK read confirms that the next checkpoint entry is absent. Reset at the exact
+frontier and at a newly appended writer tail both succeed. The existing reset reply-loss case still retains
+its original C/D tickets and local/durable ownership; this does not terminate an UNKNOWN SDK operation.
+Module161 and BK38 are UP-TO-DATE and are excluded from this fresh count. Main/Provider compilation,
+Checkstyle and full scoped module format checks pass. No new Native Pulsar source changes were made.
+
+All648 live/archive inputs match manifestdc3c2a7912e541269404e403b1eacd51414e6cd4c6287a4f4271b710ca7c1c0e;
+resultd74385fc11e2d689c34574652b8b995c3b4b29d9932bca3bcaf4caf5b7ae54c1; Owner XML
+a7351149d42884a50f258301d8cfe2054bcb4450c4d400f1a50dc5d7f2ffff33. Owned BK/Object/Oxia are absent,
+original containers are unchanged. After terminal verification,84 exact task-owned superseded setup/fixture
+artifact paths were removed (176,551,422 bytes reclaimed); terminal assertion-RED, final GREEN and the earlier
+hung-teardown source/raw-output/thread diagnostics remain retained. No user/pre-existing artifact was removed.
+Documentation and lifecycle-design checks pass; these design checks grant no runtime authority.
+
+This does not qualify the fixture's ten floor values, Native resolver visibility, other floor/reference producers or
+physical deletion. The17 obligations/five children/whole M5 remain OPEN; no staging/commit/push/final review.
+
+### Native reader lifetime and committed trim (2026-10-16, focused pass)
+
+The controlled initial Native owner now acquires an original P1 READ_GENERATION_PIN_OR_OPEN_HANDLE ticket
+before creating its durable M4 grant. It uses the existing bounded control-writer ReadHold lifecycle. Existing
+materialized owners retain their additional physical C/D path. Both paths read the inline frontier inside the
+P1 ticket and retain only its typed position locally. Range admission compares the request with that frontier
+in the actual captured Native directory. No per-read remote metadata lookup is added. Missing trim lineage
+rejects installation; an absent committed frontier preserves the prior range behavior.
+
+The ticket remains held until the original private Native read/preparation drain and caller Entry aliases
+finish. Observer cancellation cannot acknowledge that drain. Frontier-read/physical-admission failures keep
+the existing guard error/UNKNOWN semantics; a physical guard failure is not converted into APPLIED. Once P1
+writers are enrolled or trim state exists, initial owner creation without its original control writer rejects
+before a durable M4 grant. Unenrolled legacy-owner enrollment/drain still needs controller qualification.
+No persisted format, executor or retry layer is added.
+
+The terminal actual Native campaign is runner/Gradle0:4 fresh suites/18 cases,0 failures/errors/skips
+(SDK5,Provider5,Owner7,namespace-negative1). Seven owner cases cover post-trim ordinary reads and Entry drain,
+missing control writer, existing birth/member creation, actual manifest publication, applied-publication UNKNOWN,
+stop-before-selector cleanup and legacy borrowed-alias compatibility. Below-trim BK and Object ordinary reads
+reject; the exact frontier returns its original data. An unreleased actual Entry keeps the P1 reader ticket
+and owner drain pending; original release/drain clears it. The actual enrolled-P1/missing-writer case leaves
+its durable M4 selector absent. Publish checks retain the original SOURCE_PROTECTION assertion and separately
+require the added reader ticket; after protection reconciliation the still-live reader ticket must remain.
+Existing physical C/D cleanup-UNKNOWN, observer cancellation, immutable candidate and no-redispatch checks pass.
+The initial fixture SDK-identity mismatch and stale ticket assertions were corrected, without relaxing original
+SDK identity checks. Those intermediate campaigns are not passing evidence. Module161 and BK38 are
+UP-TO-DATE and excluded from the fresh count. Compilation, Main/Test/Provider style and module format checks pass.
+
+All648 live/archive inputs match manifestdeea90c2def437584e618e5a8ab9fa0d3479ce10d853514b905dda8ba35844d8;
+result51c7bbc0e38dd8ceb338f32401cb382686afa65843f9fd25f8a1dc0e187c41ac; Owner XML
+0a2037eb3b80eb7ef0f07117f8c92a441b2194dd5799ae5a5b02ac119cc891e1. Original containers remain unchanged;
+owned BK/Object/Oxia are absent. The final source archive and terminal XML/logs remain retained;35 exact
+untracked, unreferenced task-owned intermediate artifacts were removed (59,823,459 bytes reclaimed). The final
+source archive retains28,575,442 bytes. No pre-existing artifact or unrelated workspace change was removed.
+
+The ten floor values remain declared fixtures: this is ordinary-read lifetime/trim evidence, not Native floor
+production or physical-delete qualification. Other read entry points, complete legacy enrollment/drain,
+reference-free deletion, the17 OPEN obligations/five children and whole M5 remain incomplete. No
+staging/commit/push or coordinator final review.
+
+
+### Native cursor floor source scan (2026-10-16, focused pass)
+
+The authorized single-authority trim extension now has a Pulsar source-scan phase: an exact CAS from a
+writer-enrolled, ticket-free OPEN revision freezes admission before an actual floor snapshot exists. Wire4
+is emitted only for this pending phase; old wire1-3 decoding and original NTA1 bytes/version remain supported.
+Sealing binds the actual source-scan revision and SF root into the existing wire3 fixed fence; the existing
+same-key commit stores the frontier and reopens admission. Exact abort excludes a delayed seal. UNKNOWN
+never reopens admission. Binding wire5 and the separate retirement fence retain their existing contracts.
+
+`PulsarNativeCursorFloorScanV3` supplies PULSAR_CURSOR_SUBSCRIPTION only. It reserves the existing Cell
+workspace, reads uncached Native parent/cursor names/values and actual read-only BK headers/checkpoints,
+orders positions by the actual directory, and rereads the source-scan authority and Native metadata before
+delivery. Its witness is a domain snapshot, never a fabricated stored metadata key/version. Original read
+handles/entries must close before workspace release; failed SDK cleanup retains the original Cell charge.
+It borrows caller-owned metadata/BK clients and an existing executor. No client, thread or retry layer is added.
+No-cursor policy, unavailable source lineage and unconfirmed checkpoints fail closed.
+
+An active controlled factory retains its original SDK recovery ticket until actual factory/SDK closure;
+quiet writes alone do not permit source-scan entry. The first actual campaign therefore correctly retained
+admission and failed its fixture's expectation of live-factory scan progress. The corrected read-only scan
+runs after original factory drain. The SDK ownership boundary was not weakened. Four focused core suites
+passed234 cases. The terminal actual BK/Object/Oxia campaign passed4 fresh suites/16 cases with zero
+failures/errors/skips (SDK5,Provider5,Owner5,namespace-negative1). Actual cursor BK-checkpoint floor,
+source-scan sealing and inline frontier commit pass; cursor metadata remains unchanged during observation,
+and original read-handle drain restores Cell usage. Post-trim reset/read Entry lifetime, missing control writer
+and reset-response-loss/original C/D retention regressions pass. Module161 and BK38 are UP-TO-DATE and
+excluded from this fresh count. Compilation, Checkstyle and Spotless pass.
+
+The649 exact live/archive inputs have manifestb28d576d7f5b7edca813477a652b9e78ce15980844888ce620d4a4b5155d8eef;
+resultdf768e35e137b3083e51c0031816fc4f9178923b299803e334bb2e74f074cf2b; Owner XML
+dacd10f398fb102e91307713a3c20bde0b8b9cfc595a7142d12b92a49041f8c5. The passing campaign and source
+archive are `build/m5-native-pulsar-offload-green-native-source-floor-checkpoint-final*`. Original containers
+are unchanged; owned BK/Object/Oxia containers, networks and volumes are absent. Earlier fixture failures
+are not passing evidence. Fresh metadata compatibility tests passed24 cases (NTA codec5 and Binding
+lifecycle19), including old wire1/2 aggregate projection/source versions and legacy frontier migration.
+The four core suites plus these two metadata suites total258 passing unit cases; their XML and exact test
+sources remain in `build/m5-native-source-floor-core-unit`. Sixty exact, untracked task-owned superseded
+campaign paths were removed after confirming no passing-campaign dependency (119,409,217 bytes reclaimed).
+The final649-input source archive retains28,619,677 bytes; original race RED/GREEN evidence and pre-existing
+artifacts are retained.
+Native normal close may leave the parent tail counters stale; the scanner uses the actual BK header for
+that final boundary while still checking historical sealed counters. The fixture also observes that Native
+mark-delete can remove a consumed head ledger and normal cursor close can move authority to metadata.
+Its BK-checkpoint branch now uses a real noncontiguous delete and the existing metadata-range threshold;
+expected directory/checkpoint facts come from current stored Native records rather than pre-close handles.
+The other nine floor classes remain declared fixtures, so complete Native floor authority, legacy qualification,
+physical deletion, the17 obligations/five children and whole M5 remain OPEN. No staging/commit/push/final review.
+
+
+### Durable Native trim floor snapshot and cold continuation (2026-10-16, focused pass)
+
+Pulsar source-scan sealing now creates the existing canonical typed SF bytes at an authority-scoped,
+content-addressed immutable key before changing P1 from the pending scan to the fixed fence. The key is
+`<exact-P1-authority-key>/logical-trim-floor-snapshots/<SF-root>`, checked against the existing metadata
+key bound. Only absent-to-exact creation is attempted. Exact readback settles a lost create response;
+missing/unavailable readback returns UNKNOWN and retains the pending scan. Different stored bytes reject
+without overwriting them. Detached SF bytes grant no authority, and exact abort still excludes a delayed seal.
+No P1 wire, SF wire, Binding authority wire or original SDK ownership contract changes.
+
+`commitStoredSourceScan` reconstructs from the actual current fixed P1 value and canonical stored SF.
+It checks attempt, exact authority version/value, SF root, Binding/capability, prior frontier and frozen facts
+before the existing one-key frontier CAS. Missing/corrupt SF and stale authority fail closed. Existing explicit
+snapshot commit and abort paths remain available for older fixed fences; they are not silently migrated.
+The immutable SF is retained for recovery/audit and is not deleted at commit or abort. This does not establish
+bounded terminal-evidence retirement or complete retention-policy authority.
+
+The133-case focused retention suite passes, including applied-create/readback loss with cold retry,
+missing/corrupt SF and stale/aborted fences. The terminal real Native campaign passed18 fresh suites/176
+cases with zero failures/errors/skips: SDK5,Provider5,Owner4,namespace-negative1 and module161. BK38 was
+UP-TO-DATE and is excluded. Actual SF creation and P1 sealing each applied while their replies and original
+readbacks were lost. The pending/fixed fences remained authoritative. After the original observation closed
+and Cell usage returned to baseline, a fresh Oxia client/coordinator reconstructed SF and committed the exact
+frontier. Immutable SF bytes/version remained unchanged. Normal cold continuation, post-trim reset and read
+Entry lifetime regressions also passed. This is fresh-client reconstruction, not process-death qualification.
+
+The649 live/archive inputs match manifest6b1d8aa84abdcf3b1701894c9d26d41f3fd5b1d05292c998158d2626b1f4f644;
+result0c6a9f45725e97934e503e09f700c4844dce6944ebe31b1f40e69ca44a2ca49b; Owner XML
+fd8384986a8a527ed04ebc42b5fe1dc910d7daf67cb8ec825487f4d44c355d01; retention XML
+46fd0d1a2a88368a5f5fdd937606e67df031ce4319071b82dfeeb71202a15b0a. Source, current retention test source,
+XML and terminal logs are retained under `build/m5-native-pulsar-offload-green-native-trim-cold-snapshot*`.
+Original containers are unchanged; owned BK/Object/Oxia containers, networks and volumes are absent. Earlier
+focused receipts remain exact at their original verification, but their source manifests are historical and
+cannot be presented as current-source gates after this change. The implementation projection records that
+supersession explicitly. Other nine floor classes, legacy qualification, process-death recovery, terminal
+SF retirement, physical deletion, the17 obligations/five children and whole M5 remain OPEN; no commit/push/review.
+
+
+### Native selected-generation floor producer and legacy writer fence (2026-10-16, focused pass)
+
+`PulsarNativeM4ControlV1.captureGenerationFloor` reads the actual selected M5 manifest/recipe, complete
+plan/predecessor graph, capability, protection inventory and old-epoch proofs inside an exact P1 source-scan
+fence. Current-owner NPOD and pending old-epoch NPOD/terminal/proof records must match actual Binding,
+selector core and conformance facts. Exact original NPOD selector bytes are retained across metadata-only
+anchor/batch normalization. Expiry, missing records, unresolved protected lineage and unknown formats veto.
+
+The operation uses the confirmed end of the selected generation's complete directory as its typed safe bound
+after all admitted actors are drained. It does not pin the old logical prefix merely because immutable physical
+mapping bytes remain selected. Future qualified readers acquire P1 and capture the committed frontier. The
+supplied directory must contain that exact ledger/entry boundary; no scalar/numeric-ID clamp substitutes for
+missing lineage. This producer currently requires a selected M5 graph. Direct Native source-map qualification,
+complete mapped-source directory handoff and composition of all ten actual floor producers remain open.
+
+Protections are scanned across all actual Oxia shards, including records not attached to a selected batch,
+with row/byte bounds, exact key/Binding checks and a second full inventory comparison. Routed immutable facts
+are reread from native keys. Every row uses actual native key/opaque version/stored SHA; scoped route tokens
+are not passed off as backend versions. All fact values/versions and P1 are reread before delivery. The existing
+Cell metadata workspace is reserved before I/O and released only after private work ends. Observation
+cancellation cannot acknowledge that work. No new client, executor or retry layer is added.
+
+A real RED case showed a missing-writer legacy M4 control creating a new PROTECTED key while P1 held the
+pending source-scan fence. The repaired branch rereads actual P1 before the legacy external CAS and rejects
+when writer enrollment, logical trim or a non-OPEN fence exists; missing/unknown/different P1 cannot authorize
+that write. Installed writers retain their original guarded C/D path; unenrolled legacy format compatibility
+remains. This entry check does not qualify concurrent enrollment/drain of pre-admitted legacy actors.
+
+The terminal source-locked Native campaign passed18 fresh suites/178 cases with zero failures/errors/skips
+(SDK5,Provider5,Owner6,namespace-negative1,module161; BK38 UP-TO-DATE excluded). The six actual owner cases
+cover selected-generation floor production, metadata UNKNOWN/version race/cancellation, absence of the new
+protection key under the repaired source fence, durable-SF cold commit, missing-writer read admission,
+unenrolled borrowed-alias compatibility and applied-publication UNKNOWN with original custody retained.
+The generation observer uses a newly admitted owner only after the same-profile old Cell's durable drain;
+it does not reopen/reset the old allocator or alter capacity. NPOD read UNKNOWN rejects, a same-byte actual
+selector CAS invalidates the observation, and cancelling a held scan keeps Cell close pending until its
+original metadata work and reservation cleanup finish.
+
+RED manifest a15135e4d46094ce036aa77dd2c3e2f867249a1111ceaf473cddf941d4aca226;
+RED Owner XML5fa5176a3ed5ab50b7520f95caaa68f989ee4181e8ba6c82741a72f089a0943a.
+Final649-input manifestc0e8a78906940c051bf45acab9a744b9bfda21d08e29739322a34d4f0228258c;
+result6579a537935d4eefa6c53f79cfe3151a1abd16530c3062bfdc07cab7ba494e05;
+Owner XML965097988bacc406fbac3e8c54b33ba7d313f45d1e96e227efd58a8e7f7d8f68.
+Final source/XML/logs remain under `build/m5-native-pulsar-offload-green-native-generation-floor-final*`;
+actual RED evidence remains under `build/m5-native-pulsar-offload-green-native-legacy-control-direct-red*`.
+Original containers and the12 Native Pulsar task paths are unchanged; owned BK/Object/Oxia resources are absent.
+No staging/commit/push or coordinator final review.
+
+The Native-only policy decision for the three Kafka floor classes is still awaiting the user; those classes
+remain vetoing. Other producers, complete legacy qualification, physical deletion, the17 obligations/five
+children and whole M5 remain OPEN. No complete Native floor, process-death or production authority is claimed.
+
+### Native fully mapped cursor floor under the P1 source scan (2026-10-16, focused pass)
+
+`PulsarNativeCursorFloorScanV3` now captures the actual M4 selection and complete selected M5 graph on its
+already admitted metadata worker. A sealed ledger fully covered by the selected rewrite map uses that graph's
+confirmed entry boundary and the existing mapped-ledger identity, with an exact actual Native parent count
+check. Partial/unmapped sources and the active tail retain actual BK-header reads. Missing data for those
+sources still vetoes; no missing-BK exception is converted into a boundary or absence proof.
+
+The private NPCF audit witness is now version2 and includes the actual selected metadata fact and full map
+bytes. It remains an opaque observation witness, not an invented backend key/version. P1/NTA persistence
+encoding and the protected Native SDK are unchanged. The full graph, its actual versions/values, the exact
+selection, parent/cursor metadata and source-scan fence are checked before delivery. Private work and SDK
+cleanup must finish before the existing Cell reservation can be released.
+
+A real RED removed one fully mapped original BK ledger after actual ordinary mapped reads; the original
+floor path failed with BKNoSuchLedgerExistsOnMetadataServerException. The first implementation exposed an
+inline asynchronous-callback metadata timeout. The corrected implementation directly reuses synchronous
+graph capture on the original scan worker, with no new executor or timeout extension. A subsequent run
+reached the successful floor and correctly rejected a same-byte selector CAS at the earlier manifest check;
+its over-specific error-text assertion was replaced with independent actual version/value checks plus
+observable state rejection. All failed campaign source/XML/logs remain retained.
+
+The final source-locked campaign passed4 fresh suites/18 cases (SDK5,Provider5,Owner7,namespace-negative1),
+with zero failures/errors/skips. Module161 and BK38 were UP-TO-DATE and are excluded from the fresh count.
+All649 live inputs and archived source copies match. Manifest10658328649f9fbb56b3c7139c2f53e735cbc5b165e325b27343e26c6d208214;
+result0aae7489ac6730742d67b36ba41756a964b1d60e2832173b104fe8cfe151f8e8;
+Owner XMLf7d0f02a468dd94604aa86e3ff7796d06a735e43170d065b82af3342894abd3f.
+RED manifest2290284ce4a9b72c4a7eee1b2cf6204f081c2ff849cc868627ceed98b618bbc4;
+RED Owner XMLce930f553a81187455f3c4b27415570d6bec32070fd871b5a6d1aa378d01103a.
+Final evidence remains under `build/m5-native-pulsar-offload-green-native-mapped-cursor-observable-final*`;
+the actual missing-BK RED and two intermediate failed campaigns remain under their distinct
+`green-native-mapped-cursor-red*`, `green-native-mapped-cursor-final*` and
+`green-native-mapped-cursor-worker-final*` prefixes. The final two production sources match the worker
+repair; only the observable assertion changed. Original containers and the12 Native Pulsar task paths
+remain unchanged; owned BK/Object/Oxia resources are absent. No staging/commit/push or final coordinator review.
+
+Qualification is limited to fully mapped ledger boundaries in an actual selected M5 graph. Direct Native
+offload with missing original BK, partial mappings with missing retained BK, complete directory handoff,
+all ten actual floor producers, concurrent legacy enrollment, physical delete/UNKNOWN, the17 obligations,
+five children and whole M5 remain OPEN. Native-only policy is still awaiting the user; the three Kafka
+floor classes remain vetoing. This controlled deletion fixture grants no production deletion authority.
+
+### Native generation floor without an M5 rewrite graph (2026-10-16, focused pass)
+
+The generation/read producer now accepts the actual selected Native NPSM/NPBV graph before any M5 rewrite.
+This supersedes the selected-M5-graph requirement for this one producer. Selection still comes from the actual
+native M4 selector and source-map key; caller-supplied source bytes or directory numbers cannot select it.
+The same registered capability, original NPOD, pending old-epoch terminal/proof, complete protection inventory
+and exact P1 source-scan fence requirements remain in force.
+
+`PulsarNativeM4SourceMapV1.floorChain` parses the full SHA-bound Native view, exact Binding/NTA identity,
+stored parent identity/directory, physical namespaces, each complete source record and canonical order.
+Plain active/sealed BK sources and NPRV1/NPRV2 offloads retain their actual encoded confirmed boundaries
+and source digests. Existing full physical-member decoders validate offload records, immutable versions
+and suffixes. An omitted row, unknown format, foreign namespace, malformed parent, or incomplete record
+rejects the observation. Parsing creates no SDK client or read actor and performs no Object HEAD substitution.
+
+The producer uses the confirmed end of that selected directory, validates the typed position in the supplied
+actual floor context, and returns actual native key/version/stored-SHA facts. Its admitted metadata worker,
+Cell reservation, private-work drain, final version/value checks and UNKNOWN behavior are unchanged.
+P1/NTA persistent formats and the protected Native SDK remain unchanged.
+
+The original-actor `drainForLogicalTrim` operation must begin before ordinary local fence. It reuses that
+same one-way private fence and retains the original Owner Cell reservation until actual NPOD publication
+and readback end. Cancelling the returned observer cannot end that work. It records no fallback retirement
+or RELEASED state. The existing recovery operation retains its fallback-bearing-owner restriction.
+
+A real old cold-owner regression exposed a separate successor admission error: a plain Native successor
+was incorrectly sent through the materialized-only writer requirement. Successor/cold registration now
+uses the existing native P1 admission checks and read ticket for plain Native views, and the full physical
+read ticket for materialized views. Only actually unenrolled legacy P1 admits a legacy read without a
+writer. Initial, successor and cold registration share this check; an enrolled missing writer still rejects.
+
+The final source-locked campaign passed18 fresh suites/178 cases with zero failures/errors/skips:
+SDK5,Provider5,Owner6,namespace-negative1,module161. BK38 was UP-TO-DATE and is excluded.
+Actual direct Native scanning passed with no M5 manifest, actual native fact rereads, NPOD read UNKNOWN
+veto and same-byte selector-version rejection. A held actual NPOD GET retained the original Owner charge
+after Entry cleanup; only confirmed proof publication/readback released that final Owner charge. Selector
+and fallback-protection facts stayed exact. Old cold recovery, its UNKNOWN retry, the M5 rewrite floor,
+durable-SF cold commit and enrolled missing-writer rejection passed in the same campaign. The existing
+SDK Object-only/missing-BK fixture independently verified decoded chain equality with its actual view.
+
+All649 live inputs and archived copies match. Manifest59cc7dd0df4aa88643465e807bfce3a61b8dbc1337b2cda4173e4376ecda9596;
+result289487d1150a8d6a1539ba1259c72cbf9167438b6276c26981bf0b2654ffe9c9;
+Owner XML4c1e17883da1f60ce1f3db23d71f384dbe1da6c55557903338e94739ec62f1b2.
+Original Native RED manifest5ec0654c5568c7f178dc8c09746570ed074bdc8f84f71e98987f824b78a05fa5;
+RED Owner XMLd31ab5656f2e5bdd32cb5976f8f7e0a7cc1dc60f6dbe17518f4f007f1221d5e1.
+RED exposed Native bytes incorrectly decoded as an M5 recipe. The first intermediate candidate correctly
+vetoed a missing NPOD after ordinary local fence; the next exposed the legacy successor writer requirement.
+Their complete source/XML/logs remain under distinct `green-native-direct-generation-red*`,
+`green-native-direct-generation-final*` and `green-native-direct-generation-owner-final*` prefixes.
+Final source/XML/logs remain under `build/m5-native-pulsar-offload-green-native-direct-generation-lifetime-final*`.
+Original containers and12 Native Pulsar task paths are unchanged; owned BK/Object/Oxia resources are absent.
+
+This is generation/read evidence for an enrolled ordinary Native selection plus focused Object-only decoder
+evidence. It is not complete Native retention qualification, a proof of all17 obligations/five children, or
+physical deletion authority. Full lifecycle-task, shared-member, policy/projection/audit producer composition,
+legacy enrollment and complete cursor directory handoff remain OPEN. Native-only policy still awaits the
+user; all three Kafka floor classes remain vetoing. No staging/commit/push or final coordinator review.
+
+### Enrolled Native cold-owner read tickets (2026-10-16, focused pass)
+
+Two real Native cases now exercise ordinary preferred-only cold recovery after P1 writer enrollment.
+Both predecessor and cold ManagedLedger factories use the actual guarded factory path. The original
+Owner's logical drain and factory closure settle before the new factory opens, using the same configured
+Cell profile; no capacity reset or unguarded factory substitutes for the cold actor.
+
+A new controller without its P1 writer rejects before grant; actual selector and Cell usage remain exact.
+The installed controller publishes one cold grant, acquires an actual P1 READ_GENERATION_PIN_OR_OPEN_HANDLE
+ticket and reads the original offloaded payload. An original retained Entry keeps both private close and
+that read-ticket class live. Actual Entry drain, factory close and writer cleanup leave P1 tickets empty
+and Cell usage zero. A competing recovery cannot grant another actor or change the charged capacity.
+
+The applied-selector/reply-loss case independently confirms owner epoch+1 and specifically requires the
+unresolved MANIFEST_SELECTED P1 ticket, plus the original cold-attempt Cell charge. Retrying that same
+recovery returns its sole actor; ordinary read, read-ticket retention and full final cleanup then pass.
+The factory's unrelated recovery ticket cannot satisfy this grant-ticket assertion. This extends the
+previous shared admission implementation's evidence; this turn changes test coverage and its existing
+whitelist only, with every production source unchanged from the prior source-locked campaign.
+
+The terminal campaign passed4 fresh suites/13 cases, zero failures/errors/skips (SDK5,Provider5,Owner2,
+namespace-negative1). Module161 and BK38 were UP-TO-DATE and are excluded. All649 live/archive inputs
+match. Manifest7b40f0be62e5d0034c0fb66499dc03e62071fe356d3d70ded84757bdc82f2b0b;
+result1e705bd690ffd40f5cbfc9c0617dea29541bdd133f6ec5874ba3d5338fc6aadc;
+Owner XMLf3e27c70bbb80c5e11c4b0de2c27b2aae55bd16006d440b32ca874d62559f44f.
+Replay source/XML/logs remain under `build/m5-native-pulsar-offload-green-native-enrolled-cold-final*`.
+Original containers and12 Native Pulsar task paths remain unchanged; owned BK/Object/Oxia resources are absent.
+
+Three older writer/reset receipts had stale current-source-match flags. Their642-input source archives
+remain exact, while20/16/16 respective live inputs have changed. Those flags now state historical archive
+exactness and current-source supersession; their original focused results are retained.
+
+This qualifies enrolled ordinary Native cold read-ticket lifetime and same-attempt grant reconciliation
+in this process. Process-death takeover, complete legacy enrollment, all ten floor/fifteen reference producers,
+physical delete/UNKNOWN, the17 obligations/five children and whole M5 remain OPEN. Native-only policy still
+awaits the user and all three Kafka floor classes remain vetoing. No staging/commit/push or final coordinator review.
+
+### Native Object-only factory recovery and cursor floors (2026-10-16, focused pass)
+
+A real enrolled Native case exposed two ordinary product-path failures after the original BK metadata was
+removed while the selected preferred-only Object source remained readable. First, guarded factory recovery
+unconditionally tried to admit that BK ledger. After that prerequisite was repaired, the unchanged floor
+scanner also tried to open the missing BK ledger. Both actual RED source/XML/logs remain retained.
+
+`PulsarNativeM4SourceMapV1.FloorDirectory` reuses complete Native view decoding and distinguishes explicit
+NPRV2 Object-only sources. Its full original parent directory, source identity, namespaces, immutable root/
+data identities and known confirmed boundaries come from actual selected bytes. It is an internal decoded
+value, not a new authority or caller-declared source summary.
+
+Guarded sealed-source admission captures/rechecks the actual selection. Only an explicit selected Object-only
+ledger whose attempt, entry count and logical length match the actual Native parent skips BK-header admission.
+The original configured Object SDK opens the selected immutable versions with `readOffloadedCaptured`, validates
+their actual identity/frontier and closes its original handle. Other sources keep their prior BK/header path.
+Selection key/version/value facts are bound into private NPSA witness5, and captured buffers are cleared at
+settled cleanup. The original C/D admission and Cell workspace remain required.
+
+The cursor observer validates the selected directory's BK namespace against its actual observer. For that
+explicit Object-only row it retains the exact selected source digest and matches current parent attempt,
+count and length; plain BK rows, active tail and unresolved source types retain actual BK reads. Private NPCF
+witness3 includes the selected facts/full map, row source kind and actual parent/cursor/checkpoint observations.
+Final exact selection/P1/native metadata rereads, private-work drain and UNKNOWN veto remain required.
+P1/NTA persistence encodings and the protected Native SDK are unchanged.
+
+The terminal source-locked campaign passed18 fresh suites/176 cases, zero failures/errors/skips
+(SDK5,Provider5,Owner4,namespace-negative1,module161). BK38 was UP-TO-DATE and is excluded. The Object-only
+case read the original payload after both deleting original BK metadata and replacing the current Object
+root HEAD with another version. Actual durable cursor minimum, full generation-floor capture, same-byte
+selector CAS rejection and source-map read UNKNOWN veto passed. The same backend campaign also passed
+the M5 rewrite/mapped-cursor path, durable-SF cold commit and enrolled cold grant UNKNOWN/reconciliation.
+
+All649 live/archive inputs match. Final manifestab933ed0e3f5f0a0e78ffe054307f1ec1d9bc46d434ea2d693cdca5eed45af30;
+result790f621b2ef86681a10f9d978d20cb771b3887ebf8c17a6e5b320b12b9c2dfd7;
+Owner XML273b330742db7a0e92b656d7f1dff737bc13910335984aa441b9de4d08e272dc.
+Factory RED manifest66037968c4a9b9530ab86c6af85aa399851bc1054099dedd2fdac7113653e2cc;
+Owner XML366cf775206ae7e89e9a0b624e51bc3e4aa71247c60e1440a7c8d1734b806ab3.
+Cursor RED manifestcce256425a51f03b13f7839f8ac22a26ea5ff53c71feb2233c8f4cd4750e000a;
+Owner XMLd74ef9d681eee8374b9a8c751f3ce314012a3d07ac468f4af71ef019fdbbc418.
+Exact failing replay sources remain under `build/m5-native-pulsar-offload-green-native-object-only-floor-red*`
+and `build/m5-native-pulsar-offload-green-native-object-only-cursor-red*`; final replay remains under
+`build/m5-native-pulsar-offload-green-native-object-only-floor-final*`. Original containers and12 Native
+Pulsar task paths are unchanged; owned BK/Object/Oxia resources are absent.
+
+This qualifies the tested Native Object-only directory path and controlled missing-BK/current-HEAD cases.
+It grants no production deletion authority. Partial/unresolved mappings, complete task/shared-member/
+policy/projection/audit producer composition, legacy enrollment, all ten floor/fifteen reference producers,
+physical delete/UNKNOWN, process-death takeover, the17 obligations/five children and whole M5 remain OPEN.
+Native-only policy still awaits the user; all three Kafka floor classes remain vetoing. No staging/commit/
+push or final coordinator review.
+
+### Guarded M5 cold factory after original BK removal (2026-10-16, focused pass)
+
+The repeated-materialization Native scenario now reopens a guarded factory after a prior actual mapped-source
+floor case removed one fully rewritten original BK ledger. The original path failed with actual
+BKNoSuchLedgerExistsOnMetadataServerException before it could deliver the cold factory. Its complete RED
+source/XML/logs are retained; the same test reaches cold original-byte reads and cleanup on the repaired source.
+
+`PulsarNativeSealedPlainAdmissionV2` now captures the actual complete selected M5 manifest/recipe graph on
+its existing control executor. It validates that graph's physical namespace against the configured Object
+connection, includes graph key/version/value facts in its private selection witness, and rechecks the exact
+selection/graph before activation. It reuses existing full graph decoders; no new client, executor, persistent
+encoding, or protected SDK change is introduced.
+
+Current readable payload/index resources and still-selected predecessor payloads come from that actual map.
+Their original quota facts, OPEN target authority, complete writer inventory, capability and actual Cell/Binding
+member are required. The admission reopens those original target contexts and retains their original writer
+enrollment. It never creates or retags an absent mapped output authority. Resource-member admission remains
+under the existing original C/D path. Fully replaced Native ledger rows skip obsolete BK/offload admission;
+partial mappings and active tail keep their existing source path. Captured graph buffers clear at cleanup.
+
+The fresh cold controller uses the same configured Cell profile after the previous allocator's confirmed drain,
+prepares actual mapped sources, obtains its original read grant and reads every original expected entry via
+ManagedLedger. Actual drain, factory close and writer cleanup require empty P1 tickets and zero Cell usage.
+This controlled missing-BK fixture is not a production physical-delete receipt.
+
+The terminal campaign passed 18 fresh suites/176 cases, zero failures/errors/skips
+(SDK 5, Provider 5, Owner 4, namespace-negative 1, module 161). BK 38 was UP-TO-DATE and is excluded.
+The extended repeated-M5 case successfully delivered its guarded cold factory, recovered an actual mapped
+read owner, read every original expected entry after original BK removal, and ended with empty P1 tickets/
+zero Cell usage. Object-only missing-BK/current-HEAD behavior, enrolled cold grant UNKNOWN and durable-SF
+cold commit passed on the same backend. This is same-process controller/SDK reactivation, not process-death proof.
+
+All 649 live/archive inputs match. Final manifest cff4f2da161d8a85f30602927d21ba61568e62a423aad6677e2bd4902ee0f756;
+result 82c306f9d3acdf83ef381a98320363b068c82df1dc8cb9d3dc17f1cf055a6b28;
+Owner XML 464345c6337cce1d792bc69a7e184f046a6289fcf2f8cef240717238c75d01b4.
+RED manifest 9430929bc818c0df4266cf9ea83f31f03b049b6ac3fdfcb551194f73c7d39147;
+RED Owner XML 26e875500cdbaf89c4b6682d2d31a972d8dd7ff9576516156133726136efec93.
+RED and GREEN differ only in the production sealed-source admission file; the regression test is identical.
+Replay evidence remains under `build/m5-native-pulsar-offload-green-native-mapped-factory-red*` and
+`build/m5-native-pulsar-offload-green-native-mapped-factory-final*`. Original containers and 12 Native Pulsar
+task paths are unchanged; owned BK/Object/Oxia resources are absent.
+
+Complete partial/unresolved-source recovery, all ten floor/fifteen reference producers, legacy enrollment,
+physical delete/UNKNOWN, process-death takeover, the 17 obligations/five children and whole M5 remain OPEN.
+Native-only policy still awaits the user and all three Kafka floor classes remain vetoing. No staging/commit/
+push or final coordinator review.
+
+### Published partial Native map cold recovery (2026-10-16, focused pass)
+
+The actual Native materialization campaign now publishes a partial cut across two sealed ledgers,
+closes the original Task/source, control writer and Native SDK ledger, then admits a guarded cold factory
+against the same Cell profile. Neither sealed ledger is fully rewritten. A new mapped read owner reads
+all original expected entries through ManagedLedger, including rewritten ranges, retained original ranges
+and the captured tail. This extends the earlier unpublished-Task partial-route coverage.
+
+After that actual read owner drains and its factory/writer close, the fixture physically removes a sealed BK
+ledger still needed outside the rewritten range. A second guarded factory fails with actual
+BKNoSuchLedgerExistsOnMetadataServerException; the selected view stays unchanged and original P1 tickets/
+Cell usage are empty/zero. This is a controlled missing-source veto, not production physical-delete authority.
+No production source, persistent format or protected SDK was changed in this focused test extension.
+
+The terminal run passed 4 fresh suites/12 cases (SDK 5, Provider 5, Owner 1, namespace-negative 1),
+with zero failures/errors/skips. Module 161 and BK 38 were UP-TO-DATE and are excluded. All 649 live/archive
+inputs match: manifest 82fd2d5c3e6dfee58c4597b7978d8647f5772f4e731cca04e4c53b327012a255;
+result 04c31201c43e23abfe81a07dd80d44b0d2d52701a3a1e7c1c05f99cc48bf9561;
+Owner XML 5cf40223f2bc8866fc061a846c0fa419947e7eb5f9091bae8568fc57e4148fea.
+Replay evidence remains under `build/m5-native-pulsar-offload-green-native-partial-cold-drained*`.
+The first fixture attempted cold admission while its original SDK tail was still open and was rejected by
+sealed-source admission. Its unchanged production source, complete input archive and failure logs remain
+under `build/m5-native-pulsar-offload-green-native-partial-cold-first*`; the passing fixture performs actual
+original SDK close. It does not qualify crash recovery of an unclosed tail or process-death takeover.
+Original containers and 12 Native Pulsar task paths are unchanged; owned backend resources are absent.
+
+This proves the exercised published partial-map lifecycle after confirmed original SDK close. Complete
+unresolved-source recovery/directory handoff, legacy enrollment, all ten floors/fifteen reference producers,
+exact RELEASED/delete/UNKNOWN, process-death recovery, the 17 obligations/five children and whole M5 remain
+OPEN. Native-only policy still awaits the user; all three Kafka floor classes remain vetoing. No staging,
+commit/push or final coordinator review.
+
+### Retained Object versions in partial M5 cold recovery (2026-10-16, focused pass)
+
+A published partial M5 map can retain original offloaded entries outside its rewritten ranges. Cold source
+admission previously loaded the mapped outputs but did not recover the original Native directory for those
+retained entries. With the original offloaded BK ledger removed, the actual guarded factory failed with
+BKNoSuchLedgerExistsOnMetadataServerException. The regression also overwrites the current Object root HEAD
+with a different actual provider version, so reopening the mutable HEAD cannot stand in for the selected root.
+
+`PulsarNativeMaterializationReadMapV2.originalNativeDirectory` follows its already decoded predecessor maps
+to the original full Native directory. `PulsarNativeSealedPlainAdmissionV2` validates that directory's actual
+BK/Object namespace bindings, then passes its explicit Object-only immutable identities into the existing
+source admission. Existing parent attempt/count/length checks, actual pinned SDK reads, original resource
+writer/quota/member checks, C/D admission and final selection/graph rereads remain in force. Captured
+directory state clears with the existing admission cleanup. No new SDK/client/executor, persistence encoding,
+private witness version or protected SDK change is introduced. Partial plain BK and active tail keep their
+existing actual BK path; missing required plain BK still vetoes the second guarded factory.
+
+The actual RED and GREEN use the identical regression test and differ only in those two production files.
+The terminal GREEN passed 18 fresh suites/175 cases (SDK 5, Provider 5, Owner 3, namespace-negative 1,
+module 161), zero failures/errors/skips; BK 38 was UP-TO-DATE and is excluded. The partial-map cold factory
+reads every original expected entry despite missing offloaded BK/current root HEAD replacement, then its
+missing-required-plain-BK case preserves the selected view and clears original P1 tickets/Cell usage. Complete
+mapped cold factory/repeated materialization and direct Object-only cursor/generation floors also pass.
+
+All 649 live/archive inputs match. GREEN manifest
+09ddc3c3af447b914e04c7eff26f9a9c564adc903045ed4202cded2f65020d8b;
+result ccd938788cf08816be0f4c945c01b6f60f68a507ff25d68590e57ed5be0526ca;
+Owner XML 4899fd378a108667bf3c55f82b80e5b5dc32dd5a6c593049ecff368cbbdee2e0.
+RED manifest 978b4e0e082208eb1334b80d8ee2475cc6c963415b7f8ad07162c53d626b459c;
+RED Owner XML 728faed3ea8eb8701f10d351e7572bc50269928a2f66bc5232e7ae09fc934a7c.
+Replay evidence remains under `build/m5-native-pulsar-offload-green-native-partial-object-red*` and
+`build/m5-native-pulsar-offload-green-native-partial-object-final*`. Original containers and 12 Native Pulsar
+task paths are unchanged; owned BK/Object/Oxia resources are absent.
+
+Cross-SDK source admission still requires the prior actual creation fence and CLOSED header; this repair
+provides no open-tail crash takeover. Complete unresolved-source/directory handoff, partial-map floor proof,
+legacy enrollment, all ten floors/fifteen reference producers, exact RELEASED/delete/UNKNOWN, process-death
+recovery, the 17 obligations/five children and whole M5 remain OPEN. Native-only policy awaits the user and
+all three Kafka floor classes remain vetoing. No staging, commit/push or final coordinator review.
+
+### Partial-map cursor and generation floor source resolution (2026-10-16, focused pass)
+
+The published partial-map scenario now retains a real Earliest cursor, drains its actual mapped Owner/factory,
+and captures cursor plus generation floors under the original P1 source-scan fence. The old offloaded BK is
+absent and its Object root's current HEAD differs. Before this fix, actual cursor scanning still opened that
+BK and failed. `PulsarNativeCursorFloorScanV3` now obtains the original directory from the fully decoded selected
+M5 map, validates its BK binding against the actual observer and Object binding against the selected profile,
+and reuses the existing Object-only parent attempt/count/length checks. The existing NPCF v3 witness includes
+the complete selected map; final graph, cursor, parent, P1 and observer rereads remain required. No persistence,
+private witness version, SDK/client/executor or protected SDK change is introduced.
+
+The actual cursor floor retains the first required Object entry. Actual generation-floor observations match
+reread native key/version/value facts. A subsequent missing-required-plain-BK scan is rejected and restores
+its original Cell baseline. This is source resolution for the exercised partial-map floor, not all-floor or
+physical-delete authority. RED/GREEN have identical tests and differ only in the production cursor scanner.
+The terminal GREEN passed 18 fresh suites/175 cases (SDK 5, Provider 5, Owner 3, namespace-negative 1,
+module 161), zero failures/errors/skips; UP-TO-DATE BK 38 is excluded. All 649 live/archive inputs match.
+GREEN manifest 2d557fd43b695d9e9ff258c19666fc8ff6cfd1e3b26905c025c5974567b4c925;
+result 7a32fcea78cc2a37fb49b03e87a16509bca2cb7c9ec68b3e3d1a2abcdc7c6263;
+Owner XML 752038bcf96ebdaa43670e55adb168538842508a634417b4ba49de6061e3c1e6.
+RED manifest 5831a1a55d341d8ddb4fe1b044b5192e5ef55cb168ba1c509b1c7ab7f4a93c67;
+RED Owner XML 87b54acc3caac8cc85dfe35e5d64aa1f101d7bced7098dd2f5e18041f946c8a9.
+Replay evidence remains under `build/m5-native-pulsar-offload-green-native-partial-floor-red*` and
+`build/m5-native-pulsar-offload-green-native-partial-floor-final*`. Original containers and 12 Native Pulsar
+task paths are unchanged; owned backend resources are absent. Complete unresolved-source/directory handoff,
+legacy enrollment, all ten floors/fifteen references, exact RELEASED/delete/UNKNOWN, process-death recovery,
+the 17 obligations/five children and whole M5 remain OPEN. Native-only policy awaits the user; Kafka floors
+remain vetoing. No staging, commit/push or final coordinator review.
+
+### Current Kafka source and loaded-artifact regression after trim changes (2026-10-16)
+
+The current shared libraries were rebuilt and exercised after the single-authority trim revisions. Required
+verification exposed stale runner counts (worker 6 -> 9, materialization 17 -> 18, multi-writer 9 -> 10), an
+eligibility check still looking for the old scalar expression, and a whitespace-sensitive authority-acquire
+check. The eligibility checker now requires both the current Kafka scalar and typed Pulsar predicates and their
+actual call. Authority acquire remains mandatory across formatting. Failure/error/skip checks stay exactly zero.
+The source runner also captures the changed checkers and their tests in its source manifest.
+
+The fixed M5-C base implementation projection is restored byte-for-byte to its 12-field committed contract.
+All 24 added focused records are retained in the existing closed-writer projection: six were already identical
+there and the other 18 are under `retentionFocusedExtensions`. The fixed base and historical manifests are
+unchanged. No runtime Java code changed in this verification repair.
+
+The current legacy stage passed 23 suites/112 cases, including actual BK/Oxia restart checks, with all 757
+live/archive inputs exact. Manifest 91bd1c3bba807d460ff23b4d736c16113ae7c3bf8975f301fd34e6ca728e51ac;
+summary cba1a00afc2bc9601bf47ba1762fd9113856de6f48a9d91c5884a98750f5f4ae. The source stage passed 29
+suites/183 cases with two actual service-restart cycles and all 781 live/archive inputs exact. Manifest
+ab870989951adfb48405c39a76d1d98e01d2a374ce06a7dfe1cd5144fa15a47d; summary
+5d00477e5e4c7c2cb30e68f31ae14e7bc896254e119a7570c739e6c92c09f323. These library fixtures retain their
+explicit synthetic external-proof limits. The groups are reported separately and are not unique-case totals.
+
+Six task-local published JARs match the source-stage built hashes. An actual Kafka Broker BK_ONLY dataset
+with no Object service passes all 29 recompaction/read-scope cases, including transaction cold reads, pending
+append, replacement facts, actual M4 release, old-read drain and selected-cache handoff. Native admission
+checks the current source summary, loaded classes and six runtime JARs. Kafka manifest
+a5ae70a09a06340fe4807bce9268da5cb16f2dc88e386be53d865b40f2fd7e4c binds 59 unchanged live/archive
+inputs; XML 492de47f617eede841f93ad778b9e329b8290154824e3d788f68950902626acc records 29 tests,
+zero failures/errors/skips. Actual Gradle/runner exit is zero. Evidence is retained in
+`build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-25809`,
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-3812` and
+`build/m5-kafka-current-trim-broker`; task-local JARs remain in
+`build/m5-current-trim-development-repository`. All earlier count/contract failures retain their original
+source and logs/XML. Original containers and Kafka source/worktree state are unchanged; owned backends are absent.
+
+This refresh qualifies the exercised current-source compatibility paths. The remaining native Kafka cases,
+complete internal-topic BK_ONLY reclamation, Native Pulsar directory handoff/open-tail recovery, complete
+writer/floor/reference/delete/UNKNOWN composition, all 17 obligations/five children and whole M5 remain OPEN.
+Native-only retention policy still awaits the user. No staging, commit/push or final coordinator review.
+
+### Current Kafka admission-class remaining regression (2026-10-16)
+
+The same current source/library tuple now also executes every method outside the previously completed
+recompaction method. The current class declares 112 cases, rather than the older 109: 29 belong to that
+method and 83 to the remaining methods. Both groups use the identical 59-input Kafka manifest and the same
+six source-qualified JARs. Actual Gradle passes the 83 cases in 8m27s, zero failures/errors/skips. The two XML
+case sets are disjoint and their counts match every declared method, including the three additional cases.
+
+The original one-off wrapper still expected 80 and exited 1 after Gradle had passed; its original runner
+source, input/result JSON, XML and count-assertion log remain unchanged. The replay helper now derives its
+expected count from the captured test class. No runtime Java source or test selection was changed, and tests
+were not repeated for that count-only correction. A separate post-run verifier exits 0 after checking each
+method's declared count, XMLs, original runner snapshots, current and archived source inputs, baseline summaries,
+JAR hashes and cleanup. This verification does not relabel the original wrapper exit as success.
+
+Remaining XML 483756650beb63ca8346833bc1cc59c5051ceebedd975c1ff451eb3dc681649f;
+result 48402438bc59e985f8200e7801d8a1879fde0a60f3eb0c09f87a8101199ab7da;
+inputs c9f22e0556cb4a9dc4f63c89404a0ed83d33353076c187c8a93bceed19180788.
+Independent verification 10f14e3ccb433c0b2930f4d4044d344609f3e853c8ac77496789b2f0f4867cee;
+verification source 14bfff69202199906fbacf0aec7278af2817cfccc8f27e4aa90846961a13e03d.
+Evidence remains in `build/m5-kafka-current-trim-broker-remaining` and its runner/verification logs. Original
+containers are unchanged; owned backend resources are absent. The groups use separate owned BK/Oxia datasets
+and no Object service. This is current coverage of this admission test class, not a shared-backend M5 campaign.
+The complete native writer/floor/reference/delete/UNKNOWN matrix, internal-topic BK_ONLY reclamation,
+Native Pulsar directory/open-tail recovery, all 17 obligations/five children and whole M5 remain OPEN.
+Native-only retention policy awaits the user. No staging, commit/push or final coordinator review.
+
+### BookKeeper close proof after queued append (2026-10-16)
+
+`RealBookKeeperCellSessionV1.closeRunLedger` now reads LAC after successful SDK close. Previously it
+captured LAC before dispatching close, so an acknowledged append before the SDK's queued close sealed the
+ledger could leave the returned provider proof behind the actual closed header. The real-BK RED reproduces
+closed header LAC 1 versus proof 0. The regression holds only SDK close dispatch; ledger creation, both
+quorum-acknowledged writes, close, header observation and payload read use the real SDK/provider.
+
+Final GREEN passes all 16 real-session cases and the applicable Checkstyle/Spotless checks (Gradle exit 0).
+The 17 focused unit cases passed in the preceding run against the same production code; final GREEN reuses
+those UP-TO-DATE results and does not count them as fresh. That preceding run failed only five missing-brace
+Checkstyle checks in the new test helper; its original source, logs and XML remain preserved. The regression
+method is unchanged between RED and final GREEN; the test helper additionally received those braces.
+All 209 final live/archive inputs match. RED, the style-failed run and final GREEN remain under
+`build/m5-close-proof-red`, `build/m5-close-proof-green-style-failed` and `build/m5-close-proof-green`.
+Final manifest 1c669da8a641073f198a9c74b8311be997f7f8f2bac2ee98f2060f23e305554e;
+result 7b3de192a820066a8b53ad9ae7ac40902523590c0786bb3f5bdf535d67e16fd9;
+real XML 19c03bd5886a3870005f6721c67c546730e4adb817539b5cc52cc4737aface8a.
+Original containers are unchanged; owned backend resources were removed.
+
+The existing task-terminal runner now expects 16 real-session cases, and its enclosing source runner expects
+113 legacy cases. No API, persistent format, SDK client, executor or protected Native SDK source changed.
+The earlier 781-input Kafka source, 757-input legacy and 649-input Native Pulsar receipts retain exact archives,
+but this shared BK implementation change supersedes their current-source qualification, including the Kafka
+29+83 loaded-artifact results. Those broader current-source regressions have not been rerun for this fix.
+
+This provider close result is not Kafka run-seal authority, TaskTerminal authority or physical-delete authority.
+Unpublished-output lifecycle/GC composition, all 17 obligations/five children and whole M5 remain OPEN.
+Native-only policy still awaits the user; Kafka floors remain vetoing. No staging, commit/push or final
+coordinator review.
+
+### Native cancelled BK output fact capture (2026-10-16)
+
+The existing native Owner now reads cancelled output through `NereusKafkaUnpublishedScopeV2` on its owned
+control executor and existing BK/Oxia connections. It binds the immutable Task, cancelled decision, terminal,
+exact native instance/create fence, every reserved/absent Part, actual CLOSED metadata, permanent physical
+reservation/OPEN authority and complete member inventory. Full identities and versions are reread before return,
+including absent Part observations. A live writer ticket, mismatched seal/member/namespace, changed version or
+unknown read rejects the observation. This read path neither releases capacity nor supplies GC/delete authority.
+The four existing read-scope fact helpers are reused within the package; no public API, wire format, client,
+executor or retry loop was added.
+
+Current source 97937 passes 29 suites/183 cases; fresh legacy 97948 passes 23 suites/113 cases, including actual
+retained-data BK/Oxia restart checks. All 781/757 captured inputs match current bytes and post-terminal archives.
+Source manifest f890876f402a55c0370590a57de56eb2e499e6d0016a277f4f1077902723c20d;
+summary b7a5a54bd05fd17b09d1c8482076abd32b662c0ea26501d205f2859d4c14b1eb.
+Legacy manifest 77ba38780b20eb23cd537902aefc21c2392a8eb4534cc2a3e1943f47c306e97d;
+summary bfb4175468931f1df1975e5ee81624558241dfbb46cac8e1752740e2546b5107.
+Six built/task-local published runtime JARs match this source summary, including the corrected BK close proof.
+They are retained in `build/m5-unpublished-development-repository`; these fixtures retain their synthetic
+external-proof limits and do not qualify a complete native lifecycle by themselves.
+
+The actual Broker output/termination method passes 10/10 with zero failures/errors/skips, including complete
+output/empty-key output, append/close reply faults and exact original-invocation cleanup. The existing output and
+read cases additionally check actual terminal GET response loss and a same-value CAS during capture: both reject,
+exact retry succeeds, and physical quota/authority/member facts remain unchanged. Before cancellation, capture
+is rejected. Native compilation, main/test Checkstyle and SpotBugs pass. The 60-input native manifest is
+3f8c465f70c36960b2c8cde0afd53a581bfbeab0c01a65bbdf7be91155a56e04;
+XML 40e16408d1e2e7e5ba54f8e2b3d0857fecb350f61cc8abee189d4e7a9854b906.
+Evidence remains in `build/m5-unpublished-broker`; its owned BK/Oxia resources are removed and original
+containers are unchanged. Earlier compilation/style failures retain their original logs. The broader 102-case
+batch on a separate owned dataset reached actual native physical-authority quota EXHAUSTED, followed by
+cascading timeouts. Its verified task-owned worker was stopped with SIGTERM; the original runner completed
+failed and removed its backends. Original XML reports 57 tests, 12 failures, zero errors and one skipped
+interrupted test; this is neither a 102-case pass nor complete current-class qualification. Logs, manifest,
+XML and the exact termination record remain in `build/m5-unpublished-broker-remaining`. The fixed quota was
+not enlarged. The separate 10-case output result remains valid. No broader rerun is started to chase green;
+full lifecycle/quota progress must come from the pending production GC composition.
+
+This completes the owned observation of cancelled output facts, not full unpublished GC composition.
+All ten floors/fifteen references, grace, shared-member closure, exact M4 RELEASED and physical delete/UNKNOWN,
+Native Pulsar directory/open-tail recovery, five children/all 17 obligations and whole M5 remain OPEN. The older
+649-input Native Pulsar receipt still lacks a refresh after the shared BK close-proof fix. The user referred the Native-only policy
+decision to the coordination chat `整理 NSIP-1 修改优化方案` (01a0e113-1ba8-70e3-b6cd-3b5fd715a656);
+the decision request has been sent and remains pending. Kafka floors remain vetoing. No staging, commit/push or final coordinator review.
+
+### Accepted Native Pulsar-only retention policy (coordination decision, 2026-10-16)
+
+At the user's explicit referral, the coordination chat `整理 NSIP-1 修改优化方案`
+(01a0e113-1ba8-70e3-b6cd-3b5fd715a656, decision turn 01a141f5-98e2-7973-a7ad-a01de9bfdb77) accepted
+`NATIVE_PULSAR_ONLY_V1` for explicitly selected Native Pulsar Bindings. This settles the semantic choice;
+runtime policy qualification is not implemented or verified yet. The three Kafka floor classes remain vetoing
+until the following production conditions hold. Whole M5 and the fixed lifecycle obligations stay OPEN.
+
+Persist the versioned policy within the existing actual P1 aggregate-key M5 authority/enrollment extension,
+without changing historical NTA1 or creating a second mutable policy authority. Bind actual Cell/Binding,
+incarnation/StorageEpoch, original P1 identity and closed writer admission; qualify using current physical P1
+key/version/full stored value, explicit policy tag/version/root and actual enrollment/capability. Same-value
+new versions invalidate old observations. The policy is fixed for the Topic Incarnation and must be persisted
+and enforced before its first protocol/state/source-reference admission. Existing unqualified or policy-less
+Bindings, unknown origin, old/unknown policy versions, UNKNOWN and mismatches continue vetoing. No automatic
+migration, online conversion of active/stored Bindings, new dual-protocol support or policy switch with live
+actors/tickets/UNKNOWN is authorized.
+
+The actual admitted protocol/capability set and closed writer guard must exclude Kafka/KoP/dual-protocol
+reads and writes, group/offset state, producer/transaction state and replication/recovery source writers.
+Producer rejection alone is insufficient. Reuse real existing entry gates/connections; where no Kafka/KoP
+entry exists, enforce its exclusion through the actual admitted protocol/capability set rather than building
+a new stack. Native Pulsar subscriptions, cursors, replication and recovery keep their normal obligations.
+
+Only KAFKA_CONSUMER_GROUP, KAFKA_PRODUCER_TRANSACTION and KAFKA_REPLICATION_RECOVERY may produce explicit
+policy rows from the existing PulsarNativeBindingV1 owner with constraining=false, safeFloor=-1 and no
+pulsarSafeFloor. Keep all three rows/classes and complete enumeration; bind real authority versions and policy
+root. Other seven floors, BINDING_EPOCH_POLICY, complete ten-class snapshot, source/P1 fences and final CAS
+remain required; the policy itself does not advance a frontier. The four Kafka reference classes remain in
+the complete inventory. Their explicit ABSENT observations require the actual closed admission domain and
+exact target/Binding/policy/enrollment/version facts plus absence of historical/external/actual Kafka references;
+policy bytes or non-constraining floors alone are insufficient. Other members/Bindings/Cells, cross-protocol
+ownership, shared/projection/recovery references, selected/fallback/pins/Task/M4, grace and delete are unchanged.
+
+Implementation stops for this policy slice after the existing paths and three bounded verification groups pass:
+compatibility/rejection (missing/unknown/foreign/stale policy and unchanged legacy decoding); actual first
+admission plus cold reopen/P1/source-scan/trim with forbidden writers rejected before SDK mutation, remaining
+Pulsar floors constraining and one relevant version/UNKNOWN rejection retaining charges; and reference boundaries
+showing policy floors cannot bypass missing closure or actual other-member/source references. Reuse equivalent
+current coverage. This decision does not authorize optional matrices, unrelated full regressions, new tracking
+files, staging, commit/push or whole-M5 promotion.
+
+### Native-only policy implementation in progress (2026-10-16)
+
+The accepted policy now has a v5 M5PA envelope on the same P1 key. Historical NTA1 and envelopes v1-v4 keep
+their policy-less encoding. Absent-only creation stores NATIVE_PULSAR_ONLY_INITIALIZING_V5 with complete
+writer enrollment; P1 projection and writers stay closed. Exact readback then binds the actual initial P1
+version and activates through the existing RESERVED/ACTIVE selector coordinator. No existing P1 value can
+be converted by this create path. Ticket/source-scan/trim successors preserve the policy; its stable root
+binds original P1 identity, capability and closed implementation root. Four Kafka reference ticket classes
+are rejected before authority mutation. The policy alone produces neither reference absence nor
+physical-delete qualification.
+
+PulsarNativeBindingV1 now exposes explicit first creation and an observer for exactly the three accepted
+Kafka floor classes. The observer requires actual current P1 source-scan key/version/full value, original
+P1 source identity and exact native-owned closed enrollment, then rereads P1 and selector before returning.
+Rows use constraining=false, safeFloor=-1, no typed floor and complete enumeration; the policy root is
+returned with them. Legacy/missing/stale/mismatched policy observations reject and retain the scan.
+
+The same v5 P1 record also claims the actual first Native factory scope before installing metadata writers
+or admitting SDK recovery/source references. A missing parent is accepted only for that original claimed scope,
+with no selected map/manifest and an actually empty cursor directory; no parent bytes or version are
+fabricated. Existing parent metadata cannot be adopted as a first admission. Later factories with an absent
+prior parent reject before writer admission. Successors preserve the first-scope claim. The focused three
+policy tests, production/P6 compilation and relevant Checkstyle passed after this change. Real validation
+previously exposed the missing-first-parent failure; that failed attempt is retained. Its first-admission and subsequent cold-factory replacements passed as recorded below.
+
+The initial retention/retirement unit run passed 136 cases; after adding the first-factory scope, its three
+focused policy cases passed again with zero failures/errors/skips, plus production/P6 compilation and
+Checkstyle. The actual first-parent run then passed 18 fresh suites/173 cases (module161, SDK5, provider5,
+Native-only Owner1 and namespace1). BK38 was UP-TO-DATE and is excluded. It performs seven real appends,
+fresh Oxia policy read, all four Kafka writer rejections before external dispatch, actual three policy rows
+and constraining cursor scan, then a same-byte physical P1 CAS invalidates the old observation without
+releasing charges. All 649 inputs matched before post-terminal source archiving; owned backend cleanup
+passed. Result SHA256 79a91b3f630bba7939c0097b03a1fe3c56a3c3fd1a05cd89092a05aadb2e6ff9;
+input SHA256 0c15cbcd130a10a163a2206fde9a43bab086c519e1764ccae8e64a8309445f2c.
+The same bounded case now also reopens an actual factory through fresh Oxia/Native metadata connections
+and reads all seven payloads. Its terminal rerun passes four fresh suites/12 cases (SDK5, provider5, Owner1,
+namespace1), zero failures/errors/skips; unchanged module161/BK38 are UP-TO-DATE and excluded. All 649
+current/archive inputs matched; owned backend cleanup passed. Current input SHA256
+094233e06c6fe0d3aa058a5898ae67fb6c424d2b4b6060d6303f0b708298b1f8; result SHA256
+7f9978ff46fff16b997ce9db57f7f9948b07b2fea76f6ea78b69b9ceb766e447; Owner XML SHA256
+3cbf238c4905f7b5223e65585afb7063d1ca9cfa93de3ed7576d529731c068d3. Source archives are
+post-terminal copies made only after every captured hash matched. Documentation/design-amendment/lifecycle
+gates passed 24s. The complete ten-floor snapshot/trim composition and four-class reference closure remain
+unfinished, so the policy slice and
+whole M5 remain OPEN. The existing closed-inventory boundary tests passed 55 focused cases: missing any
+floor/reference adapter, any PRESENT kind and same-value reference version changes still veto assembly.
+The explicit producer for this original aggregate's four Kafka classes passes the same actual bounded
+case: first admission, factory cold reopen, seven payloads, physical P1 source-scan, four aggregate-target
+ABSENT results and foreign-Binding coverage rejection. It independently qualifies the original birth policy,
+physical P1/version, first factory scope and native closed writer enrollment; it cannot consume standalone
+policy-floor rows. The final source tuple passes 18 fresh suites/173 cases, zero failures/errors/skips
+(module161, SDK5, provider5, Owner1 and namespace1; UP-TO-DATE BK38 excluded). All 649 current/archive
+inputs match and owned cleanup passed. Input SHA256 dd6d3296b1ba7508831885d355d9414d49e9241273343058858f0071d8a598e2;
+result SHA256 51cfbe7f7af5395579ef0b9706f359b2844f75a66ebc777d645b0ff18c1b19e4;
+Owner XML SHA256 1d05d6abc2e61a4ac47228e5dc595e96e99fe815c7335b2ab346f05d1979ec6e.
+This producer is limited to the original aggregate. It does not scan physical targets or other members/
+Bindings and cannot substitute for their required reference scans or the remaining eleven kinds. Complete
+ten-floor trim and four-class physical/reference-domain composition remain unfinished. Common Object-library changes supersede the earlier current-source Kafka/library
+qualification; its exact archives and the successful 10-case cancelled-output observation remain historical
+evidence. Do not rerun unrelated full matrices per policy step; complete affected candidate validation at
+the agreed milestone. No staging, commit/push or final coordinator review.
+
+
+### Native materialization retention-root observation (2026-10-16)
+
+The production Native Task owner now observes every accepted materialization record in the actual
+Binding-scoped namespace under the original P1 source-scan revision. It retains plans, source cuts,
+unselected/terminal tasks, pending outputs, Native inputs without plans and the known retention roots;
+partial/orphaned registration, unknown kinds, foreign Binding, changed key sets and changed physical
+versions veto the observation. RetentionRoots owns the existing Cell workspace until explicit close.
+It provides a materialization subgraph, not the complete LIFECYCLE_TASK floor or deletion authority.
+
+Oxia hierarchical ranges now enumerate both accepted record depths and the direct protection children.
+The former protections0 byte-prefix range could omit existing records; older results do not prove
+protection completeness. Actual scope comparison now requires every backend-listed protection in the
+generation floor. No wire, capacity, fixed profile or legacy enrollment policy was relaxed.
+
+The final actual run passes four fresh suites/14 cases: SDK5, provider5, Owner3 (legacy refusal, guarded
+unselected QUARANTINED roots and published/repeated/cold roots), namespace1; zero failures/errors/skips.
+Unchanged module161/BK38 are UP-TO-DATE and excluded. All 649 current/archive inputs match; original
+containers and Native Pulsar owned paths remain unchanged and owned backends are removed. Input SHA256
+bc7efeb39ec766c9776a2662fded50d9bee01e9db2c921be1e12f3c91d16c378; result SHA256
+0ba8e4deb45032ccd4eca8acab35d275069bb5aa4218325fd00c2b5e88168aeb; Owner XML SHA256
+1c7fc661b7d19fba9c8a5eaacc9d4c553c8625a9fa9c37dca31f1715448f30c2. Source archives are post-terminal copies after exact hash verification.
+Compile/style and documentation/design/lifecycle checks pass. Earlier failed XML/source archives and the
+locked-client/Oxia range diagnostic remain recorded in the implementation log and projection.
+
+Complete ten-floor trim, other lifecycle/reconciliation/shared-member/projection/audit collectors, complete
+references and physical delete/UNKNOWN composition remain unfinished. All17 obligations/five children and
+whole M5 remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Native Task worker/Cell authority capture (2026-10-16)
+
+RetentionRoots captures the actual M4 worker/selector authority and shared Cell materialization admission
+alongside the complete Task/input roots under the original P1 source-scan revision. Their physical key,
+version and full bytes are included and reread. Persisted plans without worker/Cell authority veto the
+observation; first-use absence is not replaced with invented state. Foreign reservations remain explicit
+shared state rather than being attributed to this Binding. The existing workspace remains owned until
+close. Terminal Task state or an absent reservation alone grants no source absence or complete floor.
+
+The final actual tuple passes 18 fresh suites/174 cases (module161, SDK5, provider5, Owner2 for published/
+repeated/cold and guarded unselected roots, namespace1), zero failures/errors/skips. UP-TO-DATE BK38 is
+excluded. Actual same-byte Cell-admission CAS invalidates the observation, and unavailable worker GET
+rejects it; the observation retains/releases its original workspace correctly. All 649 current/archive
+inputs match, owned backends are removed, original containers and Native Pulsar owned paths are unchanged.
+Input SHA256 fd8b1628b0514b0a2fd281c1def4d3325f8a72110417cdbcb9dbbc0906bee0a8; result SHA256
+3af3a200ce9b35a324707c434760ccb8aa75eb8b381c6f6472123330fc6c44b9; Owner XML SHA256
+4e697174a56606708e810bdac44e76ee87dc7ed9eb5a59cf5fc7661bca1e0e55. Archives are post-terminal copies after every captured hash matched.
+Production/P6 compile, formatting and Checkstyle pass.
+
+Binding/epoch floor still needs a semantic choice for the Native Pulsar retention/compaction-policy source,
+persistent generation and updates. NTA1 contains storage/frame policy; NATIVE_PULSAR_ONLY_V1 settles only
+three Kafka classes. The user clarification remains pending; no policy format/default is changed. Independent
+Task/reference implementation continues. Complete ten-floor trim, full reference/delete/UNKNOWN combinations,
+all17 obligations/five children and whole M5 remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Native physical namespace member observation (2026-10-16)
+
+Native Task-root capture accepts actual assigned BK/Object backends and reuses the original admitted
+Cell workspace. It scans the existing permanent authority, quota-entry, physical-member and Object
+birth-credit ranges, retains exact physical keys/versions/full bytes, and joins observed resource slots
+without inventing missing authority/reservation/member state. Historical/DONE members and incomplete
+birth slots remain visible. Route/head/key inventory and each record are reread; the joined observation
+is bounded and remains charged until explicit close. No quota initialization or capacity increase occurs.
+The existing three-argument Task-root API remains available.
+
+The actual published/repeated/cold and guarded QUARANTINED paths pass with real BK, MinIO and locked
+Oxia. Same-byte physical-member CAS invalidates the observation; unavailable member GET rejects it
+and the Cell workspace returns to baseline. The final tuple has 18 fresh suites/174 cases, zero failures,
+errors or skips (module161, SDK5, Provider5, Owner2, namespace1). UP-TO-DATE BK38 is excluded. All649
+current and archived inputs match; the archive was copied post-terminal only after every captured hash
+matched. Original containers/Native Pulsar paths are unchanged and owned containers/networks/volumes
+are absent. Production/P6 compile, scoped formatting and Checkstyle pass.
+
+Evidence prefix: build/m5-native-pulsar-offload-green-native-physical-member-observation.
+Input SHA256 f02d5ae3e6e77c16179505f7c8a5cc19303752bc45090d63864290d7036fa054;
+result SHA256 75a3b42c8f7a4eb19c8db4b9b3b7c499cb6112b4fed3e288241257beeb7334aa;
+Owner XML SHA256 f7155704e509b7c99cacce6d51de7669bbdbdc6607bb9d415e794280dc1d5a09.
+Earlier worker/Cell evidence remains exact for its archived source tuple, superseded for current-source
+qualification by this change. This observes metadata only; complete writer enrollment/fencing, shared
+floor, references, physical absence/delete/UNKNOWN and whole M5 acceptance remain unfinished. The
+Binding/epoch retention/compaction-policy semantic choice remains pending. All17 obligations/five children
+remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Native retained Task positive references (2026-10-16)
+
+The owned Native RetentionRoots now derives MATERIALIZATION_OR_COMPACTION_TASK PRESENT/incomplete
+rows for retained exact source identities/BK ledger digests and assigned Object output credits. Rows bind
+actual plan/Task and, for outputs, native birth-credit keys/versions/full-value digests with the original typed
+Pulsar cut. Output credits must match the retained worker identity, complete plan and source-cut roots.
+Terminal Task state does not automatically clear the retained roots. A missing target or unresolved credit/
+plan association vetoes absence. No ABSENT row, complete Task-class summary or delete authority is produced.
+
+Actual published/repeated/cold and QUARANTINED paths pass with real BK/MinIO/locked Oxia. Assertions inspect
+actual source and output reference rows and their metadata revisions, retain PRESENT after Task completion/
+quarantine, and reject an unmatched target. Existing same-byte Task/Cell/member CAS, failed GET and original
+workspace lifetime assertions remain effective. The tuple passes 18 fresh suites/174 cases with zero failures,
+errors or skips (module161, SDK5, Provider5, Owner2, namespace1); UP-TO-DATE BK38 is excluded. All649 current/
+archive inputs match. The source archive was copied post-terminal after every captured hash matched. Owned
+containers/networks/volumes are absent; original containers and Native Pulsar owned paths are unchanged.
+Compile/scoped formatting/Checkstyle pass. No temporary artifacts were removed in this slice; the existing
+runner, logs, source archives and XML remain necessary evidence.
+
+Evidence prefix: build/m5-native-pulsar-offload-green-native-task-positive-references.
+Input SHA256 6ba589eaffcb646330c2dd43c9ef483e3e2a8a1bc1944754cd3ee2aa83047316;
+result SHA256 b2e12bfe56f9ae9696da7f32595db1aa9d94d51ec27883a80f589b7507098ad6;
+Owner XML SHA256 e05670950862fa0dd87e16dcab6dbab0d2b49027abd99cafcbedbdc7003ce46f.
+The preceding physical namespace tuple remains exact archived evidence for its earlier source. Complete
+Task/lifecycle closure, root handoff, shared/reference/floor absence and delete/UNKNOWN combinations remain
+unfinished. Binding/epoch retention/compaction-policy semantics remain pending. All17 obligations/five children
+and whole M5 remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Native Cell reservation roots (2026-10-16)
+
+Task-root capture now observes the existing actual Native Cell profile/head under its original admitted
+owner. The exact workspace UUID/Binding/charge must remain present. Other reservations of the observed
+Binding are returned explicitly, excluding only this exact workspace; foreign Binding holds remain in the
+full captured head and are not silently attributed to this Binding. Profile/head keys, physical versions and
+full bytes join the existing bounded root facts and are reread. The final joined observation rejects changes.
+No persistent format, automatic head recreation, quota initialization or capacity increase is introduced.
+
+Actual published/repeated/cold and QUARANTINED paths verify a second durable reservation remains visible,
+a same-value Native Cell head CAS invalidates the observation, and unavailable head/cleanup retains the
+original charge until the connection recovers and original undelivered cleanup succeeds. Existing Task,
+member and shared materialization-admission checks remain effective. Compile/scoped formatting/Checkstyle
+pass. The actual tuple passes 18 fresh suites/174 cases, zero failures/errors/skips (module161, SDK5,
+Provider5, Owner2, namespace1). UP-TO-DATE BK38 is excluded. All649 current/archive inputs match; source
+archives are post-terminal copies after every captured hash matched. Owned containers/networks/volumes are
+absent, original containers and Native Pulsar owned paths are unchanged. Existing source archives/XML/logs
+remain needed; no temporary files were removed in this slice.
+
+Evidence prefix: build/m5-native-pulsar-offload-green-native-cell-reservation-roots.
+Input SHA256 1d36faa68987acd1a0c45aeeb609d375c437e6d4d32ba0e800dcf0f3cbb4c64c;
+result SHA256 0d21188c3ed16fcc4b3e5284174a8a0ae53076da11810af83f71aa5110219fa8;
+Owner XML SHA256 fcbc3d1d3b9c7e3e07f6f79ba3b3e2bc31a0fe1b73e783937b494b1e79e3ed5e.
+The preceding positive Task-reference tuple remains exact archived evidence for its earlier source. Empty
+other-reservation state alone is not Task root handoff or complete Task/reference absence. Task terminal/
+output graph and root handoff, all remaining floor/reference/delete/UNKNOWN combinations and whole M5
+acceptance remain required. Binding/epoch policy semantics remain pending. All17 obligations/five children
+remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Closed Native Task actor references (2026-10-16)
+
+RetentionRoots.closedTaskReferences derives the Task-class ABSENT/complete rows for an actually observed
+single Native Binding target only after the original first-admission Native-only P1 policy/enrollment and
+exact source-scan are present, all same-Binding reservations except this original observation have drained,
+shared Task charges and metadata mutations are settled, and every retained plan is terminal. Pending slots
+must have original assigned/no-dispatch birth terminals. Published plans must retain their exact manifest,
+generation, validation, original plan/cut identities and immutable output versions. Unknown or foreign physical
+members, unresolved dispatch/assignment, missing graph, wrong registry/coverage and residual reservations
+veto the query. P1 owns reference-writer enrollment; M4 retains worker/capability, checked against its own
+original plans. No duplicate mutable enrollment authority is introduced. Mutable D authority and quota mutation
+rows are excluded from the reference freshness vector to avoid a dependency on the target's own transition.
+
+The previous PRESENT/incomplete retained-root query remains conservative. Closed Task actor absence does
+not remove selected, recovery, shared-member, source-protection or other reference obligations. Full proof
+assembly must still reread the returned exact vector under the existing protocol. This changes no stored wire
+format, default policy or physical delete permission. Multi-member/other admission scopes remain unqualified.
+
+The new real Native-only case starts through the guarded first factory and cold reopen, then uses one original
+owner/fixed Cell profile to produce CANCELLED_STALE, QUARANTINED and PUBLISHED tasks. All three exact states
+are independently read back. After actual Source/Provider/factory/Cell drain, the query returns only Task ABSENT
+rows. A second actual reservation vetoes it. Removing the actual published validation root vetoes it; restoring
+the original bytes yields a new metadata version used by the next qualified observation. SDK/MinIO/Oxia paths
+are real. Final run passes 4 fresh suites/12 cases, zero failures/errors/skips (SDK5, Provider5, Owner1, namespace1).
+UP-TO-DATE module161/BK38 are excluded. All649 current/archive inputs match; archives are post-terminal copies
+after every captured hash matched. Owned containers/networks/volumes are absent, original containers and Native
+Pulsar owned paths unchanged. Compile, scoped formatting and Checkstyle pass.
+
+Evidence prefix: build/m5-native-pulsar-offload-green-native-closed-task-actor-original-plan.
+Input SHA256 867aa6ca1d13febfdada28ad2e4872548256eb7e092cd548f5d33bfc6851f4c7;
+result SHA256 05670027c86254708ba6ce5eed933e32fa7be5197f9ef2c5be2a6741a35e393c;
+Owner XML SHA256 ad7f90f3c6e35982af1ec5167073630e622dab62659abd20bb974c561885d9cd.
+The first failed tuple (174 cases/1 failure, exact649-source archive) exposed an incorrect query requirement
+that conflated P1 enrollment with M4 worker authority; its two historical NTA1 paths correctly vetoed closure.
+The second failed tuple (172 cases/1 failure, exact649-source archive) passed the three-state closure/held-charge
+assertions, then the fixture incorrectly called plan() after actor close. The fixture now saves the original
+immutable plan before close; production closed-actor restrictions are retained. Both original failures remain
+separate evidence, not fresh passing cases in the final run.
+
+Protocol/recovery root handoff, complete ten-floor/fifteen-reference/delete/UNKNOWN composition and whole M5
+acceptance remain unfinished. Binding/epoch retention/compaction-policy semantics remain pending. All17 lifecycle
+obligations/five children remain OPEN; no staging, commit/push or final coordinator review.
+
+
+### Native cursor/recovery reference composition (2026-10-16, focused pass)
+
+The actual P1-fenced cursor source collects physical subscription/data and recovery references with its Native
+catalogue/checkpoint scan. Recovery retains the native ML startup tail, checkpoint carriers, current selected
+outputs, remaining native sources and selected fallback dependencies. Class results require first-admission
+Native-only P1 writer closure. Unresolved cursor/position properties (including native compactor recovery pointers)
+veto absence; that unsupported path has no qualification claim. The opaque diagnostic witness is NPCF4; no stored
+wire format changes. Task queries compose with the same actual source-scan/allocator's metadata-only observer
+through its private reservation identity and current typed coverage. Other reservations still veto. Two bounded
+original reference I/O slots drain before close releases workspace; observer cancellation cannot settle them.
+
+Creator physical registration now follows actual SDK immutable-version/full-GET qualification and birth assignment,
+before verified output delivery. Original close also settles this handoff for already assigned outputs. Missing or
+UNKNOWN member registration retains original Task/Cell capacity. Publication reads existing registration and does
+not adopt missing members. The actual Q path loses a member CAS response on the cold Binding's original Oxia
+connection, checks local/durable charge retention, restores observation and retries original close. Exactly one
+actual birth is assigned; unstarted slots are cancelled. The member is independently reread before the next task.
+
+Final actual Native-only case verifies selected payload PRESENT and Q orphan ABSENT for both cursor/recovery
+classes, composition with closed Task references on current coverage, the other-reservation veto, and accepted
+P1 GET/cancel/close retaining charge until the original GET completes. It passes 4 fresh suites/12 cases with zero
+failures/errors/skips (SDK5, Provider5, Owner1, namespace1). UP-TO-DATE module161/BK38 are excluded; unchanged
+module161 and legacy publication/Native-only policy cases passed in the preceding exact archived production run.
+All649 current/archive inputs match. Archives are post-terminal copies after every captured hash matched. Owned
+containers/networks/volumes are absent; original containers and all12 Native Pulsar owned paths are unchanged.
+Scoped formatting, compilation and Checkstyle pass; necessary documentation/design checks pass.
+
+Evidence prefix: build/m5-native-pulsar-offload-green-native-cursor-recovery-original-client.
+Input SHA256 abafecad2dc601d9de9a68377e3a3c3a0d39331813248d49335a404140363c08;
+result SHA256 514ad58bdf3e3f718d10d76886c5163ff512522d7535421e792c9616adaa1530;
+Owner XML SHA256 26d981d72650898575eb3d0b2a77fc4c968c247c9deba4cbc152b3e9ed733eb4.
+The original missing-member failure is retained (17 fresh suites/174 cases/one failure). The next production run
+passed module/SDK/Provider and legacy/policy cases but the new loss fixture used the first connection rather than
+the cold Binding connection. Its assertion was initially masked by closing the policy client before factory cleanup.
+The isolated replay exposed that assertion (3 fresh suites/11 cases/one failure). Both exact649-source archives
+remain failing evidence. Cleanup now closes the original factory while its clients are open and preserves primary
+exceptions with suppressed cleanup failures. The final replay uses the actual cold connection; no assertion was
+weakened and no production source changed after the preceding member-handoff implementation.
+
+These are scoped reference observations, not complete fifteen-class proof, recovery-root handoff or physical-delete
+authority. Complete ten-floor/delete/UNKNOWN composition and whole M5 acceptance remain unfinished. Binding/epoch
+retention/compaction-policy semantics are still pending independently of the accepted Native-only Kafka policy.
+All17 lifecycle obligations/five children remain OPEN; no staging, commit/push or final coordinator review.
+
+### Native M4 generation reference composition (2026-10-16, focused pass)
+
+The M4 control observer produces selected, fallback, source-protection and registered-read reference rows from
+the existing P1-fenced generation graph. It requires the same actual cursor scan/allocator, first-admission
+Native-only writer enrollment, exact original NPOD actor drain and every pending epoch terminal/proof. Physical
+resources come from the selected Native/materialized map; protected sources resolve their original source extent
+and mapped predecessor rather than substituting preferred outputs. Unknown old protected sources, unresolved plain
+view fallback and other same-Binding Cell reservations veto. One original bounded metadata workspace owns all I/O;
+observer cancellation cannot release it. Exact P1/selector/protection/floor versions are reread before delivery.
+Cell-head values remain live admission checks under the P1 freeze, not durable reference roots, because the
+metadata observer's own release advances the head. These observations cover this Binding's graph; physical shared
+membership and other Bindings still require their independent qualification. No stored format changes.
+
+The real Native-only composition now cold-reads the actual Binding, admits an independent controller and guarded
+mapped factory, reads a selected payload through the ordinary Native SDK path, drains that exact owner for logical
+trim, and closes its original factory/controller before P1 scan. The query observes selected payload PRESENT,
+actual original BK fallback/protection PRESENT, and Q orphan ABSENT in all four classes. Another actual reservation
+vetoes the query while preserving its original charge. Task/cursor/recovery closure and cancellation checks remain
+in the same original case. All run with fixed existing Cell/physical quota profiles; no capacity expansion.
+
+Final run passes 4 fresh suites/12 cases, zero failures/errors/skips (SDK5, Provider5, Owner1, namespace1).
+UP-TO-DATE module161/BK38 are excluded; module161 passed in the first exact archived production run. All649
+current/archive inputs match. Archives are post-terminal copies after every captured hash matched. Original
+containers and all12 Native Pulsar owned paths are unchanged; owned containers/networks/volumes are absent.
+Scoped formatting, compilation and Checkstyle pass. Necessary documentation/design checks pass.
+Evidence prefix: build/m5-native-pulsar-offload-green-native-generation-reference-enrolled-controller.
+Input SHA256 b39e5da88a25a9d8282628d5998bfed69de67def03326a732cd1ae98775422d2;
+result SHA256 5ded65398df54ba79bafe00a80f3c9ca0004084250ffa6e660d215680a5f7d14;
+Owner XML SHA256 2e4d0234e32840aa8b79dd60fe1b3abd489ace1901c98a3de453b48d3868dcf8.
+
+The first actual run correctly rejected a missing current-view NPOD (17 fresh suites/172 cases/one failure):
+publication drained the predecessor, not the new selected view's never-installed owner. Subsequent fixture
+attempts reused an already closed controller, then omitted the independent controller's own writer admission
+(each 3 fresh suites/11 cases/one failure). All three exact649-source archives remain failing evidence. Actual cold
+SDK read/drain and explicit independent writer admission repair the fixture; missing-proof, closed-controller and
+uninstalled-writer refusal remain intact. No production source changed after the first implementation run.
+
+Full fifteen-class proof, remaining floors, recovery-root handoff/delete/UNKNOWN composition and whole M5 remain
+unfinished. Binding/epoch retention/compaction-policy semantics are pending independently of the accepted
+Native-only Kafka policy. All17 lifecycle obligations/five children remain OPEN; no staging, commit/push or final
+coordinator review. This focused result grants no physical-delete or whole-M5 authority.
+
+### Kafka cancelled-output native authority facts (2026-10-16, in progress)
+
+Cancelled native BK outputs already have original Task/selection records, actual fenced creation scope, exact SDK
+seals and physical/member facts. The capture now also retains actual Oxia key/backend-version facts for the Task
+terminal and cancellation decision, rather than relabeling route-local keys/version tokens. Both routed adapters
+reread the real backend and reject foreign routes or same-byte/new-version observations. The original routed APIs
+and stored wire formats are unchanged. Native cancelled-output evidence can derive the existing typed
+UnpublishedEvidence only for a resource in that original sealed/physical/member cut: the terminal binds the original
+Task and fenced create scope; the irreversible cancellation decision binds closed adoption and never-selection.
+This supplies only Task evidence. Full floor/reference/grace/native-disposition qualification is still required;
+it grants no physical deletion and does not qualify complete internal-topic BK_ONLY reclamation.
+
+Two focused metadata suites pass 26 cases with zero failures/errors/skips, plus scoped formatting and Checkstyle.
+The native Kafka fixture now independently rereads the actual authority keys/versions using its real Oxia client and
+rejects a resource outside the original cancelled cut. Kafka main compilation and joint Java/Scala test compilation pass (14s/10s) against isolated current local artifacts.
+The later focused-results section records the actual10-case cancelled-output pass and the failed57-case shared-backend gate; old source receipts do not qualify changed classes.
+Native policy clarification now also asks how projection registration and audit/grace authority time/deadlines are
+specified. The accepted Native-only policy still covers only its designated Kafka classes; those other classes are
+not silently declared empty or non-vetoing. Whole M5/all17 obligations/five children remain OPEN; no commit/push.
+
+### Kafka replacement native authority facts (2026-10-16, in progress)
+
+The existing actual Broker replacement observer now retains backend-native Oxia facts for its selected immutable
+BK descriptor and verified replacement-comparison record. Each conversion uses the previous exact logical
+observation and rejects changed physical versions, including identical stored bytes. The original routed record,
+semantic-source and reference APIs remain intact. A resource in the captured original replaced cut can derive the
+existing typed ReplacementEvidence, with actual selected-descriptor authority, distinct sealed BK replacements and
+all original per-resource semantic transfers bound to the actual comparison key/backend version. Sealed scope,
+physical/member facts and current native selection checks remain required; no Object dependency is introduced.
+
+The existing real Broker scenario independently rereads both native facts and checks the derived transfer
+keys/versions/ranges; it also rejects the actual selected output as an old replaced input. Kafka main/joint test
+compilation pass (13s initial main/test, 10s after selected-output rejection coverage). The later focused-results section records18/18 publication/read and26/29 recompaction cases before actual fixed-quota exhaustion. Complete floor/reference/grace/native-disposition qualification remains pending. This supplies replacement Task data, not a GC permission, shared-member proof or
+complete internal-topic BK_ONLY lifecycle. No stored format or policy changes. All17 obligations/five children and
+whole M5 remain OPEN; no commit/push.
+
+### Kafka native authority facts: focused results and failed shared gate (2026-10-16)
+
+Current-source prerequisites pass on independent owned BK/Oxia datasets: source29 suites/183 cases with its two
+service-restart cycles, and legacy23 suites/114 cases, all zero failures/errors/skips. These groups are separate
+coverage, not a unique-case sum. Source781 and legacy757 captured inputs match live bytes and post-terminal
+archives; each archive was copied only after every captured live hash matched. All XMLs/counts/digests were
+independently checked. Six current built/runtime JARs match the isolated development repository. Original containers
+are unchanged and source/legacy owned containers are absent. The record-store expected count is now6 (one new exact
+native-version mapping case); the legacy total correspondingly becomes114, without relaxing any zero-failure gate.
+
+Source: build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-50055.
+Source manifest SHA256 30ce8406928bfca9840e5619dfef8dea883a77e3dbaf212e1e6b70800b6904b8;
+summary SHA256 6a9125256cfb688cc6d67e30d51b4a08e88b4d3090a26ee66e8059d2967958d3.
+Legacy: build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-50066.
+Legacy manifest SHA256 f6e730a18caf5c0d863904b47ae942ea8157294d5bcfa33bf48254378cb42bd4;
+summary SHA256 b99aa4935f9c644e9b5f20ca854631de6c53a2caa2a73c7ef41308e34cdbd6e6.
+The library prerequisites retain their SYNTHETIC_FACTS_WITH_REAL_OXIA_AND_BK qualification boundary.
+
+The first attempt stopped at Kafka Checkstyle before Broker execution: the added record-byte budget made the
+replacement capture exceed NPath complexity. Extracting that unchanged check into a private helper passes main/joint
+test compilation and both Checkstyle tasks (17s). That attempt's wrapper incorrectly copied stale XML; its counts
+are invalid and excluded. Raw output remains preserved at build/m5-kafka-native-authority-facts-broker. Subsequent
+wrappers require XML modification time to be at least the current Gradle invocation start; a later compile failure
+correctly records null counts and freshBrokerXml=false rather than collecting old results.
+
+The fresh shared-backend run, build/m5-kafka-native-authority-facts-broker-fresh-xml, terminates with Gradle exit1:
+57 cases,13 failures,zero errors/skips. Publication/read passes18/18; recompaction passes26/29, then the actual native
+Run authority reservation reports EXHAUSTED. The remaining two recompaction and ten materialization cases time out.
+The fixed permanent quota is unchanged. This is a real shared-backend reclamation failure, not a passing Broker or
+GC gate. All60 Kafka inputs matched live/archive bytes at termination; the full archive remains exact. A subsequent
+test-only assertion change supersedes this manifest's current-source qualification; production inputs are identical.
+Kafka manifest SHA256 1f1e2c6582bd2f6918df80fedd0ac95ea9295198dd9d2f1efd0f0cd8f92e8dd5;
+XML SHA256 f237aafa5cea3cae90388f1aa8c56559a1edeee6bb5a524725901ae7b7e316df.
+
+A separate diagnostic dataset exercises the previously unreachable cancelled-output path. Its first10-case run
+has one failure: same-byte/new-version refresh is rejected earlier by nativeFact, while the fixture still expects
+the old final-reread message. The updated assertion checks the actual rejection and independently verifies that
+retry retains exact stored bytes but observes the new backend version. A missing static import causes one compile
+failure with no fresh XML; the corrected joint compile/Checkstyle passes15s. No production guard is weakened.
+The final build/m5-kafka-native-authority-facts-cancelled-current run passes10/10 with zero failures/errors/skips,
+actual Gradle exit0 and all60 current/archive input hashes exact. This is cancelled-output evidence qualification
+only; it does not replace the failed shared-backend run or qualify complete floor/reference/grace/native disposition.
+Kafka manifest SHA256 c4f12e534706c4c609da4a1167b504152c539e5f52c424eb4ac8e8d4014c818d;
+XML SHA256 776f516ad2c95e1e1e7c2d350b7b9fadf6312c77904a0647a9b64c6f8d3bd863;
+result SHA256 b82a5811a583c3cd4414adf0459ed6c529108a6254f0482f2a657d4a1242585a;
+cleanup SHA256 860036d11909b34792f39a6a45b5f81460456898d11ff821613a8e1e70f304ca.
+All owned datasets are removed and original containers are unchanged. Source781/legacy757 live/archive hashes
+remain exact. These case groups overlap and are never summed into a unique passing aggregate.
+
+Native Binding retention/compaction policy generation, projection registration domain and audit/grace authority
+clock/deadline definitions remain unresolved. The accepted Native-only decision covers only its designated Kafka
+classes; the existing policy clarification remains pending. These missing semantics cannot be replaced by empty
+reference declarations or caller-supplied time. Full production reference/grace assembly and genuine reclamation
+are still required before permanent quota can settle. All17 obligations/five children and full M5 remain OPEN;
+no commit/push, physical-delete authority or final coordinator review.
+
+### Accepted retention, projection and epoch-grace implementation decisions (2026-10-16)
+
+The coordinating conversation has resolved the three policy choices previously awaiting clarification. They no
+longer block implementation; this decision is not runtime qualification or whole-M5 acceptance.
+
+Native Pulsar retains its actual installed native retention time/size and compaction semantics. Persist the finite,
+fully resolved semantic values and stable Deployment/Namespace/Topic source identity in the current same-key P1
+Binding policy snapshot, with an explicit schema, canonical root and checked monotonic activation generation.
+Actual owner/ManagedLedger configuration must match. Missing upstream versions are not invented: exact P1
+activation generation/key/backend-version/stored value is the activation fact. Unknown configuration or drift vetoes
+trim/GC. Updates freeze affected admission, drain original actors/tickets/UNKNOWN, exact-CAS the successor generation
+and reopen admission; an unactivated external change stops M5. Historical NTA1 and frozen bytes remain unchanged.
+Native time/size sentinels and consumed sealed-prefix rules remain those of the locked Pulsar version; all cursor,
+replication, recovery and other floors remain effective. REPLACED_REPRESENTATION and UNPUBLISHED_ARTIFACT do not
+require advancing logical trim; they still require their complete reason-specific semantic/reference qualification.
+
+ADR0016's0.2 profile excludes ProjectionMapStore, secondary-protocol serving and cross-protocol migration/backfill/
+activation/authority-transfer runtime. Persist and verify that exclusion through actual product/Cell/Binding
+capability and closed writer admission, retaining both projection enums and their owners. A qualified observation
+may report nonconstraining/no-reference for that closed domain; local service absence or a hardcoded empty list is
+insufficient. Existing export/recovery/migration references or unqualified historical admission continue to veto.
+M4 selector projection and M5 materialization maps are not Access Projection. No new projection registry is required.
+
+Grace uses one actually fenced GC authority owner's nonreusable epoch and monotonic clock domain. Its finite positive
+duration is an explicitly persisted admitted policy value, at least every applicable audit/provider lower bound.
+Real business-audit references remain vetoes. Timing starts only after successful exact confirmation of the first
+complete observation's persisted mark; elapsed work before confirmation does not count. Only the original qualified
+producer may issue readiness after the full duration in that same epoch, followed by the required complete rescan
+and exact current-reference/owner rereads. Caller-supplied numeric time or boolean readiness is not production proof.
+Owner change, restart, clock loss/anomaly or uncertainty invalidates elapsed proof: a new legal epoch must reconfirm
+its own initial mark and wait the full duration again. Late old-owner callbacks fail current fencing. Existing
+DELETE_INTENT/UNKNOWN uses original-resource reconciliation, never a new deletion on timer reset. Any new versioned
+clock-domain mark/proof extension preserves historical wire and does not reinterpret legacy numbers as Unix time.
+Reuse existing owner/executor/target authority; no distributed wall clock, global ticker or new retry framework.
+
+The shared57-case failure must be accounted from actual capacity, reserved/settled counters, pending state and
+active/permanent byte components. Head.usedBytes includes both active reservation charge and retained permanent
+entry/authority/member/compact-DONE costs. Settlement refunds only unused reservation after exact compact DONE;
+permanent evidence is not deleted. The next runtime milestone is one real REPLACED or UNPUBLISHED resource through
+all vetoes, physical deletion/UNKNOWN reconciliation, compact DONE, settle and renewed reserve on the same backend
+under the existing fixed capacity. Explain permanent and in-flight usage before repeating the affected shared gate.
+The13 reported failures comprise the first EXHAUSTED rejection and12 later timeouts, not13 established root causes.
+All17 obligations/five children remain OPEN; no commit/push or M6 authority follows from this decision.
+
+### Epoch grace mark and reference-proof integration (2026-10-20, implementation continues)
+
+The current target authority adds a wire7 envelope around unchanged canonical wire4/5/6 bodies. Its same-key mark
+persists the admitted positive duration, original complete-observation root, actual GC owner/capability facts and a
+nonreusable clock domain. The original Session starts System.nanoTime only after exact mark confirmation; retries
+retain that candidate and clock. A writer admission invalidates the original confirmation while retaining the versioned epoch profile; the native
+route rejects downgrade to legacy time qualification. Reconstructed Sessions wait again, native owner
+replacement fences old readiness, and same-byte/new-backend-version changes invalidate the confirmed observation.
+BK native epoch/intent formats and both quota capacities are unchanged; the mark fits the existing bounded Oxia
+resource-authority value reservation and creates no separate clock service, thread, ticker or mutable authority.
+
+Initial reference capture enumerates all15 classes and exactly rereads its authority vector, without claiming elapsed
+time. The new reference-proof wire3 carries the epoch mark separately and requires its legacy timestamp fields to be
+zero; old proof wire1/2 keeps its original meaning and bytes. Only original opaque readiness can promote the full
+rescan, whose capture root must match the initial observation. Epoch qualification, identity-read fencing and intent
+binding use readiness-aware entry points; native BK intent binding/dispatch rejects this profile without readiness
+and rechecks its actual resource, mark and current native epoch before dispatch. Legacy numeric proof APIs cannot
+promote an epoch profile. Production duration admission, provider/audit minima and actual protocol collectors remain required; marked
+READ_FENCED/INTENT epoch renewal is implemented by the recovery continuation below; no business audit reference is overridden by this time component.
+
+Four focused suites pass203 cases (retention138, authority14, coordinator37, quota14), all zero failures/errors/skips.
+The final focused tests plus required v2M5RetentionCoreCheck and v2M5TargetDeleteAuthorityCoordinatorCheck pass24s. The retention source checker
+now verifies both conditional-transaction and serialized logical-trim commit paths and rejects a direct unfenced
+one-key publication; its old compareAndSet literal assertion was obsolete after the accepted trim refactor.
+The permanent v2M5EpochGraceRealTest is registered in the existing Gradle/source gate and passes one real BK/Oxia
+case on build/m5-epoch-grace-real-profile, with fresh XML and actual Gradle exit0 (13s). It exercises real750ms waits,
+reconstructed clocks, a changed native owner, exact-version invalidation, full library rescan, marked intent binding
+and readiness-free rejection before physical dispatch. Protocol reference statements in its final library phase are
+explicitly synthetic; no physical deletion occurs. This is a dependency test, not production reference-free or GC
+qualification. A separate-JVM epoch-grace restart has not been qualified. All784 captured live/archive inputs match;
+original containers are unchanged and the exact owned backend is removed. The earlier CAS-1 failure remains archived
+at build/m5-epoch-grace-real-reference: the fixture incorrectly reused observation epoch2 for its first M5 identity
+read. The correction supplies a first M5 observation under the already advanced real native owner; the CAS guard is
+unchanged. Earlier actual red/green source archives remain evidence of their respective captured source only.
+
+The read-only quota diagnostic now separates active reservations, permanent entry/authority/member/DONE costs, birth
+costs, pending state, revision and capacity on a native Run admission rejection. Actual Kafka main/joint test compilation
+and main/test Checkstyle pass18s against seven independently matched current task-local runtime JARs; the diagnostic
+failure path has not yet produced a current exhaustion-accounting receipt. The original failed57-case dataset did not retain
+its head snapshot; its active-versus-permanent exhaustion distribution remains unmeasured. Do not infer that every
+EXHAUSTED result is reclaimable or count its12 later timeouts as independent root causes. Real protocol GC, compact
+DONE, quota settlement and another reserve on the same fixed-capacity backend remain the next functional closure.
+All17 obligations/five children and whole M5 remain OPEN; the original goal is active, with no commit/push or M6.
+
+### Kafka source initialization fence (2026-10-20, closed writer qualification pending)
+
+The M4-qualified Kafka path now persists a capability-bound source initialization record at the existing selector key
+before opening its native BK source. M5BS wire1 has no selected view and is not an M4 selector. The projected M4
+view remains absent until exact activation with the real source view. Activation writes Binding authority wire6,
+retains the complete original initialization bytes and names their digest as predecessor. Ordinary selector, Task,
+worker, retirement and trim successors preserve that provenance. Historical wire1–5 remains unchanged; an existing
+selector cannot import startup provenance. Pending initialization rejects mutable lifecycle writes. Reopening keeps
+the original source scope; native Owner/Run-root recovery remains responsible for old SDK operations and roots.
+
+This record does not certify that historical writers were closed. It carries no closed-writer enrollment, no
+Native-only/projection policy and no reference-absence statement. Legacy history is not upgraded to qualified C
+history, and first-admission policy/enrollment plus all actual Kafka floor/reference writer guards and collectors
+remain necessary before real GC. The runtime ordering is implemented and will be covered by the affected full
+source gate when the functional collector/recovery chain is ready; the external Broker gate has not run on this
+source. No new expiry, background service or deletion permission is introduced.
+
+The affected four unit suites pass183 cases (Task9, retention138, history15, Oxia route21), zero failures/errors/skips.
+Compile and scoped formatting/Checkstyle pass16s after correcting one overlong Javadoc line. The existing real
+BK/Oxia cold-owner case passes with fresh XML/Gradle exit0 in9s at build/m5-binding-bootstrap-real-current: pending
+initialization, a fresh route retaining original bytes across a changed proposed scope, real selector activation,
+transaction state and reads across cold Owners. Its declared capability/protocol fixture is synthetic; it grants
+only source-initialization/read dependency evidence, not production closed-writer or GC qualification. All
+785 captured live/archive inputs match; original containers are unchanged and the owned backend is removed.
+The earlier epoch-grace archive remains exact for its captured source; its live source manifest is superseded by
+these common Binding changes. Whole M5 and all17 lifecycle obligations remain OPEN, with no commit/push.
+
+Kafka joint main/test compilation and main/test Checkstyle now pass18s against seven built/published JARs matched
+byte-for-byte in the task-local repository. Source bootstrap uses one cohesive helper to keep the existing open
+method within its unchanged complexity bounds; the initial complexity-check failure is retained. The four document/
+design gates and retired-history source/contract checks pass22s. v2M5RetentionCoreCheck passes; the broader
+v2M5RetiredHistoryCheck stopped at its existing real BK carrier prerequisite because that invocation supplied no
+backend URI. That aggregate is not passed or waived and remains for the required backend acceptance. No full Kafka
+source/Broker gate or protocol GC acceptance is claimed by these compile/component results.
+
+### Epoch grace recovery for closed reads and intents (2026-10-20, protocol GC pending)
+
+READ_FENCED and DELETE_INTENT now retain their closed writer admission while a successor clock confirms a fresh
+same-key mark and waits the full duration. EPOCH_GRACE_RENEWAL_PENDING is a durable recovery veto. The old eligibility
+remains historical evidence and cannot qualify the new clock. A full fresh15-kind rescan and original opaque readiness
+are required to replace it. Reconstruction creates a new domain and consumes an exact successor; it cannot recover
+elapsed time from persisted numbers. The original read attempt remains fixed. INTENT renewal requires an actually
+fenced successor native Owner and retains its exact physical identity, delete attempt and intent authority revision.
+A pending intent cannot bind, dispatch or complete absence, even with elapsed readiness; fresh eligibility is required.
+
+Historical wire4/5/6 and the wire7 epoch envelope remain unchanged. A new inner wire8 represents the combination of
+an already-refreshed dispatch history and a pending grace veto; it is still inside the existing bounded wire7 epoch
+envelope. Older decoders fail closed on the new combination. The native Oxia route checks that a pending transition
+is exactly the prescribed successor of the closed predecessor, retaining its qualifications/identity/intent. A failed
+read observation preserves the pending barrier. Successful typed refresh clears the veto and revalidates the actual
+Owner, original native identity and every eligibility fact before exact CAS. No new timer, thread or authority key
+is introduced, and no old clock value is reinterpreted.
+
+Four affected unit suites pass193 cases (authority14, coordinator37, retention138, native route4), all zero failures/
+errors/skips. Compile and relevant Checkstyle pass. The existing v2M5EpochGraceRealTest passes one fresh real BK/Oxia
+case in17s at build/m5-read-epoch-renewal-real-intent, including actual Owner replacement under READ_FENCED, rewait,
+reconstructed producer rewait, full library rescan, preserved read attempt, and two successive INTENT takeovers.
+Both the original and previously refreshed intent retain fixed identity/attempt and reject binding/dispatch/absence
+completion while pending. Actual native INTENT binding succeeds only after qualified refresh. No physical deletion
+occurs. Protocol eligibility/reference statements remain explicitly synthetic; this is recovery/clock/native-binding
+dependency evidence, not production C or GC qualification. All785 live/archive inputs match; original containers
+are unchanged and the exact owned backend is removed. The earlier assertion failure remains at
+build/m5-read-epoch-renewal-real-current: the obsolete assertion expected a version mismatch although native current-
+Owner checking correctly rejected the old coordinator first. The corrected READ_FENCED-only trace is retained at
+build/m5-read-epoch-renewal-real-corrected for its earlier captured source.
+
+Actual cross-JVM epoch-clock restart, admitted duration/provider/audit minima, complete real Kafka/Pulsar protocol
+collectors, native Cell UNKNOWN recovery, and same-backend physical GC/DONE/quota reuse still require the integrated
+runtime acceptance. The existing source and external Broker gates have not run on this source. Prior startup/epoch
+archives remain exact for their captured source; their common runtime inputs are superseded. Whole M5/all17 lifecycle
+obligations and the five children remain OPEN; no commit/push or M6 authority follows from these dependencies.
+
+### Native Access Projection exclusion and physical policy references (2026-10-21, C assembly pending)
+
+An explicit new first-admission policy, NATIVE_PULSAR_ONLY_WITHOUT_ACCESS_PROJECTION_V2, persists ADR0016's0.2 runtime
+exclusion in the actual P1 authority. The existing createNativeOnly overload and three-argument creation request
+retain NATIVE_PULSAR_ONLY_V1; old wire1–5 and the original policy-root bytes remain valid. New policy2 uses a distinct
+root domain and enum tag in the existing wire5 policy slot. Existing aggregates cannot acquire or replace this
+policy through creation/migration. Older readers reject its unknown tag. Both policies retain the four Kafka
+reference exclusions; only policy2 rejects Access Projection/migration/export writer tickets before external dispatch.
+Ordinary M4 selector projection and materialization maps remain subject to their existing reference producers.
+
+The actual Native Binding now exposes a projection floor only after verifying the exact original P1 policy/version,
+first-factory admission, closed writer enrollment and current source scan. Old-policy or missing-policy Bindings veto
+that floor. The physical-reference producer additionally reads the existing active resource/member inventory, checks
+actual protocol Cell and every member's Pulsar domain/Binding, then rereads membership and the original P1 scan. It
+emits only explicitly excluded kinds: five for policy2, four for policy1. Each physical row targets the immutable
+resource digest and carries both exact P1 and physical-inventory facts with the typed observed coverage. It neither
+adopts missing inventory nor substitutes local service absence, zero floors or aggregate digests for physical identity.
+
+Compilation/Checkstyle and139 retention unit cases pass, including legacy policy bytes/root behavior, distinct policy2
+identity and projection-writer rejection/policy replacement conflict. Required v2M5RetentionCoreCheck passes22s.
+The existing Native owner cases80/81 pass on real BK/MinIO/Oxia at
+build/m5-native-pulsar-offload-green-native-policy-exclusion-current: old policy continues to veto projection exclusion;
+new policy2 is explicitly selected before first SDK admission, survives cold factory recovery, rejects an export writer
+and observes the real discarded Task output through P1 plus actual physical membership. SDK/provider prerequisites and
+module validation also pass:18 fresh suites/174 cases (module161, Native SDK5, provider5, owner2, namespace-negative1),
+zero failures/errors/skips. The owner invocation exits0 in59s. All651 captured live/archive inputs match; source archive
+is copied after terminal completion only after every captured live hash matched, and every archived copy is verified.
+Original containers and all12 owned Pulsar source paths are preserved; owned containers/networks/volumes are removed.
+The initial local scoped-format helper failed during included-build configuration before compilation; its root guard
+was corrected, without changing the Pulsar checkout or build configuration.
+
+This proves the declared policy and these Native capture paths only. Complete15-kind C assembly, Audit/Grace and
+retirement producers, admitted policy-duration/provider minima, actual protocol GC/UNKNOWN/DONE/quota reuse and the
+required full candidate acceptance remain open. No physical GC qualification, M5 receipt/Final, commit or push is
+created by this result. Prior epoch/startup and Native captures retain their archived-source meaning; changed common
+P1 inputs supersede their live manifests. All17 lifecycle obligations and the five children remain OPEN.
+
+### Native P1 audit obligations and original physical-writer reconciliation (2026-10-21, complete C pending)
+
+New Native Bindings may explicitly initialize an empty business-audit domain before first admission. The existing
+creation overloads leave the domain absent; absent/legacy domains cannot produce audit ABSENT or a nonconstraining
+floor. P1 wire6 carries the bounded canonical domain and preserves it through factory, scan, trim, ticket and retirement
+transitions. Wire1–5 and existing policy-root bytes are unchanged. Initial imported holds and changes to the domain's
+presence on creation retry are rejected. Each obligation binds its immutable physical resource, typed Pulsar coverage,
+original ID and admission generation. Business obligations have no local expiry and are distinct from GC epoch grace.
+
+Native registration reopens the actual assigned quota route and physical membership, verifies first-factory/P1 enrollment,
+and acquires the existing resource D writer ticket before the exact P1 CAS. Original-operation ownership survives
+observer cancellation. A lost reply retains the original ticket until an exact reread confirms the original hold or a
+later P1 version excludes its conditional write; reconciliation never reissues registration. Successful reconciliation
+remains terminal even after the business hold is later cleared. Clearing requires the complete original hold including
+its generation; a late clear cannot remove a replacement using the same ID. P1 source scans block audit mutations and
+metadata retirement retains live obligations. Generic AUDIT_GRACE mutation tickets cannot bypass this inline domain.
+
+The Native audit producer returns PRESENT/ABSENT from the exact P1 domain plus reread physical membership under the
+same source scan. Floors use ledger/entry positions and actual directory order, validating covered sealed-ledger bounds
+without equating independent observation digests. A live hold constrains trim; only an explicitly initialized empty
+domain can produce a known nonconstraining audit floor. These business-reference rows do not establish elapsed grace.
+
+Retention unit tests141 pass, including strict wire/domain bounds, legacy absence, same-P1 scan exclusion, unknown reply
+reconciliation and generation-safe clear. Production/test compilation, Checkstyle and Native Spotless pass. Required
+v2M5RetentionCoreCheck passes20s; closed-writer source/contract and documentation checks pass. Existing
+real cases80/81 pass with the actual first P1 audit domain, physical orphan output, applied-but-lost P1 reply, original D
+cleanup, PRESENT and empty-domain ABSENT captures, typed cursor-directory floor and same-ID reuse. Captured validation:
+build/m5-native-pulsar-offload-green-native-audit-domain-current,18 fresh suites/174 cases, zero failures/errors/skips;
+Owner2 cases exit0 in59s. All652 captured live inputs and post-terminal archived copies match. The source archive was
+copied only after terminal completion and every captured live hash matched. Original containers and the12 owned Pulsar
+paths are unchanged; all owned containers/networks/volumes are removed. Earlier local failures were compile/style errors
+and two incorrect new-test expectations (lost-reply reread returns EXISTING_EXACT; first registered generation is3),
+corrected without weakening assertions. The prior projection capture remains exact for its archive and is superseded
+for changed live P1/Binding inputs.
+
+Complete15-kind C assembly and the retirement/reconciliation producer remain pending, as do actual retention policy and
+provider-duration minima, protocol GC owner/epoch readiness, physical delete/UNKNOWN/DONE/quota reuse and final candidate
+acceptance. This is a business-audit dependency result, not physical-delete qualification, receipt or Final. All17
+lifecycle obligations and the five children remain OPEN; no commit/push or M6 authority is created.
+
+### Native physical-reference composition and exact observation lifetimes (2026-10-21, GC qualification pending)
+
+The Native control path now collects all15 reference classes from existing actual producers under the same original
+P1 source scan: five first-policy exclusions, two cursor/recovery classes, four generation/read/protection classes,
+Task ownership, business audit, physical membership and retirement/reconciliation. It retains PRESENT observations,
+rejects missing/duplicated classes, and rereads the complete authority vector before returning. Original cursor and
+Task captures remain caller-owned through consumption; cancelling the returned observer does not release them.
+
+The aggregate retirement coordinator verifies original first-factory/enrollment, a current P1 source-scan fence and
+no outstanding mutation tickets. Native aggregate retirement consumes that same P1 cell; the control producer also
+uses the actual M4 batch/protection enumeration and original Owner drains. Unreleased physical sources remain PRESENT;
+permanent RELEASED history cannot recreate readability. The shared-member producer uses the actual complete resource
+inventory. A single matching Native member can be ABSENT for that class; multiple scopes remain PRESENT and foreign
+membership vetoes. This result does not qualify multi-Binding shared reclamation or erase historical members.
+
+Generation observation accepts only the actual retained Task/cursor captures with the same exact scan and allocator.
+Every other unresolved Cell reservation remains a veto. Its temporary reservation normally advances the Cell head;
+Task consumption therefore asynchronously rereads the original live hold, native owner and identical remaining
+reservation inventory before refreshing only actual allocator facts. Task/worker/source/namespace facts stay fixed.
+Task close waits for an accepted original refresh before releasing capacity. Cancelling its observer cannot cancel
+the original read, and closing prevents a late refresh from publishing usable roots.
+
+Real validation first detected stale allocator facts after generation drain. The first fix then exposed a synchronous
+wait inside an Oxia completion callback; refresh is now an asynchronous dependency. Neither the exact freshness check
+nor timeout was weakened. The original stale-version red source is archived with all652 captured digests verified:
+two known later additions were removed only in archive buffers to reconstruct matching original bytes. Its provenance
+explicitly records reconstruction; no worktree rollback was used. The intermediate async capture also remains exact
+for its archived source and is superseded by the final close/drain change.
+
+The final existing cases80/81 pass on real BK/MinIO/Oxia at
+build/m5-native-pulsar-offload-green-native-c-reference-inventory-drain: the actual orphan has all15 unique complete
+reference classes with matching immutable target and typed cursor coverage; a live audit is PRESENT and the explicitly
+cleared domain yields ABSENT. A held actual Cell reread proves cancellation/close retain the original capacity until
+its callback completes. Retention unit cases141, production/test compilation, Checkstyle and Native Spotless pass.
+Runtime prerequisites plus module/Owner/namespace checks produce18 fresh suites/174 cases, zero failures/errors/skips;
+Owner2 cases exit0 in61s. All652 live inputs and post-terminal archived source copies match. Original containers and
+all12 owned Pulsar paths are preserved; owned containers/networks/volumes are removed. Required retention-core,
+lifecycle design, documentation and closed-writer source/contract checks pass together in27s.
+
+This closes the scoped Native reference-inventory composition, not complete C qualification. Retention policy/floor
+assembly, an admitted GC owner and provider/audit minima, original epoch readiness, a complete reference-free proof,
+physical delete/UNKNOWN/DONE/quota reuse, shared multi-Binding composition and final candidate acceptance remain pending.
+No clock or deletion qualification, receipt/Final, production authority, commit or push is created. All17 lifecycle
+obligations and five independent children remain OPEN.
+
+### Native GC owner facts and first-admitted grace policy (2026-10-21, deletion eligibility pending)
+
+Cell Provider profiles preserve their original wire2 bytes when no GC policy is present. Explicit configured
+provider/audit minima and a finite positive duration use wire3; duration must meet both declared minima. The actual
+configured SDK builds this profile before its first materialization writes. Scope identity commits the policy bytes;
+existing per-Cell profiles stay frozen. The old constructors retain absence, which never means zero grace. GC opens
+only an exact already admitted profile through a read-only catalogue path; it cannot create, migrate or replace one.
+Business audit obligations remain separate non-expiring references.
+
+PulsarNativeGcScopeV1 reuses the actual Cell allocator, original cursor observation, existing executor and configured
+SDK loan. Every owner check reads/decodes the real profile/head and verifies the original private UUID and non-reused
+native Cell generation. The Native owner fact is a read-only projection of those persisted fields plus immutable
+resource identity and actual scope version. Its opaque native version carries that owner identity and scope version;
+it does not claim to be an Oxia row/version. The private metadata port rereads native fields for this fact, rejects
+writes to it, forwards all durable D operations to the original bound Oxia route and reports multi-key transactions
+unsupported. Reservation head revisions do not change native owner identity. D's resource observation sequence stays
+separate: first observation1, then the existing exact successor rule. A displaced owner requires the actual native
+Cell generation's confirmed durable drain, never a caller number, lease timeout or unrelated BK ledger.
+
+A mark captures the exact D predecessor before the complete actual15-kind scan, so a resource writer cannot slip
+between the scan and a later predecessor read. PRESENT references veto. Owner/policy facts join the initial root.
+The original candidate and invocation survive observer cancellation and UNKNOWN; retry reconfirms that candidate
+without rescanning into a different root or restarting a confirmed clock. Elapsed readiness comes only from the
+original producer after exact persistent confirmation and actual System.nanoTime waiting. No caller time or duration
+is accepted by this Native API. Restart/owner uncertainty still requires a new legal scope and a full wait.
+
+A resource-owning GC observation groups its accepted child I/O under the existing cursor observation lifetime.
+Independent observation slots remain bounded at2; each GC scope separately admits at most2 public calls and2 internal
+I/O frames. Closing waits for original accepted work, including reads through an externally held elapsed credential.
+Cancelling an observer cannot release the original operation or SDK loan. No thread, timer service or retry queue is
+added. These facts qualify configured elapsed grace only; actual provider/object retention restrictions, complete
+native eligibility, reference-free rescan and dispatch admission remain separate checks.
+
+Provider registry/codec unit tests6 pass, including independent legacy wire2 bytes, wire3 roundtrip/distinct identity,
+invalid/short duration rejection and read-only reopen without admission. Compilation, Checkstyle and Native Spotless
+pass. Existing real cases80/81 at build/m5-native-pulsar-offload-green-native-gc-owner-group-current exercise the actual
+first policy, real orphan, held/applied D mark, cancelled observer, lost reply, exact original reconciliation,
+unconfirmed-clock rejection, actual25ms wait and close waiting for the original readiness read. The native projection
+also observes resource epoch1 while independently verifying the actual native owner. Runtime/module/prerequisite checks
+produce18 fresh suites/174 cases, zero failures/errors/skips; Owner2 cases exit0 in64s. All653 live inputs and
+post-terminal archived copies match. Original containers and12 owned Pulsar paths are unchanged; owned containers,
+networks and volumes are removed. Required retention-core, lifecycle, documentation, closed-writer and metadata
+unit/style checks pass together in29s.
+
+Initial local compile/style failures were corrected. The first real fault hook used a relative key and missed the
+actual native Oxia key; the mark had completed normally, and the hook now uses the real namespace assignment. The
+Native fact integration then detected duplicate accounting of one GC operation and its child CAS; the grouped
+lifetime fixes this without increasing independent observation capacity. That red source/archive retains all653
+verified captured inputs. The earlier profile/counter preparation capture remains exact only for its archived source.
+
+The Native owner/time preparation now has real evidence, but the complete retention/floor producer, actual applicable
+provider/object policy collection, full C rescan/proof, D read-fence/intent/absence/DONE composition, quota reuse,
+shared multi-Binding and cross-process recovery acceptance remain pending. Prior C/audit captures retain historical
+archive meaning; their changed live common profile/owner inputs are superseded. All17 lifecycle obligations and five
+children remain OPEN. No physical delete qualification, M5 receipt/Final, production authority, commit or push follows.
+
+### Native installed retention time/size and policy floor (2026-10-21, complete C/D pending)
+
+The current Native factory now persists the actual resolved ManagedLedgerConfig retention time/size before first
+SDK parent creation, then confirms installation only after the original SDK opens with that exact private config.
+M5PC wire1 records the original first-factory identity, exact native values, local P1 policy generation and optional
+actual installing factory identity. P1 outer wire7 carries it; absent configuration preserves wire1-6 bytes and the
+original NTA1 projection. These are local activation facts, not invented upstream Namespace/Topic policy versions.
+Old Binding/parent history cannot import missing policy. Pending, missing or mismatched configuration cannot supply
+the BINDING_EPOCH_POLICY floor.
+
+ManagedLedgerConfig.copyWithFrozenRetention is opt-in and copies existing SDK resource references while freezing
+retention setters and the clock reference. The Native qualified path requires the concrete config and system UTC;
+the ordinary SDK config remains mutable. Direct retained SDK config edits therefore cannot bypass policy activation.
+An explicit update uses the original P1 CAS only after all old reference/SDK tickets drain, advances the local policy
+generation and remains pending until a new actual SDK installation confirms the configured values. Old configuration
+is rejected on cold open. Existing source-scan state excludes updates and invalidates observations on every P1 change.
+
+The original cursor observation now also supplies an installed-policy floor. It uses actual native directory,
+sealed-ledger lengths/timestamps, current cursor consumption and current UTC under the existing P1 source fence.
+It follows this dependency's consumed sealed-prefix time-expired OR remaining-size-over-quota rule, including strict
+time comparison and native size units. Negative values retain their actual unit-converted infinite semantics; zero
+retains native immediate semantics. It stops at the first retained ledger and always protects the current/last
+ledger and unconsumed data. No-cursor capture requires the confirmed policy; unresolved compaction/recovery properties
+still veto policy-floor qualification. Missing lengths and missing expiry timestamps cannot invent eligibility.
+The witness binds actual policy bytes, time and ledger facts. This does not complete the other floor producers,
+reference-free proof, provider/object policy collection or physical-delete dispatch.
+
+Retention unit tests142 and Native config/algorithm tests2 pass; compile, scoped format and Main/Test/P6 Checkstyle
+pass. The first real capture build/m5-native-pulsar-offload-green-native-retention-policy-current executed17 fresh
+suites/173 cases without test failures but exited1 on one new test-log LineLength violation, before Owner dispatch.
+Its655-input source archive remains exact. The corrected capture
+build/m5-native-pulsar-offload-green-native-retention-policy-style-current passes4 fresh suites/13 cases, zero failures,
+errors or skips (SDK5, S3 drain5, Owner2, namespace-negative1). Module163 cases are UP-TO-DATE in this corrected run
+and are excluded from its fresh count; they passed in the preceding source capture. Owner2 completes in66s and
+actually verifies first install, frozen SDK configuration, active-writer update rejection, drained generation2,
+pending-before-install and cold old-config rejection. Existing Native Task/GC grace/reference checks also pass.
+All655 live inputs and post-terminal archived copies match. Original containers and13 owned Pulsar paths remain
+unchanged during validation; owned containers, networks and volumes are removed. Protected Native Data Client stays
+at SHA256 54816dc2f2cfd3d484fc8e73da69449ccd198dba733533d9b825c2cea5b2273f.
+
+The preceding GC-owner/grace capture remains exact only for its archived source; common Native policy/config inputs
+have changed. Complete floor assembly, actual applicable provider/object restrictions, full C proof/rescan and D
+read-fence/INTENT/absence/DONE, quota reuse and whole-M5 acceptance remain pending. All17 lifecycle obligations and
+five children remain OPEN; no physical-delete authority, receipt/Final, production authority, commit or push follows.
+
+Current implementation: [policy record](../../../../nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5PulsarRetentionConfigurationV1.java), [Native factory](../../../../nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/PulsarNativeManagedLedgerFactoryV2.java), [actual floors](../../../../nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/PulsarNativeCursorFloorScanV3.java).
+
+Required retention-core, lifecycle, documentation, closed-writer contract/source and metadata provider-policy
+unit/style checks pass together in32s after this change. This remains bounded component/Native evidence.
+
+### Native full floor inventory, provider veto and unpublished GC integration (2026-10-21, preparation superseded below)
+
+The original Native producers now compose all10 floor classes. Lifecycle Task absence reuses actual terminal plans,
+resolved original birth credits and Cell drain; shared-source absence requires an exact exclusive member inventory.
+Unqualified shared members still veto. The floor operation joins the original cursor observation drain, including
+cancellation. Binding/epoch, cursor, generation, Kafka, Access Projection and audit observations retain their actual
+source/version checks. This does not qualify shared multi-Binding deletion.
+
+The original S3 SDK loan now checks actual bucket versioning/Object Lock and exact-version legal hold/retention under
+the existing executor. A missing legal-hold field still requires an independent retention check. Active holds,
+unexpired retention and unknown/permission/bucket failures veto. Expiry uses the response's actual server Date;
+per-object absence here is not DONE. The locked MinIO07c3a429 has an explicit NoSuchObjectLockConfiguration/400 for
+an absent per-object field; only this exact response is accepted as field absence, not arbitrary400 errors.
+The corresponding pinned handlers are [upstream source](https://github.com/minio/minio/blob/07c3a429bfed433e49018cb0f78a52145d4bedeb/cmd/object-handlers.go#L2670).
+
+The floor/provider capture build/m5-native-pulsar-offload-green-native-gc-policy-floor-fixed-current passes19 fresh
+suites/176 cases with zero failures/errors/skips. Actual policy checks cover empty per-object policy, retention-only,
+legal-hold veto, actual server-time expiry, exact-version absence and missing-bucket veto. Native Owner2 cases take66s;
+all655 source inputs and post-terminal archived copies match. The initial per-object-policy400 failure is retained
+with its exact655-input source archive. Source changes for the following C/D work supersede that capture's live inputs.
+
+PulsarNativeGcScopeV1 now derives an unpublished candidate from the actual assigned credit, terminal Task, resolved
+pending-output graph, source-scan fence and exact selected Native graph. It collects current floors plus a full15-kind
+rescan after elapsed readiness, then enters the existing READ_FENCED/exact identity/INTENT/absence/compact DONE/quota
+settlement path. It retains original exact phase candidates across in-process UNKNOWN and observer cancellation;
+it does not replace an existing cold READ_FENCED/INTENT with a new attempt. Cold frontend reconciliation, other
+reclamation reasons and whole-M5 acceptance remain pending. SDK delete/reconcile uses the existing executor and SDK;
+no new thread, queue or timer service is introduced.
+
+A rescan must be complete and fresh; its entire hash need not equal the initial hash because the original bounded
+observation itself advances Cell accounting versions. Initial observation root remains persisted in the same mark.
+The assembler still checks the actual epoch/capability, all current facts, every reference disposition and that the
+same D mark is current before and after proof construction; a resource writer invalidates that mark. The actual
+source-scan fence stays current through C/D. A new owner also considers a prior mark with no read fence when choosing
+the next resource epoch and proving its predecessor's real durable Cell drain.
+
+Compilation/style and214 retention/assembler plus9 S3 unit results are valid. The first complete Native integration
+capture build/m5-native-pulsar-offload-green-native-unpublished-gc-current reaches actual new-owner/full-grace and C
+proof assembly, then exits1 because the new reader passed a4096 single-key cap above the existing1024 bound; no physical
+delete occurs. Its655-input source archive is exact. That parameter and the required directory leaf prefix are fixed;
+the current actual deletion run is pending. No new physical-delete, Final or production authority is claimed.
+
+### Native unpublished deletion, settlement and real Task readmission (2026-10-21, bounded loop verified)
+
+The original Native path now completes one terminal/unselected SDK output through actual10-floor capture, full15-kind
+reference rescan, original epoch readiness, exact D eligibility CAS, READ_FENCED, native full identity reread,
+DELETE_INTENT, exact-version S3 deletion, authoritative absence, compact DONE and original quota settlement. An
+independent S3 HEAD of that exact version returns404. Replaying the same invocation returns the same terminal without
+new dispatch. The original exact phase candidates, external identity and delete attempt remain retained in-process
+across uncertain responses; this positive run does not by itself qualify all UNKNOWN/restart combinations.
+
+A second actual GC owner follows the first observation's confirmed durable Cell drain, chooses resource observation
+epoch2 and waits a new full25ms. Initial CAS-1 now accepts the exact confirmed epoch mark/context and matching complete
+proof, including a later epoch before the first read fence. Legacy mark-absent CAS-1 still requires epoch1 without a
+predecessor. The new component test rejects wrong contexts and legacy/missing epoch proofs. Eligibility generation is
+checked current D authority revision+1, not an unrelated floor counter. The reader uses the existing1024 single-key
+bound and original Task directory prefix; key/version/length/full hash remain exact. Native SDK delete/reconcile runs
+on the existing executor and original client loan, including namespace/identity reads.
+
+After DONE/settle, the same namespace/backend, original capacity and retained source data admit a new actual mapped
+source cold owner. The normal source API persists another complete Plan, performs actual SDK writes and full output
+verification, and obtains new physical quota reservations. The reservation count increases and available bytes
+fall while capacity stays identical; prior permanent history remains. The source then closes through ordinary
+unpublished quarantine/drain. This is actual producer readmission, not a fabricated resource or a new dataset.
+
+Current capture build/m5-native-pulsar-offload-green-native-gc-quota-readmission-current passes4 fresh suites/13 cases
+(SDK5, S3 drain5, Owner2, namespace-negative1), zero failures/errors/skips, Owner2 in90s. Module163 is UP-TO-DATE and is
+excluded from this fresh count; it passed in the preceding common-source capture
+build/m5-native-pulsar-offload-green-native-unpublished-gc-confirmed-epoch-current (19 fresh suites/176 cases,
+zero failures/errors/skips, Owner2 in75s). All655 current input hashes and post-terminal archived copies match.
+Original containers and13 owned Pulsar paths are unchanged during validation; owned containers/networks/volumes are
+removed. Retention/assembler/state-machine unit results229 and S3 unit results9 pass; compile/style/P6 checks pass.
+
+The earlier reader-bound, eligibility-revision and initial-epoch integration failures remain archived at their exact
+655-input source captures. They each failed before physical dispatch. The current implementation fixes the producer
+inputs or requires the confirmed mark/proof; it does not relax native owner fencing, version identity, writer closure,
+legacy compatibility or quota capacity. The previous Native floor/provider capture is historical source evidence.
+
+This loop is bounded Native evidence. It does not close cold READ_FENCED/INTENT frontend recovery, all native UNKNOWN
+combinations, shared multi-Binding eligibility, Kafka's original shared57 gate/fixed500M accounting or all M5
+requirements. Those remain active work. All17 lifecycle obligations and five children remain OPEN; no receipt/Final,
+whole-M5 or production physical-delete authority is promoted, and no commit or push follows.
+
+Required retention-core, lifecycle, documentation, closed-writer contract/source, metadata provider-policy unit/style
+and S3 unit checks pass together in32s for this loop. This does not promote any lifecycle obligation or evidence child.
+
+### Native cold recovery integration and independent HEAD correction (2026-10-21, bounded validation passed)
+
+Native frontend recovery now branches from the actual persisted READ_FENCED or INTENT, keeps the original
+read/delete attempt and external identity, renews grace under a drained/fenced native owner and uses the
+existing typed refresh operations. A necessary same-resource test recreates GC/cursor/Task observations and
+reconnects actual Oxia clients between applied-but-lost READ_FENCED and INTENT replies; old elapsed
+credentials must fail and reservations remain unsettled until DONE. This is controlled drained frontend/client
+reconstruction, not a kill-9 or cross-JVM claim.
+
+The first cold integration capture build/m5-native-pulsar-offload-green-native-gc-cold-read-intent-current
+reaches persisted READ_FENCED after the injected lost reply, then fails its independent HEAD because that
+assertion used the unsuffixed base bucket while the actual scenario uses a suffixed bucket. The previous
+positive loop's independent404 assertion had the same test defect and is not independent exact-version absence
+evidence. Its production D reader used the admitted actual namespace and its raw result/source remain
+historical; the incorrect independent assertion is explicitly superseded. The correction uses the resource's
+actual containerIdentity for every independent HEAD and adds a pre-delete exact-version existence check, plus
+presence after each uncertain phase and404 only after DONE. The failed cold capture's655-input source archive
+is exact. Cold recovery and the corrected independent check remain pending current actual validation. The
+actual-container retry build/m5-native-pulsar-offload-green-native-gc-cold-actual-container-current confirms
+initial exact-version presence and presence after the applied-but-lost READ_FENCED reply, then fails because
+the closed old scope rejects synchronously while the test expected an asynchronous exception wrapper. Its655
+inputs and post-terminal archive match. The assertion now requires the exact closed-scope error; production
+checks are unchanged. No frozen history, capacity, source dataset, commit or authority flags are promoted. The
+subsequent original-attempt and cause-chain captures retain exact655-input archives. Cold phase1 rejects
+before INTENT because typed read refresh eagerly starts predecessor validation alongside readiness,
+overlapping two checks of the original Provider admission. Typed refresh now starts predecessor validation
+after readiness completes; all native/freshness checks remain required. Current
+build/m5-native-pulsar-offload-green-native-gc-cold-sequential-refresh-current passes19 fresh suites/176 tests
+with zero failures/errors/skips, including the2 Owner cases in105s. All655 captured inputs and their
+post-terminal archived copies match. Independent HEAD uses the actual containerIdentity: the exact version
+exists before GC and after each uncertain READ_FENCED/INTENT phase, and is404 only after compact DONE.
+Original read/delete attempts and external identity survive both drained/client reconstructions; each
+successor waits full grace, reservations remain charged until terminal, exact replay is stable, and a real new
+Task writes/verifies through the same backend and unchanged quota afterward. Original containers and13 owned
+Pulsar paths remain unchanged; owned backend containers/networks/volumes are absent. The52
+coordinator/state-machine unit tests and compile/style checks pass. This bounded result does not establish
+cross-JVM/kill-9 recovery, every UNKNOWN refresh path, multi-Binding eligibility, the original Kafka
+shared57/fixed500M gate or whole M5; all17 obligations/five children remain OPEN. The same-resource case now
+also injects applied-but-lost CAS replies at each new typed read/dispatch refresh and retries the original
+local attempt. This necessary UNKNOWN validation is pending; the preceding green archive remains exact but its
+live-source match is superseded. The required-check retry first found a coordinator formatter correction;
+that14s formatting failure is not a passing gate. The refresh UNKNOWN red capture
+build/m5-native-pulsar-offload-green-native-gc-refresh-unknown-red-current has an exact655-input archive and
+reaches an applied read-refresh candidate, then rejects the original retry with "epoch grace confirmed
+authority changed". The Native attempt now retains the original mutation result and candidate bytes. A retry
+authoritatively rereads the same key: exact candidate bytes permit continued current-owner/clock
+qualification, exact original predecessor permits the original mutation retry, and any different/absent value
+remains unresolved. The normal exact identity, eligibility/owner, dispatch, DONE and settlement checks still
+follow. Current build/m5-native-pulsar-offload-green-native-gc-refresh-unknown-original-candidate-current
+passes19 fresh suites/176 tests with zero failures/errors/skips; Owner2 completes in108s. Both
+applied-but-lost typed refresh candidates retain original attempts/identity and unsettled quota, then the
+original retries reach compact DONE, exact replay and same-backend actual new-Task admission. All655 current
+input hashes and archived copies match; the independent actual-container pre/intermediate/post checks pass,
+original containers and13 owned Pulsar paths are unchanged, and owned backends are removed. These specific
+UNKNOWN paths are validated; this does not claim every native UNKNOWN combination or cross-JVM/kill-9
+behavior. Required retention-core, lifecycle, closed-writer contract/source, documentation, metadata profile unit/style and S3 unit checks pass together in36s after the formatter correction.
+
+### Kafka fixed-capacity GC continuation (2026-10-21, implementation in progress)
+
+The Native cold/refresh loop above closes only its bounded resource path. The original Kafka57 shared sequence and
+500_000_000-byte capacity remain the next gate. Current native fallback retirement ends after M4 RELEASED/read-scope
+transfer; the existing BK native GC owner and run finalizer still need actual complete C producers and runtime
+composition. No deletion, quota settlement or positive shared57 claim is inferred from those helpers.
+
+The first current-source prerequisite run at build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-27597 stops in
+its legacy wrapper, after all23 suites/116 actual cases pass with zero failures/errors/skips and native BK/Oxia
+restart reads finish. The wrapper still expected7 TaskSelection cases although the actual class now has9, including
+the two existing bootstrap compatibility/rejection tests. Its original761 captured inputs and post-terminal archive
+match; the failed wrapper does not produce a successful run summary. The wrapper now requires9 plus both exact
+bootstrap test names; the downstream legacy total becomes116. Current source qualification is being rerun after this
+necessary gate correction. No test, failure or skip check is removed.
+
+The original Kafka57 fixture does not opt into ledgerGc; the actual defaults remain enabled=false/dryRun=true.
+The designated coordination decision now explicitly permits M5_SEALED_TARGET_CONFIRMED_DRAIN_V1 only after first
+persisted admission in the existing BK namespace/Cell/Binding authority. The existing enabled/dryRun total switches
+also govern this path; defaults and the old lease/orphan drain/late-create-audit path stay unchanged. The new profile
+requires actual sealed identity, fenced/drained original creation, no late-create/adoption/UNKNOWN, exact required
+M4 RELEASED and complete actual reader/writer/reference closure. Its positive monotonic-epoch grace must meet every
+actually applicable admitted provider/audit minimum; unknown minima and business audit holds veto. Owner/clock restart
+rewaits the full duration. No Object configuration, second authority root, new background GC framework or inferred
+zero minimum is introduced for BK.
+
+The positive gate may explicitly enable that profile with enabled=true/dryRun=false while keeping the original57
+scenario order/data/backend lifecycle and capacity500_000_000. No per-case reset/namespace swap, direct test eligibility,
+manual physical delete or refund is allowed. The old disabled/dry-run failure remains historical; its configuration
+is not expected to refund via physical GC. First close one actual Kafka sealed-resource delete/DONE/settle/new-reserve
+loop on the same backend, then run the enabled57 gate and account permanent residuals.
+
+NATIVE_KAFKA_LOG_RETENTION_V1 is also accepted for explicitly first-admitted Native Kafka Bindings. Persist the exact
+policy/version, actual KRaft image/config provenance and closed protocol/state-writer admission in the existing
+bootstrap/selector family. Ordinary user-data retention does not wait for group committed offsets; only the group
+floor gets a sourced nonconstraining row. This neither alters internal-topic BK_ONLY obligations nor removes actual
+producer/transaction/replica/recovery/read/pin/source references. Pulsar/projection exclusions require their actual
+closed admission, and audit remains real configured holds/grace. Old/missing/unknown/drifted policy remains vetoing.
+Implementation and current Kafka qualification of these accepted policies remain pending. The actual Goal status was
+rechecked as active; all17 obligations/five children remain OPEN. No submission, push or M6 authority is granted.
+
+The next current-source run at build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-34424 passes the corrected
+legacy116 gate, then fails its actual BK epoch-grace dependency because the test assumes the shared namespace has
+exactly one reservation. Actual reservedResources is109 after preceding source cases; no grace/Owner assertion
+failed. Its785 captured inputs and post-terminal source archive match. The test now compares the observed before/after
+head, requiring exactly one additional reservation, no new settlement and this exact target's reservation unsettled.
+It preserves shared history and the no-delete intent assertion. Compile/style checks pass9s. A new current source run
+is verifying that correction; no success summary is claimed for the failed run.
+
+The subsequent run build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-46806 passes the corrected shared-head
+epoch assertions, then the bound-delete fixture rejects a new native GC claim because its separate native quota
+was deliberately initialized for two resources. The newly added non-deleting epoch test retains its original native
+Owner reservation; it must not refund or delete that target merely to make the older bound-delete fixture pass.
+The failed run's785 captured inputs and archived copies match. This is separate from Kafka's500M canonical quota.
+
+The source entry now requires the epoch-grace test in its own owned, retained GC profile before the original M4
+source fixture. The new scripts/run-v2-m5-epoch-grace-check.py reuses the existing isolated real test and exact BK/Oxia
+images, captures/archive-checks current sources, requires fresh1/1 XML with no failures/errors/skips and verifies
+owned cleanup/original containers. The source script verifies that child and includes its XML/input/result hashes;
+it no longer dispatches the same non-deleting test inside the two-resource fixture. The original M4 quota is not
+expanded and no test is omitted. The public v2M5EpochGraceProfileCheck task exposes the independent prerequisite.
+This is two bounded profile results, not one shared-capacity proof and not the future enabled Kafka57 gate. Current
+combined source-entry validation is running; no passing source summary is claimed yet.
+
+The stock-owned Kafka configuration now exposes an optional explicit sealed-target profile name, finite positive
+millisecond grace and deployment audit-policy file reference. The existing six-argument LedgerGc constructor keeps
+an empty M5 selection; enabled/dryRun, old drain/late-create-audit values and their validation remain unchanged.
+Selecting the profile while the total switch is closed still leaves that switch closed. Missing/unknown/incomplete
+selection is rejected, and configuration parsing performs no audit-file I/O or durable admission. The audit/provider
+facts, first authority persistence, current checks and physical GC composition remain pending. The actual Kafka
+server config test class passes7/7 with zero failures/errors/skips; main/test Checkstyle also passes in22s at
+build/m5-kafka-sealed-gc-config-checks.log. This is a configuration prerequisite, not a provider minimum, empty audit
+proof, GC authorization or quota refund. These four Kafka files are outside the running Nereus source/classpath
+manifest, whose independent epoch profile722 hashes remain exact.
+
+Kafka startup now loads a selected profile's bounded UTF-8 Properties audit-policy input before opening the native
+control connection. The input explicitly names schema NEREUS_M5_KAFKA_AUDIT_POLICY_V1, deployment.id, kafka.cell.id,
+provider.scope.sha256, provider.configuration.sha256, policy.catalog.sha256, business.audit.domain and
+minimum.grace.ms. Only FIRST_ADMISSION_EMPTY_V1 is accepted as an initial-domain request, not proof that an existing
+domain is empty. Duplicate/unknown/missing fields, foreign actual deployment/Cell/capability/catalog or grace below
+that explicit audit minimum reject startup. Raw original bytes are retained for later first-admission persistence
+and drift checks; selected M5 also requires actual M4 admission. No policy file alone closes writers or references.
+The core compile attempt at build/m5-kafka-sealed-gc-policy-input-compile.log is blocked by the old task-local Nereus
+JAR repository, whose classes lack the already-existing prepareSourceBootstrap and describeUsage methods. It is not
+a passing core compile. Current source-qualified JAR publication/compile and loader/runtime validation remain next;
+Nereus source validation is still running, so its runtime outputs are being preserved until terminal.
+
+The current source prerequisite now passes at build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-61277:
+30 suites/184 tests with zero failures/errors/skips, including the independently retained epoch profile. All786
+current source hashes and archived copies match; the legacy child separately passes23 suites/116 tests. The summary
+SHA256 is80f65a288b3b6f0ade2a779204660d1a08ada1280390840e9ad9508ab22aea7d. This remains synthetic protocol
+statements over real BK/Oxia and a bounded source dependency, not production delete/whole-M5 authority. Owned named
+backend resources are absent. Seven task-local published JARs match current builds, including the six exact artifacts
+bound by that source summary. Kafka core compile/main Checkstyle then passes13s against those current JARs.
+
+The new Kafka policy-input tests use actual stock config snapshots and bounded files, with only the KafkaConfig
+accessor mocked; they do not mock provider success or manufacture eligibility. Both tests pass with zero failures,
+errors or skipped tests, and core main/test Checkstyle passes together in38s. Kafka source/XML archives are retained
+at build/m5-kafka-sealed-gc-policy-input-verified-source. Earlier old-JAR and formatter attempts remain failed history.
+First bootstrap/selector persistence, actual writer/floor/reference qualification and sealed-target deletion/settlement
+remain implementation work; input validation does not establish any of those facts.
+
+The Kafka policy now has a bounded canonical wire and first-bootstrap representation in the existing selector key.
+Policy-free bootstrap wire1 remains byte-identical; policy bootstrap wire2 activates authority wire7, while old
+Binding authority wires1–6 retain conservative decoding. Current policy generations and business audit holds remain
+on that same authority. An exact source-scan fence excludes policy/Task writers by the same CAS, retains the original
+OPEN predecessor, and rejects stale metadata versions. Lost CAS responses retry the original exact candidate.
+The related policy5/Task9/retention142 unit tests and storage-object/Oxia main/test checks pass in13s at
+build/m5-kafka-policy-source-cas-tests.log. These are model/CAS tests; actual Kafka first admission, closed writer
+qualification and physical reclaim are still pending. These captured-source edits supersede the live-source scope
+of the earlier Native655 and Kafka-source786 results; their archived inputs remain exact.
+
+Kafka now supplies the explicitly selected initial policy to prepareSourceBootstrap before opening its guarded SDK
+source. It captures the actual topic incarnation, KRaft image offset/feature and effective LogConfig, records
+canonical sorted JSON values, the original deployment audit-input SHA and enabled/dryRun identity, and rejects
+an old/missing or immutable-profile-mismatched bootstrap. Native config changes use the same Binding policy CAS
+before installing new values; initial log attachment also checks the current applied configuration. Exact source-scan
+capture overloads reuse existing replacement/cancelled-output readers and reread their full original authority.
+These calls are implemented, but actual first-policy broker admission and all-floor/reference GC composition have
+not yet been qualified. The policy input/first-model3 tests and main/test style pass34s before the latest attachment
+and capture additions; that limited result is retained, not described as validation of those later additions.
+
+The owned real BK/Oxia epoch prerequisite at build/m5-epoch-grace/owned-94896 passes1/1 in23s. The existing epoch
+case additionally observes this SDK/profile's provider minimum through the actual permanent namespace assignment
+and rejects a foreign metadata incarnation. The confirmed-drain implementation has no additional provider time hold
+only after exact create fencing/resolution, sealed identity and completed M4 drain; it reports0 from this source-bound
+profile, not from caller-supplied absence or UNKNOWN. Positive deployment audit grace and every target prerequisite
+remain mandatory. This run validates namespace/epoch behavior and issues no physical delete; it cannot qualify
+full references, business hold absence or whole M5.
+
+The formatted current-source prerequisite now passes at build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-1521:
+30 suites/184 tests, zero failures/errors/skips; all788 current inputs and post-terminal archives match. Its legacy
+child2101 separately passes23 suites/116 tests with763 exact archived inputs. Summary SHA256 is
+e8c7bd99f2debb37af9494310bf1df119b775e1d84c018761a496fb4f81bf282. The earlier96055 run failed mandatory Spotless
+before legacy acceptance; its original763 inputs were archived before repair and no passing summary was fabricated.
+These remain prerequisite profile results over separate owned fixture lifecycles, not shared57 or production authority.
+
+GC total-switch identity is now carried in the mutable native-configuration generation, alongside actual LogConfig
+values; the explicit original audit-policy bytes remain immutable. Therefore closing GC on a restart can update the
+current configuration without pretending the admitted audit policy changed. This correction supersedes the earlier
+wording that put switch identity in the immutable audit input. The policy3 unit tests and Kafka main/test style pass36s.
+The existing native fixture now has one selected-profile policy/config-writer case; its actual Broker run is next.
+The real-read source-capture overloads and first-attachment policy check compile and pass style. Native GC epoch
+quota and Cell limits also initialize before any guarded ledger reservation for explicitly selected profiles, preserving
+existing values without import/expansion; canonical quota stays500_000_000 and native epoch capacity is separately
+fixed at500_000_000. Native dispatch/possible-UNKNOWN slots both use the actual configured maxConcurrentDeletes.
+The last startup addition compiles and passes main style in16s. It does not prove a delete or quota settlement.
+
+The actual selected-profile Broker case now passes at build/m5-kafka-policy-first-native-current: fresh1/1 test,
+zero failures/errors/skips,7.833s; Gradle/build/style/SpotBugs succeeds in33s. It opens the explicit first policy before
+SDK source admission, verifies the persisted bootstrap/current policy and25ms grace with actual provider0/audit10ms
+inputs, performs real Produce/rollover, then applies topic config and broker-default changes through actual KRaft
+publishers. Current native capture matches each persisted policy, and old captures are rejected after changes.
+All67 captured Kafka inputs remain exact; owned containers are absent and original containers are unchanged.
+This establishes that bounded first-policy/config-writer path only. Closed writer enrollment, the complete10-floor/
+15-reference producers, per-target audit/epoch qualification, actual Kafka delete/DONE/settle/readmission and enabled
+shared57 remain unfinished. Native GC capacity initialization is exercised here; no physical delete is dispatched.
+
+The next Kafka admission refinement binds five concrete Nereus mutation owners to exact source hashes from the
+already verified source manifest and their actual loaded tested JARs. Their fixed directory covers10 floor classes
+and15 reference classes. The immutable pre-SDK admission input now retains the original audit input and this source
+inventory; first selected-log attachment persists the matching writer enrollment at the existing Binding key.
+Missing/mismatched source identities or an existing native Owner head before a new bootstrap reject admission.
+Neither that absence check nor the directory alone establishes reference absence; all actual histories and per-target
+facts remain to be collected. This refinement supersedes the live-source scope of the preceding67-input Broker run;
+its archive/result stay exact. Current compile/style and a rerun of the changed first-policy contract are pending.
+
+The source-bound writer refinement passes the actual Broker case at build/m5-kafka-policy-writer-native-current:
+1/1,12.712s, zero failures/errors/skips; build/style/SpotBugs succeeds in22s. Assertions read the persisted five-source
+inventory and matching writer enrollment (all10 floors/all15 references), then exercise real topic and broker-default
+writers. Original containers are unchanged and owned containers are absent. This directory is not a reference-free
+proof. Its original source archive is retained; subsequent scan-lifetime work supersedes its live-source qualification.
+
+Source-scan cancellation has an exact original-OPEN transition that advances the same authority generation
+without changing policy, enrollment or bootstrap. The deterministic delayed-request case confirms that a late
+original source-fence CAS conflicts after cancellation. Policy6/Task9/retention142 tests and styles pass14s
+(build/m5-kafka-policy-original-scan-cancellation-checks.log). The current source prerequisite passes at
+build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-36265:30 suites/184 tests, no failures/errors/skips; all788
+main and763 legacy live/archive inputs match. Seven runtime artifacts were rebuilt and published locally only.
+
+The owned Kafka scan retains its original attempt/predecessor and actual native Owner. It accepts observations
+only under that exact source-scan revision and keeps one scan per Binding. Owner close and configuration changes
+close admission, drain accepted observations, then reconcile the original fence/cancellation. UNKNOWN keeps the
+original ownership pending. Configuration callbacks perform that drain outside the native log guard, check the
+actual native Owner and Binding owner epoch before policy CAS, and stop new scans during the mutation. Storage
+detachment clears the old callback. The cancelled-Task/native protocol collector compiles with main/test style
+in18s; it is not yet a complete floor/reference or deletion proof.
+
+Actual scan/configuration validation remains pending. The first run at
+build/m5-kafka-policy-scan-drain-native-current fails1/1 on initial Owner readiness (32.722s), before the changed
+race assertions. Exact input archives and cleanup are retained. The diagnostic fixture now surfaces the original
+recovery exception instead of merely timing out. Documentation/lifecycle/closed-writer source checks pass20s
+(build/m5-kafka-policy-source-requalified-doc-checks.log). Complete native floor/reference production, physical
+Kafka GC/settlement/readmission and enabled shared57 remain unfinished. No receipt, lifecycle or Final status changes.
+
+The current owned scan/configuration race passes at build/m5-kafka-policy-scan-drain-native-recovery-cause:
+1/1,7.775s, zero failures/errors/skips; build/style/SpotBugs succeeds24s. The actual Broker case confirms the
+source fence, accepted-observation drain, rejection of the old observation, exact source-fence release, and native
+KRaft topic/broker-default application. Current Kafka inputs and source archives match; original containers are
+unchanged and owned containers are absent. The earlier initial Owner timeout remains a failed historical run;
+its underlying cause was not reproduced or established by this passing run. Kafka delete/settlement/shared57 remain open.
+
+The next native recovery change separates permanent create-scope/reservation observations from live ledger metadata.
+A new read-only fenced-scope API reads actual native fence/reservation revisions even after ledger deletion; it does
+not fabricate a seal or prove absence. Cancelled-Task evidence retains its immutable original drained seal and an
+optional distinct live seal. Native NoSuchLedger is accepted only for the same source-scanned persisted DELETE_INTENT;
+UNKNOWN, changed/unsealed identity and other absent states veto. Canonical GC facts exclude deleted ledger metadata;
+the permanent reservation reader no longer depends on ledger existence. The API and real-test sources compile and
+pass required style in10s. The existing applied-lost-delete real case now checks the permanent scope after actual
+absence; execution and the changed Kafka evidence composition remain pending. These changes supersede live-source
+qualification of the184-test prerequisite and70-input Broker case; both original archives remain exact. No GC success.
+
+The concrete cancelled-output adapter now binds10 floor classes and15 reference classes to the captured native
+policy, coherent protocol, immutable cancellation/terminal, actual complete Task Cell directory, permanent native
+create fences/reservations and exact physical member inventory. It conservatively preserves the already-published
+native trim; it does not compute a newer logical expiry. Group/Pulsar/Projection exclusions require the actual first
+Native-Kafka policy and source-bound writer enrollment. Unknown/open Task obligations, current public physical
+references, other physical members and actual business audit holds remain vetoes. Every captured dependency is
+retained for exact final rereads; deleted ledger metadata and mutable target-delete authority are not C freshness
+inputs. Source scan now rechecks the admitted implementation inventory against actual verified runtime JAR/source
+identities on each attempt. Adapter compile/style passes15s; the actual cancelled-output probe compiles/styles18s.
+Its Broker execution and full epoch-qualified C→D→settlement remain pending. The native permanent-scope change is
+being requalified at build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-75182, without reusing old JAR authority.
+
+The permanent-scope source run75182 fails its same-server restart read case: the new API incorrectly reused the
+raw-recovery guard requiring exactly one Run configuration, while the original Task spec retains multiple Parts.
+All788 failed-run inputs and85 fresh XML files are archived before repair; legacy763/116 and independent epoch
+evidence remain bounded prerequisite results. The new API now uses the existing Task membership/reservation reader
+and separately requires the exact permanent Task fence; the original raw recovery API stays strict. No assertion or
+fixture input was weakened. Requalification and actual cancelled-output execution remain pending. Source-registry
+recheck plus Kafka main/test compile/style pass23s (build/m5-kafka-unpublished-source-registry-checks.log).
+
+The repaired permanent Task scope passes the full source prerequisite at
+build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-89593:30 suites/184 tests, zero failures/errors/skips, including
+the original applied-lost-delete restart case with actual ledger absence. All788 main and763 legacy live/archive
+inputs match. Summary SHA-256 is d224eccd4dcdd4d740187df2f907b223e3371cc5a69c3391778093374aa4b0e9. The seven
+runtime artifacts were published locally in4s; the actual Kafka cancelled-output probe is now running against these
+qualified artifacts. The failed75182 source run stays archived; no assertion, quota, legacy defaults or data were
+weakened to obtain this result. This prerequisite does not establish Kafka reference completeness or deletion.
+
+The actual Kafka cancelled-output probe passes at build/m5-kafka-unpublished-reference-native-current:
+1/1,11.039s, zero failures/errors/skips; build/style/SpotBugs succeeds46s. Real Produce/materialization/cancellation
+precedes the owned source scan. The probe resolves10 floor classes and15 reference classes, independently rereads
+every returned authority version/hash, checks group constraining=false/floor=-1 and the actual retained native
+frontier, then confirms unchanged policy/logical trim after scan release. All72 current and archived Kafka inputs
+match (manifest bbe6d520fd2f5ef70d8d89432b20543990cb8b1f60597fe20dc47dadc8f40cd1). Original containers remain
+unchanged and owned containers are absent. Documentation/lifecycle/closed-writer source checks pass22s. This is
+actual cancelled-output input/floor qualification, not an epoch-qualified reference-free or deletion result.
+Actual Kafka GC epoch/grace, C→D, compact DONE, settlement/readmission and enabled shared57 remain open;17 lifecycle
+obligations and five evidence children are unchanged. Native scope and source archives are retained. The unusable
+thread snapshot created during the earlier timeout investigation was removed (7bytes); no user files were removed.
+
+The owned Kafka source scope now composes the existing native GC epoch, canonical route, Cell budget and C producers
+for cancelled Tasks. It retains original mark/session/candidates/INTENT per target, uses the Broker scheduler for
+the admitted positive grace, captures a complete initial vector, and performs a fresh scan before eligibility.
+Deletion and compact DONE/quota settlement use existing production coordinators. Disabled/dry-run rejects new
+OPEN-target dispatch; existing callback-terminal UNKNOWN requires exact native absence reconciliation before a new
+epoch. Completed Parts are retained as permanent DONE and settled on retry instead of requiring missing live ledger
+metadata. Source close cancels grace observation, drains accepted operations and closes its owned native delete client
+before releasing the source fence. Actual same-backend GC→settle→new Task reservation and minimal switch-negative
+checks have been added but have not run. The earlier72-input probe remains exact in its archive; current Kafka source
+has advanced. No full C/D/shared57 or M5 authority is claimed from this composition.
+
+GC composition and the real loop/switch fixtures compile with main/test style in17s
+(build/m5-kafka-native-gc-real-loop-checks.log). The first actual loop at build/m5-kafka-native-gc-loop-current
+fails1/1 (12.312s) before identity-read fencing or deletion: eligibility used the Binding observation generation
+where D requires exactly target.authorityRevision+1. The adapter now reads the exact confirmed D mark and derives
+that successor revision while retaining independently sourced floor generations. No state-machine check was
+changed. Its corrected actual rerun is pending. Original containers were unchanged and all owned containers were
+removed. The failed source/XML/archive remain intact; no GC, refund or readmission success is claimed from it.
+
+The actual Kafka GC→compact DONE→settlement→new materialized Task reservation loop passes1/1 (19.870s) at
+build/m5-kafka-native-gc-loop-permanent-members; build/style/SpotBugs succeeds36s. Assertions verify real BK absence,
+permanent compact DONE, retained quota entries and unchanged physical member inventories via the existing permanent
+namespace scan, fixed500_000_000 capacity and successful distinct new Task/ledger reservations. ReservedResources
+is the active count: settlement decrements it while the sum of active and settled entries stays constant. The earlier
+active-counter and active-only member-reader test mistakes remain failed history; neither production guard changed.
+
+The same loop plus disabled/dry-run controls pass3/3 (34.949s) at
+build/m5-kafka-native-gc-switches-and-loop-current; build/style/SpotBugs succeeds51s. Both closed switches preserve
+actual ledger presence, exact D records and quota accounting. Disabled uses the unchanged valid false/true settings;
+the initial invalid disabled/non-dry-run fixture is retained as a failed attempt. Both passing runs retain73 exact
+source archives; owned containers are absent and original containers unchanged. Their live-source scope is now
+superseded by the shared57 hook. No aggregate/Final/production authority follows from these bounded results.
+
+The explicitly enabled shared57 run at build/m5-kafka-shared57-enabled-gc-verified-profile ended57 tests/51 failures
+(177.811s), with73 exact archived Kafka inputs and complete owned-resource cleanup. It used the original three methods,
+scenario data/order, one continuous BK/Oxia backend and fixed500M capacity. Failures exposed first-policy checks that
+rejected unrelated metadata-image updates, a fault proxy decoding bootstrap records as full Binding authority, and
+eager budget access after the original Owner closed. These results do not establish a quota failure or a passing gate.
+The repair compares actual topic incarnation/effective log configuration/feature inputs, passes bootstrap writes through
+the fault proxy, and reads the GC budget only after current-Owner eligibility. The first style attempts rejected added test-helper
+complexity, now split into the existing policy helper without relaxing limits. Compilation/style pass15s and the existing
+publication18 group passes18/18 (143.644s) at build/m5-kafka-publication18-bootstrap-style-qualified;73 live/archive inputs
+are exact and cleanup is complete. Documentation/lifecycle/writer contract checks pass22s. The repaired shared57 ends57 tests/13 failures
+(680.683s) at build/m5-kafka-shared57-enabled-gc-startup-repaired, with exact73-input archive and complete cleanup.
+The first failure is again COLD_REPLACEMENT_RECOVERY_REFRESH: fixed500M canonical quota has472 active reservations,
+zero settled resources,499,323,066 charged bytes,676,934 available and1,057,887 required for the next reservation.
+Later failures retain the same exact head. The cancelled-output cases run after exhaustion, so their hook has not
+settled any resource. This is actual evidence that replaced-source GC/settlement must also be connected before this
+shared gate can pass; neither history deletion, quota expansion, scenario reordering nor data replacement is permitted.
+Only actual sealed cancelled outputs under a current admitted native Owner enter source-scan GC after original assertions;
+selected outputs and unresolved/closed-Owner cases remain retained. Shared cases add no readmission data. Original disabled
+and enabled failures remain archived. Replaced-source GC, interrupted-owner recovery and overall M5 acceptance remain open.
+
+The actual quota failure now drives a local extension of the owned GC composition to replaced sources. The same
+native source-scan lifetime, original target attempts, epoch/grace, D coordinator and settlement path are reused.
+The common C input/reference producer retains reason-specific cancelled terminals or actual selected descriptors,
+semantic transfers, M4 RELEASED, read scopes, quiescence, protocol/Task and physical-member facts. Each physical target
+owns a native client admitted to its exact original create scope. Source-scan capture separates permanent DONE from
+active targets so a later target can rescan after an earlier deletion. Ordinary non-GC capture stays strict; unresolved
+missing metadata is retained rather than treated as successful recovery. Existing warm/cold assertions precede the GC
+hook. Required replacement coverage asserts a nonempty actual reference-free physical cut, not a skipped cleanup.
+Compilation and main/test style pass18s without threshold changes. The bounded replacement plus existing cancellation
+and switch controls are running at build/m5-kafka-replacement-and-unpublished-gc-current; no success is claimed yet.
+The earlier18 and shared57 archives remain exact, while current Kafka sources have advanced. Full shared57, replacement
+UNKNOWN/cold-owner interruption handling and the complete M5 acceptance remain open.
+
+The first replacement/cancellation/switch run ends4 tests/1 failure (57.735s) at
+build/m5-kafka-replacement-and-unpublished-gc-current; the existing three cases pass and cleanup is complete. The new
+replacement case is rejected by exact freshness because a scoped M4 capability key was read as a raw Oxia key.
+The input adapter now rereads the complete verified quiescence vector through the existing Binding route; the kernel
+freshness check is unchanged. Its four-case rerun is in progress at build/m5-kafka-replacement-gc-quiescence-route.
+
+The quiescence-vector reread run ends4 tests/2 failures at build/m5-kafka-replacement-gc-quiescence-route: replacement
+waits beyond its30s observer budget, and cancellation sees an unrelated metadata-image update during GC capture.
+The exact timeout's internal stage was not established. Rather than reread the entire M4 interval for each key,
+the source scan now owns the existing exact lifecycle store for its actual namespace/partition/Binding. Quiescence
+keys are reread asynchronously through that scoped store; its key/version rules and the kernel freshness checks remain
+unchanged. Native cut capture now checks the relevant actual topic/configuration/feature/Owner inputs, as first-policy
+capture already does. No timeout was enlarged. The four-case rerun is at build/m5-kafka-replacement-gc-direct-binding-route.
+
+Direct Binding reads compile and pass main/test style/SpotBugs. Their actual run at
+build/m5-kafka-replacement-gc-direct-binding-route ends4 tests/1 failure: the three original cases pass, while the
+replacement observer again reaches30s. Cleanup is complete. No internal-stage or performance conclusion follows from
+this timeout. The replacement fixture now records actual per-target D states and settled-resource counts at timeout;
+a replacement-only diagnostic is running at build/m5-kafka-replacement-gc-wait-diagnostic with the same30s budget.
+
+The target-progress diagnostic at build/m5-kafka-replacement-gc-target-progress establishes7 actual replacement
+targets: at30s six are DELETE_DONE and settled, while the last is DELETE_INTENT. The earlier diagnostic attempt
+stopped at style before execution; it was split without changing limits. The fixture now budgets30s per sequential
+target while retaining its original240s scenario bound; production timing/grace and all state-machine checks are unchanged.
+The replacement/cancellation/switch suite passes4/4 (87.010s), build/style/SpotBugs103s, at
+build/m5-kafka-replacement-gc-per-target-budget. Its74 live/archive inputs match and cleanup is complete. Actual
+replacement targets are absent, compact DONE and settled; permanent physical members remain exact and selected
+read bytes before/after GC are identical. The original cancellation/readmission and both total-switch controls pass.
+This bounded result does not close replacement UNKNOWN/cold-owner interruption recovery or the whole M5 goal.
+The unchanged shared57 now runs at build/m5-kafka-shared57-replacement-and-unpublished-gc on one backend and fixed500M;
+all prior disabled/enabled failures remain archived. No aggregate/Final/production authority is established.
+
+The both-reason shared run ends57 tests/6 failures (1478.175s), build24m49s, at
+build/m5-kafka-shared57-replacement-and-unpublished-gc. Its74 archived inputs are exact and cleanup is complete.
+No EXHAUSTED failure recurs on the unchanged data/order/backend/capacity. This is51 passing cases, not gate success.
+The six failures are release UNKNOWN leaving a trim-write ticket; selected-byte probing after actual Owner close or
+same-value Owner-version refresh; one normal physical-refresh race whose injection was displaced by an added D read;
+and two cold-reader captures after the final append advanced the selector beyond the captured cold scope.
+Repairs now reuse the existing exact lifecycle-store trim-write reconciliation before fencing a source scan, compare
+the actual Owner fact including the original fallback fact version for GC admission, limit DONE classification to GC
+source scans, and run cold GC immediately after its already validated actual reader scope. The original later Produce,
+read and cache assertions still run, giving post-GC coverage. Unknown writes/Owner reads and stale scopes remain vetoes;
+no version check or original race assertion was relaxed. Main/test compilation/style validation is pending at
+build/m5-kafka-gc-retirement-fence-repairs-checks.log. Both bounded green and failed shared archives remain retained;
+current Kafka sources have advanced, and the complete M5 acceptance remains OPEN.
+
+The six scoped repairs compile with main/test style in19s. The original shared57 is rerunning at
+build/m5-kafka-shared57-retirement-fence-repaired, using the same source prerequisite89593, original methods/data/order,
+continuous BK/Oxia backend and fixed500M. Current sources are frozen for that run; no passing shared gate is claimed.
+
+The repaired same-backend shared gate passes57/57, zero failures/errors/skips, at
+build/m5-kafka-shared57-retirement-fence-repaired (1520.512s; build/style/SpotBugs25m47s). All74 live/archive Kafka
+inputs match; scenario names and order are identical to the prior57-case run, and capacity remains500_000_000.
+Owned containers are absent and original containers unchanged. Result SHA256 is
+11a2e68a71ce1f777a8c14a165013e483941ecd79af5f045f6c0e5366c6195f3; input manifest SHA256 is
+a6802a31a74b0e51c57810e39daeff897f9faa3f3bb5dae6cc5b1fe925f56b61. Documentation/lifecycle/writer contract checks pass22s.
+The prior disabled and all enabled failures remain archived. This closes the affected fixed500M shared regression,
+not the whole M5 acceptance:17 lifecycle obligations/five evidence children and interruption/UNKNOWN coverage still
+need their complete current-source audit. Native Pulsar evidence is being checked against current dependencies;
+there is no commit/push, aggregate/Final or production-authority promotion.
+
+Current Native evidence audit finds8 changed inputs among the prior655 captured inputs, including shared authority
+codec/records, Kafka route and BookKeeper native-scope APIs. The archived176-test result remains exact but cannot be
+promoted as current. Its existing real SDK/S3/BK prerequisites, first Native-only policy/owner case and original Task
+drain/GC case are being requalified at build/m5-native-pulsar-offload-green-native-kafka-gc-current-dependencies.
+The frozen Pulsar Native client and historical projection are unchanged. No optional Kafka matrix is started.
+
+The current Native dependency requalification passes19 suites/176 tests with zero failures/errors/skips at
+build/m5-native-pulsar-offload-green-native-kafka-gc-current-dependencies. Prerequisites complete in2m10s and the two
+original Native Owner cases in1m48s. All656 live inputs and manually archived exact copies match; all owned containers,
+networks and volumes are absent, and existing Pulsar dirty paths are unchanged. Result SHA256 is
+ad3866a8153b37fbb733c1806c829b94bff750686fcbe1f81446b65f1751fef7; input manifest SHA256 is
+b2c409f18eefce0cfcc4392248051fd90ade2f1b3f088953416f431a2d525732. The six89593 source-prerequisite JARs still match
+their qualified hashes. This refreshes the bounded Native scope; controlled frontend reconstruction remains distinct
+from kill9/cross-JVM recovery. Full lifecycle/five-child and aggregate acceptance remain unestablished.
+
+### BK-only internal-topic lifecycle audit (2026-10-21, in progress)
+
+The existing real BK/Oxia source tests cover user/internal topic routes but explicitly retain Controller/semantic or
+GC eligibility fixtures. The actual Broker57-case corpus compacts the user topic; its internal topics support real
+transaction traffic, not their own complete compaction/recovery/GC lifecycle. BK_ONLY_COMPACTION therefore remains
+unproved. A new actual Broker scenario uses Coordinator-produced OffsetCommit and transaction-state records, plus a
+user topic, on the existing BK/Oxia backend with no Object provider. Each topic must materialize/select, consume exact
+M4 release, delete/settle its actual replaced ledgers and survive cold ownership with independent protocol reads.
+Three selected caches coexist under an explicit finite three-Task Cell budget; canonical quota stays500M. The original
+57 methods/data are unchanged; their archive remains exact while the enclosing test-source file has advanced.
+The new entry compiles with main/test style in17s and is running at build/m5-kafka-internal-topic-lifecycle-current.
+No internal-topic lifecycle or whole-M5 pass is claimed before actual terminal results.
+
+The first internal lifecycle run fails1/1 before compaction or internal protocol traffic: the new fixture omitted the
+existing4KiB message.max.bytes bound, so conservative pre-offset append reservation rejects the default message upper
+bound against the small DATA budget. Production admission remains unchanged. The fixture now uses the same4KiB bound
+as the existing native corpus; quota remains500M. Cleanup is complete, and the repaired run is in progress at
+build/m5-kafka-internal-topic-lifecycle-bounded-batch. No internal lifecycle success is claimed from the initial run.
+
+The bounded-batch run ends1/1 failed (208.973s) at
+build/m5-kafka-internal-topic-lifecycle-bounded-batch; owned cleanup is complete. Actual replacement GC/settlement
+and both internal Coordinator cold-recovery checks completed before user-topic cold takeover failed with a nonpositive
+remaining recovery envelope. Selected-prefix recovery unconditionally bypasses newer native suffix checkpoints,
+forcing replay across the suffix despite its native bounded checkpoint cut. The repair now applies the existing exact
+checkpoint validation to that suffix as well; removed raw carriers remain excluded and stale extra locator sources
+remain a veto. The entry/byte/time limits and original fixture data/order are unchanged. Exhausted replay budgets now
+report their remaining dimensions explicitly. Current-source qualification is running at
+build/m5-kafka-selected-suffix-checkpoint-source.log; the actual Broker regression must then be rerun against those
+qualified artifacts. The earlier57/176 archives remain retained; their dependency scope predates this kernel repair.
+No internal-topic lifecycle or whole-M5 success is claimed.
+
+Selected-suffix checkpoint recovery is qualified at
+build/m5-kafka-run-source/nereus-v2-m5-kafka-run-source-59303:30 suites/184 tests, zero failures/errors/skips,
+788 exact live/archive inputs; its legacy dependency passes116 tests with763 exact inputs. The summary SHA256 is
+2f5ec9f0ce150d82efabe1c12a57833ae74347cc787b4cd97e62bec220bc772b. Local artifact publication completes in3s.
+The preceding54759 attempt stopped on formatting of the new diagnostic; its legacy failure log is retained.
+The unchanged actual Broker lifecycle fixture is now running at
+build/m5-kafka-internal-topic-lifecycle-selected-suffix-checkpoint using these exact artifacts. Native Pulsar's656
+captured dependencies still match current files, so its176-test result remains current within that bounded scope;
+the Kafka-only recovery kernel is outside that manifest. Full M5 acceptance remains OPEN.
+
+The checkpoint-repaired Broker run reaches successful user cold takeover, closing the original replay-budget failure,
+but ends1/1 failed (210.416s): the full-byte baseline preceded an asynchronous EndTxn marker, and the cold read correctly
+contains that later control record. The original complete equality assertion is retained. The fixture now waits for
+actual native LSO=HW after the transaction before taking its baseline; no data or operation order is removed.
+The rerun is at build/m5-kafka-internal-topic-lifecycle-stable-marker with the same qualified59303 kernel and fixed500M.
+The prior failure and full cleanup remain archived. Internal-topic lifecycle acceptance is still pending; the suppressed
+capture-release conflict during failed teardown must not be hidden if it recurs after the stable-prefix repair.
+
+The stable-prefix internal-topic Broker fixture passes1/1 (218.254s; build/style/SpotBugs3m55s) at
+build/m5-kafka-internal-topic-lifecycle-stable-marker. All75 live/archive Kafka inputs match, actual Gradle exit is0,
+and owned containers are absent with original containers unchanged. Actual Coordinator OffsetCommit/transaction-state
+records and user data each complete materialization/selection, exact M4 release, native replaced-resource deletion,
+compact DONE and quota settlement on the same BK/Oxia backend without Object storage. Cold internal-topic relocation
+preserves committed offsets and permits a new transaction; the stable complete user-byte baseline matches after cold
+relocation. Canonical capacity remains500_000_000. Result SHA256 is
+b2a870fed41123c5893f2e1e6fae7bfbf026ccc7e65191ef3cdc549cc72a437a; Kafka input manifest SHA256 is
+d766a1830c9c6c91f2f294f5cb385175b55fa410572e83d424bb7f4a2ad48937. There is no capture-release/fault-handler error
+in the green XML. The prior suppressed teardown conflict remains a recorded failure observation, not a separately
+proved shared-Cell defect. No speculative CAS repair is applied. The original shared57 archive and Native176 scope are
+retained; the Kafka archive predates this recovery-kernel repair, while all656 Native dependencies remain exact.
+This closes the bounded BK_ONLY_COMPACTION execution gap for these three topics. It does not promote the17 design
+obligations/five evidence children or establish whole-M5, Final, production or aggregate physical-delete authority.
+
+### Replacement GC interruption recovery (2026-10-21, in progress)
+
+A focused actual Broker case now withholds the original resource DONE write only after the real native delete
+completes. It must prove actual ledger absence, retained original INTENT and unsettled quota, close the source scan,
+then rebuild every GC client/fact and converge using the same resource/attempt before settlement. No cached metadata
+or synthetic absence can satisfy the recovery assertion. Replacement capture currently rereads CLOSED ledger metadata
+unconditionally; its behavior on this real absent-INTENT boundary is being tested at
+build/m5-kafka-replacement-delete-before-done-red-current. The first precheck stopped on fixture complexity/NCSS;
+conditional dispatch was moved into the new helper without changing style rules. Original57 scenario values/order
+are unchanged. This is controlled source-scan reconstruction, not kill9 or cross-JVM evidence.
+
+The real interruption case fails1/1 (33.434s) exactly after confirming native absence, original INTENT and unsettled
+quota, then rebuilding the GC scope: required CLOSED metadata fails with ZooKeeper NoNode for the deleted ledger.
+The red archive build/m5-kafka-replacement-delete-before-done-red-current has unchanged captured inputs and complete
+owned cleanup. Kafka capture now represents live CLOSED metadata and original absent-INTENT scope separately.
+The latter is allowed only inside the admitted source scan, with the exact original REPLACED_REPRESENTATION INTENT,
+current selected-generation authority key/version/value, actual permanent fenced create reservation and namespace,
+no writer tickets, and repeated real native absence. Other captures still require CLOSED metadata; unknown/foreign
+identity remains a veto. All current member, M4 release, protocol/ref/floor, grace, native epoch and dispatch checks
+remain in the existing owned GC path. Compilation/style passes13s; the exact Broker regression is rerunning at
+build/m5-kafka-replacement-delete-before-done-fenced-absence. No new SDK API or persistent wire is introduced.
+
+The preliminary13s default-config check did not select the dedicated native fixtures. The dedicated run caught an
+existing live-metadata test still using the old internal accessor; it now explicitly requires live().orElseThrow(),
+retaining its original strict native CLOSED observation. That compile failure is archived separately at
+build/m5-kafka-replacement-delete-before-done-fenced-absence and is not a runtime recovery result. The corrected run
+at build/m5-kafka-replacement-delete-before-done-current also requires complete selected bytes to match before/after
+scope reconstruction; success still awaits its actual terminal result.
+
+Reconstructed replacement GC passes1/1 (65.071s; build/style/SpotBugs1m38s) at
+build/m5-kafka-replacement-delete-before-done-current, zero failures/errors/skips. It confirms the original physical
+absence and retained INTENT before reconstruction, then the same original delete-attempt ID in compact DONE, actual
+absence for the full replacement cut, exact fixed500M settlement counters, unchanged selected bytes and complete
+Owner/cache drain. All76 live/archive Kafka inputs match; actual Gradle exit is0 and owned cleanup is complete.
+Result SHA256 is b2a870fed41123c5893f2e1e6fae7bfbf026ccc7e65191ef3cdc549cc72a437a; Kafka manifest SHA256 is
+2e17c0f40378571852606bf8f55fcc72606f61e05d527abd5580c58e90e1a1f9. The red33.434s and precheck/compile failures
+remain archived. Ordinary replacement GC, cancellation/readmission and both total-switch controls are rerunning at
+build/m5-kafka-gc-after-absent-intent-recovery on the same current implementation. The existing59303 kernel/source
+qualification is unchanged. This is source-scan reconstruction with actual BK/Oxia I/O, not kill9/cross-JVM proof,
+and does not establish whole-M5 or aggregate authority.
+
+The affected ordinary GC regressions pass4/4 (87.258s; build1m36s) at
+build/m5-kafka-gc-after-absent-intent-recovery, zero failures/errors/skips, covering live replacement GC,
+cancelled-output settlement/readmission, disabled GC and dry-run. Its76-input Kafka manifest exactly matches the
+reconstruction green run and all live/archive bytes; owned cleanup is complete. Result SHA256 is
+963ce54ca230a1c81e950dd740721fac7a3218408b736069d022391a0f18b686. This validates both ordinary and reconstructed
+flows on the same code. Documentation/lifecycle/closed-writer checks pass19s before the terminal metadata update.
+The earlier internal-topic75-input archive remains exact, but its enclosing Kafka implementation/test inputs have
+advanced; current-source requalification of that fixture is pending the complete campaign. The same applies to the
+historical shared57 dependency scope. Root59303 qualification and Native656-input dependencies remain unchanged.
+The17 design obligations/five evidence children remain unpromoted; no commit, push, Final or aggregate authority.
+
+### M5-E candidate input closure implementation (2026-10-21)
+
+The new scripts/m5-candidate-inputs.py prepares and independently verifies the full pre-commit Nereus/Kafka/Pulsar
+input cohort and later compares complete committed trees. It never commits, stages, checks out or resets the original
+repositories. All11 contract tests pass, including independent verification after deleting the original temporary
+repos, changed/deleted/untracked files, real commit equivalence, dependency-edge omission, ignored dependency drift,
+source mutation during capture, missing/extra nodes, unsafe links, mode changes and external Git alternates.
+The new Gradle contract gate plus documentation/lifecycle/writer checks pass36s (14 tasks).
+
+Actual preparation at build/m5-e-input-preparation/closure-first captures2273 Nereus,7150 Kafka and5541 Pulsar source
+entries plus1030 explicitly registered extra input files, with complete object/edge verification. Input root SHA256 is
+c17a5900518254fa4cd302389d1ca5d497610fb050ba1313f7deffe69bc0a77a; manifest SHA256 is
+901da9c3736f656b4f22507507138b4c55edd8d7544f0dc92d593758c1eba154. An independent process running the copied tool
+from /tmp verifies the closure without reading original source/dependency bytes. Binding the actual old base HEADs
+is correctly rejected with no output report: those committed trees omit the current uncommitted implementation.
+Fresh extra-input hashes use earlier manifests as path discovery only; no old run/receipt or tested SHA is rewritten.
+
+This is PREPARED_INPUTS_ONLY, with executionEvidence=false and promotionEligible=false. It is not complete M5 candidate
+acceptance, five child receipts, aggregate or Final. Subsequent source changes require the proper frozen cohort and
+applicable validation again. The new verification task advances the earlier root/Native input manifests; their exact
+archives remain historical, with unchanged Java runtime artifacts, not a current aggregate qualification.
+
+### Current-source Cell isolation coverage audit (2026-10-21)
+
+The accepted NSIP-1 revision of ADR0087 removes mandatory Observation Journal/Applied/election-adoption qualification;
+the frozen lifecycle row's old wording does not authorize reintroducing that mechanism. Current storage-side replay
+coverage must exercise exact closed-Owner legal history, durable common protocol checkpoints, payload reads and
+stale-owner/failure ordering. The original matrix remains unchanged and unpromoted; native process scenario promotion
+continues to belong to M6.
+
+The existing actual Object authorization tests cover held same-lane work and different-lane progress, but do not
+provide the required cross-Cell/fixed-shard per-Binding samples. M5ObjectCellIsolationRealTest now uses the admitted M2
+Object boundary with actual MinIO/Oxia, one shared S3 client and one shared Oxia client, separate Cell namespaces and
+one common Cell namespace/bucket across its shards. The fixed six-Binding corpus runs with1 and2 shards. A completed
+actual native PUT reply is held and then delivered as UNKNOWN; observer cancellation must retain accepted work and
+credits. Same-lane work is retained, other lane/Cell/shard work must progress, all six Bindings recover exact bytes
+through positive native GET counts/bytes, and closing one Cell must preserve the other client's use. Raw samples
+include pending locator/body bytes, latency/convergence, group assembly and recovery reads/time. These are bounded
+handoff samples, not a network/production performance claim. KMS uses the existing admitted M2 test-key transport,
+not an external KMS service. The first actual run is pending at build/m5-object-cell-isolation-first; precheck/style
+repairs do not establish execution success. Whole M5 and five-child acceptance remain OPEN.
+
+The first actual Cell/shard run executes2 cases and fails2 at the intended same-lane refusal: the new assertion
+looked only at the outer NWG1AdmissionFailure message instead of its exact unresolved-lane root cause. Both cases
+reach the completed-native-PUT hold before that assertion. The1.522s failure archive at
+build/m5-object-cell-isolation-first has unchanged captured inputs and full owned cleanup. The assertion now checks
+the exact root cause, preserving the refusal; build/m5-object-cell-isolation-root-cause is the corrected actual run.
+No Cell-isolation or full lifecycle success is claimed from the first attempt.
+
+The next run, build/m5-object-cell-isolation-root-cause, fails2/2 (1.452s) at the intact NWG1 Root identity guard:
+the reusable fixture still encoded shard7 in its group plan. The fixture now uses the actual Root shard. The following
+build/m5-object-cell-isolation-actual-shard passes the1-shard case and fails the2-shard case (2 tests,1 failure,
+1.711s) during strong-LIST reconciliation. Investigation identifies another fixture error: sharing the actual bucket
+also reused its name as both Roots' exclusive Object prefix. Distinct Roots then listed two lane-sequence0 extents.
+The production inventory correctly refused that duplicate. Shared-service fixtures now allocate distinct
+bucket/shards/<shard>/runs/<epoch> Root prefixes while preserving the same bucket, S3/Oxia clients, Cell ProviderScope
+and Cell metadata namespace across shards. No production identity or inventory check is weakened. Both failure
+archives retain exact captured inputs and owned cleanup. The corrected run is build/m5-object-cell-isolation-root-prefix;
+its result is pending. These failures do not establish a production defect or Cell-isolation acceptance.
+
+The corrected actual Cell/shard run passes2/2 (1.947s; Gradle16s), zero failures/errors/skips, at
+build/m5-object-cell-isolation-root-prefix. Each fixed-shard variant emits13 raw samples and recovers all6 Bindings
+with24 actual GETs/9696 bytes. All captured source inputs remain unchanged; owned MinIO/Oxia are absent and original
+containers unchanged. Result SHA256 is f644423cc653e9f5106f1a213aa5ee8883c9ef69bdb3c0b100a13c6bbe7660fd;
+source manifest740a222406325e03396d7c2561cd080e1d8d2c656383bea62ed1c7899ba89a34;
+sample manifest1eb300b1c2b36cb5862f12098201a11af9b2d3fe3bc2aa60895715315649c902.
+This is focused shared-client lane/Cell/shard handoff and recovery evidence using admitted M2 test KMS transport.
+The three failed attempts were assertion/fixture errors; they do not establish a production defect. The original
+Object authorization regression is rerunning after the reusable fixture changes. No full child, aggregate, Final,
+production performance, scenario promotion, commit or push is claimed.
+
+The affected original Object authorization regression also passes28/28 (7.972s; Gradle13s), zero failures/errors/skips,
+at build/m5-object-authorization-shared-fixture-regression. The original tests still use their original isolated
+bucket/prefix path; only the shared-service fixture selects distinct Root prefixes. Its complete captured source
+inventory is unchanged, and owned cleanup/original-container preservation pass. Result SHA256 is
+b50a700c2145c61eda9587a7ad3ee76ca8982269ea51a98739af572c6ea0d7ba;
+source manifest1a9688f32a8bf94ecc5d7515cea352ce1e44cc95278b56f08d15d581185e178e.
+The focused Cell/shard slice is closed. Complete CURRENT_SOURCE_CELL_ISOLATION, whole-run recovery retirement,
+the five-child campaign and final commit/source binding remain required; no earlier focused source archive is relabeled.
+
+### Raw M5 JUnit attachment validation (2026-10-21)
+
+scripts/m5-evidence-junit.py independently parses bounded raw Gradle XML, verifies attachment length/SHA256, counts
+actual testcase terminal states and rejects hidden failure/error/skip, empty suites, duplicate testcase ownership,
+ambiguous names, unsupported XML declarations/encodings and symlinked inputs. Its10 contract tests pass. The result
+is explicitly STRUCTURE_AND_COUNTS_VERIFIED_ONLY, executionEvidence=false, sourceQualified=false and
+promotionEligible=false: it neither proves that a command ran nor supplies semantic/source/child/aggregate authority.
+The complete execution, source/input closure and five-child ownership checks remain required.
+
+The first check against the actual prior2/28-case archives refuses the28-case suite because two different
+parameterized methods both use Gradle/Jupiter display names [1] false / [2] true. The old raw results remain valid
+focused runs, but cannot supply unambiguous exact testcase identities to the new attachment gate. The checker is
+not relaxed or deduplicated by occurrence. Both Object evidence tasks now explicitly include the method display name
+in parameterized invocations using the actual JUnit5.13.4-supported displayname.default setting. The corrected
+same-backend2/28-case execution is pending at build/m5-object-cell-junit-method-identities; source Java/assertions
+are unchanged. No previous XML/receipt is rewritten.
+
+The whole-run recovery retirement authority placement and bounded continuous-prefix rule have been referred to the
+coordination chat (request turn01a15d1c-ba77-7953-85cf-d50a7a43c29e). The existing naked retirementFrontier and a
+single-Binding terminal Head do not establish full shared-Run qualification. That production implementation remains
+required; the goal remains ACTIVE while this specific persistence/recovery decision is pending.
+
+### Accepted whole-Run recovery retirement authority (2026-10-21)
+
+The coordination decision in turn01a15d1c-ba77-7953-85cf-d50a7a43c29e approves a versioned immutable certificate at a
+canonical same-Cell/shard Root-derived key. It is a derived complete-prefix decision, without a second mutable owner,
+policy or frontier root. Production qualification must authenticate the actual sealed Root/Seal/full physical CP
+chain and every NWG1 directory, enumerate all members/related Owners, verify their actually selected immutable closed
+histories and complete common checkpoints, and preserve protected read representations/checkpoint evidence.
+Unselected candidates require their actual closed Owner's complete selection history, not a missing lookup.
+
+Per-Binding monotonic close/checkpoint selection and retained immutable history may compose without new multi-CAS;
+all non-monotonic dependencies still need existing reference/fence protection. The first prefix certificate must
+start at actual genesis. Extension must join the exact direct predecessor Root/Seal/qualified certificate digest,
+with genesis and cumulative boundaries/counts bound. Actual epoch gaps are allowed; a missing/untransferred Run may
+not be crossed numerically. Publication verifies the direct qualified prefix once; cold recovery consumes the trusted
+immutable bounded decision, without walking all retired payload/physical-CP/certificate history. UNKNOWN retains and
+precisely confirms the original candidate. Legacy Root/Seal wire bytes remain unchanged.
+
+Both cold lineage recovery and successor admission must use this same qualified boundary. The active unsealed Run
+cannot retire. Certificate reads/decoding and retained work consume the existing current Root's persisted envelope;
+no budget reset/expansion is granted. Retirement only removes recovery obligations: exact M4 RELEASED, selected
+reads/pins, physical membership and all existing retention/GC vetoes remain independent. The required positive
+real Oxia/Object shared-Run transfer, missing-member/prefix-gap/response-loss and selected-byte checks remain pending.
+
+The first implementation step adds the protocol-owned WalRunRecoveryRetirementVerifierV1 boundary to both actual
+entry paths. Default construction retains all predecessor Runs. A naked nonempty retirementFrontier can no longer
+truncate; it is only a hint matched to a verified prefix. Qualified cuts omit the whole retired prefix from the live
+recovery Run list. Successor admission retains the exact old Root/Seal identity header as charged control bytes while
+skipping retired replay/physical checkpoints; it also applies the hook at deeper retained-to-retired boundaries.
+Current16 targeted unit cases and module style checks pass14s before the final deeper-boundary argument correction;
+the initial two new fixture failures omitted the mandatory terminal Kafka Head binding, with raw XML/log retained at
+build/m5-whole-run-retirement-cut-fixture-failure (no exact source-closure/production red claim). Unit fake-verifier
+coverage verifies only entry-path ordering/budget behavior. The actual immutable certificate producer and real
+Kafka protocol qualification are not implemented yet, so no production Run obtains retirement from this step.
+The affected actual Object authorization regression will run against this new kernel.
+
+Raw JUnit qualification is complete as a structural component: the fresh same-backend run at
+build/m5-object-cell-junit-method-identities passes2 Cell cases (2.049s) and28 authorization cases (8.066s), Gradle24s,
+with unchanged captured inputs and complete owned cleanup. Exact method identities now distinguish all parameterized
+invocations; the new checker accepts all30 raw cases (actual testcase sum9.998s). Its output still grants no execution,
+source or promotion authority. Result396ee00a02e8feae73b4f37be7118cc53f8384485bda5ee0a8b2c2b1a1d00722;
+input manifest1b3a16d049c80305259c24dff81fc2322a0f0722d273910edaf77e8b3c0dea23;
+structural outputf2ae83315fce0390053499b1948ea28488b18ec4e981e34a4ec517812fc0f66c.
+The10 new JUnit contracts,11 input-closure contracts and documentation/lifecycle/writer checks pass28s (15 tasks).
+Subsequent kernel edits require current-source requalification; no prior source archive or whole-M5 gate is relabeled.
+
+The final affected-source execution at build/m5-object-authorization-retirement-cut-regression passes the16 targeted
+kernel cases (lineage6/lifecycle10) and28 actual MinIO/Oxia authorization cases, zero failures/errors/skips. Gradle18s
+includes module style checks. All three fresh XML files, complete captured Root input inventory and runner/raw logs
+are retained. Captured inputs are unchanged; owned services are absent and original containers unchanged.
+Result SHA256 f1ee9dbd36e9892b2bdb64c8b92f9d02e71b0dc352e429eb1e3bf73c75a74fc6; input manifest2a45e262b76841c9c176401cdeec7c7761651ec8490a22b16914d893a6ee6a78.
+This closes the verifier entry-path implementation step only. Default production wiring retains every Run; the
+actual certificate producer/selected closed-history qualification and required real shared-Run retirement remain
+unfinished. No Run/child/scenario/whole-M5 authority is promoted by the unit adapter doubles or these regressions.
+
+### Whole-Run certificate producer implementation (2026-10-21, actual verification pending)
+
+KafkaObjectRunRecoveryRetirementV1 now produces the private versioned KRR1 immutable certificate at the exact
+Root-derived /root/recovery-retirement-v1 key. It authenticates the actual sealed Root/Seal/full physical CP chain,
+every NWG1 directory and payload unit, and joins each unit's reconstructed commit identity to the actual selected
+closed Owner history. Every admitted member requires a complete selected common checkpoint. Unselected physical
+units require the exact closed Owner in that selected chain; no query-miss exemption is used. The existing immutable
+closed snapshots/checkpoints and retained grants remain protected by legal monotonic Head inheritance.
+
+Prefix publication first verifies the actual direct predecessor certificate; only true genesis starts a prefix.
+The certificate binds exact Root/Seal, genesis, cumulative Run count, direct-prefix digest and canonical complete
+member snapshots. Cold readers verify the trusted immutable decision, current protected checkpoint provenance and
+one direct certificate edge; they do not walk the entire retired certificate/payload/physical-CP history. Its opaque
+terminal binding can identify the confirmed aggregate checkpoint transfer for a successor, without changing the
+legacy single-Binding NWKCP1 contract or Root/Seal wire. Oxia admits only the exact same Cell/shard route and forbids
+CAS replacement of this create-only certificate. Unsupported/expanded/truncated identities fail closed.
+
+The original Root-owned control/read/decoded/working-memory budgets pay all qualification costs. One growing metadata
+workspace shares one existing concurrency reservation; prefix and payload work retain their existing session budget.
+A real sealed-session I/O pin and original candidate workspace survive UNKNOWN/read failure. Confirmation requires
+exact same-key bytes, preserves the original candidate and drains metadata workspaces before releasing the session
+pin. Certificate publication grants no M4 RELEASED, trim or physical-delete authority and preserves selected reads.
+
+Precheck compiles the producer, metadata adapter and actual test fixture; module style plus all10 existing/new
+metadata-route cases pass15s. The first precheck failed only line length; a subsequent compile exposed a stale
+workspace-list call after the one-workspace conversion, now fixed. Neither failure is production red/green evidence.
+The actual MinIO/Oxia2-case campaign is starting at build/m5-object-run-retirement-first: shared selected/unselected
+members, missing member, applied certificate response loss/original retry and legal Owner advancement, followed by
+fresh-client no-old-payload recovery and selected original reads; plus missing-prefix veto then exact continuous
+extension across actual epoch gaps. Existing real fixtures are reused, with no budget enlargement or reset. No passing
+retirement result or whole-M5 qualification is claimed before that execution completes.
+
+The first actual Run-retirement campaign executes2 cases and fails2 (1.862s) with unchanged captured inputs and
+complete owned cleanup at build/m5-object-run-retirement-first. The shared case stops because the conservative
+BINDING_REJECTED ticket remains charged after an exact Provider resolution and actual Owner close; the old tracker
+correctly requires owning-Binding recovery, but had no exact closed-suffix settlement entry. The new
+reconcileRejectedAfterOwnerClose reads that same real selected closed history, accepts only a physically resolved
+rejected unit beyond its immutable selected end, rechecks the full ticket/authority and releases local pending
+resources. It does not regress physical sequence/nonce state, release selected locators or assert protocol success.
+The new test retains pre-resolution refusal and checks unchanged physical extent count/zero logical visibility.
+
+The prefix case already reaches actual continuous-prefix retirement and fresh-client no-old-payload recovery, then
+fails at selected reads because the reusable read fixture bound every locator to the current physical Root. The
+existing per-Root source-protection guard correctly refused old Root locators. The fixture now routes each actually
+selected locator to its exact source session/Root and its own per-Root protection tracker, retaining binding-wide M4
+hazard guards. Production protection is unchanged. The corrected actual campaign is
+build/m5-object-run-retirement-closed-rejection-and-read; no full Run-retirement PASS is claimed from the first run.
+
+The corrected actual campaign at build/m5-object-run-retirement-closed-rejection-and-read passes2/2 (2.076s;
+Gradle14s), zero failures/errors/skips. It proves the covered shared selected/unselected histories, original
+certificate UNKNOWN/retry with actual Native Owner advancement, rejected-ticket closed-suffix settlement,
+missing-prefix veto, exact1/2 certificate extension and actual1/2/5 epoch linkage. Fresh Oxia clients restore only
+the current Run with zero retired payload GETs, while exact original selected bytes remain readable. Complete
+captured inputs are unchanged and owned cleanup/original-container preservation pass. Source manifest is
+1932115dd76f6609d9073df2ee07409601374f6e7f6748096a1387caa8ca0155. The first failed source/XML archive remains intact.
+New persistent-wire mutation/prefix-summary/budget-before-I/O tests and affected Object suites pass50 Kafka cases;
+the three affected storage recovery/session suites pass20 cases, with module style checks (Gradle14s).
+
+A required protocol-domain gap remains before general Run-retirement qualification: the independent legacy
+Root-scoped NWKCP1 Head/protocol-only Objects are not enumerated by the physical NWG1 directory. The existing Root
+only declares KAFKA; it has no persisted exclusion of that writer domain. Its metadata Head CAS does not currently
+join the session active-I/O fence, so physical drain plus an absent lookup is insufficient to exclude a late write.
+Empty Runs especially need a real protocol-root inventory/closed-domain proof. Current two passing cases establish
+only their covered admitted M2 histories, not general qualification for arbitrary Roots. Coordination resolved this concrete question in
+turn01a15d64-683d-7a22-96fc-40ba7231b079; its accepted decision and implementation scope follow below.
+The actual producer must close this domain before the lifecycle obligation or child can be promoted. Production
+Native process activation is absent, and no commit/push or whole-M5 authority is granted.
+The fresh32-case Object authorization/Cell/retirement regression below is now terminal.
+Source archives are never relabeled after later code changes.
+
+
+The coordination decision in turn01a15d64-683d-7a22-96fc-40ba7231b079 is now explicit: close the existing
+Root-scoped protocol Head with its same-key CAS, include its actual selected protocol members, and introduce no
+Native-T4-only policy. An absent Head requires a distinct create-if-absent terminal value, not an empty checkpoint.
+The new NKC0/schema1 value binds the exact Root and physical Seal without inventing a Binding, publisher or offset;
+its attempt retains the real sealed session and candidate workspace through UNKNOWN. Strict readers reject it as a
+checkpoint, and the Oxia route refuses replacing/reopening a selected NKC0 value. Foundation checks pass2 Object
+wire tests and11 metadata-route cases; the affected50 Kafka cases and module styles also pass (Gradle19s at
+build/m5-protocol-domain-empty-marker-unit.log). These are component checks, not actual protocol-domain closure.
+
+The prior fresh real campaign at build/m5-object-run-retirement-current-regressions has now completed32/32:
+Run retirement2, existing authorization28 and Cell isolation2; zero failures/errors/skips, Gradle23s. Captured source
+manifest894c7b9ff270ef820a38d78d9c84bc88d9e6216f7c56ded54805df771f253b1b remains unchanged, with owned cleanup and
+original-container preservation verified. This archive predates the NKC0 and Head-I/O changes and remains bounded
+to the admitted histories it actually executes. It does not prove the missing independent protocol-domain closure.
+
+A deterministic in-process test now reproduces the missing Head-I/O pin: while the original metadata get is blocked,
+closing the session incorrectly succeeds. The failure and selected source snapshots remain at
+build/m5-protocol-head-io-red (not a complete execution-input closure). The implementation is adding the original
+session pin to Head reads/CAS and preserving an exact unresolved CAS candidate and its working memory across UNKNOWN.
+Ordinary publication/takeover will reject after physical admission stops; a sealed terminal operation and exact
+original reconciliation retain their restricted completion path. Actual same-key races, complete protocol transfer,
+a complete certificate version rejecting the earlier incomplete candidate, and real cold recovery remain required.
+
+
+The Head-I/O lifetime slice now passes its actual backend campaign at
+build/m5-protocol-domain-io-and-close-first:34/34 cases (protocol/retirement4, authorization28, Cell isolation2),
+zero failures/errors/skips, Gradle25s. The protocol cases take2.561s, authorization8.225s and Cell1.949s. Captured
+inputs are unchanged; manifest SHA24cfb5b722c51468dd878bafc76a732d2525022c81aff23b78c68b85b3829a7c. Owned MinIO/Oxia
+containers are absent afterward and all original containers preserve their recorded identities/status. KMS remains
+the admitted M2 test transport; this is not a Native-process or external-KMS qualification.
+
+The actual applied Head CAS is held before its reply returns, and the original session cannot close. After a lost
+CAS reply and failed confirmation, the same pending candidate/workspace continues pinning the session. Exact native
+Head confirmation settles it; physical sealing and OPEN-to-TERMINAL CAS can then finish. The actual Oxia backend
+rejects a late mutation with the old exact expected Head. The opposite ordering creates NKC0 at the absent Head key,
+loses its reply/confirmation, retains the original attempt through retry, and rejects an actual late first Head CAS.
+A real checkpoint Object exists in both zero-physical-extent cases. An existing terminal checkpoint wins against an
+absent-domain close; no empty checkpoint is substituted. NKC0 recovery now rejects directly instead of entering
+NWG1 suffix fallback.
+
+The original synchronous metadata reads/CAS and physical-closure metadata verification now acquire the Root session
+I/O pin. Ordinary publication/takeover and protocol Object creation require admitting runtime state; sealed terminal
+CAS and exact original reconciliation retain their restricted completion path. Unresolved CAS bytes and memory are
+kept until actual completion plus exact confirmation or a definitive CAS result, and a different candidate is refused.
+Observer cancellation uses a separate future and cannot cancel the internal mutation-completion callback. Focused
+units pass53 Kafka and6 storage cases; one precheck variable-name compile error and one real-test line-length/style
+failure were corrected and retained in the logs. The deterministic red source/failure archive remains intact.
+
+This completes only the Head-I/O/empty-domain primitive and its targeted races. The retirement producer still needs
+to consume the domain closure, enumerate the union of actual final checkpoint members and authenticated directory
+members, prove full producer/transaction/leader-state transfer, and publish/verify a complete certificate version
+that rejects the earlier incomplete KRR1 candidate. Checkpoint-only cold recovery and the complete M5-E candidate,
+five children, coordination review and final delivery remain outstanding. The frozen17 OPEN/null obligations and
+all formal authority flags are unchanged. No staging, commit, push or M6 activation occurred. The goal service still
+reports blocked; this manual turn does not claim to have resumed automatic goal execution.
+
+
+A final pre-dispatch budget audit found that a new Head CAS could register its pending I/O pin before the canonical
+control-byte charge rejected it. The charge now occurs before pending-candidate ownership transfers, with the acquired
+I/O lease released on failure. The original UNKNOWN retry still retains its existing candidate/leases when another
+budget charge fails. The new unit exhausts the unchanged actual Root budget and verifies no Head write and successful
+session close. Latest focused Kafka units pass54/54 plus main/test Checkstyle and Spotless (Gradle14s at
+build/m5-protocol-head-pre-dispatch-unit.log). The34-case real archive above predates only this pre-I/O charge-order
+correction and its added unit; it is retained with its original source manifest, not relabeled as a later-source run.
+Full source-qualified M5-E refresh remains required after complete certificate/state-transfer implementation.
+
+
+Current mandatory closeout order (coordination continuation, 2026-10-21): C1 is implementing the complete Root-scoped
+protocol member/state transfer and certificate v2 on top of the verified Head-I/O/NKC0 primitives. C2 still requires
+the actual five-child/aggregate/Final source gates and Gradle entry. C3 runs the agreed complete current-input
+candidate after C1/C2 stabilize, reusing existing obligation mappings without optional matrices. C4 is the single
+coordination review of the actual diff/call chains/raw evidence and necessary existing-doc cleanup. C5 is the already
+authorized concentrated commit/equivalence/Final/source-check/push node after that review. No earlier delivery is
+being made. These are five closeout items, not17 new implementation projects; historical17 OPEN/null remains frozen.
+
+C1 in-progress implementation now joins the authenticated physical directory with the actual final Root-scoped
+checkpoint, closes that domain through the existing exact Head CAS, and encodes its exact terminal value in
+KRR1/version2. The decoder rejects the earlier incomplete version1 candidate. Complete producer/transaction/leader
+state is compared after replaying only the actual authorized suffix into the selected closed common checkpoint;
+coverage offsets alone do not qualify it. Cross-Run replay uses the retiring Root's original cumulative envelope,
+while the actual source session still verifies its own Object namespace/KMS/Root and holds its I/O lease. The cold
+certificate path binds the same immutable terminal Head and selected protected checkpoint provenance, avoiding old
+payload traversal. Compilation and focused tests are in progress; none of these new changes is yet execution-qualified.
+The goal service remains blocked, but the explicit coordination continuation authorizes this manual implementation
+turn; automatic goal resumption is separate and is not claimed.
+
+
+The first complete-protocol real C1 run at build/m5-run-protocol-complete-transfer-native executes5 cases and fails3
+(2.307s; Gradle7s); both previously covered domain-CAS primitives pass. Captured inputs remain unchanged and owned
+cleanup/original-container preservation pass. The shared four-member case exhausts canonical control accounting
+before the intended UNKNOWN confirmation, while the prefix/checkpoint-only cases hit recovery concurrency. These
+are Root-envelope integration failures; the installed32MiB/4-slot limits remain unchanged. No complete C1 result is
+claimed from that run, and no old success is substituted for its missing fresh sibling regressions.
+
+The fix transfers the original protocol-closure workspace into the existing qualification ReadScope, preserving one
+working-set owner instead of retaining a fifth concurrent lease during physical scanning. Control metadata reads
+now reserve their bounded maximum before I/O and settle only unused bytes after a successful bounded response,
+using the same reservation/settlement rule as existing LIST accounting. Actual consumed bytes remain charged;
+UNKNOWN, oversized or abandoned responses retain the full original reservation. Repeated settlement is rejected,
+and an already-exhausted Root still rejects before metadata dispatch. No Root cap, payload accounting, quota or
+assertion is enlarged. The original UNKNOWN candidate/I/O is preserved across this ownership transfer. Two narrow
+budget contracts cover settlement and failed/oversized retention; focused regression and the corrected real run are
+pending before C1 can close.
+
+
+C1 is now locally closed on its complete production library path. The corrected actual campaign at
+build/m5-run-protocol-complete-transfer-budget-fixed passes35/35: complete protocol/retirement5 (2.999s), existing
+Object authorization28 (7.953s), Cell isolation2 (1.859s); zero failures/errors/skips, Gradle19s. Captured source
+manifest SHA1d747aa9f4bb8b0235bc39a00e2cd94d1f33dbd65970d2a9d77c0a2406d456e4 is unchanged. Owned MinIO/Oxia
+cleanup and original-container preservation pass. Focused storage30 and Kafka54 cases plus compile/Checkstyle/
+Spotless pass20s. The first failed5-case archive and its exact source remain preserved.
+
+The actual shared Run now includes3 physical members plus1 independent checkpoint-only member. The test retains
+original domain-close UNKNOWN/failed confirmation and original certificate UNKNOWN through actual Owner advancement,
+then verifies fresh-client recovery with zero retired Provider GETs and exact selected-byte reads. An empty successor
+physical Run carries actual nonempty producer and completed-transaction/leader state from real original messages;
+missing protocol membership and same-offset/different-producer-state reject. Its full state transfers into the actual
+selected closed common checkpoint and cold-recovers with the real fresh Oxia client. The continuous-prefix case
+replays a real later-Run suffix against the earlier selected protocol checkpoint and proves those GETs charge only
+the retiring Root's original budget. KRR1/version2 binds exact Root/Seal/protocol terminal value and complete selected
+snapshots; incomplete version1 rejects. More-than-one-row legacy protocol Objects explicitly veto rather than dropping
+rows, matching the existing supported single-Binding store boundary. Cold verification uses the same persistent Head
+selection and protected common checkpoints; it does not fetch retired protocol/payload Objects.
+
+C1 grants no M4 RELEASED, physical delete, scenario or whole-M5 authority. Its integration remains subject to the
+single complete C3 current-input campaign. No further optional C1 matrix is planned. C2 actual evidence ownership,
+execution/attachment and Final/source gates are the next implementation item; C3/C4/C5 remain pending in their fixed
+order, and no staging/commit/push has occurred.
+
+
+C2 is in progress after C1 coordination acceptance. The new explicit evidence validator now separates complete
+precommit candidates from commit-bound Final authority, checks the fixed five execution/child sets, exact raw XML
+case provenance, exclusive assertion ownership, all17 obligations, pinned backend observations, loaded dependency
+membership, actual completion/cleanup, fresh production timestamps and unreferenced/symlink rejection. The six
+current-source shared-M4 task outputs are reparsed with the existing exact M4 JUnit/metric validators without creating
+another M4 Final. Source-only preparation/JUnit helpers still grant no execution authority. The original57 Kafka
+method/mode identities remain an exact required corpus; a selected subset cannot qualify that stage.
+
+The commit-binding reader retains its original semantics; all11 input-closure contracts pass. The18 current M5
+validator contracts pass, including the actual assembler/validator agreement for five exclusive children, exact
+Kafka57 completeness, fixed500M observations from the exact executed raw XML, complete-source Git equivalence,
+evidence-only successor allowance and rejection of later runtime/untracked changes. The10 raw-JUnit contracts also
+pass. These synthetic validator tests grant no actual execution or M5 acceptance authority.
+
+The fixed campaign entry is [run-v2-m5-evidence.py](../../../../scripts/run-v2-m5-evidence.py), with direct current
+BK/Oxia, Object, Native Kafka and Native Pulsar recipes. It preserves fresh XML timestamps, actual exits, container
+observations, owned cleanup and JVM-observed loaded files, all checked against the complete frozen dependency cohort.
+The original Kafka57 arrays execute first on one unchanged fixed500M backend; the already required GC/internal-topic
+closure follows on that same backend. The capacity log samples report the actual durable quota head observed by the
+existing native assertions. There is no quota expansion or backend/data reset between these phases.
+
+Gradle now exposes `v2M5EvidenceContractTest`, `v2M5EvidenceExecutionCheck`, `v2M5PhysicalGcCheck`,
+`v2M5CurrentSourceIsolationCheck`, `v2M5FinalSourceCheck` and `v2M5Check`. Execution requires explicit prepared inputs,
+output, Kafka JDK and captured Maven repository. Final/current-source checks require explicit native checkout roots and
+the complete canonical Final. They never execute tests or relabel focused receipts. The separate publisher refuses
+existing destinations, binds all three exact committed trees, copies every non-versioned dependency object and updates
+only the complete approved scenario group after independent validation; publication is deferred to C5.
+
+C3 preparation has compiled the current Root/Pulsar and Native Kafka runtime sources without executing backend tests.
+Runtime input capture uses each Gradle configuration's owning project: the first cross-project attempt was rejected
+by Gradle's configuration lock and retained as a failed preparation log; the corrected capture passes. C3 execution,
+complete candidate, coordination review and authorized delivery remain outstanding. No canonical M5 child/Final,
+scenario promotion, staging, commit or push has occurred. C1 remains closed after its limited coordination review.
+The coordination conversation reconfirmed that the delayed Native-only floor reply creates no new decision or retest.
+
+C3 first complete-entry execution (`m5-e-complete-candidate-v2`) stopped after COMPONENTS: the actual Gradle
+execution passed566 cases with zero failures/errors/skips, and the complete source/dependency cohort was unchanged.
+The evidence validator then correctly rejected duplicate raw testcase names: several distinct parameterized retention
+methods used the same enum-only default display name. The campaign now passes a method/index/argument display-name
+default through inherited JVM options, including the existing nested shell recipes. Explicit Kafka57 method/mode
+names remain unchanged. No assertion is removed, raw XML is not rewritten and duplicate-identity rejection remains
+strict. The failed candidate/prepared inputs and logs are retained; no child/Final or source promotion was issued.
+Only the affected execution naming is repaired before a new complete frozen campaign.
+
+C3 `m5-e-complete-candidate-v3` verifies COMPONENTS at566/566 with unique raw method identities, zero failure/error/skip
+and unchanged complete inputs. Before later promotion, the semantic ownership inventory was found to omit an explicit
+reference to the already fixed Native Kafka positive replacement-GC case. `REPLACEMENT_RETAINED_MESSAGES` now requires
+both the recompaction/drain assertion and `nativeM5ReplacedSourceReclaimsAndSettles`, which actually requires GC
+admission, checks native target absence/compact DONE/quota settlement and compares the selected bytes before/after.
+No test or data matrix was added. The current18 evidence contracts pass with that complete ownership link.
+
+The v3 campaign dispatcher was deliberately stopped; its already active owned BK/Oxia recipe is allowed to complete
+its normal cleanup, and its raw results remain non-promotable. A new complete input cohort is required because the
+checker source changed. This is an evidence-inventory correction, not a product-test failure or a quota/backend reset.
+
+C3 `m5-e-complete-candidate-v4` stopped in BOOKKEEPER_OXIA after a real restart assertion failure: the legacy test
+expected wire4 although the accepted single-authority logical-trim enrollment persists wire5. The before/after exact
+canonical hash, retired-history root/count, authority generation and metadata version had matched. Current history
+integration passed9/9, including1026 retirements; the standalone source and retention recipes had also passed.
+The failure archive and independently verified unchanged complete input root `146a6ef5d200344665de57a2cce4dc900e99318ca950961024a8d01f9c913926`
+are retained. Owned backends cleaned up; this stopped candidate grants no receipt or Final authority.
+
+The restart test now requires wire5 and present logical-trim state, while retaining every existing exact byte/version,
+history, old-ID rejection, worker epoch and successor check. Its trace reports the actual wire. The history runner's
+obsolete5/3 suite counts now match the current9/5 assertions introduced by the accepted trim coverage. Product code,
+wire semantics, quota, dataset and valid assertions are unchanged. The affected actual same-container Oxia restart
+passes2/2 separate JVM cases, zero failure/error/skip; source unchanged and owned cleanup verified. Integration compile,
+Checkstyle and Spotless pass. Only the changed restart test class differs in the7651-entry runtime input inventory.
+A new complete current-input campaign is required before candidate/C4/C5; no scenario or frozen17-row status changed.
+
+Coordination-approved bounded C3 continuation (2026-10-21): v5 independently verifies COMPONENTS566, BK/Oxia1326
+and Object39 at input root `297dc4ef5c0fe1e38e8c5876a5932525fbc4ed9d7d2837b3cef1989714bbc9e7`, all zero
+failure/error/skip. Native Kafka stopped before Broker tests because its inherited adapter expected per-run
+`source-archive/sources` directories not produced by the standalone Source/Legacy recipes. The complete outer source
+closure and both original tested-input manifests remained intact. The minimal native adapter repair verifies every
+manifest entry against the final complete cohort, materializes missing archive files create-only, then retains the
+original independent hash checks. Actual preflight verifies794 Source and769 Legacy files without changing v5 inputs.
+
+The coordination conversation explicitly approved one-hop reuse of only those three successful v5 execution records,
+with their original inputRoot, working directory, command, driver, time, raw XML/logs/loading facts and cleanup bytes.
+The failed v2/v3/v4 executions and failed v5 Native launch are not promotion evidence. The new stage-input equivalence
+record is input equivalence only: it cannot grant execution/child/Final authority. It carries the full old inventory,
+complete old/final difference list, original changed-source bytes and exact pinned v5 record digests. Runtime sources,
+actual Java tests/assertions, stage drivers/called scripts, build/config/source locks and every dependency must remain
+identical. Only the reviewed native archive repair, explicitly enumerated postprocessing verifier/continuation files
+and these status docs may differ; omitted/new/deleted/mode/length/hash differences outside that set reject reuse.
+
+The original parent dispatch expression, old/current stage mapping and actual fixed BK nested shell call closure are
+reparsed, alongside the complete unchanged call/build inventory. Raw receipts are independently revalidated against
+their original full input cohort. Supplemental evidence/input/JUnit contracts and the documentation gate execute on
+the final frozen tree. Native Kafka and Native Pulsar execute on that final tree; Kafka retains its original57 arrays
+followed by the agreed GC/internal-topic cases on the same500M backend. Source/Legacy qualifier file relocation is
+create-only, preserves old origins/summaries/manifests and archives every exact consumed source file. The five children
+and aggregate bind the final input while explicitly retaining the old actual execution input and its equivalence link.
+The22 current evidence contracts pass, including the new bounded difference/dependency/original-receipt rejection
+risks. The actual parent/nested-call source preflight passes. Complete candidate/C4/C5 remain outstanding; no source
+staging, commit, push, scenario promotion or frozen17-row change has occurred. C1 remains closed.
+
+The first bounded-continuation verification executes all22 evidence,11 input and10 raw-JUnit contracts plus docs
+successfully on its frozen final cohort, then correctly stops before Native tests at an evidence-reader integration
+error: original standalone Source manifests retain their original unsorted JSON formatting. The relocation reader now
+uses the existing bounded, duplicate-member-rejecting input-manifest parser instead of imposing new canonical-evidence
+formatting on those original bytes. No raw manifest/summary/record is rewritten and all original byte/SHA checks remain.
+Only the postprocessing verifier/current docs changed; no v6 stage or failed launch is reused.
+
+The next actual Native Kafka execution passes its fixed57 cases but fails one of the six subsequent
+GC/internal-topic cases: shared Cell CAS contention during drained capture release propagates through
+`NereusKafkaNativeInputV2.CellReservation` and broker close. Its old57 success, six-case failure and separate
+parent Docker list/inspect teardown race remain archived under the original v7 input; none is current-source
+Native acceptance. Native release now continues the same drained release/fence intent through at most the
+existing `MAX_RESERVATIONS` conflict bound on its existing control executor, preserving each latest sibling
+reservation. `CONFLICT` may follow an applied/unknown mutation and an advanced head; safety derives from
+the same idempotent intent and a new exact CAS. Actual `OUTCOME_UNKNOWN` still stops and retains ownership.
+Formal IDs remain fenced before preparation release. Root Outcome/wire/quotas are unchanged.
+
+Coordination extends the single v5-to-final input proof only to that exact Native production source, its new
+release unit test, the exact file-only test import rule and traceable compiled classes/main JAR. Complete
+three-repository and dependency differences remain mandatory; Root/Pulsar source, shared classes/JARs and
+the original three stages' actual calls/build/runtime inputs remain unchanged. The V2 binding preserves
+all old/new source and artifact objects, checks class SourceFile/binary identity, compares every JAR entry,
+requires changed JAR classes to equal the individual compiled objects, checks the manifest's exact edges
+and rejects any changed input loaded by a reused stage. The only parent driver AST exception is the
+read-only Docker observer; explicit disappeared IDs may explain partial inspect output, while other engine
+errors or unexplained absence still fail. All dispatch/test/backend/capacity/cleanup checks remain.
+
+The release regression gives deterministic red3/2 failures and green3/3, including retained UNKNOWN and an
+applied-unknown mutation overtaken by a sibling. Actual Native compile/Checkstyle pass. The affected real
+internal-topic compact/reclaim/recover case passes1/1 on BookKeeper/Oxia, with unchanged source and owned
+cleanup. Evidence contracts pass28/28. These bounded results do not close C3: the full repaired57+6 must
+execute together on the same500M backend, followed by Native Pulsar on the final frozen input. C4/C5 and
+complete candidate remain outstanding; no staging, commit, push or scenario promotion has occurred.
+
+The actual v8 V2 binding and fresh28/11/10 verifier/input/JUnit contracts plus docs pass. Its repaired-source
+Kafka57 passes57/57, followed on the same500M backend by six GC/internal-topic cases with one failure.
+This failure precedes compaction: internal user Produce times out after30s while server run rollover later
+times out at its60s bound and fences the Owner. The original result is retained; it is distinct from the
+previous drained capture-release CONFLICT. Owned backend cleanup and original-container preservation pass.
+Native Pulsar is not reached, and C3 remains incomplete.
+
+One unchanged-config owned internal-topic diagnostic passes1/1 with source unchanged and owned cleanup;
+continuous thread snapshots cover Produce, transactions, compaction/GC and cold reads without reproducing
+the timeout. This does not close the full-history failure or justify a speculative product change. One
+further complete57+6 execution will retain the original shared-history order and500M conditions, with
+read-only runtime thread capture aimed at that specific blocking path. No timeout, assertion, thread
+capacity or production semantics is changed to obtain a pass; all original failures remain reviewable.
+
+The independent v8 post-failure input check additionally rejects162 rebuilt Native Kafka artifacts
+(145 class/17 JAR); its original sources/objects/input root remain immutable. Root/Pulsar artifacts do not
+change. The captured old Native binaries were not the actual cold-build outputs, so no semantic equality
+is inferred. The prepared-but-unexecuted v9 workspace is removed as unused; its inventory and preparation
+log are retained. Neither campaign is accepted as a complete current-input execution.
+
+Coordination approves a concrete Native prebuild before the final freeze. The new preparation entry first
+captures source/external inputs, publishes and checks the same six exact Root JARs, then builds the real
+Native Test dependency graph, including source-fence fixtures and required static checks, using JDK17 in
+the eventual execution workspace. A second producer pass must preserve every captured input/output byte.
+Actual producer/source/classpath/compiler records and original objects accompany the V3 direct v5-to-final
+binding. Compact file references keep these records within the existing JSON bound. Every changed or added
+input requires its exact producer/dependency; no whole-checkout/class/JAR exemption is introduced. The
+formal Native driver consumes the already frozen development repository and verifies its JDK executables;
+it does not republish Root dependencies during the test stage. Actual JVM origins and before/after input
+checks remain strict. Preparation explicitly rejects any Test task in its graph and grants no execution
+authority.
+
+The no-backend producer prototype executes successfully and two actual passes have identical graphs and
+bytes. Its7484 real class/JAR origins parse successfully;31 evidence contracts pass. Full prepared-input
+validation and the actual Native stages remain outstanding. This workflow repair does not explain or
+close the Produce/rollover timeout; the bounded full-history diagnostic plan and C4 review retain that
+limitation. C1 remains closed, C3 incomplete, and no submission or promotion has occurred.
+
+V10 successfully freezes actual prebuilt inputs at37a79774330e60cba51d5d7c555b9a8c2b42e2496d612c00a819089d275c539f,
+with86 producer tasks normally up-to-date in the byte-identical stability pass. It stops before Native
+execution at a validator association error: runtime JARs must bind the qualified original Source summary
+and actual resolved classpath; published `-sources.jar` classifiers instead bind source bytes. The corrected
+reader validates the original immutable archive. Exact after-build objects are shared by reference between
+preparation and difference inventories, retaining all bytes/hashes without duplicate files or relaxed bounds.
+The updated33 contracts pass, including source-classifier and registered-object rejection coverage. A fresh
+snapshot must include these verifier corrections before the bounded actual Native campaign; v10 is not
+current-source execution evidence and the earlier timeout remains unresolved.
+
+### C3 v11 Native execution and JUnit identity correction (2026-10-22, incomplete)
+
+V11 freezes the stable prebuilt execution inputs at
+`6260125ce524bae2dc02fbcf34e8ee7e207a1d58f34a591356c63310fefb554c`.
+The original57 and subsequent6 Native Kafka cases pass on the same500M backend, with zero failures,
+errors or skips, unchanged inputs and successful owned cleanup. All six capacity observations remain
+500000000. Twenty bounded runtime thread captures have no sampling errors; the internal-topic case
+passes the previous Produce/rollover failure position. The v8 timeout remains unexplained, not repaired
+by this successful execution.
+
+The parent stops after recording those63 cases because its postprocessing parser expects `.mode=...`,
+while the actual fixed JUnit configuration emits `method(String)[index]MODE`. The corrected parser reads
+the full actual name and checks both explicit mode and exact original array index; missing mode,
+index/mode mismatch and the invented old fixture format reject. The actual-format fixture reproduces
+the original rejection, then34 verifier contracts and independent validation of the unchanged original
+v11 Native Kafka record pass. No raw XML, execution record, source input root or frozen workspace is
+rewritten. Native Pulsar continues through the original frozen stage entry. Complete candidate,
+postprocessing-source binding and C4/C5 remain outstanding; no scenario promotion, staging, commit or push.
+
+That actual Native Pulsar stage terminates with exit1 and verified owned cleanup. Its32 collected suites
+contain646 cases,2 failures and2 retry-related skips. Both failures are existing cursor skip-read tests:
+their returned entries have the expected count, but the protected read-range observation is bypassed by
+the new private ledger-id overload. The cause and correct observation/call boundary are being checked;
+the failing assertions remain intact. The original failure archive is preserved. The new direct-origin
+binding/immutable-record assembly contracts pass36 cases; complete binding and C3 remain unqualified.
+
+Coordination confirms the original protected virtual read entry must remain effective for actual physical
+ReadHandles. `internalReadFromLedger` now dispatches those reads through that existing overload, which
+already delegates to the new implementation; only the handle-free preferred/source-map path calls the
+explicit-ledger-id private overload directly. No fake handle, new API or skip/filter change is introduced.
+The same two existing cursor tests now pass2/2 with zero failures/errors/skips, Checkstyle passes and the
+checked sources remain unchanged during execution. Actual v11 inputs independently verify unchanged
+after its failed Pulsar stage. This production fix requires a separate exact SDK input/build qualification
+and a complete new Native Pulsar execution, including existing preferred-source coverage; it is not part
+of the validator-only exception.36 evidence/11 input/10 JUnit contracts and documentation execute and pass.
+
+The actual compile closure requires rerunning COMPONENTS: its explicit Pulsar composite and M4 Pulsar
+task consume the modified SDK JAR. Absence from JVM load logs alone cannot qualify that old stage.
+The final composition therefore retains only unaffected BK/Oxia and Object stages directly fromv5 and
+Native Kafka63 directly fromv11; COMPONENTS and complete Native Pulsar must execute on the new final input.
+The V4 origin map and child/aggregate input-root fields preserve these actual origins and original record
+bytes. Actual Native Kafka producer inputs, not only loaded classes, must also remain byte-identical.
+
+The Pulsar preparation implementation extends the existing collector with an explicit Root/Pulsar
+composite target. It captures the required Test producer/SDK/archive/static graph, forbids any Test task,
+checks two passes for identical bytes and freezes the resulting exact files in the eventual execution
+workspace. The sole approved SDK source change is the pinned virtual-read dispatch repair. Every new or
+changed generated file needs its actual source/task/compiler/archive provenance; shape checks do not
+grant a Pulsar-directory exemption.38 lightweight contracts pass; actual preparation/stability and complete
+execution remain outstanding, so this implementation does not yet qualify a new complete input/candidate.
+
+The actual composite preflight identifies its unchanged `build-logic` auxiliary build and a cross-build
+before-capture race over generated SDK classes. The collector keeps the no-Test guard on all builds,
+captures source/external bytes before production, records each deferred generated input, and captures
+generated bytes only after the selected real producers complete. Every deferred file must appear in the
+completed graph; final source/task/archive provenance and byte checks remain mandatory. Gradle9 capture
+ordering uses task collections outside lazy mutation callbacks.
+
+Two actual corrected producer preflights succeed with identical graphs/bytes:99 project records,
+91 real producers,19 required Test inputs, zero Test producers,3793 deferred files all present afterward,
+and maximum JSON4539659 bytes within the existing bound. Actual compilers are JDK21.0.10 with release17
+or21 as declared by their projects. These are preparation prototypes on the failed v12 workspace, not
+complete execution evidence. A fresh source snapshot must still prepare, freeze, validate and execute.
+
+V13's actual build and stability passes both succeed. Its freezer then rejects the absent default
+`config/checkstyle` directories, although the corresponding actual Checkstyle tasks completed successfully.
+The reader now permits only those exact optional directories for their observed Checkstyle tasks;
+compiler/external missing inputs still reject. V13 remains an incomplete preparation, with both successful
+build logs and the original freezer rejection retained. A corrected fresh freeze is still required.
+
+V14 successfully builds, checks stability and independently freezes complete inputs at
+`ad8a5b85bc3da659751510d60275b147617eaf99cd8eeca36d007998345b6806`.
+Its fresh38/11/10 contracts and documentation pass. The pre-stage binding then rejects an external bnd
+dependency already owned by the original Kafka preparation because it is associated with the Pulsar
+inventory. The corrected reader selects the actual validated inventory and still checks exact bytes;
+39 contracts pass, including mixed-origin dependency rejection. Original v14 inputs, proof and rejection
+remain unchanged. The corrected reader diagnostically validates the complete original binding, including
+20502 registered provenance paths and all three retained origins. This does not qualify the old validator
+or rewrite its failure. A fresh corrected-source freeze is required; no new COMPONENTS/Native Pulsar stage
+has executed.
+
+V15 includes the association repair, actually builds/stability-checks and independently freezes inputs at
+`d434f270b0555cd6c7e9fe28ace708dba028e207548111dc1236fc7aab303770`. Its fresh39/11/10 contracts,
+documentation and complete V4 binding pass in the frozen workspace. Actual COMPONENTS passes566/566
+with zero failures/errors/skips. Complete Native Pulsar's SDK/Provider phase succeeds and
+produces capsulea4b58165d8830f9eb8a1dfa6ba0809435f91210c773b734ca89881ff00eec111; Owner follow-ups
+subsequently terminate in failure as described below. No complete candidate/C4/C5 authority is claimed.
+
+The SDK Checkstyle rule excludes absolute paths containing `/build/`, making its isolated-checkout tasks
+NO-SOURCE. That is not actual source-quality verification. After Native Pulsar terminates, an independent
+C4 attachment must run real Checkstyle Main/Test and Spotless at a non-excluded directory whose complete
+SDK source/test/build/quality inventory, including additions/deletions/modes, matches v15 before and after.
+It must retain actual nonzero source participation, reports, logs and toolchain identity without rewriting
+the v15 execution or changing its inputs. Unused task-owned v12/v13 workspaces are removed; their source
+objects/bootstrap and original producer/failure evidence remain.
+
+The v15 Owner phase reports failures in
+`nativeMetadataWriteUnknownUsesActualVersionFence` and
+`nativeMetadataCleanupUnknownRetainsOriginalSdkCapacity`. Current raw output shows initial
+`guarded-cursor` metadata-ledger creation returning BookKeeper Unexpected condition, followed by
+`Switch new cursor ledger failed`; this occurs before their intended metadata-UNKNOWN assertions.
+The batch then stalls in the mode74 fixture's final offloader drain. Two unchanged thread snapshots and
+the original JVM heap identify a retained sealed-source C ticket and a borrowed Object connection;
+the original source-admission error is hidden by the fixture's unbounded close. After preserving these
+diagnostics, only that verified test JVM receives SIGTERM. Owner XML records53 cases/2 failures/0 errors/
+1 skipped; the process exits143 and the stage/controller exit1, with owned backend cleanup verified.
+The complete v15 input closure still verifies after failure. This is a failed execution, not a full
+Native pass or candidate. First source-admission and metadata-create causes remain under investigation.
+Independent C4 SDK quality checking passes against the complete5541-entry inventory equal to v15 before
+and after. At the original SDK directory, actual rerun Checkstyle checks113 main/57 test files with zero
+errors, and Spotless passes. `build/m5-sdk-quality-v15-c4/attempt-2` retains the fresh reports, actual
+source lists/hashes, command/log and inventory proof. The first offline attempt's dependency-resolution
+failure is preserved; the second uses the existing verified local dependency repositories. No backend is
+repeated for this supplement. The test fixture now bounds provider drain and preserves its primary
+failure. Compilation, Checkstyle and Spotless for this fixture pass. The first diagnostic correctly
+rejects a capsule bound to another backend; the second reaches a formatting gate before Owner execution.
+Both failed attempts and owned cleanup remain recorded. A corrected diagnostic now runs fresh actual
+SDK/Provider prerequisites and Owner on one backend, with read-only failure quota evidence. It is not a
+frozen execution or candidate and does not replace v15's failure.
+
+The current same-backend diagnostic's fresh SDK/Provider prerequisites pass644 cases/32 suites with
+zero failures/errors/skips. Owner modes36/34/74/71 then reproduce failures against the same actual BK
+quota head:64MiB capacity, revision127,63 active reservations, zero settled/pending,66647283 canonical
+bytes charged,461581 available and1057887 required for the next reservation. Thus normal resource
+admission is exhausted before the intended UNKNOWN/trim assertions. Bounded JFR captures the Native BK
+birth authority rejection and sealed-source admission/C-ticket failure. The fixture reports the primary
+error after its finite close and continues. `build/m5-native-owner-diagnosis-current-backend-v2` retains
+the actual snapshots/stacks; the complete Owner batch remains running. The capacity/dataset contract
+decision is referred to the coordination chat. Capacity, permanent costs, assertions and namespace/backend
+sharing remain unchanged; no production fix, full Native acceptance or complete candidate is claimed.
+
+The64MiB diagnostic terminates naturally at79 Owner cases/11 failures/0 errors/skips, with owned cleanup
+verified. Its full resource metadata was not captured before teardown; the two-marker scan is explicitly
+incomplete. Coordination requires attribution of all63 active reservations and a finite canonical peak
+budget before any larger campaign. After those conditions, the next complete Native Pulsar campaign may
+initialize its shared BK canonical namespace at a fixed500000000 bytes; this is a new explicit acceptance
+budget, not a production default or Kafka contract. Selected/referenced/UNKNOWN resources stay charged;
+actual DELETE/DONE/settle and permanent costs remain mandatory. Unexplained resources or a bound above
+500M block this change. Object/Cell/buffer and deliberate low-capacity cases retain their existing values.
+A bounded original64MiB replay now stops on the first original failure and captures Oxia, SDK ledger,
+cursor-checkpoint and ZK metadata before cleanup; incomplete capture preserves that same backend for
+read-only repair. Its boundary matches the locked Oxia encoder. Attribution/budgeting remain pending;
+no capacity change, complete candidate, C4/C5, commit or push is established.
+
+
+The original64MiB attribution replay has now terminated and preserved its actual pre-cleanup inputs:
+865 Oxia rows plus BK ledger/ZK/cursor metadata resolve all63 distinct resource identities and purposes.
+All63 authorities are OPEN; no existing DELETE_INTENT, DONE or eligibility is present. This is fee
+attribution, not deletion authority or proof that future fresh GC is impossible. The source-derived
+fixed79-mode lifetime bound is444 different resources, charged at the complete active reservation even
+after settlement:402 +444*1057887 =469702230 bytes, below500000000 without assuming any refund.
+Coordination reviewed both original artifacts and closed the budget prerequisite. The next complete
+Native Pulsar campaign is authorized to initialize one shared BK namespace at fixed500000000 bytes.
+Only that fixture's first/subsequent Native BK route budget changes; production defaults, Object/Cell/
+buffer and deliberate low-capacity rejection cases retain their values. The original64MiB failures and
+attribution keep their original source and result identities.
+
+The fixture now independently reads actual Oxia quota head/entry/compact-DONE bytes and versions at
+initial admission, final Owner completion, final namespace verification, GC settlement and subsequent
+same-backend task admission. It checks the444 lifetime bound, exact refund and retained permanent costs.
+Mode65 now exposes its source-publication future failure and preserves secondary cleanup errors without
+masking the primary cause; no speculative production race fix is added. Fixture compilation, Checkstyle
+and Spotless pass. The complete evidence reader/assembler now binds these raw observations and validates
+namespace identity, stored checksums, canonical charges, exact resource settlement and readmission.
+Source equivalence permits only the exact reviewed fixture bytes, preserves its original82 method/mode
+inventory (the unchanged full Owner selection remains79), and checks that reused executions neither
+compiled nor loaded this fixture; actual prior Native producer inputs must still match. All41 reader contracts,11 input contracts,10 JUnit contracts and the documentation gate pass.
+Fresh frozen preparation is next. No500M backend execution, complete candidate, C4/C5,
+staging, commit or push has occurred. Existing C1 and Native-only policy decisions remain closed.
+
+
+V16 freezes the new source at a1d7e47841a8f30733571c0d8e64ae15a6b37cecd36dc247703387ddb1d7f290.
+Both actual build/stability passes, fresh41/11/10 contracts, documentation and original-source V4 input
+equivalence succeed. COMPONENTS executes566 cases with zero failures/errors/skips. The Native Pulsar
+SDK/Provider prerequisite recipe succeeds; its BK/SDK ordinary and module tests use Gradle FROM-CACHE,
+while Native SDK/Provider tasks execute on the current backend. The complete SDK source/mode inventory
+matches the independent v15 C4 quality supplement. Current admission capsule is
+13329188fce6c8937b5db1e3b16c3c24d95144540cad13ab00d46eb0fb305f26.
+
+The actual initial BK head is revision1/capacity500000000/reserved0/settled0. The complete79 Owner batch
+terminates at2 failures/0 errors/0 skips: mode77 nativeEnrolledColdOwnerUnknownKeepsOriginalGrantAndCell
+and mode32 nativeInitialClaimMissingHeadCannotReinitialize both report BookKeeper -6, not enough
+non-faulty bookies. Mode65 passes in the actual terminal XML. Final BK head is revision227, capacity500M,
+113 active/zero settled resources,119541633 charged and380458367 available; the444-resource plan bound
+holds and this failure is not canonical quota exhaustion. One actual Object GC reduces charged bytes
+from6481614 to5433776 by releasing1MiB and retaining738 compact-DONE bytes; the same actual head then
+admits a new task without changing its64MiB Object capacity. Namespace-negative never executes.
+
+Host ENOSPC interrupts the original Owner XML copy and then the cleanup logger. The original failed
+1MiB partial copy remains untouched; a separately named diagnostic recovery copy preserves the complete
+2758053-byte terminal XML, SHA256 c744bfe7eab429983eaa3579efd70ffecacc9d40a277b0b7f4862865a6f98a08.
+Docker VM logs show ext4 write I/O errors and its API subsequently reports that Docker Desktop cannot
+start. The preserved timeline aligns the captured VM vda WRITE/ext4 errors at22:41:34.300-.375 UTC with
+mode77 losing Bookie handles at22:41:35.142, all three addresses unavailable and creation-6 at22:41:36.591;
+mode32 creation-6 follows at22:42:07.520. SDK timestamps use the original Asia/Shanghai timezone. Earlier
+mode70 errors belong to its controlled reset-UNKNOWN case, which passes in the actual XML, and are not
+these two terminal failures. This proves temporal correlation; the exact disk/Bookie cause, current
+Bookie health/writeability and owned cleanup remain unverified. Original v16 source/inputs/raw remain a failed execution, without stage/candidate/Final
+promotion. The unused v14 preparation workspace is removed only after its complete original input
+verification and proof that v5/v11/v15/v16 do not reference it;1381935142 logical bytes are removed while
+original source objects, bootstrap/producer/verification failures and input closure remain. Observed host
+free space rises from2162872320 to2757431296 bytes; this is not an exact attribution of physical savings.
+The pre-run backend snapshot contains an unrelated running connector, so normal Docker Desktop restart
+requires the user's confirmation. No global reset, unrelated container/volume deletion, new budget,
+production workaround, C4/C5 authority, staging, commit or push is established.
+
+
+Environment recovery also removes the v6/v10 unused materialized workspaces after both complete original
+input closures verify and1606 retained input/proof/producer/source-migration JSON files show no runtime
+reference. Their original manifests/objects/raw/proofs stay unchanged; additional non-input source,
+compiled and terminal/report bytes are archived separately before removal. The v6/v10 logical totals
+are1141710229/1399356921 bytes, with5032556/6525641 extra bytes retained. Host available space is then
+3689271296 bytes (about3.4GiB). A further1874-file retained proof/producer/source-migration audit and
+complete original input checks qualify the unused v2/v3/v4 workspaces for removal. Original objects,
+inputs/raw/proofs remain;11161802/35181568/35670796 additional non-input source/compiled/report bytes
+and their SHA/path mappings are separately preserved. Host available space afterward is4808790016 bytes
+(about4.5GiB), still below the previous run's observed growth plus archival/cleanup margin. V7/v8 fail
+original materialized-dependency verification and stay untouched. V5/v11 provenance, v15 quality/failure
+origin and the v16 failure/input tree remain. No new execution starts while Docker recovery and the
+shared-Desktop confirmation are pending.
+
+Read-only resume preflight revalidates the original V4 binding and all four whole successful stages:
+COMPONENTS566, BK/Oxia1326, Object39 and Native Kafka63, each with zero failures/errors/skips and its
+original execution record digest. V16 has no successful Native Pulsar record. The same stable input root
+can therefore support a separate retry output, preserving these whole stages and requiring the complete
+Native Pulsar recipe again. No failed-batch Owner fragments are promoted. This preflight uses the
+original Python3.14.7; the main workspace's default3.12.10 serializes ASTs differently and is correctly
+rejected against the stored AST proof. Original proof bytes are unchanged. Frozen inputs contain no
+build/test-results paths; any later generated test-output handling must preserve the archived originals,
+maintain actual Gradle freshness/capsule requirements and recheck the same input closure.

@@ -45,6 +45,7 @@ public final class M5ReferenceMutationGuardV1 {
     public enum GuardOutcomeV1 {
         MUTATION_APPLIED_AND_TICKET_CLEARED,
         MUTATION_NOT_APPLIED_AND_TICKET_CLEARED,
+        UNDISPATCHED_TICKET_FENCED_AND_CLEARED,
         RETAINED_BEFORE_EXTERNAL_MUTATION,
         RETAINED_AMBIGUOUS_EXTERNAL_MUTATION,
         RETAINED_TICKET_STATE_UNKNOWN
@@ -87,6 +88,7 @@ public final class M5ReferenceMutationGuardV1 {
             Objects.requireNonNull(outcome, "outcome");
             if (!externalMutationDispatched
                     && outcome != GuardOutcomeV1.RETAINED_BEFORE_EXTERNAL_MUTATION
+                    && outcome != GuardOutcomeV1.UNDISPATCHED_TICKET_FENCED_AND_CLEARED
                     && outcome != GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN) {
                 throw new IllegalArgumentException("guard result outcome contradicts external dispatch state");
             }
@@ -97,6 +99,7 @@ public final class M5ReferenceMutationGuardV1 {
         APPLIED_EXACT,
         EXISTING_EXACT,
         RETAIN,
+        CONFLICT,
         UNKNOWN_OR_CONFLICT
     }
 
@@ -106,6 +109,8 @@ public final class M5ReferenceMutationGuardV1 {
         CompletionStage<TicketOutcomeV1> acquire(VersionedValue exact, ReferenceMutationTicketV1 ticket);
 
         CompletionStage<TicketOutcomeV1> clear(VersionedValue exact, ReferenceMutationTicketV1 ticket);
+
+        CompletionStage<TicketOutcomeV1> fenceUndispatched(VersionedValue exact, ReferenceMutationTicketV1 ticket);
 
         boolean containsTicket(VersionedValue exact, ReferenceMutationTicketV1 ticket);
 
@@ -170,6 +175,12 @@ public final class M5ReferenceMutationGuardV1 {
                     }
 
                     @Override
+                    public CompletionStage<TicketOutcomeV1> fenceUndispatched(
+                            VersionedValue exact, ReferenceMutationTicketV1 ticket) {
+                        return CompletableFuture.completedFuture(TicketOutcomeV1.RETAIN);
+                    }
+
+                    @Override
                     public boolean enrollmentMatches(VersionedValue exact, M5ClosedWriterRegistryV1 exactRegistry) {
                         BindingRetirementAuthorityV1 value =
                                 M5BindingAuthorityCodecV1.decodeAuthority(exact.canonicalStoredBytes());
@@ -221,10 +232,20 @@ public final class M5ReferenceMutationGuardV1 {
                     }
 
                     @Override
+                    public CompletionStage<TicketOutcomeV1> fenceUndispatched(
+                            VersionedValue exact, ReferenceMutationTicketV1 ticket) {
+                        return coordinator
+                                .fenceUndispatchedTicket(new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(
+                                        authorityKey, exact, ticket))
+                                .thenApply(M5ReferenceMutationGuardV1::normalize);
+                    }
+
+                    @Override
                     public boolean enrollmentMatches(VersionedValue exact, M5ClosedWriterRegistryV1 exactRegistry) {
                         PulsarAggregateRetirementAuthorityV1 value =
                                 M5PulsarAggregateAuthorityCodecV1.decodeAuthority(exact.canonicalStoredBytes());
-                        return value.writerEnrollment().equals(Optional.of(exactRegistry.enrollment()));
+                        return value.originalAggregateSha256().equals(originalAggregateSha256)
+                                && value.writerEnrollment().equals(Optional.of(exactRegistry.enrollment()));
                     }
                 },
                 ReferenceTargetKindV1.PULSAR_AGGREGATE,
@@ -247,53 +268,146 @@ public final class M5ReferenceMutationGuardV1 {
                 request.writer().capability(),
                 request.operationIdSha256(),
                 request.externalAuthorityRootSha256());
+        return acquireKnownConflict(ticket, 0).thenCompose(acquired -> {
+            if (acquired != TicketOutcomeV1.APPLIED_EXACT && acquired != TicketOutcomeV1.EXISTING_EXACT) {
+                return completed(
+                        acquired == TicketOutcomeV1.RETAIN
+                                ? GuardOutcomeV1.RETAINED_BEFORE_EXTERNAL_MUTATION
+                                : GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN,
+                        false);
+            }
+            return authority.read().thenCompose(ticketed -> {
+                if (ticketed.isEmpty() || !authority.containsTicket(ticketed.orElseThrow(), ticket)) {
+                    return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, false);
+                }
+                return dispatch(externalMutation).thenCompose(external -> {
+                    if (external.isEmpty()) {
+                        return completed(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION, true);
+                    }
+                    ExternalMutationResultV1 result = external.orElseThrow();
+                    boolean terminal = result.outcome() == ExternalMutationOutcomeV1.APPLIED_EXACT
+                            || result.outcome() == ExternalMutationOutcomeV1.EXISTING_EXACT
+                            || result.outcome() == ExternalMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED;
+                    if (!terminal
+                            || !result.authoritativeKeySetRootSha256().equals(request.externalAuthorityRootSha256())) {
+                        return completed(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION, true);
+                    }
+                    return clearVisibleTicket(ticket, result.outcome());
+                });
+            });
+        });
+    }
+
+    private CompletionStage<TicketOutcomeV1> acquireKnownConflict(ReferenceMutationTicketV1 ticket, int attempt) {
         return authority.read().thenCompose(current -> {
             if (current.isEmpty() || !authority.enrollmentMatches(current.orElseThrow(), registry)) {
-                return completed(GuardOutcomeV1.RETAINED_BEFORE_EXTERNAL_MUTATION, false);
+                return CompletableFuture.completedFuture(TicketOutcomeV1.RETAIN);
             }
-            return authority.acquire(current.orElseThrow(), ticket).thenCompose(acquired -> {
-                if (acquired != TicketOutcomeV1.APPLIED_EXACT && acquired != TicketOutcomeV1.EXISTING_EXACT) {
-                    return completed(
-                            acquired == TicketOutcomeV1.RETAIN
-                                    ? GuardOutcomeV1.RETAINED_BEFORE_EXTERNAL_MUTATION
-                                    : GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN,
-                            false);
+            return authority
+                    .acquire(current.orElseThrow(), ticket)
+                    .thenCompose(outcome -> outcome == TicketOutcomeV1.CONFLICT && attempt < 8
+                            ? acquireKnownConflict(ticket, attempt + 1)
+                            : CompletableFuture.completedFuture(outcome));
+        });
+    }
+
+    /** Reconcile only this request's already completed original external operation; never dispatches another one. */
+    public CompletionStage<GuardResultV1> reconcileCompleted(
+            GuardedMutationRequestV1 request, ExternalMutationResultV1 originalTerminal) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(originalTerminal, "originalTerminal");
+        registry.requireRegistered(request.writer());
+        if (request.targetKind() != authorityTargetKind
+                || !request.targetIdentitySha256().equals(authorityTargetIdentitySha256)) {
+            throw new IllegalArgumentException("guarded mutation target differs from its authority cell");
+        }
+        boolean terminal = originalTerminal.outcome() == ExternalMutationOutcomeV1.APPLIED_EXACT
+                || originalTerminal.outcome() == ExternalMutationOutcomeV1.EXISTING_EXACT
+                || originalTerminal.outcome() == ExternalMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED;
+        if (!terminal
+                || !originalTerminal.authoritativeKeySetRootSha256().equals(request.externalAuthorityRootSha256())) {
+            return completed(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION, true);
+        }
+        var ticket = new ReferenceMutationTicketV1(
+                request.targetKind(),
+                request.targetIdentitySha256(),
+                request.writer().referenceKind(),
+                request.writer().capability(),
+                request.operationIdSha256(),
+                request.externalAuthorityRootSha256());
+        return authority.read().thenCompose(current -> {
+            if (current.isEmpty() || !authority.enrollmentMatches(current.orElseThrow(), registry)) {
+                return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, true);
+            }
+            if (!authority.containsTicket(current.orElseThrow(), ticket)) {
+                return completed(
+                        originalTerminal.outcome() == ExternalMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED
+                                ? GuardOutcomeV1.MUTATION_NOT_APPLIED_AND_TICKET_CLEARED
+                                : GuardOutcomeV1.MUTATION_APPLIED_AND_TICKET_CLEARED,
+                        true);
+            }
+            return clearVisibleTicket(ticket, originalTerminal.outcome());
+        });
+    }
+
+    /**
+     * The caller must own the settled original execute attempt and establish that its external
+     * dispatch never ran. This only fences that attempt's predecessor and removes its exact ticket.
+     */
+    public CompletionStage<GuardResultV1> reconcileUndispatched(GuardedMutationRequestV1 request) {
+        Objects.requireNonNull(request, "request");
+        registry.requireRegistered(request.writer());
+        if (request.targetKind() != authorityTargetKind
+                || !request.targetIdentitySha256().equals(authorityTargetIdentitySha256)) {
+            throw new IllegalArgumentException("guarded mutation target differs from its authority cell");
+        }
+        var ticket = new ReferenceMutationTicketV1(
+                request.targetKind(),
+                request.targetIdentitySha256(),
+                request.writer().referenceKind(),
+                request.writer().capability(),
+                request.operationIdSha256(),
+                request.externalAuthorityRootSha256());
+        return fenceUndispatched(ticket, 0);
+    }
+
+    private CompletionStage<GuardResultV1> fenceUndispatched(ReferenceMutationTicketV1 ticket, int attempt) {
+        return authority.read().thenCompose(current -> {
+            if (current.isEmpty() || !authority.enrollmentMatches(current.orElseThrow(), registry)) {
+                return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, false);
+            }
+            return authority.fenceUndispatched(current.orElseThrow(), ticket).thenCompose(outcome -> {
+                if (outcome == TicketOutcomeV1.CONFLICT && attempt < 8) {
+                    return fenceUndispatched(ticket, attempt + 1);
                 }
-                return authority.read().thenCompose(ticketed -> {
-                    if (ticketed.isEmpty() || !authority.containsTicket(ticketed.orElseThrow(), ticket)) {
-                        return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, false);
-                    }
-                    return dispatch(externalMutation).thenCompose(external -> {
-                        if (external.isEmpty()) {
-                            return completed(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION, true);
-                        }
-                        ExternalMutationResultV1 result = external.orElseThrow();
-                        boolean terminal = result.outcome() == ExternalMutationOutcomeV1.APPLIED_EXACT
-                                || result.outcome() == ExternalMutationOutcomeV1.EXISTING_EXACT
-                                || result.outcome() == ExternalMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED;
-                        if (!terminal
-                                || !result.authoritativeKeySetRootSha256()
-                                        .equals(request.externalAuthorityRootSha256())) {
-                            return completed(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION, true);
-                        }
-                        return clearVisibleTicket(ticket, result.outcome());
-                    });
-                });
+                return completed(
+                        outcome == TicketOutcomeV1.APPLIED_EXACT || outcome == TicketOutcomeV1.EXISTING_EXACT
+                                ? GuardOutcomeV1.UNDISPATCHED_TICKET_FENCED_AND_CLEARED
+                                : GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN,
+                        false);
             });
         });
     }
 
     private CompletionStage<GuardResultV1> clearVisibleTicket(
             ReferenceMutationTicketV1 ticket, ExternalMutationOutcomeV1 externalOutcome) {
+        return clearVisibleTicket(ticket, externalOutcome, 0);
+    }
+
+    private CompletionStage<GuardResultV1> clearVisibleTicket(
+            ReferenceMutationTicketV1 ticket, ExternalMutationOutcomeV1 externalOutcome, int attempt) {
         return authority.read().thenCompose(current -> {
             if (current.isEmpty() || !authority.containsTicket(current.orElseThrow(), ticket)) {
                 return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, true);
             }
-            return authority.clear(current.orElseThrow(), ticket).thenApply(cleared -> {
-                if (cleared != TicketOutcomeV1.APPLIED_EXACT && cleared != TicketOutcomeV1.EXISTING_EXACT) {
-                    return new GuardResultV1(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, true);
+            return authority.clear(current.orElseThrow(), ticket).thenCompose(cleared -> {
+                if (cleared == TicketOutcomeV1.CONFLICT && attempt < 8) {
+                    return clearVisibleTicket(ticket, externalOutcome, attempt + 1);
                 }
-                return new GuardResultV1(
+                if (cleared != TicketOutcomeV1.APPLIED_EXACT && cleared != TicketOutcomeV1.EXISTING_EXACT) {
+                    return completed(GuardOutcomeV1.RETAINED_TICKET_STATE_UNKNOWN, true);
+                }
+                return completed(
                         externalOutcome == ExternalMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED
                                 ? GuardOutcomeV1.MUTATION_NOT_APPLIED_AND_TICKET_CLEARED
                                 : GuardOutcomeV1.MUTATION_APPLIED_AND_TICKET_CLEARED,
@@ -317,8 +431,8 @@ public final class M5ReferenceMutationGuardV1 {
             case APPLIED_EXACT -> TicketOutcomeV1.APPLIED_EXACT;
             case EXISTING_EXACT -> TicketOutcomeV1.EXISTING_EXACT;
             case RETAIN, EXISTING_TERMINAL -> TicketOutcomeV1.RETAIN;
-            case DEFINITIVELY_NOT_APPLIED, CONFLICT, QUARANTINED, RESPONSE_UNKNOWN ->
-                TicketOutcomeV1.UNKNOWN_OR_CONFLICT;
+            case CONFLICT -> TicketOutcomeV1.CONFLICT;
+            case DEFINITIVELY_NOT_APPLIED, QUARANTINED, RESPONSE_UNKNOWN -> TicketOutcomeV1.UNKNOWN_OR_CONFLICT;
         };
     }
 
@@ -327,8 +441,8 @@ public final class M5ReferenceMutationGuardV1 {
             case APPLIED_EXACT -> TicketOutcomeV1.APPLIED_EXACT;
             case EXISTING_EXACT -> TicketOutcomeV1.EXISTING_EXACT;
             case RETAIN -> TicketOutcomeV1.RETAIN;
-            case DEFINITIVELY_NOT_APPLIED, CONFLICT, QUARANTINED, RESPONSE_UNKNOWN ->
-                TicketOutcomeV1.UNKNOWN_OR_CONFLICT;
+            case CONFLICT -> TicketOutcomeV1.CONFLICT;
+            case DEFINITIVELY_NOT_APPLIED, QUARANTINED, RESPONSE_UNKNOWN -> TicketOutcomeV1.UNKNOWN_OR_CONFLICT;
         };
     }
 

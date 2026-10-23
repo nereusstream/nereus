@@ -39,6 +39,7 @@ import org.apache.kafka.common.record.MutableRecordBatch;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.utils.BufferSupplier;
+import org.apache.kafka.common.utils.ByteBufferOutputStream;
 import org.apache.kafka.common.utils.ByteUtils;
 import org.apache.kafka.common.utils.CloseableIterator;
 
@@ -204,6 +205,39 @@ public final class KafkaRecordBatchCodecV1 {
     /** Empty means the complete batch became an explicit manifest/index gap. */
     public static Optional<CanonicalBytes> rewrite(
             ParsedBatch batch, List<RecordValue> retained, org.apache.kafka.common.record.CompressionType compression) {
+        return rewrite(batch, retained, compression, false, RecordBatch.NO_TIMESTAMP);
+    }
+
+    /** The producer-codec policy retains native offset headers and the first-clean tombstone horizon. */
+    static Optional<CanonicalBytes> rewriteProducer(
+            ParsedBatch batch, List<RecordValue> retained, long nowMs, long deleteRetentionMs) {
+        return rewriteNative(batch, retained, batch.compressionType(), nowMs, deleteRetentionMs);
+    }
+
+    static Optional<CanonicalBytes> rewriteNative(
+            ParsedBatch batch,
+            List<RecordValue> retained,
+            org.apache.kafka.common.record.CompressionType compression,
+            long nowMs,
+            long deleteRetentionMs) {
+        var original = MemoryRecords.readableRecords(
+                        ByteBuffer.wrap(batch.canonicalBody().toByteArray()))
+                .batches()
+                .iterator()
+                .next();
+        long horizon = original.deleteHorizonMs().orElse(RecordBatch.NO_TIMESTAMP);
+        if (horizon == RecordBatch.NO_TIMESTAMP && retained.stream().anyMatch(RecordValue::tombstone)) {
+            horizon = Math.addExact(nowMs, deleteRetentionMs);
+        }
+        return rewrite(batch, retained, compression, true, horizon);
+    }
+
+    private static Optional<CanonicalBytes> rewrite(
+            ParsedBatch batch,
+            List<RecordValue> retained,
+            org.apache.kafka.common.record.CompressionType compression,
+            boolean nativeHeaders,
+            long deleteHorizonMs) {
         Objects.requireNonNull(batch, "batch");
         retained = List.copyOf(Objects.requireNonNull(retained, "retained"));
         Objects.requireNonNull(compression, "compression");
@@ -213,7 +247,16 @@ public final class KafkaRecordBatchCodecV1 {
         if (batch.controlKind() != ControlKind.NONE && retained.equals(batch.records())) {
             return Optional.of(batch.canonicalBody());
         }
-        if (retained.equals(batch.records()) && compression == batch.compressionType()) {
+        boolean unchangedHorizon = !nativeHeaders
+                || MemoryRecords.readableRecords(
+                                        ByteBuffer.wrap(batch.canonicalBody().toByteArray()))
+                                .batches()
+                                .iterator()
+                                .next()
+                                .deleteHorizonMs()
+                                .orElse(RecordBatch.NO_TIMESTAMP)
+                        == deleteHorizonMs;
+        if (retained.equals(batch.records()) && compression == batch.compressionType() && unchangedHorizon) {
             return Optional.of(batch.canonicalBody());
         }
         if (!canRewriteSubset(batch, retained)) {
@@ -227,19 +270,35 @@ public final class KafkaRecordBatchCodecV1 {
         }
         ByteBuffer target = ByteBuffer.allocate(estimated);
         Compression outputCompression = Compression.of(compression).build();
-        MemoryRecordsBuilder builder = MemoryRecords.builder(
-                target,
-                batch.magic(),
-                outputCompression,
-                batch.timestampType(),
-                batch.baseOffset(),
-                batch.maxTimestamp(),
-                batch.producerId(),
-                batch.producerEpoch(),
-                batch.baseSequence(),
-                batch.transactional(),
-                false,
-                batch.partitionLeaderEpoch());
+        MemoryRecordsBuilder builder = nativeHeaders
+                ? new MemoryRecordsBuilder(
+                        new ByteBufferOutputStream(target),
+                        batch.magic(),
+                        outputCompression,
+                        batch.timestampType(),
+                        batch.baseOffset(),
+                        batch.maxTimestamp(),
+                        batch.producerId(),
+                        batch.producerEpoch(),
+                        batch.baseSequence(),
+                        batch.transactional(),
+                        false,
+                        batch.partitionLeaderEpoch(),
+                        estimated,
+                        deleteHorizonMs)
+                : MemoryRecords.builder(
+                        target,
+                        batch.magic(),
+                        outputCompression,
+                        batch.timestampType(),
+                        batch.baseOffset(),
+                        batch.maxTimestamp(),
+                        batch.producerId(),
+                        batch.producerEpoch(),
+                        batch.baseSequence(),
+                        batch.transactional(),
+                        false,
+                        batch.partitionLeaderEpoch());
         try (builder) {
             for (RecordValue record : retained) {
                 builder.appendWithOffset(
@@ -248,6 +307,9 @@ public final class KafkaRecordBatchCodecV1 {
                         record.key().map(CanonicalBytes::toByteArray).orElse(null),
                         record.value().map(CanonicalBytes::toByteArray).orElse(null),
                         headers(record.headers()));
+            }
+            if (nativeHeaders) {
+                builder.overrideLastOffset(batch.lastOffset());
             }
             MemoryRecords built = builder.build();
             ByteBuffer encoded = built.buffer().duplicate();

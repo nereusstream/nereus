@@ -70,6 +70,7 @@ class M5MinioMultipartCleanupTest {
 
                     var sameKeyFirst = create(client, "cell-a/attempt-1/data");
                     var sameKeySecond = create(client, "cell-a/attempt-1/data");
+                    var samePrefixSibling = create(client, "cell-a/attempt-1/data-sibling");
                     assertThat(client.listParts(ListPartsRequest.builder()
                                             .bucket(BUCKET)
                                             .key(sameKeyFirst.key())
@@ -90,6 +91,7 @@ class M5MinioMultipartCleanupTest {
                                             .prefix("cell-a/attempt-1/data")
                                             .build())
                                     .uploads())
+                            .as("this fixed MinIO release returns only exact-key multipart uploads")
                             .hasSize(2);
                     Set<ObjectProviderTransport.MultipartUploadIdentity> paginated =
                             Set.of(sameKeyFirst, sameKeySecond);
@@ -97,6 +99,15 @@ class M5MinioMultipartCleanupTest {
                     var paginatedResult = first.cleanupOwned(first.inventoryRoot(paginated), paginated);
                     assertThat(paginatedResult.kind()).isEqualTo(CleanupKindV1.AUTHORITATIVELY_ABSENT);
                     assertThat(paginatedResult.totalListPages()).isGreaterThanOrEqualTo(3);
+                    assertThat(client.listParts(ListPartsRequest.builder()
+                                            .bucket(BUCKET)
+                                            .key(samePrefixSibling.key())
+                                            .uploadId(new String(
+                                                    samePrefixSibling.uploadId().toByteArray(), StandardCharsets.UTF_8))
+                                            .build())
+                                    .parts())
+                            .hasSize(1);
+                    abort(client, samePrefixSibling);
 
                     var responseLoss = create(client, "cell-a/attempt-2/root");
                     ObjectProviderTransport faultCut = new LostAbortResponseTransport(transport);

@@ -74,6 +74,9 @@ public interface Nwkcp1BackendV1 {
         return Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
     }
 
+    /** Rejects new ordinary publication/takeover after the actual owner stops admission. */
+    default void requirePublicationAdmission() {}
+
     CompletionStage<CreateResult> conditionalCreateObject(String key, CanonicalBytes body, Sha256Digest bodyDigest);
 
     CompletionStage<Optional<CanonicalBytes>> readCreatedObject(CreatedObjectToken token);

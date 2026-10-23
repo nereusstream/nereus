@@ -29,6 +29,7 @@ import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClas
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,6 +46,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -95,6 +98,130 @@ class NereusPulsarLedgerOffloaderV1Test {
     Path temporaryDirectory;
 
     @Test
+    void closeWaitsForCancelledOffloadPublicationAndStagingCleanup() throws Exception {
+        InMemoryStore store = new InMemoryStore();
+        FakeReadHandle source = new FakeReadHandle(PAYLOADS);
+        source.heldFirstBatch = new CompletableFuture<>();
+        NereusPulsarLedgerOffloaderV1 offloader = offloader(store, new AtomicInteger());
+        var operation = offloader.offload(source, ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"));
+        var close = offloader.closeAsync();
+
+        assertThat(close).isNotDone();
+        assertThat(operation.cancel(false)).isTrue();
+        assertThat(close.cancel(false)).isTrue();
+        var repeatedClose = offloader.closeAsync();
+        assertThat(repeatedClose).isNotDone();
+        assertThatThrownBy(() -> offloader
+                        .offload(source, UUID.randomUUID(), Map.of("ManagedLedgerName", "tenant/ns/topic"))
+                        .join())
+                .hasRootCauseMessage("Nereus Pulsar offloader is closed");
+
+        source.heldFirstBatch.complete(source.pendingFirstBatch);
+
+        repeatedClose.join();
+        assertThat(operation).isCancelled();
+        assertThat(store.objects).hasSize(2);
+        assertThat(source.batchBuffers)
+                .allSatisfy(buffer -> assertThat(buffer.refCnt()).isZero());
+        try (var files = Files.list(temporaryDirectory)) {
+            assertThat(files.count()).isZero();
+        }
+        offloader.close();
+    }
+
+    @Test
+    void closeWaitsForAnOpeningHandleAndDeclinesItsLateHandoff() {
+        InMemoryStore store = new InMemoryStore();
+        NereusPulsarLedgerOffloaderV1 offloader = offloader(store, new AtomicInteger());
+        offloader
+                .offload(new FakeReadHandle(PAYLOADS), ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"))
+                .join();
+        store.holdNextRange = true;
+        var opening = offloader.readOffloaded(LEDGER_ID, ATTEMPT, offloader.getOffloadDriverMetadata());
+        var close = offloader.closeAsync();
+
+        assertThat(close).isNotDone();
+        store.heldRange.complete(store.pendingRange);
+
+        assertThatThrownBy(opening::join).hasRootCauseMessage("Nereus Pulsar offloader is closed");
+        close.join();
+        assertThat(offloader.closeAsync()).isCompleted();
+    }
+
+    @Test
+    void closeWaitsForCancelledSourceRevalidationAndItsOwnedHandleClose() {
+        InMemoryStore store = new InMemoryStore();
+        NereusPulsarLedgerOffloaderV1 offloader = offloader(store, new AtomicInteger());
+        offloader
+                .offload(new FakeReadHandle(PAYLOADS), ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"))
+                .join();
+        store.holdNextRange = true;
+        int before = store.rangeReads;
+        var verification = offloader.revalidateOffloadedForSourceDeletion(
+                LEDGER_ID, ATTEMPT, offloader.getOffloadDriverMetadata(), 4, 5, 15);
+        var close = offloader.closeAsync();
+
+        assertThat(close).isNotDone();
+        assertThat(verification.cancel(false)).isTrue();
+        store.heldRange.complete(store.pendingRange);
+
+        close.join();
+        assertThat(store.rangeReads).isGreaterThan(before + 1);
+        assertThat(verification).isCancelled();
+        assertThat(offloader.closeAsync()).isCompleted();
+    }
+
+    @Test
+    void cancelledOffloadObserverStillReleasesNativeBatchesAndStagingFile() throws Exception {
+        InMemoryStore store = new InMemoryStore();
+        FakeReadHandle source = new FakeReadHandle(PAYLOADS);
+        source.heldFirstBatch = new CompletableFuture<>();
+        NereusPulsarLedgerOffloaderV1 offloader = offloader(store, new AtomicInteger());
+        CompletableFuture<Void> observer =
+                offloader.offload(source, ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"));
+        try (var files = Files.list(temporaryDirectory)) {
+            assertThat(files.count()).isEqualTo(1);
+        }
+        assertThat(observer.cancel(false)).isTrue();
+
+        source.heldFirstBatch.complete(source.pendingFirstBatch);
+
+        assertThat(observer).isCancelled();
+        assertThat(store.objects).hasSize(2);
+        assertThat(source.batchBuffers)
+                .allSatisfy(buffer -> assertThat(buffer.refCnt()).isZero());
+        try (var files = Files.list(temporaryDirectory)) {
+            assertThat(files.count()).isZero();
+        }
+    }
+
+    @Test
+    void rejectedNativeBatchCallbackFailsOffloadAndReleasesEntriesAndStagingFile() throws Exception {
+        AtomicInteger dispatches = new AtomicInteger();
+        Executor executor = operation -> {
+            if (dispatches.incrementAndGet() == 3) {
+                throw new RejectedExecutionException("native batch callback dispatch rejected");
+            }
+            operation.run();
+        };
+        InMemoryStore store = new InMemoryStore();
+        FakeReadHandle source = new FakeReadHandle(PAYLOADS);
+        CompletableFuture<Void> operation = offloader(store, new AtomicInteger(), executor)
+                .offload(source, ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"));
+
+        assertThat(operation).isCompletedExceptionally();
+        assertThatThrownBy(operation::join)
+                .hasRootCauseInstanceOf(RejectedExecutionException.class)
+                .hasRootCauseMessage("native batch callback dispatch rejected");
+        assertThat(store.objects).isEmpty();
+        assertThat(source.batchBuffers).isNotEmpty().allSatisfy(buffer -> assertThat(buffer.refCnt())
+                .isZero());
+        try (var files = Files.list(temporaryDirectory)) {
+            assertThat(files.count()).isZero();
+        }
+    }
+
+    @Test
     void offloadsThroughBoundedNativeBatchesThenReadsRevalidatesAndDeletes() throws Exception {
         InMemoryStore store = new InMemoryStore();
         AtomicInteger integritySignals = new AtomicInteger();
@@ -105,8 +232,9 @@ class NereusPulsarLedgerOffloaderV1Test {
                 .offload(source, ATTEMPT, Map.of("ManagedLedgerName", "tenant/ns/topic"))
                 .join();
 
-        assertThat(source.batchRequests).hasValue(3);
-        assertThat(source.maximumRequestedEntries).hasValue(LIMITS.maxEntriesPerBlock());
+        assertThat(source.batchRequests).hasValue(PAYLOADS.size());
+        assertThat((long) source.maximumRequestedEntries.get() * LIMITS.maxEntryBytes())
+                .isLessThanOrEqualTo(LIMITS.maxDecodedBlockBytes());
         assertThat(source.maximumRequestedBytes).hasValue(Math.toIntExact(LIMITS.maxDecodedBlockBytes()));
         assertThat(store.rangeReads).isPositive();
         PulsarOffloadKeysV1 keys = PulsarOffloadKeysV1.derive("cells/pulsar-a", LEDGER_ID, ATTEMPT);
@@ -148,11 +276,12 @@ class NereusPulsarLedgerOffloaderV1Test {
                 .hasRootCauseMessage("native deletion facts differ from NPO1");
 
         store.calls.clear();
-        offloader.deleteOffloaded(LEDGER_ID, ATTEMPT, persisted).join();
-        assertThat(store.calls)
-                .containsExactly(
-                        "delete:" + keys.rootKey(), "delete:" + keys.dataKey(), "cleanup:" + keys.attemptPrefix());
-        assertThat(store.objects).doesNotContainKeys(keys.rootKey(), keys.dataKey());
+        assertThatThrownBy(() ->
+                        offloader.deleteOffloaded(LEDGER_ID, ATTEMPT, persisted).join())
+                .hasRootCauseMessage(
+                        "Pulsar offload deletion requires M5 intent, release and native reference-free authority");
+        assertThat(store.calls).isEmpty();
+        assertThat(store.objects).containsKeys(keys.rootKey(), keys.dataKey());
         assertThat(integritySignals).hasValue(0);
     }
 
@@ -203,6 +332,11 @@ class NereusPulsarLedgerOffloaderV1Test {
     }
 
     private NereusPulsarLedgerOffloaderV1 offloader(InMemoryStore store, AtomicInteger integritySignals) {
+        return offloader(store, integritySignals, Runnable::run);
+    }
+
+    private NereusPulsarLedgerOffloaderV1 offloader(
+            InMemoryStore store, AtomicInteger integritySignals, Executor executor) {
         RuntimePolicy policy = new RuntimePolicy(
                 "m2-pulsar-v1",
                 "cells/pulsar-a",
@@ -234,7 +368,7 @@ class NereusPulsarLedgerOffloaderV1Test {
                 },
                 (ledgerId, attemptUuid, failure) -> integritySignals.incrementAndGet(),
                 new OffloadPoliciesImpl(),
-                Runnable::run,
+                executor,
                 temporaryDirectory);
     }
 
@@ -281,6 +415,9 @@ class NereusPulsarLedgerOffloaderV1Test {
         private final AtomicInteger batchRequests = new AtomicInteger();
         private final AtomicInteger maximumRequestedEntries = new AtomicInteger();
         private final AtomicInteger maximumRequestedBytes = new AtomicInteger();
+        private final List<ByteBuf> batchBuffers = new ArrayList<>();
+        private CompletableFuture<LedgerEntries> heldFirstBatch;
+        private LedgerEntries pendingFirstBatch;
 
         private FakeReadHandle(List<byte[]> payloads) {
             this.payloads = payloads.stream().map(byte[]::clone).toList();
@@ -325,10 +462,16 @@ class NereusPulsarLedgerOffloaderV1Test {
                     break;
                 }
                 bytes += payload.length;
-                entries.add(LedgerEntryImpl.create(
-                        LEDGER_ID, entryId, payload.length, Unpooled.wrappedBuffer(payload.clone())));
+                ByteBuf buffer = Unpooled.wrappedBuffer(payload.clone());
+                batchBuffers.add(buffer);
+                entries.add(LedgerEntryImpl.create(LEDGER_ID, entryId, payload.length, buffer));
             }
-            return CompletableFuture.completedFuture(LedgerEntriesImpl.create(entries));
+            LedgerEntries result = LedgerEntriesImpl.create(entries);
+            if (heldFirstBatch != null && startEntryId == 0) {
+                pendingFirstBatch = result;
+                return heldFirstBatch;
+            }
+            return CompletableFuture.completedFuture(result);
         }
 
         @Override
@@ -398,6 +541,9 @@ class NereusPulsarLedgerOffloaderV1Test {
         private final Map<String, StoredObject> objects = new HashMap<>();
         private final List<String> calls = new ArrayList<>();
         private int rangeReads;
+        private boolean holdNextRange;
+        private final CompletableFuture<byte[]> heldRange = new CompletableFuture<>();
+        private byte[] pendingRange;
 
         @Override
         public Capabilities capabilities() {
@@ -446,6 +592,19 @@ class NereusPulsarLedgerOffloaderV1Test {
         }
 
         @Override
+        public CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+            StoredObject stored = objects.get(key);
+            if (stored == null) {
+                return CompletableFuture.failedFuture(new ObjectStoreException(FailureKind.NOT_FOUND, "absent"));
+            }
+            if (!stored.proof().equals(expected)) {
+                return CompletableFuture.failedFuture(
+                        new ObjectStoreException(FailureKind.INTEGRITY, "range proof differs"));
+            }
+            return readRange(key, offset, length);
+        }
+
+        @Override
         public CompletionStage<byte[]> readRange(String key, long offset, int length) {
             calls.add("read:" + key);
             rangeReads++;
@@ -453,8 +612,14 @@ class NereusPulsarLedgerOffloaderV1Test {
             if (stored == null || offset < 0 || offset + length > stored.bytes().length) {
                 return CompletableFuture.failedFuture(new ObjectStoreException(FailureKind.SHORT_READ, "outside"));
             }
-            return CompletableFuture.completedFuture(
-                    Arrays.copyOfRange(stored.bytes(), Math.toIntExact(offset), Math.toIntExact(offset + length)));
+            byte[] result =
+                    Arrays.copyOfRange(stored.bytes(), Math.toIntExact(offset), Math.toIntExact(offset + length));
+            if (holdNextRange) {
+                holdNextRange = false;
+                pendingRange = result;
+                return heldRange;
+            }
+            return CompletableFuture.completedFuture(result);
         }
 
         @Override

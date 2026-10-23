@@ -129,6 +129,85 @@ class WalRunLineageRecoveryTest {
     }
 
     @Test
+    void bareFrontierCannotSkipAnUntransferredPredecessor() {
+        MapStore store = new MapStore();
+        WalRunRootRecord first = root(1, Optional.empty());
+        WalRunReference reference1 = reference(WalRunControlKeys.rootKey(7, 1), first);
+        WalRunRootRecord current = root(
+                2,
+                Optional.of(new WalRunPredecessor(
+                        reference1, WalRunControlKeys.sealKey(7, 1), digest(6), Optional.of(terminalBinding(1)))));
+        WalRunReference reference2 = reference(WalRunControlKeys.rootKey(7, 2), current);
+        store.values.put(
+                WalRunControlKeys.pointerKey(7),
+                WalRunControlCodec.encodePointer(new CurrentWalRunPointer(reference2)));
+        store.values.put(reference2.rootKey(), WalRunControlCodec.encodeRoot(current));
+        assertThatThrownBy(() -> new WalRunLineageRecovery(store)
+                        .recover(
+                                WalRunControlKeys.pointerKey(7),
+                                current.protocolCellIdentity(),
+                                current.providerScopeId(),
+                                Optional.of(reference2),
+                                () -> 0))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("retirement frontier lacks a verified persisted prefix certificate");
+        assertThatThrownBy(() -> new WalRunLineageRecovery(store)
+                        .recover(
+                                WalRunControlKeys.pointerKey(7),
+                                current.protocolCellIdentity(),
+                                current.providerScopeId(),
+                                Optional.empty(),
+                                () -> 0))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("WalRun Seal is absent");
+    }
+
+    @Test
+    void protocolVerifiedCutExcludesTheWholeRetiredPrefixFromTheLiveEnvelope() {
+        MapStore store = new MapStore();
+        WalRunRootRecord first = root(1, Optional.empty());
+        WalRunReference reference1 = reference(WalRunControlKeys.rootKey(7, 1), first);
+        WalRunPredecessor boundary = new WalRunPredecessor(
+                reference1, WalRunControlKeys.sealKey(7, 1), digest(6), Optional.of(terminalBinding(1)));
+        WalRunRootRecord current = root(2, Optional.of(boundary));
+        WalRunReference reference2 = reference(WalRunControlKeys.rootKey(7, 2), current);
+        store.values.put(
+                WalRunControlKeys.pointerKey(7),
+                WalRunControlCodec.encodePointer(new CurrentWalRunPointer(reference2)));
+        store.values.put(reference2.rootKey(), WalRunControlCodec.encodeRoot(current));
+        // This is adapter-boundary coverage only. The real adapter must qualify a durable complete-prefix decision.
+        var recovery = new WalRunLineageRecovery(
+                store,
+                com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1.failClosed(),
+                com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1
+                        .ProtocolObjectRecoveryReaderFactoryV1.failClosed(),
+                (observed, retained, budget) -> {
+                    assertThat(observed).isEqualTo(boundary);
+                    assertThat(retained).isEqualTo(current);
+                    budget.chargeControlMetadata(19);
+                    return true;
+                });
+        var recovered = recovery.recover(
+                WalRunControlKeys.pointerKey(7),
+                current.protocolCellIdentity(),
+                current.providerScopeId(),
+                Optional.of(reference1),
+                () -> 0);
+        assertThat(recovered.runs())
+                .extracting(WalRunLineageRecovery.RecoveredRun::reference)
+                .containsExactly(reference2);
+        var budget = recovered.consumeFor(current).snapshot();
+        assertThat(budget.liveRoots()).isOne();
+        assertThat(budget.predecessorRuns()).isZero();
+        assertThat(budget.rangeGetRequests()).isZero();
+        assertThat(budget.canonicalBodyBytes())
+                .isEqualTo(WalRunControlCodec.encodeRoot(current).length()
+                        + WalRunControlCodec.encodePointer(new CurrentWalRunPointer(reference2))
+                                .length()
+                        + 19);
+    }
+
+    @Test
     void rootDigestSubstitutionAndUnreachableFrontierFailClosed() {
         MapStore store = new MapStore();
         WalRunRootRecord root = root(1, Optional.empty());

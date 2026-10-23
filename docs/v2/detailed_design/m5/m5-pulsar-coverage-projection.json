@@ -1,0 +1,82 @@
+{
+  "schema": "NEREUS_V2_M5_PULSAR_COVERAGE_PROJECTION_V2",
+  "authority": "DECLARED_TYPED_VALUE_NOT_SOURCE_QUALIFICATION",
+  "status": "PRE_PRODUCER_INSTALLATION",
+  "coverage": {
+    "magicHex": "4d355043",
+    "version": 2,
+    "positionDomainTag": 1,
+    "integerEncoding": "BIG_ENDIAN_SIGNED_I64_AND_U32_COUNTS",
+    "maximumBytes": 65536,
+    "maximumChainLedgers": 256,
+    "maximumRanges": 256,
+    "fields": [
+      "magic:u32",
+      "version:u32",
+      "positionDomainTag:u8",
+      "bindingId:sha256",
+      "incarnation:sha256",
+      "storageEpoch:sha256",
+      "chainAuthorityRoot:sha256",
+      "chainSnapshotSha256:sha256",
+      "chainCount:u32",
+      "chainRows:ChainLedger[chainCount]",
+      "rangeCount:u32",
+      "ranges:EntryRange[rangeCount]"
+    ],
+    "chainLedgerFields": [
+      "ledgerId:i64_nonnegative",
+      "active:u8_0_or_1",
+      "entryEndExclusive:i64_nonnegative",
+      "sourceIdentity:sha256_nonzero"
+    ],
+    "entryRangeFields": [
+      "ledgerId:i64_nonnegative",
+      "startEntryInclusive:i64_nonnegative",
+      "endEntryExclusive:i64_positive"
+    ],
+    "canonicalRules": [
+      "Directory order is declared authority order, never numeric ledger-ID sorting.",
+      "Directory ledger IDs are unique; at most one active ledger and it is last.",
+      "Ranges are nonempty, one merged range per ledger, in exact directory order.",
+      "Selected range may not include the active ledger.",
+      "Consecutive ranges must exhaust the prior sealed ledger and start the next at zero; only explicitly empty sealed directory rows may intervene.",
+      "First/last range may select a sealed subcut; every boundary lies within the declared ledger end.",
+      "Total entry count uses checked per-ledger subtraction and checked addition.",
+      "Same Binding/incarnation/storage epoch, authority root, chain digest and directory are required for containment/adjacency.",
+      "Unknown tags, noncanonical bytes, trailing bytes, invalid roots/counts/positions/roles and overflow reject."
+    ],
+    "chainDigestEncoding": "SHA256(u32(domain.length)||ASCII(domain)||bindingId||incarnation||storageEpoch||chainAuthorityRoot||chainCount||chainRows)",
+    "coverageDigestEncoding": "SHA256(u32(domain.length)||ASCII(domain)||completeCanonicalCoverageBody)"
+  },
+  "identityDomains": {
+    "chain": "NEREUS_V2_M5_PULSAR_LEDGER_CHAIN_V2",
+    "coverage": "NEREUS_V2_M5_PULSAR_COVERAGE_V2"
+  },
+  "golden": {
+    "resource": "../../../../nereus-storage-object/src/test/resources/materialization/m5-pulsar-coverage-v2.hex",
+    "fixtureAuthority": "SYNTHETIC_CODEC_ONLY_NO_NATIVE_SOURCE_PROOF",
+    "chainLedgerOrder": [
+      9,
+      3,
+      7
+    ],
+    "ranges": [
+      [
+        9,
+        1,
+        2
+      ],
+      [
+        3,
+        0,
+        2
+      ]
+    ],
+    "canonicalBytes": 372,
+    "bodySha256": "139686fdb9bc250d640e598a074f01957a2ce9e25a025aab8a9bcb692eb2921f",
+    "chainSha256": "b0bd157c6322d5dc19a0b830a806bb7d18a1ad2ba27c0216b3f648f108d47903",
+    "coverageSha256": "1b2eefe54c97ca05dbd67521858546d4037b99d909662668d13af389f6c3b1e8"
+  },
+  "installationBoundary": "The native/virtual-chain source producer must independently qualify/reread actual directory and source facts. This value and its digest grant no SourceProof, publication, M4 release or deletion. Pulsar control/NMS1/lookup versions and all downstream typed consumers remain to be installed; Kafka V1 and historical frozen bytes remain unchanged."
+}

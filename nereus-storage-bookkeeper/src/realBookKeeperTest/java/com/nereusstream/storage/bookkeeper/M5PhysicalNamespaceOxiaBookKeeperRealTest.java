@@ -149,6 +149,9 @@ class M5PhysicalNamespaceOxiaBookKeeperRealTest {
                     .isEqualTo(ExactMetadataTransactionStoreV1.MutationOutcome.APPLIED_EXACT);
             var exact = await(first.read(resource.authorityKey())).orElseThrow();
             assertThat(await(second.read(resource.authorityKey()))).contains(exact);
+            var resourceFact = await(first.readResourceFact(resource));
+            assertThat(resourceFact.authority()).isEqualTo(exact);
+            assertThat(await(second.readResourceFact(resource))).isEqualTo(resourceFact);
             assertThat(await(second.compareAndSet(
                             Optional.empty(),
                             resource.authorityKey(),
@@ -198,6 +201,7 @@ class M5PhysicalNamespaceOxiaBookKeeperRealTest {
             var route = await(metadata.openAuthorityRoute(backend, new Oxia09ExactMetadataTransactionStoreV1(oxia)));
             var resource = new PhysicalResourceIdV2.BookKeeperLedger(backend.namespace(), ledgerId);
             var authority = await(route.read(resource.authorityKey())).orElseThrow();
+            assertThat(await(route.readResourceFact(resource)).authority()).isEqualTo(authority);
             assertThat(authority.canonicalStoredSha256().toHex()).isEqualTo(lines.get(3));
             assertThat(authority.metadataVersion().value().toHex()).isEqualTo(lines.get(4));
             assertThat(Sha256Digest.hash(await(route.quota().snapshot()).head().encode())

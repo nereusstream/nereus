@@ -36,6 +36,7 @@ public final class WalRunLifecycleManager {
     }
 
     private final CanonicalControlMetadataStore metadata;
+    private final WalRunRecoveryRetirementVerifierV1 retirementVerifier;
     private final TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier;
     private final TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1
             protocolObjectReaderFactory;
@@ -59,7 +60,20 @@ public final class WalRunLifecycleManager {
             CanonicalControlMetadataStore metadata,
             TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier,
             TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1 protocolObjectReaderFactory) {
+        this(
+                metadata,
+                protocolCheckpointVerifier,
+                protocolObjectReaderFactory,
+                WalRunRecoveryRetirementVerifierV1.retainAll());
+    }
+
+    public WalRunLifecycleManager(
+            CanonicalControlMetadataStore metadata,
+            TerminalProtocolCheckpointVerifierV1 protocolCheckpointVerifier,
+            TerminalProtocolCheckpointVerifierV1.ProtocolObjectRecoveryReaderFactoryV1 protocolObjectReaderFactory,
+            WalRunRecoveryRetirementVerifierV1 retirementVerifier) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
+        this.retirementVerifier = Objects.requireNonNull(retirementVerifier, "retirementVerifier");
         this.protocolCheckpointVerifier =
                 Objects.requireNonNull(protocolCheckpointVerifier, "protocolCheckpointVerifier");
         this.protocolObjectReaderFactory =
@@ -387,9 +401,7 @@ public final class WalRunLifecycleManager {
                 new CumulativeRecoveryBudget(currentRoot.recoveryEnvelope(), System::nanoTime);
         budget.chargeControlMetadata(pointerBytes.length());
         budget.chargeRoot(false, currentRootBytes.length());
-        WalRunRootRecord predecessorRoot = observedPointer.current().equals(expectedSealedRoot)
-                ? currentRoot
-                : loadExactRootUnderBudget(expectedSealedRoot, budget);
+        WalRunRootRecord predecessorRoot = currentRoot;
         String sealKey = WalRunControlKeys.sealKey(expectedSealedRoot.shardId(), expectedSealedRoot.shardRunEpoch());
         budget.chargeControlMetadata(MAX_BOOTSTRAP_CONTROL_BYTES);
         Optional<CanonicalBytes> sealBytes = metadata.get(sealKey);
@@ -410,7 +422,8 @@ public final class WalRunLifecycleManager {
         if (observedPointer.current().equals(expectedSealedRoot)) {
             verifySealRecord(seal, predecessorRoot, budget);
         } else {
-            ProspectiveSuccessorSnapshot snapshot = new ProspectiveSuccessorSnapshot(budget, seal, predecessorRoot);
+            ProspectiveSuccessorSnapshot snapshot = captureProspectivePredecessor(currentRoot, seal, budget);
+            predecessorRoot = snapshot.predecessorRoot();
             validatePreparedSuccessor(
                     new CurrentWalRunPointer(expectedSealedRoot),
                     sealKey,
@@ -497,8 +510,7 @@ public final class WalRunLifecycleManager {
         if (!exactSeal.equals(suppliedSeal) || !exactSeal.root().equals(expectedPointer.current())) {
             throw new IllegalStateException("successor predecessor Seal differs from the exact pointer Root");
         }
-        WalRunRootRecord predecessorRoot = loadExactRootUnderBudget(exactSeal.root(), budget);
-        return new ProspectiveSuccessorSnapshot(budget, exactSeal, predecessorRoot);
+        return captureProspectivePredecessor(successorRoot, exactSeal, budget);
     }
 
     private ProspectiveSuccessorSnapshot prepareProspectiveSuccessorFromStore(
@@ -517,7 +529,21 @@ public final class WalRunLifecycleManager {
         if (!exactSeal.root().equals(expectedPointer.current())) {
             throw new IllegalStateException("owner-open predecessor Seal differs from the exact pointer Root");
         }
-        return new ProspectiveSuccessorSnapshot(budget, exactSeal, loadExactRootUnderBudget(exactSeal.root(), budget));
+        return captureProspectivePredecessor(successorRoot, exactSeal, budget);
+    }
+
+    private ProspectiveSuccessorSnapshot captureProspectivePredecessor(
+            WalRunRootRecord successorRoot, WalRunSealRecord seal, CumulativeRecoveryBudget budget) {
+        WalRunPredecessor boundary = successorRoot
+                .predecessor()
+                .orElseThrow(() -> new IllegalArgumentException("successor Root omits its exact predecessor"));
+        if (!boundary.root().equals(seal.root())
+                || !boundary.sealSha256().equals(WalRunControlCodec.sealSha256(seal))) {
+            throw new IllegalArgumentException("successor retirement boundary differs from the exact Seal");
+        }
+        boolean retired = retirementVerifier.isRetiredPrefix(boundary, successorRoot, budget);
+        WalRunRootRecord predecessor = loadExactRootUnderBudget(seal.root(), budget, retired);
+        return new ProspectiveSuccessorSnapshot(budget, seal, predecessor, retired);
     }
 
     private void validatePreparedSuccessor(
@@ -562,7 +588,10 @@ public final class WalRunLifecycleManager {
                 || !snapshot.exactSeal().equals(predecessorSeal)) {
             throw new IllegalStateException("successor validation received a substituted prospective snapshot");
         }
-        verifyRetainedLineageClosure(successorRoot, predecessorRoot, predecessorSeal, actualLineage, snapshot.budget());
+        if (!snapshot.predecessorRetiredPrefix) {
+            verifyRetainedLineageClosure(
+                    successorRoot, predecessorRoot, predecessorSeal, actualLineage, snapshot.budget());
+        }
     }
 
     private void verifyTerminalProtocolCheckpoint(
@@ -648,6 +677,9 @@ public final class WalRunLifecycleManager {
                     || olderLineage.root().shardRunEpoch() >= retainedRoot.shardRunEpoch()) {
                 throw new IllegalStateException("retained lineage fork or non-decreasing predecessor epoch");
             }
+            if (retirementVerifier.isRetiredPrefix(olderLineage, retainedRoot, recoveryBudget)) {
+                return;
+            }
             recoveryBudget.chargeControlMetadata(MAX_BOOTSTRAP_CONTROL_BYTES);
             CanonicalBytes olderSealBytes = metadata.get(olderLineage.sealKey())
                     .orElseThrow(() -> new IllegalStateException("retained predecessor Seal is absent"));
@@ -668,7 +700,16 @@ public final class WalRunLifecycleManager {
 
     private WalRunRootRecord loadExactRootUnderBudget(
             WalRunReference reference, CumulativeRecoveryBudget recoveryBudget) {
-        recoveryBudget.chargeRoot(true, MAX_BOOTSTRAP_CONTROL_BYTES);
+        return loadExactRootUnderBudget(reference, recoveryBudget, false);
+    }
+
+    private WalRunRootRecord loadExactRootUnderBudget(
+            WalRunReference reference, CumulativeRecoveryBudget recoveryBudget, boolean retiredPrefix) {
+        if (retiredPrefix) {
+            recoveryBudget.chargeControlMetadata(MAX_BOOTSTRAP_CONTROL_BYTES);
+        } else {
+            recoveryBudget.chargeRoot(true, MAX_BOOTSTRAP_CONTROL_BYTES);
+        }
         CanonicalBytes bytes = metadata.get(reference.rootKey())
                 .orElseThrow(() -> new IllegalStateException("retained WalRun Root is absent: " + reference.rootKey()));
         if (bytes.length() > MAX_BOOTSTRAP_CONTROL_BYTES
@@ -751,13 +792,18 @@ public final class WalRunLifecycleManager {
     }
 
     private static final class ProspectiveSuccessorSnapshot {
+        private final boolean predecessorRetiredPrefix;
         private final CumulativeRecoveryBudget budget;
         private final WalRunSealRecord exactSeal;
         private final WalRunRootRecord predecessorRoot;
         private boolean candidateRootObserved;
 
         private ProspectiveSuccessorSnapshot(
-                CumulativeRecoveryBudget budget, WalRunSealRecord exactSeal, WalRunRootRecord predecessorRoot) {
+                CumulativeRecoveryBudget budget,
+                WalRunSealRecord exactSeal,
+                WalRunRootRecord predecessorRoot,
+                boolean predecessorRetiredPrefix) {
+            this.predecessorRetiredPrefix = predecessorRetiredPrefix;
             this.budget = Objects.requireNonNull(budget, "budget");
             this.exactSeal = Objects.requireNonNull(exactSeal, "exactSeal");
             this.predecessorRoot = Objects.requireNonNull(predecessorRoot, "predecessorRoot");

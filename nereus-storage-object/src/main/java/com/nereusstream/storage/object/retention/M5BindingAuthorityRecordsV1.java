@@ -42,7 +42,9 @@ public final class M5BindingAuthorityRecordsV1 {
 
     public enum BindingAuthorityStateV1 {
         OPEN_V1,
-        REFERENCE_SCAN_FENCED_V1
+        REFERENCE_SCAN_FENCED_V1,
+        LOGICAL_TRIM_SCAN_FENCED_V2,
+        SOURCE_SCAN_FENCED_V2
     }
 
     /** One never-reused BatchId slot. Full bytes and a tombstone are mutually exclusive. */
@@ -154,6 +156,13 @@ public final class M5BindingAuthorityRecordsV1 {
         }
     }
 
+    public record BindingSourceScanFenceV2(Sha256Digest attemptId, Sha256Digest openAuthoritySha256) {
+        public BindingSourceScanFenceV2 {
+            requireDigest(attemptId, "attemptId");
+            requireDigest(openAuthoritySha256, "openAuthoritySha256");
+        }
+    }
+
     /** Entire canonical value at the existing Binding selector key. */
     public record BindingRetirementAuthorityV1(
             BindingIdentity binding,
@@ -170,7 +179,171 @@ public final class M5BindingAuthorityRecordsV1 {
             long lastActivationOrdinal,
             M5RetiredBatchHistoryV2.Root retiredHistory,
             Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
-            Sha256Digest authorityCanonicalSha256) {
+            Optional<M5MaterializationWorkerV1> materializationWorker,
+            Sha256Digest authorityCanonicalSha256,
+            Optional<M5LogicalTrimRecordsV2.LogicalTrimStateV2> logicalTrim,
+            List<M5LogicalTrimRecordsV2.LogicalTrimMutationV2> trimMutationTickets,
+            Optional<M5BindingBootstrapV1> bootstrap,
+            Optional<M5KafkaBindingPolicyV1> kafkaPolicy,
+            Optional<BindingSourceScanFenceV2> sourceScan) {
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                int wireVersion,
+                long lastActivationOrdinal,
+                M5RetiredBatchHistoryV2.Root retiredHistory,
+                Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
+                Optional<M5MaterializationWorkerV1> materializationWorker,
+                Sha256Digest authorityCanonicalSha256,
+                Optional<M5LogicalTrimRecordsV2.LogicalTrimStateV2> logicalTrim,
+                List<M5LogicalTrimRecordsV2.LogicalTrimMutationV2> trimMutationTickets,
+                Optional<M5BindingBootstrapV1> bootstrap) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    wireVersion,
+                    lastActivationOrdinal,
+                    retiredHistory,
+                    taskSelectionDecision,
+                    materializationWorker,
+                    authorityCanonicalSha256,
+                    logicalTrim,
+                    trimMutationTickets,
+                    bootstrap,
+                    bootstrap.flatMap(M5BindingBootstrapV1::kafkaPolicy),
+                    Optional.empty());
+        }
+
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                int wireVersion,
+                long lastActivationOrdinal,
+                M5RetiredBatchHistoryV2.Root retiredHistory,
+                Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
+                Optional<M5MaterializationWorkerV1> materializationWorker,
+                Sha256Digest authorityCanonicalSha256,
+                Optional<M5LogicalTrimRecordsV2.LogicalTrimStateV2> logicalTrim,
+                List<M5LogicalTrimRecordsV2.LogicalTrimMutationV2> trimMutationTickets) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    wireVersion,
+                    lastActivationOrdinal,
+                    retiredHistory,
+                    taskSelectionDecision,
+                    materializationWorker,
+                    authorityCanonicalSha256,
+                    logicalTrim,
+                    trimMutationTickets,
+                    Optional.empty());
+        }
+
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                int wireVersion,
+                long lastActivationOrdinal,
+                M5RetiredBatchHistoryV2.Root retiredHistory,
+                Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
+                Optional<M5MaterializationWorkerV1> materializationWorker,
+                Sha256Digest authorityCanonicalSha256) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    wireVersion,
+                    lastActivationOrdinal,
+                    retiredHistory,
+                    taskSelectionDecision,
+                    materializationWorker,
+                    authorityCanonicalSha256,
+                    Optional.empty(),
+                    List.of());
+        }
+
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                int wireVersion,
+                long lastActivationOrdinal,
+                M5RetiredBatchHistoryV2.Root retiredHistory,
+                Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
+                Sha256Digest authorityCanonicalSha256) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    wireVersion,
+                    lastActivationOrdinal,
+                    retiredHistory,
+                    taskSelectionDecision,
+                    Optional.empty(),
+                    authorityCanonicalSha256);
+        }
+
         public BindingRetirementAuthorityV1(
                 BindingIdentity binding,
                 long authorityGeneration,
@@ -247,6 +420,112 @@ public final class M5BindingAuthorityRecordsV1 {
             Objects.requireNonNull(capability, "capability");
             Objects.requireNonNull(retiredHistory, "retiredHistory");
             taskSelectionDecision = Objects.requireNonNull(taskSelectionDecision, "taskSelectionDecision");
+            materializationWorker = Objects.requireNonNull(materializationWorker, "materializationWorker");
+            logicalTrim = Objects.requireNonNull(logicalTrim, "logicalTrim");
+            trimMutationTickets = List.copyOf(Objects.requireNonNull(trimMutationTickets, "trimMutationTickets"));
+            bootstrap = Objects.requireNonNull(bootstrap, "bootstrap");
+            kafkaPolicy = Objects.requireNonNull(kafkaPolicy, "kafkaPolicy");
+            sourceScan = Objects.requireNonNull(sourceScan, "sourceScan");
+            if ((wireVersion >= 7) != kafkaPolicy.isPresent()
+                    || kafkaPolicy.isPresent()
+                            != bootstrap
+                                    .flatMap(M5BindingBootstrapV1::kafkaPolicy)
+                                    .isPresent()) {
+                throw new IllegalArgumentException(
+                        "Kafka policy requires its original first bootstrap and wire version");
+            }
+            if ((state == BindingAuthorityStateV1.SOURCE_SCAN_FENCED_V2) != sourceScan.isPresent()
+                    || sourceScan.isPresent()
+                            && (kafkaPolicy.isEmpty()
+                                    || writerEnrollment.isEmpty()
+                                    || !referenceMutationTickets.isEmpty()
+                                    || !trimMutationTickets.isEmpty())) {
+                throw new IllegalArgumentException(
+                        "Kafka source scan requires its ticket-free enrolled policy authority");
+            }
+            if (sourceScan.isPresent()
+                    && !predecessorValueSha256.equals(
+                            Optional.of(sourceScan.orElseThrow().openAuthoritySha256()))) {
+                throw new IllegalArgumentException("Kafka source scan differs from its exact OPEN predecessor");
+            }
+            if (kafkaPolicy.isPresent()) {
+                var initial =
+                        bootstrap.flatMap(M5BindingBootstrapV1::kafkaPolicy).orElseThrow();
+                var actual = kafkaPolicy.orElseThrow();
+                if (!actual.sameAdmittedProfile(initial)
+                        || actual.generation() < initial.generation()
+                        || actual.generation() == 1 && !actual.equals(initial)) {
+                    throw new IllegalArgumentException("Kafka policy changed its immutable first-admitted profile");
+                }
+            }
+            if ((wireVersion >= 6) != bootstrap.isPresent()
+                    || bootstrap
+                            .filter(value -> !value.binding().equals(binding)
+                                    || !value.capability().equals(capability))
+                            .isPresent()) {
+                throw new IllegalArgumentException("Binding bootstrap, capability or wire version differs");
+            }
+            if (wireVersion == 5 && logicalTrim.isEmpty()
+                    || wireVersion < 5 && logicalTrim.isPresent()
+                    || logicalTrim.isEmpty() && !trimMutationTickets.isEmpty()) {
+                throw new IllegalArgumentException("Binding trim facts and wire version disagree");
+            }
+            if ((state == BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2)
+                    != logicalTrim
+                            .flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::fence)
+                            .isPresent()) {
+                throw new IllegalArgumentException("Binding trim state and fence disagree");
+            }
+            if (state == BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2
+                    && (!trimMutationTickets.isEmpty()
+                            || !referenceMutationTickets.isEmpty()
+                            || writerEnrollment.isEmpty())) {
+                throw new IllegalArgumentException("Binding trim scan requires ticket-free enrolled writers");
+            }
+            if (logicalTrim
+                    .flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::fence)
+                    .isPresent()) {
+                var fence = logicalTrim
+                        .flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::fence)
+                        .orElseThrow();
+                if (!predecessorValueSha256
+                        .filter(fence.openAuthority().valueSha256()::equals)
+                        .isPresent()) {
+                    throw new IllegalArgumentException("Binding trim fence differs from its OPEN predecessor");
+                }
+            }
+            logicalTrim
+                    .flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::frontier)
+                    .ifPresent(frontier -> {
+                        if (!frontier.identity().binding().equals(binding)
+                                || !frontier.capability().equals(capability)) {
+                            throw new IllegalArgumentException("Binding trim frontier identity/capability differs");
+                        }
+                    });
+            if (trimMutationTickets.size() > M5LogicalTrimRecordsV2.MAX_MUTATIONS
+                    || !trimMutationTickets.equals(trimMutationTickets.stream()
+                            .sorted(java.util.Comparator.comparing(M5LogicalTrimRecordsV2.LogicalTrimMutationV2::key))
+                            .toList())
+                    || trimMutationTickets.stream()
+                                    .map(M5LogicalTrimRecordsV2.LogicalTrimMutationV2::key)
+                                    .distinct()
+                                    .count()
+                            != trimMutationTickets.size()
+                    || trimMutationTickets.stream()
+                                    .map(M5LogicalTrimRecordsV2.LogicalTrimMutationV2::operationId)
+                                    .distinct()
+                                    .count()
+                            != trimMutationTickets.size()
+                    || !trimMutationTickets.isEmpty() && writerEnrollment.isEmpty()) {
+                throw new IllegalArgumentException("Binding trim mutations exceed bounds or lack unique admission");
+            }
+            if (materializationWorker
+                            .filter(value -> !value.identity().binding().equals(binding)
+                                    || !value.identity().capability().equals(capability))
+                            .isPresent()
+                    || wireVersion < 4 && materializationWorker.isPresent()) {
+                throw new IllegalArgumentException("worker grant Binding, capability or wire version differs");
+            }
             if (taskSelectionDecision
                             .filter(value -> !value.binding().equals(binding))
                             .isPresent()
@@ -264,7 +543,13 @@ public final class M5BindingAuthorityRecordsV1 {
                     || referenceMutationTickets.size() > MAX_REFERENCE_MUTATION_TICKETS) {
                 throw new IllegalArgumentException("Binding authority exceeds a hard count cap");
             }
-            if ((wireVersion != 1 && wireVersion != 2 && wireVersion != 3)
+            if ((wireVersion != 1
+                            && wireVersion != 2
+                            && wireVersion != 3
+                            && wireVersion != 4
+                            && wireVersion != 5
+                            && wireVersion != 6
+                            && wireVersion != 7)
                     || lastActivationOrdinal < 0
                     || Math.addExact(retiredHistory.count(), batchSlots.size()) != lastActivationOrdinal
                     || (retiredHistory.count() == 0)
@@ -286,6 +571,9 @@ public final class M5BindingAuthorityRecordsV1 {
                 throw new IllegalArgumentException("Binding authority state and scan fence disagree");
             }
             if (scanFence.isPresent()) {
+                if (!trimMutationTickets.isEmpty()) {
+                    throw new IllegalArgumentException("retirement scan cannot cross an original trim writer");
+                }
                 ReferenceScanFenceV1 fence = scanFence.orElseThrow();
                 if (fence.targetKind() != ReferenceTargetKindV1.RETIREMENT_BATCH
                         || findSlot(batchSlots, fence.targetIdentitySha256())

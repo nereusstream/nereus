@@ -72,6 +72,9 @@ paths.extend([root/'scripts/check-v2-m5-bookkeeper-descriptor.py',
 manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 (out/'tested-inputs.json').write_text(json.dumps(manifest,indent=2)+'\n')
 PY
+"$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 \
+  "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
+  :nereus-storage-bookkeeper:realBookKeeperTest --console=plain
 "$m5_repo_root/gradlew" --no-daemon --no-configuration-cache --no-parallel --max-workers=2 --rerun-tasks \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
   "-Pv2M5RetentionOxiaServiceAddress=127.0.0.1:$m5_port" \
@@ -124,15 +127,17 @@ if len(before)!=4 or len(after)!=4 or any(a[:2]!=b[:2] or a[2]==b[2] for a,b in 
     raise SystemExit('Native BK restart did not retain all four exact containers and change their start times')
 suites=[]
 for module,task,name,count in (
-    ('nereus-storage-object','v2M5TaskSelectionTest','M5TaskSelectionCoordinatorV2Test',7),
+    ('nereus-storage-bookkeeper','realBookKeeperTest','RealBookKeeperCellSessionV1RealTest',16),
+    ('nereus-storage-object','v2M5TaskSelectionTest','M5TaskSelectionCoordinatorV2Test',9),
+    ('nereus-storage-object','v2M5MaterializationWorkerTest','M5MaterializationWorkerV1Test',9),
     ('nereus-storage-object','v2M5RetiredHistoryTest','M5RetiredBatchHistoryV2Test',15),
-    ('nereus-metadata-oxia','v2M5TaskSelectionRouteTest','OxiaTaskSelectionRouteV2Test',3),
+    ('nereus-metadata-oxia','v2M5TaskSelectionRouteTest','OxiaTaskSelectionRouteV2Test',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminalTest','KafkaBookKeeperTaskTerminalV2Test',4),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRealTest','KafkaBookKeeperTaskTerminationV2RealTest',5),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartWriteTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperTaskTerminationRestartReadTest','KafkaBookKeeperTaskTerminationV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeCreateTest','M5BookKeeperNativeCreateSpecV2Test',4),
-    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',9),
+    ('nereus-storage-bookkeeper','v2M5NativeCreateRealTest','M5BookKeeperNativeCreateV2RealTest',10),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRealTest','M5BookKeeperNativeDeleteV2RealTest',4),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartWriteTest','M5BookKeeperNativeDeleteV2RestartTest',1),
     ('nereus-storage-bookkeeper','v2M5NativeDeleteRestartReadTest','M5BookKeeperNativeDeleteV2RestartTest',1),
@@ -143,8 +148,8 @@ for module,task,name,count in (
     ('nereus-kafka-bookkeeper','v2M5BookKeeperOxiaControlRealTest','KafkaBookKeeperOxiaControlV2RealTest',5),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperOxiaRestartWriteTest','KafkaBookKeeperOxiaControlV2RestartTest',1),
     ('nereus-kafka-bookkeeper','v2M5BookKeeperOxiaRestartReadTest','KafkaBookKeeperOxiaControlV2RestartTest',1),
-    ('nereus-kafka-bookkeeper','v2M5BookKeeperControlStoreTest','KafkaBookKeeperControlMetadataStoreV2Test',6),
-    ('nereus-metadata-oxia','v2M5BookKeeperRecordStoreTest','OxiaKafkaBookKeeperRecordStoreV2Test',5),
+    ('nereus-kafka-bookkeeper','v2M5BookKeeperControlStoreTest','KafkaBookKeeperControlMetadataStoreV2Test',9),
+    ('nereus-metadata-oxia','v2M5BookKeeperRecordStoreTest','OxiaKafkaBookKeeperRecordStoreV2Test',6),
 ):
     matches=list((root/module/f'build/test-results/{task}').glob(f'TEST-*.{name}.xml'))
     if len(matches)!=1: raise SystemExit('Missing or ambiguous native test XML: '+task)
@@ -152,6 +157,15 @@ for module,task,name,count in (
     if {k:suite.attrib.get(k) for k in ('tests','failures','errors','skipped')}!={
         'tests':str(count),'failures':'0','errors':'0','skipped':'0'}:
         raise SystemExit('Native suite did not pass without skips: '+task)
+    if task=='v2M5TaskSelectionTest' and not {
+        'bootstrapHasNoProjectedViewAndSurvivesActivationTrimAndTaskSelection()',
+        'bootstrapRejectsCorruptionForeignActivationAndCompetingFirstView()',
+    }.issubset({case.attrib.get('name') for case in suite.findall('testcase')}):
+        raise SystemExit('Binding bootstrap compatibility cases are absent')
+    if task=='v2M5BookKeeperControlStoreTest' and not any(
+        case.attrib.get('name')=='selectedCacheBudgetKeepsActualTaskBoundsAndRequiresIndependentOwnerIdentity()'
+        for case in suite.findall('testcase')):
+        raise SystemExit('Selected cache budget metadata case is absent')
     (out/f'{task}.xml').write_bytes(data)
     suites.append({'task':task,'tests':count,'xmlSha256':hashlib.sha256(data).hexdigest()})
 summary={'nativeIntentEligibilityFactsRereadBeforeAndAfterBinding':True,'nativeGcOwnerAndCapabilityFacts':True,'nativeM5IntentTokenBinding':True,

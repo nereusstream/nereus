@@ -19,12 +19,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
+import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 
 class KafkaBookKeeperRunLifecycleV1Test {
+    @Test
+    void unknownBirthChoiceCannotStartNativeCreate() {
+        var session = new KafkaRunTestFixtures.FakeSession();
+        var roots = new KafkaRunTestFixtures.FakeRootAuthority();
+        roots.nextBirthOverride = ProviderMutationResultV1.outcomeUnknown();
+
+        assertThatThrownBy(() -> create(session, roots, KafkaRunTestFixtures.binding(6, 11, 5)))
+                .hasRootCauseMessage("run birth choice was not established exactly");
+        assertThat(session.reservedCreateCalls).isZero();
+        assertThat(session.entries).isEmpty();
+        assertThat(roots.roots).isEmpty();
+    }
+
     @Test
     void createsLedgerHeaderAndActiveRootInThatOrder() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();

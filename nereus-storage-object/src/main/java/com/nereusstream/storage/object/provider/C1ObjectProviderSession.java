@@ -360,6 +360,99 @@ public final class C1ObjectProviderSession implements AutoCloseable {
         }
     }
 
+    @FunctionalInterface
+    public interface VerifiedObjectConsumer<T> {
+        T consume(InputStream originalBody) throws IOException;
+    }
+
+    public record VerifiedObjectConsumption<T>(T value, Optional<CanonicalBytes> immutableVersionToken) {
+        public VerifiedObjectConsumption {
+            Objects.requireNonNull(value, "value");
+            try {
+                immutableVersionToken = copyVersionToken(immutableVersionToken);
+            } catch (IOException invalid) {
+                throw new IllegalArgumentException("invalid immutable version token", invalid);
+            }
+        }
+    }
+
+    /** Retains this exact original GET response after failed close; reconciliation performs no new GET. */
+    public final class VerifiedReadCleanupException extends IOException {
+        private static final long serialVersionUID = 1L;
+        private final ObjectProviderTransport.StreamingObject original;
+        private final Operation operation;
+        private boolean drained;
+
+        private VerifiedReadCleanupException(
+                Throwable workFailure,
+                Throwable closeFailure,
+                ObjectProviderTransport.StreamingObject original,
+                Operation operation) {
+            super("Original verified GET response close remains unresolved", workFailure);
+            addSuppressed(closeFailure);
+            this.original = original;
+            this.operation = operation;
+        }
+
+        public synchronized void reconcileCleanup() throws IOException {
+            if (!drained) {
+                original.close();
+                terminal(operation);
+                drained = true;
+            }
+        }
+    }
+
+    /** Same-response full length/hash/version verification without allocating a whole Object body. */
+    public <T> VerifiedObjectConsumption<T> consumeVerifiedObject(
+            ObjectIdentity identity, Optional<CanonicalBytes> exactVersion, VerifiedObjectConsumer<T> consumer)
+            throws IOException {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(consumer, "consumer");
+        exactVersion = copyVersionToken(exactVersion);
+        beginExternalCall();
+        Operation operation = null;
+        ObjectProviderTransport.StreamingObject response = null;
+        Throwable workFailure = null;
+        try {
+            requireOwned(identity.key());
+            requireBodyWithinCap(identity);
+            operation = acceptReadOperation(identity);
+            response = transport.get(identity.key(), exactVersion);
+            if (response.bodyLength() != identity.bodyLength()
+                    || response.inclusiveStart() != 0
+                    || response.exclusiveEnd() != identity.bodyLength()) {
+                throw new IOException("Provider returned a different streaming Object than requested");
+            }
+            var version = copyVersionToken(response.immutableVersionToken());
+            if (exactVersion.isPresent() && !exactVersion.equals(version)) {
+                throw new IOException("Provider streaming GET immutable version differs");
+            }
+            var input = new IdentityVerifyingInputStream(response.body(), identity);
+            T value = consumer.consume(input);
+            input.requireVerifiedAtEof();
+            return new VerifiedObjectConsumption<>(value, version);
+        } catch (IOException | RuntimeException | Error failure) {
+            workFailure = failure;
+            throw failure;
+        } finally {
+            try {
+                if (response != null) {
+                    try {
+                        response.close();
+                    } catch (IOException | RuntimeException closeFailure) {
+                        throw new VerifiedReadCleanupException(workFailure, closeFailure, response, operation);
+                    }
+                }
+                if (operation != null) {
+                    terminal(operation);
+                }
+            } finally {
+                endExternalCall();
+            }
+        }
+    }
+
     private VerifiedObjectRead readVerifiedObjectWithVersionInternal(ObjectIdentity identity) throws IOException {
         Objects.requireNonNull(identity, "identity");
         requireOwned(identity.key());

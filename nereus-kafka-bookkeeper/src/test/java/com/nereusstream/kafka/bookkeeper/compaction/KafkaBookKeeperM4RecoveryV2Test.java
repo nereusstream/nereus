@@ -137,7 +137,7 @@ class KafkaBookKeeperM4RecoveryV2Test {
         var original = fixture.runtime.currentAuthority().get();
         var foreign = new KafkaSealedBookKeeperDescriptorV2Test.Fixture(true).descriptor;
         assertThatThrownBy(() -> fixture.recovery.recover(foreign).join())
-                .hasRootCauseMessage("BK recovery descriptor differs from the captured M4 authority");
+                .hasRootCauseMessage("BK descriptor differs from the captured M4 authority");
         var cell = original.publicationCell();
         var gap = new BindingReadPublicationCellV1(
                 cell.sourceGeneration(),
@@ -147,7 +147,7 @@ class KafkaBookKeeperM4RecoveryV2Test {
                 cell.protocolStateReference());
         fixture.runtime.currentAuthority().set(withCell(original, gap));
         assertThatThrownBy(() -> fixture.recovery.recover(fixture.descriptor()).join())
-                .hasRootCauseMessage("BK recovery lacks the exact complete M4 source plan");
+                .hasRootCauseMessage("BK descriptor lacks the exact complete M4 source plan");
         assertThat(fixture.nativeReads).isZero();
         assertThat(fixture.nativeCaptures).isZero();
         assertThat(fixture.scan(fixture.selector.sourceGeneration())).isEqualTo(ScanOutcome.CLEAN);

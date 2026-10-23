@@ -39,6 +39,12 @@ public interface BookKeeperCellSession {
         throw new UnsupportedOperationException("native ledger identity reservation is not implemented");
     }
 
+    /** Activates the exact run create scope before reserving its ledger ID. */
+    default CompletionStage<ProviderMutationResultV1<BookKeeperLedgerIdentity>> reserveLedgerIdentity(
+            RunLedgerConfigurationV1 configuration) {
+        return reserveLedgerIdentity();
+    }
+
     /** Creates only the natively reserved, durably inventoried ID; retries may never allocate a different ID. */
     default CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createReservedRunLedger(
             RunLedgerConfigurationV1 configuration, BookKeeperLedgerIdentity reservedIdentity) {

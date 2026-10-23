@@ -35,6 +35,7 @@ import com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -73,6 +74,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
     private final byte[] password;
     private final CellSessionOperationRegistry operations = new CellSessionOperationRegistry();
     private final ConcurrentMap<Long, OwnedLedger> ledgers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Handle, CompletableFuture<Void>> retiringHandles = new ConcurrentHashMap<>();
     private final ConcurrentMap<EntryIdentity, UnknownAppend> unknownAppends = new ConcurrentHashMap<>();
     private final AtomicReference<CompletableFuture<Void>> closeFuture = new AtomicReference<>();
 
@@ -177,7 +179,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                     RunLedgerHandleV1 exactHandle = exactHandle(configuration, handle.getId());
                     OwnedLedger previous = ledgers.putIfAbsent(handle.getId(), new OwnedLedger(exactHandle, handle));
                     if (previous != null) {
-                        closeQuietly(handle);
+                        retireHandle(handle);
                         observer.complete(ProviderMutationResultV1.fencedOrConflict());
                         return;
                     }
@@ -227,7 +229,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                                 return;
                             }
                             if (!metadataMatches(handle, expectedHandle)) {
-                                closeQuietly(handle);
+                                retireHandle(handle);
                                 observer.complete(RunLedgerOpenResultV1.withoutHandle(
                                         RunLedgerOpenOutcomeV1.CONFIGURATION_MISMATCH));
                                 return;
@@ -236,7 +238,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                                     expectedHandle.ledgerIdentity().ledgerId(),
                                     new OwnedLedger(expectedHandle, handle));
                             if (previous != null) {
-                                closeQuietly(handle);
+                                retireHandle(handle);
                                 if (!previous.handle().equals(expectedHandle)) {
                                     observer.complete(RunLedgerOpenResultV1.withoutHandle(
                                             RunLedgerOpenOutcomeV1.CONFIGURATION_MISMATCH));
@@ -329,8 +331,9 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                     RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.PROVIDER_FAILURE));
         }
         if (owned.sdkHandle().isClosed() && entryId > owned.sdkHandle().getLastAddConfirmed()) {
-            return CompletableFuture.completedFuture(
-                    RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.DEFINITIVELY_ABSENT));
+            var absent = RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.DEFINITIVELY_ABSENT);
+            resolveUnknownFromAbsence(handle, entryId, absent);
+            return CompletableFuture.completedFuture(absent);
         }
 
         CellSessionOperationRegistry.OperationLease lease = operations.acceptOperation();
@@ -364,6 +367,62 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
         return observer;
     }
 
+    /**
+     * Observes entry zero through this session's owned handle without fencing or requiring reader LAC >= 0.
+     * The caller retains its independent quorum/protocol admission duties and must close this owned session.
+     */
+    public CompletionStage<ExactLedgerEntryV1> readNativeRunHeader(RunLedgerHandleV1 handle) {
+        requireHandle(handle);
+        var work = openRunLedger(handle).thenCompose(open -> {
+            if (open.outcome() != RunLedgerOpenOutcomeV1.OPENED_EXACT
+                    || !open.exactHandle().equals(java.util.Optional.of(handle))) {
+                return CompletableFuture.<ExactLedgerEntryV1>failedFuture(
+                        new IllegalStateException("native run header handle is unavailable: " + open.outcome()));
+            }
+            return readOwnedNativeHeader(handle);
+        });
+        return work.thenApply(entry -> entry);
+    }
+
+    private CompletionStage<ExactLedgerEntryV1> readOwnedNativeHeader(RunLedgerHandleV1 handle) {
+        var owned = ledgers.get(handle.ledgerIdentity().ledgerId());
+        if (owned == null
+                || !owned.handle().equals(handle)
+                || !metadataMatches(owned.sdkHandle(), handle)
+                || !Arrays.equals(owned.sdkHandle().getLedgerMetadata().getPassword(), password)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native run header metadata differs from its handle"));
+        }
+        var lease = operations.acceptOperation();
+        var observed = new CompletableFuture<ExactLedgerEntryV1>();
+        try {
+            owned.sdkHandle().readUnconfirmedAsync(0, 0).whenComplete((entries, failure) -> {
+                try {
+                    if (failure != null) {
+                        observed.completeExceptionally(failure);
+                        return;
+                    }
+                    try (var closeable = entries) {
+                        var entry = closeable.getEntry(0);
+                        if (entry.getLedgerId() != handle.ledgerIdentity().ledgerId() || entry.getEntryId() != 0) {
+                            throw new IllegalStateException("native header read returned another entry");
+                        }
+                        var payload = CanonicalBytes.copyOf(entry.getEntryBytes());
+                        observed.complete(new ExactLedgerEntryV1(handle, 0, payload, Sha256Digest.hash(payload)));
+                    }
+                } catch (Throwable failedRead) {
+                    observed.completeExceptionally(failedRead);
+                } finally {
+                    lease.resolveTerminal();
+                }
+            });
+        } catch (Throwable failure) {
+            lease.resolveTerminal();
+            observed.completeExceptionally(failure);
+        }
+        return observed;
+    }
+
     @Override
     public CompletionStage<ProviderMutationResultV1<RunLedgerRecoveryProofV1>> fenceAndRecoverRunLedger(
             RunLedgerHandleV1 handle) {
@@ -384,7 +443,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                             return;
                         }
                         if (!metadataMatches(recovered, handle)) {
-                            closeQuietly(recovered);
+                            retireHandle(recovered);
                             lease.resolveTerminal();
                             observer.complete(ProviderMutationResultV1.fencedOrConflict());
                             return;
@@ -393,7 +452,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                         OwnedLedger previous =
                                 ledgers.put(handle.ledgerIdentity().ledgerId(), replacement);
                         if (previous != null && previous.sdkHandle() != recovered) {
-                            closeQuietly(previous.sdkHandle());
+                            retireHandle(previous.sdkHandle());
                         }
                         long lastAddConfirmed = recovered.getLastAddConfirmed();
                         reconcileUnknownAfterRecovery(recovered, handle, lastAddConfirmed)
@@ -423,7 +482,6 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
         }
         CellSessionOperationRegistry.OperationLease lease = operations.acceptOperation();
         CompletableFuture<ProviderMutationResultV1<RunLedgerCloseProofV1>> observer = new CompletableFuture<>();
-        long lastAddConfirmed = owned.sdkHandle().getLastAddConfirmed();
         try {
             owned.sdkHandle().closeAsync().whenComplete((ignored, failure) -> {
                 try {
@@ -432,8 +490,8 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                         return;
                     }
                     ledgers.remove(handle.ledgerIdentity().ledgerId(), owned);
-                    observer.complete(
-                            ProviderMutationResultV1.appliedExact(new RunLedgerCloseProofV1(handle, lastAddConfirmed)));
+                    observer.complete(ProviderMutationResultV1.appliedExact(
+                            new RunLedgerCloseProofV1(handle, owned.sdkHandle().getLastAddConfirmed())));
                 } finally {
                     lease.resolveTerminal();
                 }
@@ -447,39 +505,38 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
 
     @Override
     public CompletionStage<Void> drain() {
-        return operations.drain();
+        return operations.drain().thenApply(ignored -> null);
     }
 
     @Override
     public CompletionStage<Void> closeAsync() {
         CompletableFuture<Void> existing = closeFuture.get();
         if (existing != null) {
-            return existing;
+            return existing.thenApply(ignored -> null);
         }
         CompletableFuture<Void> closing = new CompletableFuture<>();
         if (!closeFuture.compareAndSet(null, closing)) {
-            return closeFuture.get();
+            return closeFuture.get().thenApply(ignored -> null);
         }
         operations.closeAsync().whenComplete((ignored, drainFailure) -> {
             if (drainFailure != null) {
                 closing.completeExceptionally(unwrap(drainFailure));
                 return;
             }
-            CompletableFuture<?>[] handleCloses = ledgers.values().stream()
-                    .map(OwnedLedger::sdkHandle)
-                    .distinct()
-                    .map(Handle::closeAsync)
-                    .toArray(CompletableFuture[]::new);
-            CompletableFuture.allOf(handleCloses).whenComplete((closed, closeFailure) -> {
-                if (closeFailure != null) {
-                    closing.completeExceptionally(unwrap(closeFailure));
-                    return;
-                }
-                ledgers.clear();
-                closing.complete(null);
-            });
+            var handleCloses = new ArrayList<CompletableFuture<Void>>();
+            ledgers.values().forEach(owned -> handleCloses.add(retireHandle(owned.sdkHandle())));
+            handleCloses.addAll(retiringHandles.values());
+            CompletableFuture.allOf(handleCloses.toArray(CompletableFuture[]::new))
+                    .whenComplete((closed, closeFailure) -> {
+                        if (closeFailure != null) {
+                            closing.completeExceptionally(unwrap(closeFailure));
+                            return;
+                        }
+                        ledgers.clear();
+                        closing.complete(null);
+                    });
         });
-        return closing;
+        return closing.thenApply(ignored -> null);
     }
 
     int ownedHandleCount() {
@@ -645,10 +702,9 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
         return ProviderMutationResultV1.outcomeUnknown();
     }
 
-    private static RunLedgerOpenResultV1 openFailure(Throwable failure) {
+    static RunLedgerOpenResultV1 openFailure(Throwable failure) {
         int code = code(failure);
-        if (code == BKException.Code.NoSuchLedgerExistsException
-                || code == BKException.Code.NoSuchLedgerExistsOnMetadataServerException) {
+        if (code == BKException.Code.NoSuchLedgerExistsOnMetadataServerException) {
             return RunLedgerOpenResultV1.withoutHandle(RunLedgerOpenOutcomeV1.ABSENT);
         }
         if (code == BKException.Code.LedgerFencedException || code == BKException.Code.LedgerClosedException) {
@@ -660,7 +716,7 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
         return RunLedgerOpenResultV1.withoutHandle(RunLedgerOpenOutcomeV1.PROVIDER_FAILURE);
     }
 
-    private static ProviderMutationResultV1<AppendQuorumProofV1> appendFailure(Throwable failure) {
+    static ProviderMutationResultV1<AppendQuorumProofV1> appendFailure(Throwable failure) {
         int code = code(failure);
         if (code == BKException.Code.LedgerFencedException
                 || code == BKException.Code.LedgerClosedException
@@ -668,21 +724,14 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
                 || code == BKException.Code.UnauthorizedAccessException) {
             return ProviderMutationResultV1.fencedOrConflict();
         }
-        if (code == BKException.Code.NoSuchLedgerExistsException
-                || code == BKException.Code.NoSuchLedgerExistsOnMetadataServerException
-                || code == BKException.Code.IncorrectParameterException) {
+        if (code == BKException.Code.IncorrectParameterException) {
             return ProviderMutationResultV1.definitelyNotApplied();
         }
         return ProviderMutationResultV1.outcomeUnknown();
     }
 
-    private static RunLedgerReadResultV1 readFailure(Throwable failure) {
+    static RunLedgerReadResultV1 readFailure(Throwable failure) {
         int code = code(failure);
-        if (code == BKException.Code.NoSuchEntryException
-                || code == BKException.Code.NoSuchLedgerExistsException
-                || code == BKException.Code.NoSuchLedgerExistsOnMetadataServerException) {
-            return RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.DEFINITIVELY_ABSENT);
-        }
         if (code == BKException.Code.LedgerFencedException || code == BKException.Code.LedgerClosedException) {
             return RunLedgerReadResultV1.withoutEntry(RunLedgerReadOutcomeV1.FENCED);
         }
@@ -728,8 +777,26 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
         return current;
     }
 
-    private static void closeQuietly(Handle handle) {
-        handle.closeAsync().exceptionally(failure -> null);
+    /** Register ownership before the creating operation can terminate; failure never discards the handle. */
+    private CompletableFuture<Void> retireHandle(Handle handle) {
+        var terminal = new CompletableFuture<Void>();
+        var previous = retiringHandles.putIfAbsent(handle, terminal);
+        if (previous != null) {
+            return previous;
+        }
+        try {
+            handle.closeAsync().whenComplete((ignored, failure) -> {
+                if (failure != null) {
+                    terminal.completeExceptionally(unwrap(failure));
+                } else {
+                    retiringHandles.remove(handle, terminal);
+                    terminal.complete(null);
+                }
+            });
+        } catch (Throwable failure) {
+            terminal.completeExceptionally(failure);
+        }
+        return terminal;
     }
 
     private record OwnedLedger(RunLedgerHandleV1 handle, ReadHandle sdkHandle) {}

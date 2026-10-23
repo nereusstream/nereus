@@ -18,6 +18,7 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
 import com.nereusstream.storage.object.provider.ObjectProviderCapabilities;
 import com.nereusstream.storage.object.provider.ObjectProviderTransport;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -69,6 +70,7 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     private final ObjectProviderCapabilities capabilities;
     private final boolean versionMatchDeleteAdmitted;
     private final boolean multipartCleanupAdmitted;
+    private final String encryptionScope;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public S3C1ObjectProviderTransport(
@@ -88,11 +90,32 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             int maximumListPageKeys,
             boolean versionMatchDeleteAdmitted,
             boolean multipartCleanupAdmitted) {
+        this(
+                client,
+                bucket,
+                exactProviderIdentity,
+                closeClient,
+                maximumListPageKeys,
+                versionMatchDeleteAdmitted,
+                multipartCleanupAdmitted,
+                null);
+    }
+
+    private S3C1ObjectProviderTransport(
+            S3Client client,
+            String bucket,
+            String exactProviderIdentity,
+            boolean closeClient,
+            int maximumListPageKeys,
+            boolean versionMatchDeleteAdmitted,
+            boolean multipartCleanupAdmitted,
+            String encryptionScope) {
         this.client = Objects.requireNonNull(client, "client");
         this.bucket = requireNonBlank(bucket, "bucket");
         this.closeClient = closeClient;
         this.versionMatchDeleteAdmitted = versionMatchDeleteAdmitted;
         this.multipartCleanupAdmitted = multipartCleanupAdmitted;
+        this.encryptionScope = encryptionScope;
         if (maximumListPageKeys <= 0 || maximumListPageKeys > DEFAULT_MAXIMUM_LIST_PAGE_KEYS) {
             throw new IllegalArgumentException("maximumListPageKeys must be in [1,1000]");
         }
@@ -112,7 +135,25 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     public static S3C1ObjectProviderTransport admitVersionMatchDeleteV1(
             S3Client client, String bucket, String exactProviderIdentity, boolean closeClient, int maximumListPageKeys)
             throws IOException {
+        return admitVersionMatchDeleteV1(client, bucket, exactProviderIdentity, closeClient, maximumListPageKeys, null);
+    }
+
+    /** A Native admitted encryption domain is enforced on original PUT replies and full/range GET bodies. */
+    public static S3C1ObjectProviderTransport admitVersionMatchDeleteV1(
+            S3Client client,
+            String bucket,
+            String exactProviderIdentity,
+            boolean closeClient,
+            int maximumListPageKeys,
+            String encryptionScope)
+            throws IOException {
         Objects.requireNonNull(client, "client");
+        if (encryptionScope != null
+                && !encryptionScope.equals("NONE")
+                && !encryptionScope.equals("S3_MANAGED_AES256")
+                && !(encryptionScope.startsWith("AWS_KMS:arn:") && encryptionScope.length() <= 1024)) {
+            throw new IllegalArgumentException("Native Provider encryption scope is not a stable admitted domain");
+        }
         String canonicalBucket = requireNonBlank(bucket, "bucket");
         try {
             BucketVersioningStatus status = client.getBucketVersioning(GetBucketVersioningRequest.builder()
@@ -130,7 +171,112 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             throw mapped("bucket-versioning admission", failure);
         }
         return new S3C1ObjectProviderTransport(
-                client, canonicalBucket, exactProviderIdentity, closeClient, maximumListPageKeys, true, false);
+                client,
+                canonicalBucket,
+                exactProviderIdentity,
+                closeClient,
+                maximumListPageKeys,
+                true,
+                false,
+                encryptionScope);
+    }
+
+    /** Live policy veto on the exact immutable version. Absence here never proves deletion completion. */
+    public void requireObjectDeletePolicyAllows(String key, CanonicalBytes version) throws IOException {
+        if (!versionMatchDeleteAdmitted
+                || closed.get()
+                || version.isEmpty()
+                || version.length() > MAXIMUM_DELETE_VERSION_TOKEN_BYTES) {
+            throw new IOException("Exact-version deletion policy lacks its original admitted transport");
+        }
+        String token = com.nereusstream.domain.bytes.CanonicalUtf8.fromBytes(version.toByteArray())
+                .value();
+        try {
+            if (client.getBucketVersioning(GetBucketVersioningRequest.builder()
+                                    .bucket(bucket)
+                                    .build())
+                            .status()
+                    != BucketVersioningStatus.ENABLED) {
+                throw new IOException("Deletion policy requires actual enabled bucket versioning");
+            }
+            software.amazon.awssdk.services.s3.model.GetObjectLockConfigurationResponse lock;
+            try {
+                lock = client.getObjectLockConfiguration(value -> value.bucket(bucket));
+            } catch (S3Exception failure) {
+                if (failure.statusCode() == 404
+                        && failure.awsErrorDetails() != null
+                        && "ObjectLockConfigurationNotFoundError"
+                                .equals(failure.awsErrorDetails().errorCode())) {
+                    return;
+                }
+                throw failure;
+            }
+            if (lock.objectLockConfiguration() == null
+                    || lock.objectLockConfiguration().objectLockEnabled()
+                            != software.amazon.awssdk.services.s3.model.ObjectLockEnabled.ENABLED) {
+                throw new IOException("Actual Object Lock configuration is unresolved");
+            }
+            try {
+                var hold = client.getObjectLegalHold(
+                                value -> value.bucket(bucket).key(key).versionId(token))
+                        .legalHold();
+                if (hold == null
+                        || hold.status() != software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus.OFF) {
+                    throw new IOException("Actual immutable version has a legal hold or unresolved hold status");
+                }
+            } catch (S3Exception failure) {
+                if (!noObjectLockPolicy(failure)) {
+                    throw failure;
+                }
+                // A missing legal-hold field does not exclude a separate retention obligation.
+            }
+            software.amazon.awssdk.services.s3.model.GetObjectRetentionResponse response;
+            try {
+                response = client.getObjectRetention(
+                        value -> value.bucket(bucket).key(key).versionId(token));
+            } catch (S3Exception failure) {
+                if (noObjectLockPolicy(failure)) {
+                    return;
+                }
+                throw failure;
+            }
+            var retention = response.retention();
+            if (retention == null || retention.mode() == null && retention.retainUntilDate() == null) {
+                return;
+            }
+            if (retention.mode() != software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode.GOVERNANCE
+                            && retention.mode()
+                                    != software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode.COMPLIANCE
+                    || retention.retainUntilDate() == null) {
+                throw new IOException("Actual immutable version retention is unresolved");
+            }
+            String date = response.sdkHttpResponse()
+                    .firstMatchingHeader("Date")
+                    .orElseThrow(() -> new IOException("Provider retention response lacks actual server time"));
+            var serverTime = java.time.ZonedDateTime.parse(date, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .toInstant();
+            if (!serverTime.isAfter(retention.retainUntilDate())) {
+                throw new IOException("Actual immutable version remains retained by the provider");
+            }
+        } catch (S3Exception failure) {
+            String code = failure.awsErrorDetails() == null
+                    ? ""
+                    : failure.awsErrorDetails().errorCode();
+            if (failure.statusCode() == 404 && ("NoSuchKey".equals(code) || "NoSuchVersion".equals(code))) {
+                return; // The original exact identity reader must still independently prove native absence.
+            }
+            throw mapped("exact-version retention/hold policy", failure);
+        } catch (RuntimeException failure) {
+            throw mapped("exact-version retention/hold policy", failure);
+        }
+    }
+
+    private static boolean noObjectLockPolicy(S3Exception failure) {
+        // Locked MinIO 07c3a429: object-handlers.go only emits this after reading this exact version's metadata.
+        return failure.statusCode() == 400
+                && failure.awsErrorDetails() != null
+                && "NoSuchObjectLockConfiguration"
+                        .equals(failure.awsErrorDetails().errorCode());
     }
 
     /** Admits exact upload-id abort only after an exact live multipart LIST succeeds against the selected bucket. */
@@ -209,14 +355,22 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
         try {
             String expectedChecksum = Base64.getEncoder()
                     .encodeToString(identity.bodySha256().bytes().toByteArray());
-            var response = client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(bucket)
-                            .key(identity.key())
-                            .ifNoneMatch("*")
-                            .checksumSHA256(expectedChecksum)
-                            .build(),
-                    RequestBody.fromInputStream(body, identity.bodyLength()));
+            var request = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(identity.key())
+                    .ifNoneMatch("*")
+                    .checksumSHA256(expectedChecksum);
+            if ("S3_MANAGED_AES256".equals(encryptionScope)) {
+                request.serverSideEncryption("AES256");
+            } else if (encryptionScope != null && encryptionScope.startsWith("AWS_KMS:")) {
+                request.serverSideEncryption("aws:kms").ssekmsKeyId(encryptionScope.substring("AWS_KMS:".length()));
+            }
+            var response = client.putObject(request.build(), RequestBody.fromInputStream(body, identity.bodyLength()));
+            if (!matchesEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId())) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.OUTCOME_UNKNOWN,
+                        "Original PUT encryption response differs from the admitted KMS scope");
+            }
             if (response.checksumSHA256() == null) {
                 // Providers without a checked success checksum retain the remote-verification path.
                 return ConditionalCreateResponse.outcome(ConditionalCreateResult.CREATED);
@@ -248,6 +402,14 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
         try {
             input = client.getObject(request.build());
         } catch (Throwable failure) {
+            if (exactVersionToken.isPresent()
+                    && failure instanceof S3Exception s3Failure
+                    && s3Failure.statusCode() == 404
+                    && s3Failure.awsErrorDetails() != null
+                    && "NoSuchVersion".equals(s3Failure.awsErrorDetails().errorCode())) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.NOT_FOUND, "exact full GET found no immutable version", failure);
+            }
             throw mapped("full GET", failure);
         }
         GetObjectResponse response = input.response();
@@ -257,7 +419,8 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             throw new S3C1ProviderException(
                     S3C1ProviderException.Kind.CAPACITY, "full GET length is outside the admitted Root cap");
         }
-        return new StreamingObject(length, 0, length, versionToken(response.versionId()), input);
+        return new StreamingObject(
+                length, 0, length, versionToken(response.versionId()), encryptionBody(input, response));
     }
 
     @Override
@@ -302,7 +465,57 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
                     S3C1ProviderException.Kind.INTEGRITY, "range GET differs from the exact requested interval");
         }
         return new StreamingObject(
-                range.totalLength(), inclusiveStart, exclusiveEnd, versionToken(response.versionId()), input);
+                range.totalLength(),
+                inclusiveStart,
+                exclusiveEnd,
+                versionToken(response.versionId()),
+                encryptionBody(input, response));
+    }
+
+    private boolean matchesEncryption(String algorithm, String key) {
+        if (encryptionScope == null) {
+            return true;
+        }
+        return switch (encryptionScope) {
+            case "NONE" -> (algorithm == null || algorithm.isEmpty()) && (key == null || key.isEmpty());
+            case "S3_MANAGED_AES256" -> "AES256".equals(algorithm) && (key == null || key.isEmpty());
+            default -> "aws:kms".equals(algorithm) && encryptionScope.equals("AWS_KMS:" + key);
+        };
+    }
+
+    private InputStream encryptionBody(InputStream original, GetObjectResponse response) {
+        if (encryptionScope == null) {
+            return original;
+        }
+        // Return the original response owner to C1 before validation. A failed close must remain in C1's actual
+        // response-cleanup hold, rather than disappearing inside a transport exception before C1 receives it.
+        return new FilterInputStream(original) {
+            private void requireEncryption() throws IOException {
+                if (!matchesEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId())) {
+                    throw new S3C1ProviderException(
+                            S3C1ProviderException.Kind.INTEGRITY,
+                            "Original GET encryption response differs from the admitted KMS scope");
+                }
+            }
+
+            @Override
+            public int read() throws IOException {
+                requireEncryption();
+                return in.read();
+            }
+
+            @Override
+            public int read(byte[] bytes, int offset, int length) throws IOException {
+                requireEncryption();
+                return in.read(bytes, offset, length);
+            }
+
+            @Override
+            public long skip(long bytes) throws IOException {
+                requireEncryption();
+                return in.skip(bytes);
+            }
+        };
     }
 
     @Override

@@ -51,6 +51,15 @@ public final class KafkaBookKeeperM4RecoveryV2 {
         }
     }
 
+    /** Detached, complete batches from the selected immutable cut under one captured M4 authority. */
+    public record SelectedRead(
+            BindingReadAuthorityV1 capturedAuthority, List<KafkaBookKeeperReadViewV2.SelectedBatch> batches) {
+        public SelectedRead {
+            Objects.requireNonNull(capturedAuthority, "capturedAuthority");
+            batches = List.copyOf(Objects.requireNonNull(batches, "batches"));
+        }
+    }
+
     private final AtomicReference<BindingReadAuthorityV1> current;
     private final BindingReadHazardPoolV1 hazards;
     private final BindingReadAsyncExecutorV1 executor;
@@ -71,37 +80,50 @@ public final class KafkaBookKeeperM4RecoveryV2 {
     /** Cancellation cannot release the source-plan lease until all started native IO has actually terminated. */
     public CompletableFuture<RecoveryResult> recover(KafkaSealedBookKeeperDescriptorV2 descriptor) {
         Objects.requireNonNull(descriptor, "descriptor");
-        var digest = descriptor.descriptorSha256();
-        var binding = descriptor.sourceCut().identity().binding();
-        var coverage = descriptor.sourceCut().coverage();
-        var expectedRoute = route(descriptor);
         return executor.execute(current, hazards, captured -> {
-            if (!captured.bindingId().equals(binding.bindingId())
-                    || !captured.topicIncarnationIdentity().equals(binding.incarnationSha256())
-                    || !captured.storageEpochId().digest().equals(binding.storageEpochSha256())
-                    || captured.protocol() != BindingReadProtocolV1.KAFKA_OFFSET
-                    || !captured.selectedViewSha256().equals(digest)
-                    || captured.sourceGeneration() < descriptor.sourceGeneration()
-                    || !(captured.publicationCell().protocolStateReference()
-                            instanceof KafkaSealedBookKeeperDescriptorV2 selected)
-                    || !selected.equals(descriptor)) {
-                throw new IllegalStateException("BK recovery descriptor differs from the captured M4 authority");
-            }
-            var outcome = BindingReadPlannerV1.plan(
-                    captured.publicationCell(),
-                    coverage.inclusiveStart(),
-                    coverage.exclusiveEnd(),
-                    coverage.exclusiveEnd(),
-                    plan);
-            if (outcome != BindingReadPlannerV1.Outcome.PLANNED
-                    || plan.size() != 1
-                    || plan.startInclusive(0) != coverage.inclusiveStart()
-                    || plan.endExclusive(0) != coverage.exclusiveEnd()
-                    || !plan.route(0).equals(expectedRoute)) {
-                throw new IllegalStateException("BK recovery lacks the exact complete M4 source plan");
-            }
+            requireSelectedPlan(descriptor, captured);
             return reader.recover(descriptor).thenApply(view -> new RecoveryResult(captured, view));
         });
+    }
+
+    /** Selected-cache reads use the same Binding hazard pool as recovery and retirement. */
+    public CompletableFuture<SelectedRead> readSelected(
+            KafkaBookKeeperReadViewV2 view, long requestedOffset, long upperBoundExclusive, long byteBudget) {
+        Objects.requireNonNull(view, "view");
+        return executor.execute(current, hazards, captured -> {
+            requireSelectedPlan(view.descriptor(), captured);
+            return CompletableFuture.completedFuture(
+                    new SelectedRead(captured, view.selectBatches(requestedOffset, upperBoundExclusive, byteBudget)));
+        });
+    }
+
+    private void requireSelectedPlan(KafkaSealedBookKeeperDescriptorV2 descriptor, BindingReadAuthorityV1 captured) {
+        var binding = descriptor.sourceCut().identity().binding();
+        var coverage = descriptor.sourceCut().coverage();
+        if (!captured.bindingId().equals(binding.bindingId())
+                || !captured.topicIncarnationIdentity().equals(binding.incarnationSha256())
+                || !captured.storageEpochId().digest().equals(binding.storageEpochSha256())
+                || captured.protocol() != BindingReadProtocolV1.KAFKA_OFFSET
+                || !captured.selectedViewSha256().equals(descriptor.descriptorSha256())
+                || captured.sourceGeneration() < descriptor.sourceGeneration()
+                || !(captured.publicationCell().protocolStateReference()
+                        instanceof KafkaSealedBookKeeperDescriptorV2 selected)
+                || !selected.equals(descriptor)) {
+            throw new IllegalStateException("BK descriptor differs from the captured M4 authority");
+        }
+        var outcome = BindingReadPlannerV1.plan(
+                captured.publicationCell(),
+                coverage.inclusiveStart(),
+                coverage.exclusiveEnd(),
+                coverage.exclusiveEnd(),
+                plan);
+        if (outcome != BindingReadPlannerV1.Outcome.PLANNED
+                || plan.size() != 1
+                || plan.startInclusive(0) != coverage.inclusiveStart()
+                || plan.endExclusive(0) != coverage.exclusiveEnd()
+                || !plan.route(0).equals(route(descriptor))) {
+            throw new IllegalStateException("BK descriptor lacks the exact complete M4 source plan");
+        }
     }
 
     /**

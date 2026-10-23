@@ -47,6 +47,8 @@ public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int BASE_VERSION = 4;
     private static final int VETO_VERSION = 5;
     private static final int VERSION = 6;
+    private static final int GRACE_VERSION = 7;
+    private static final int RENEWING_INTENT_VERSION = 8;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -88,6 +90,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 deleteIntent,
                 deleteDone,
                 current.recoveryVeto(),
+                current.epochGrace(),
                 PLACEHOLDER));
     }
 
@@ -111,8 +114,22 @@ public final class M5TargetDeleteAuthorityCodecV1 {
         TargetDeleteAuthorityV1 value = decode(encoded, input -> {
             int magic = input.readInt();
             int wireVersion = input.readInt();
+            if (magic == MAGIC && wireVersion == GRACE_VERSION) {
+                var inner = readBytes(input, M5TargetDeleteAuthorityRecordsV1.MAX_AUTHORITY_BYTES, "legacy authority");
+                if (inner.length() < 8
+                        || java.nio.ByteBuffer.wrap(inner.toByteArray()).getInt(4) == GRACE_VERSION) {
+                    throw new IllegalArgumentException("nested epoch grace authority is unsupported");
+                }
+                var legacy = decodeAuthority(inner);
+                var mark = DeleteEpochGraceMarkV1.decode(
+                        readBytes(input, DeleteEpochGraceMarkV1.MAX_BYTES, "epoch grace mark"));
+                return withEpochGrace(legacy, Optional.of(mark), readDigest(input));
+            }
             if (magic != MAGIC
-                    || (wireVersion != BASE_VERSION && wireVersion != VETO_VERSION && wireVersion != VERSION)) {
+                    || (wireVersion != BASE_VERSION
+                            && wireVersion != VETO_VERSION
+                            && wireVersion != VERSION
+                            && wireVersion != RENEWING_INTENT_VERSION)) {
                 throw new IllegalArgumentException("target delete authority preamble differs");
             }
             String authorityKey = readString(input, ExactMetadataTransactionStoreV1.MAX_KEY_BYTES);
@@ -193,7 +210,9 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                             readDigest(input),
                             readDigest(input)))
                     : Optional.empty();
-            if (wireVersion == VERSION) {
+            Optional<DeleteRecoveryVetoV2> pendingVeto =
+                    wireVersion == RENEWING_INTENT_VERSION ? Optional.of(readRecoveryVeto(input)) : Optional.empty();
+            if (wireVersion == VERSION || wireVersion == RENEWING_INTENT_VERSION) {
                 TargetDeleteIntentV1 original = deleteIntent.orElseThrow(
                         () -> new IllegalArgumentException("dispatch refresh requires an intent"));
                 deleteIntent = Optional.of(new TargetDeleteIntentV1(
@@ -221,16 +240,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                     externalIdentity,
                     deleteIntent,
                     deleteDone,
-                    wireVersion == VETO_VERSION
-                            ? Optional.of(new DeleteRecoveryVetoV2(
-                                    enumValue(
-                                            DeleteRecoveryVetoV2.Reason.values(),
-                                            input.readUnsignedByte(),
-                                            "recovery veto"),
-                                    input.readLong(),
-                                    readDigest(input),
-                                    readDigest(input)))
-                            : Optional.empty(),
+                    wireVersion == VETO_VERSION ? Optional.of(readRecoveryVeto(input)) : pendingVeto,
                     readDigest(input));
         });
         if (!encoded.equals(encodeAuthority(value))) {
@@ -257,17 +267,50 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 value.deleteIntent(),
                 value.deleteDone(),
                 value.recoveryVeto(),
+                value.epochGrace(),
+                canonicalSha256);
+    }
+
+    static TargetDeleteAuthorityV1 withEpochGrace(
+            TargetDeleteAuthorityV1 value, Optional<DeleteEpochGraceMarkV1> mark, Sha256Digest canonicalSha256) {
+        return new TargetDeleteAuthorityV1(
+                value.authorityKey(),
+                value.target(),
+                value.authorityRevision(),
+                value.predecessorAuthoritySha256(),
+                value.state(),
+                value.closedWriterFenceEpoch(),
+                value.writerEnrollment(),
+                value.proofSnapshotDigest(),
+                value.eligibilitySnapshot(),
+                value.activeWriterTickets(),
+                value.readFence(),
+                value.externalIdentity(),
+                value.deleteIntent(),
+                value.deleteDone(),
+                value.recoveryVeto(),
+                mark,
                 canonicalSha256);
     }
 
     private static CanonicalBytes encodeUnchecked(TargetDeleteAuthorityV1 value) {
+        if (value.epochGrace().isPresent()) {
+            var legacy = finalizeAuthority(withEpochGrace(value, Optional.empty(), PLACEHOLDER));
+            return encode(output -> {
+                output.writeInt(MAGIC);
+                output.writeInt(GRACE_VERSION);
+                writeBytes(output, encodeAuthority(legacy));
+                writeBytes(output, value.epochGrace().orElseThrow().encode());
+                writeDigest(output, value.authorityCanonicalSha256());
+            });
+        }
         return encode(output -> {
             output.writeInt(MAGIC);
             output.writeInt(
                     value.deleteIntent()
                                     .flatMap(TargetDeleteIntentV1::dispatchRefresh)
                                     .isPresent()
-                            ? VERSION
+                            ? value.recoveryVeto().isPresent() ? RENEWING_INTENT_VERSION : VERSION
                             : value.recoveryVeto().isPresent() ? VETO_VERSION : BASE_VERSION);
             writeString(output, value.authorityKey());
             writeBytes(output, value.target().resourceId().canonicalBytes());
@@ -372,6 +415,14 @@ public final class M5TargetDeleteAuthorityCodecV1 {
         writeObservationContext(out, refresh.previous());
         writeObservationContext(out, refresh.current());
         out.writeByte(refresh.externalObservation().ordinal());
+    }
+
+    private static DeleteRecoveryVetoV2 readRecoveryVeto(DataInputStream input) throws IOException {
+        return new DeleteRecoveryVetoV2(
+                enumValue(DeleteRecoveryVetoV2.Reason.values(), input.readUnsignedByte(), "recovery veto"),
+                input.readLong(),
+                readDigest(input),
+                readDigest(input));
     }
 
     private static DeleteDispatchRefreshV2 readDispatchRefresh(DataInputStream in) throws IOException {

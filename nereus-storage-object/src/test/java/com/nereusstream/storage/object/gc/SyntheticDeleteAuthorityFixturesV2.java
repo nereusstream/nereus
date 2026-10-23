@@ -114,4 +114,8 @@ public final class SyntheticDeleteAuthorityFixturesV2 {
     public static Sha256Digest digest(String value) {
         return Sha256Digest.hash(CanonicalUtf8.fromString(value).bytes());
     }
+
+    public static DeleteObservationAuthorityVerifierV2 syntheticObservationVerifier() {
+        return M5DeleteEligibilityTestFixtures.syntheticObservationVerifier();
+    }
 }

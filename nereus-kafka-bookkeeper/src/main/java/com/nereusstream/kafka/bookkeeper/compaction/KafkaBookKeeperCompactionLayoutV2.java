@@ -31,8 +31,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-/** Deterministic BK entry segmentation of retained Kafka batches and all eight rebuilt indexes, before allocation. */
+/** Deterministic BK segmentation of retained batches, eight indexes and an optional KCRS1 recovery artifact. */
 public final class KafkaBookKeeperCompactionLayoutV2 {
     private static final int MAGIC = 0x4b424345;
     public static final int ENVELOPE_BYTES = 91;
@@ -46,7 +47,29 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
             int chunkCount,
             int artifactLength,
             Sha256Digest artifactSha256,
-            CanonicalBytes body) {
+            CanonicalBytes body,
+            boolean recoveryState) {
+        public Chunk(
+                PartKind kind,
+                Sha256Digest semanticOutputSha256,
+                int artifactOrdinal,
+                int chunkOrdinal,
+                int chunkCount,
+                int artifactLength,
+                Sha256Digest artifactSha256,
+                CanonicalBytes body) {
+            this(
+                    kind,
+                    semanticOutputSha256,
+                    artifactOrdinal,
+                    chunkOrdinal,
+                    chunkCount,
+                    artifactLength,
+                    artifactSha256,
+                    body,
+                    false);
+        }
+
         public Chunk {
             Objects.requireNonNull(kind, "kind");
             KafkaBookKeeperInventoryV2.requireDigest(semanticOutputSha256);
@@ -64,6 +87,12 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
                     || body.length() > artifactLength
                     || chunkCount > artifactLength) {
                 throw new IllegalArgumentException("BK compaction chunk exceeds its exact artifact bounds");
+            }
+            if (recoveryState
+                    && (kind != PartKind.INDEX
+                            || artifactOrdinal != 0
+                            || artifactLength > KafkaCompactionRecoveryStateCodecV1.MAX_ENCODED_BYTES)) {
+                throw new IllegalArgumentException("BK protocol recovery chunk exceeds its exact artifact bounds");
             }
         }
     }
@@ -116,6 +145,40 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
             long attempt,
             int maximumEntryBytes,
             long maximumPartBytes) {
+        return plan(
+                plan, semantic, Optional.empty(), namespace, capability, attempt, maximumEntryBytes, maximumPartBytes);
+    }
+
+    public static Layout plan(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaCompactionRecoveryStateV1 recoveryState,
+            Namespace namespace,
+            BookKeeperCapabilitySnapshotV1 capability,
+            long attempt,
+            int maximumEntryBytes,
+            long maximumPartBytes) {
+        Objects.requireNonNull(recoveryState, "recoveryState").requirePlan(plan);
+        return plan(
+                plan,
+                semantic,
+                Optional.of(recoveryState),
+                namespace,
+                capability,
+                attempt,
+                maximumEntryBytes,
+                maximumPartBytes);
+    }
+
+    private static Layout plan(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            Optional<KafkaCompactionRecoveryStateV1> recoveryState,
+            Namespace namespace,
+            BookKeeperCapabilitySnapshotV1 capability,
+            long attempt,
+            int maximumEntryBytes,
+            long maximumPartBytes) {
         if (maximumEntryBytes <= ENVELOPE_BYTES
                 || maximumEntryBytes > capability.maximumAddPayloadBytes()
                 || maximumPartBytes < maximumEntryBytes
@@ -127,14 +190,30 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
         List<CanonicalBytes> data = semantic.batchOutputs().stream()
                 .flatMap(value -> value.outputBody().stream())
                 .toList();
-        appendParts(parts, PartKind.DATA, data, semantic.outputIdentitySha256(), maximumEntryBytes, maximumPartBytes);
+        appendParts(
+                parts,
+                PartKind.DATA,
+                data,
+                semantic.outputIdentitySha256(),
+                maximumEntryBytes,
+                maximumPartBytes,
+                false);
         appendParts(
                 parts,
                 PartKind.INDEX,
                 semantic.indexBodies(),
                 semantic.outputIdentitySha256(),
                 maximumEntryBytes,
-                maximumPartBytes);
+                maximumPartBytes,
+                false);
+        recoveryState.ifPresent(state -> appendParts(
+                parts,
+                PartKind.INDEX,
+                List.of(state.encode()),
+                semantic.outputIdentitySha256(),
+                maximumEntryBytes,
+                maximumPartBytes,
+                true));
         Task task = new Task(
                 M5MaterializationCodecV1.encodeSourceCut(plan.sourceCut()),
                 semantic.compactionPlanRootSha256(),
@@ -153,7 +232,8 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
             List<CanonicalBytes> artifacts,
             Sha256Digest outputId,
             int maximumEntryBytes,
-            long maximumPartBytes) {
+            long maximumPartBytes,
+            boolean recoveryState) {
         List<CanonicalBytes> entries = new ArrayList<>();
         long partLength = 0;
         int chunkBytes = maximumEntryBytes - ENVELOPE_BYTES;
@@ -169,8 +249,8 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
                 int start = Math.multiplyExact(chunk, chunkBytes);
                 CanonicalBytes body = CanonicalBytes.copyOf(
                         Arrays.copyOfRange(bytes, start, Math.min(bytes.length, Math.addExact(start, chunkBytes))));
-                CanonicalBytes entry =
-                        encodeChunk(new Chunk(kind, outputId, ordinal, chunk, count, bytes.length, digest, body));
+                CanonicalBytes entry = encodeChunk(
+                        new Chunk(kind, outputId, ordinal, chunk, count, bytes.length, digest, body, recoveryState));
                 if (!entries.isEmpty()
                         && (partLength + entry.length() > maximumPartBytes
                                 || entries.size() == KafkaBookKeeperInventoryV2.MAX_PART_ENTRIES)) {
@@ -197,7 +277,8 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
     public static CanonicalBytes encodeChunk(Chunk chunk) {
         ByteBuffer output =
                 ByteBuffer.allocate(Math.addExact(ENVELOPE_BYTES, chunk.body().length()));
-        output.putInt(MAGIC).putShort((short) 2).put((byte) (chunk.kind() == PartKind.DATA ? 1 : 2));
+        output.putInt(MAGIC).putShort((short) (chunk.recoveryState() ? 3 : 2)).put((byte)
+                (chunk.recoveryState() ? 3 : chunk.kind() == PartKind.DATA ? 1 : 2));
         output.put(chunk.semanticOutputSha256().bytes().toByteArray());
         output.putInt(chunk.artifactOrdinal()).putInt(chunk.chunkOrdinal()).putInt(chunk.chunkCount());
         output.putInt(chunk.artifactLength()).putInt(chunk.body().length());
@@ -211,13 +292,19 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
             throw new IllegalArgumentException("BK compaction entry exceeds admitted bound");
         }
         ByteBuffer input = ByteBuffer.wrap(bytes.toByteArray());
-        if (input.getInt() != MAGIC || input.getShort() != 2) {
+        if (input.getInt() != MAGIC) {
             throw new IllegalArgumentException("BK compaction entry preamble differs");
         }
+        int version = input.getShort();
+        byte encodedKind = input.get();
+        boolean recoveryState = version == 3 && encodedKind == 3;
+        if (!(version == 2 && (encodedKind == 1 || encodedKind == 2)) && !recoveryState) {
+            throw new IllegalArgumentException("BK compaction entry version or kind differs");
+        }
         PartKind kind =
-                switch (input.get()) {
+                switch (encodedKind) {
                     case 1 -> PartKind.DATA;
-                    case 2 -> PartKind.INDEX;
+                    case 2, 3 -> PartKind.INDEX;
                     default -> throw new IllegalArgumentException("unknown BK compaction entry kind");
                 };
         Sha256Digest outputId = readDigest(input);
@@ -232,7 +319,8 @@ public final class KafkaBookKeeperCompactionLayoutV2 {
         }
         byte[] body = new byte[bodyLength];
         input.get(body);
-        return new Chunk(kind, outputId, ordinal, chunk, count, length, digest, CanonicalBytes.copyOf(body));
+        return new Chunk(
+                kind, outputId, ordinal, chunk, count, length, digest, CanonicalBytes.copyOf(body), recoveryState);
     }
 
     public static Sha256Digest entriesRoot(List<CanonicalBytes> entries) {

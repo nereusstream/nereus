@@ -25,6 +25,7 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.V
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.retention.M5RetentionEvidenceAssemblerV1.FloorAdapterResultV1;
@@ -64,6 +65,148 @@ class M5RetentionEvidenceAssemblerV1Test {
     private static final IdentityEnvelope IDENTITY =
             new IdentityEnvelope(digest("cell"), digest("provider-scope"), BINDING, 11, 13, 17, CAPABILITY);
     private static final ProtocolCoverage COVERAGE = new ProtocolCoverage(PositionDomain.KAFKA_OFFSET, 0, 1_000);
+
+    @Test
+    void typedFloorAssemblerPreservesPositionsAndRereadsEveryAuthority() {
+        var metadata = new InMemoryStore();
+        var coverage = pulsarCoverage(BINDING).pulsarCoverage().orElseThrow();
+        var owner = fact(metadata.seed("/typed-owner", bytes("owner")));
+        var storage = fact(metadata.seed("/typed-storage", bytes("storage")));
+        var context = new M5RetentionRecordsV1.PulsarFloorContextV2(coverage, new M5PulsarCoverageV2.Position(91, 0));
+        var adapters = new EnumMap<FloorClassV1, FloorAdapterV1>(FloorClassV1.class);
+        for (var kind : FloorClassV1.values()) {
+            var authority = fact(metadata.seed("/typed-floor/" + kind, bytes(kind.name())));
+            adapters.put(kind, request -> {
+                assertThat(request.pulsarContext()).contains(context);
+                var position = kind == FloorClassV1.BINDING_EPOCH_POLICY
+                        ? new M5PulsarCoverageV2.Position(91, 3)
+                        : new M5PulsarCoverageV2.Position(7, 4);
+                var row = new RetentionFloorObservationV1(
+                        kind, authority, request.domain(), -1, true, true, Optional.of(position));
+                return CompletableFuture.completedFuture(new FloorAdapterResultV1(kind, 1, 64, List.of(row)));
+            });
+        }
+        var assembler = new M5RetentionEvidenceAssemblerV1(
+                metadata, adapters, referenceAdapters(metadata, Set.of(), Optional.empty()));
+        var request = new FloorSnapshotRequestV1(
+                IDENTITY, PositionDomain.PULSAR_ENTRY, 1, -1, digest("policy"), owner, storage, Optional.of(context));
+        var snapshot =
+                assembler.buildFloorSnapshot(request).toCompletableFuture().join();
+        assertThat(snapshot.pulsarContext()).contains(context);
+        assertThat(snapshot.minimumPulsarFloor()).isEqualTo(new M5PulsarCoverageV2.Position(91, 3));
+        assertThat(M5RetentionCodecV1.decodeSnapshot(M5RetentionCodecV1.encodeSnapshot(snapshot)))
+                .isEqualTo(snapshot);
+        metadata.overwrite("/typed-floor/" + FloorClassV1.BINDING_EPOCH_POLICY, bytes("changed"));
+        assertThatThrownBy(() -> assembler
+                        .buildFloorSnapshot(request)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(M5ReferenceFreshnessVerifierV1.StaleAuthorityException.class);
+    }
+
+    @Test
+    void typedPulsarReferenceProofPreservesChainAndRestartedEntryIds() {
+        var metadata = new InMemoryStore();
+        var coverage = pulsarCoverage(BINDING);
+        var request = referenceRequest(metadata, "typed", coverage);
+        var assembler = new M5RetentionEvidenceAssemblerV1(
+                metadata,
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(metadata, Set.of(), Optional.empty()));
+        var proof =
+                assembler.buildReferenceFreeProof(request).toCompletableFuture().join();
+        var encoded = M5RetentionCodecV1.encodeReferenceFreeProof(proof);
+        assertThat(ByteBuffer.wrap(encoded.toByteArray()).getInt(4)).isEqualTo(2);
+        assertThat(M5RetentionCodecV1.decodeReferenceFreeProof(encoded)).isEqualTo(proof);
+        assertThat(proof.coverage()).isEqualTo(coverage);
+        assertThat(proof.observations())
+                .allSatisfy(row -> assertThat(row.coverage()).isEqualTo(coverage));
+        var directoryBytes = coverage.pulsarCoverage().orElseThrow().encode().toByteArray();
+        int directoryOffset = findUnique(encoded.toByteArray(), directoryBytes);
+        var changedRange = encoded.toByteArray();
+        changedRange[directoryOffset + directoryBytes.length - 1] ^= 1;
+        assertThatThrownBy(() -> M5RetentionCodecV1.decodeReferenceFreeProof(CanonicalBytes.copyOf(changedRange)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> proof.coverage().inclusiveStart()).isInstanceOf(IllegalStateException.class);
+        var unknownVersion = encoded.toByteArray();
+        ByteBuffer.wrap(unknownVersion).putInt(4, 3);
+        assertThatThrownBy(() -> M5RetentionCodecV1.decodeReferenceFreeProof(CanonicalBytes.copyOf(unknownVersion)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void typedPulsarProofRequestRejectsForeignBindingBeforeScan() {
+        var foreign = new BindingIdentity(
+                new TopicBindingId(digest("foreign-binding")), digest("incarnation"), digest("storage-epoch"));
+        assertThatThrownBy(() -> referenceRequest(new InMemoryStore(), "foreign", pulsarCoverage(foreign)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Binding");
+    }
+
+    @Test
+    void typedReferenceAdapterOrderingDoesNotReadScalarEndpoints() {
+        var authority = new AuthorityFactV1("/typed-rows", new MetadataVersion(bytes("v1")), digest("value"));
+        var coverage = pulsarCoverage(BINDING);
+        var present = new ReferenceObservationV1(
+                ReferenceKindV1.RECOVERY_CHECKPOINT_OR_SNAPSHOT,
+                authority,
+                digest("target"),
+                coverage,
+                ReferenceDispositionV1.PRESENT,
+                false);
+        var absent = new ReferenceObservationV1(
+                ReferenceKindV1.RECOVERY_CHECKPOINT_OR_SNAPSHOT,
+                authority,
+                digest("target"),
+                coverage,
+                ReferenceDispositionV1.ABSENT,
+                true);
+        var result = new ReferenceAdapterResultV1(
+                ReferenceKindV1.RECOVERY_CHECKPOINT_OR_SNAPSHOT,
+                new ReferenceScanSummaryV1(ReferenceKindV1.RECOVERY_CHECKPOINT_OR_SNAPSHOT, 2, 1, 64, true),
+                List.of(present, absent));
+        assertThat(result.observations()).containsExactly(present, absent);
+        assertThat(M5RetentionCodecV1.calculateObservationsRoot(result.observations()))
+                .isNotNull();
+        var other = new ReferenceObservationV1(
+                present.kind(),
+                authority,
+                present.targetIdentitySha256(),
+                ProtocolCoverage.pulsar(coverage.pulsarCoverage()
+                        .orElseThrow()
+                        .withRanges(List.of(new M5PulsarCoverageV2.EntryRange(91, 1, 3)))),
+                present.disposition(),
+                false);
+        assertThatThrownBy(() -> M5RetentionCodecV1.calculateObservationsRoot(List.of(present, other)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("one exact coverage");
+    }
+
+    @Test
+    void legacyKafkaReferenceProofRetainsVersionOneBytes() {
+        var metadata = new InMemoryStore();
+        var request = referenceRequest(metadata, "legacy-wire");
+        var assembler = new M5RetentionEvidenceAssemblerV1(
+                metadata,
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(metadata, Set.of(), Optional.empty()));
+        var proof =
+                assembler.buildReferenceFreeProof(request).toCompletableFuture().join();
+        var bytes = M5RetentionCodecV1.encodeReferenceFreeProof(proof);
+        assertThat(ByteBuffer.wrap(bytes.toByteArray()).getInt(4)).isEqualTo(1);
+        assertThat(Sha256Digest.hash(bytes).toHex())
+                .isEqualTo("973cd75ef32ab259e95e9eeb27f336a0934d8b51f8be9d93c3a32c99ca8bc84f");
+    }
+
+    private static ProtocolCoverage pulsarCoverage(BindingIdentity binding) {
+        return ProtocolCoverage.pulsar(M5PulsarCoverageV2.of(
+                binding,
+                digest("native-chain-root"),
+                List.of(
+                        new M5PulsarCoverageV2.ChainLedger(91, false, 3, digest("ledger-91")),
+                        new M5PulsarCoverageV2.ChainLedger(7, false, 4, digest("ledger-7"))),
+                List.of(new M5PulsarCoverageV2.EntryRange(91, 0, 3), new M5PulsarCoverageV2.EntryRange(7, 0, 4))));
+    }
 
     @Test
     void closedRegistriesBuildFreshCanonicalSnapshotAndProof() {
@@ -277,6 +420,11 @@ class M5RetentionEvidenceAssemblerV1Test {
     }
 
     private static ReferenceProofRequestV1 referenceRequest(InMemoryStore metadata, String suffix) {
+        return referenceRequest(metadata, suffix, COVERAGE);
+    }
+
+    private static ReferenceProofRequestV1 referenceRequest(
+            InMemoryStore metadata, String suffix, ProtocolCoverage coverage) {
         AuthorityFactV1 owner = fact(metadata.seed("/owner/" + suffix, bytes("owner")));
         AuthorityFactV1 storage = fact(metadata.seed("/storage/" + suffix, bytes("storage")));
         AuthorityFactV1 selector = fact(metadata.seed("/selector/" + suffix, bytes("selector")));
@@ -288,7 +436,7 @@ class M5RetentionEvidenceAssemblerV1Test {
                 IDENTITY,
                 ReferenceTargetKindV1.PULSAR_AGGREGATE,
                 digest("target"),
-                COVERAGE,
+                coverage,
                 selector,
                 manifest,
                 trim,

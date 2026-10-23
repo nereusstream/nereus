@@ -35,12 +35,28 @@ public final class M5MaterializationKeysV1 {
                 binding.bindingId().digest().toHex());
     }
 
+    public String root() {
+        return prefix;
+    }
+
     public String sourceCut(Sha256Digest taskId) {
         return prefix + "/source-cuts/" + digest(taskId);
     }
 
     public String task(Sha256Digest taskId) {
         return prefix + "/tasks/" + digest(taskId);
+    }
+
+    public String plan(Sha256Digest taskId) {
+        return prefix + "/plans/" + digest(taskId);
+    }
+
+    public String nativeInput(Sha256Digest protocolStateRoot) {
+        return prefix + "/native-inputs/" + digest(protocolStateRoot);
+    }
+
+    public String pendingOutputs(Sha256Digest taskId) {
+        return prefix + "/pending-outputs/" + digest(taskId);
     }
 
     public String validation(Sha256Digest validationSha256) {

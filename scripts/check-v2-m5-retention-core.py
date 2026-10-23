@@ -161,7 +161,7 @@ def validate_runtime_contract(root: Path) -> None:
         "retirement coordinator",
     )
     require_literals(freshness, ("requireFresh", "StaleAuthorityException"), "freshness verifier")
-    require_literals(trim, ("minimumSafeFloor", "compareAndSet", "no physical-delete API"), "logical trim")
+    validate_logical_trim(trim)
     require_literals(
         tests,
         (
@@ -270,6 +270,18 @@ def validate_tasks(root: Path) -> None:
     require_literals(root_build, ("v2M5KafkaCompactionCheck", "v2M5RetentionCoreSourceCheck"), "M5-C aggregate")
     if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build) is None:
         raise RetentionCoreError("accepted amended full M5-C retirement gate is missing")
+
+
+def validate_logical_trim(trim: str) -> None:
+    require_literals(
+        trim,
+        ("minimumSafeFloor", "supportsAtomicMultiKeyTransactions", "conditionalTransaction", "ExactCondition",
+         "M5SerializedLogicalTrimStoreV2", "advanceLogicalTrim", "Outcome.UNSUPPORTED", "RESPONSE_UNKNOWN",
+         "no physical-delete API"),
+        "logical trim",
+    )
+    if "metadata.compareAndSet(" in trim:
+        raise RetentionCoreError("logical trim must not publish through an unfenced one-key CAS")
 
 
 def validate(root: Path) -> None:

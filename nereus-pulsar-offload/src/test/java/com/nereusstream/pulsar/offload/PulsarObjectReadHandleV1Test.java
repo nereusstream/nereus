@@ -15,6 +15,7 @@
 package com.nereusstream.pulsar.offload;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1.ObjectReadException;
 import com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1.ReadFailureKind;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Body;
@@ -47,6 +48,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
@@ -71,6 +75,117 @@ class PulsarObjectReadHandleV1Test {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void closeDrainsTheWholeAdmittedRangeDespiteCancelledObservers() {
+        Fixture fixture = fixture();
+        PulsarObjectReadHandleV1 handle = open(fixture);
+        fixture.store.holdNextRange = true;
+        var read = handle.read(0, 4).toCompletableFuture();
+        var close = handle.close().toCompletableFuture();
+
+        assertThat(close).isNotDone();
+        assertThat(read.cancel(false)).isTrue();
+        assertThat(close.cancel(false)).isTrue();
+        var repeatedClose = handle.close().toCompletableFuture();
+        assertThat(repeatedClose).isNotDone();
+        assertThat(failure(handle.read(0, 0)).kind()).isEqualTo(ReadFailureKind.CLOSED);
+        int readsBeforeRelease = fixture.store.rangeReadCount;
+
+        fixture.store.heldRange.complete(fixture.store.pendingRange);
+
+        repeatedClose.join();
+        assertThat(fixture.store.rangeReadCount).isEqualTo(readsBeforeRelease + 2);
+        assertThat(read).isCancelled();
+        assertThat(handle.close().toCompletableFuture()).isCompleted();
+    }
+
+    @Test
+    void closeDrainsAFailedCompleteVerificationBeforeReportingLocalQuiescence() {
+        Fixture fixture = fixture();
+        PulsarObjectReadHandleV1 handle = open(fixture);
+        fixture.store.holdNextRange = true;
+        var verification = handle.verifyCompleteLedger().toCompletableFuture();
+        var close = handle.close().toCompletableFuture();
+
+        assertThat(close).isNotDone();
+        fixture.store.heldRange.completeExceptionally(new ObjectStoreException(FailureKind.UNAVAILABLE, "held GET"));
+
+        assertThat(failure(verification).kind()).isEqualTo(ReadFailureKind.UNAVAILABLE);
+        close.join();
+        assertThat(failure(handle.verifyCompleteLedger()).kind()).isEqualTo(ReadFailureKind.CLOSED);
+    }
+
+    @Test
+    void nativeCloseObserverCancellationCannotReplaceTheOwnedDrain() {
+        Fixture fixture = fixture();
+        var nativeHandle = new NereusPulsarReadHandleV1(open(fixture));
+        fixture.store.holdNextRange = true;
+        var read = nativeHandle.readAsync(0, 4);
+        var close = nativeHandle.closeAsync();
+
+        assertThat(close).isNotDone();
+        assertThat(close.cancel(false)).isTrue();
+        var repeatedClose = nativeHandle.closeAsync();
+        assertThat(repeatedClose).isNotDone();
+        fixture.store.heldRange.complete(fixture.store.pendingRange);
+
+        try (var entries = read.join()) {
+            assertThat(entries)
+                    .extracting(org.apache.bookkeeper.client.api.LedgerEntry::getEntryId)
+                    .containsExactly(0L, 1L, 2L, 3L, 4L);
+        }
+        repeatedClose.join();
+        assertThat(nativeHandle.closeAsync()).isCompleted();
+    }
+
+    @Test
+    void nativeCloseWaitsForResultDeliveryAfterObjectReadHasCompleted() throws Exception {
+        Fixture fixture = fixture();
+        var nativeHandle = new NereusPulsarReadHandleV1(open(fixture));
+        fixture.store.holdNextRange = true;
+        var read = nativeHandle.readAsync(0, 4);
+        var delivered = new CountDownLatch(1);
+        var releaseDelivery = new CountDownLatch(1);
+        var callback = read.thenAccept(entries -> {
+            try (entries) {
+                assertThat(entries)
+                        .extracting(org.apache.bookkeeper.client.api.LedgerEntry::getEntryId)
+                        .containsExactly(0L, 1L, 2L, 3L, 4L);
+                delivered.countDown();
+                try {
+                    if (!releaseDelivery.await(30, TimeUnit.SECONDS)) {
+                        throw new AssertionError("native delivery was not released");
+                    }
+                } catch (InterruptedException failure) {
+                    Thread.currentThread().interrupt();
+                    throw new CompletionException(failure);
+                }
+            }
+        });
+        var providerCompletion =
+                CompletableFuture.runAsync(() -> fixture.store.heldRange.complete(fixture.store.pendingRange));
+        try {
+            assertThat(delivered.await(30, TimeUnit.SECONDS)).isTrue();
+            var close = nativeHandle.closeAsync();
+            assertThatThrownBy(() -> close.get(1, TimeUnit.SECONDS)).isInstanceOf(TimeoutException.class);
+            assertThat(nativeHandle.closeAsync().cancel(false)).isTrue();
+            var repeatedClose = nativeHandle.closeAsync();
+            assertThat(repeatedClose).isNotDone();
+            assertThatThrownBy(() -> nativeHandle.readAsync(0, 0).join())
+                    .hasRootCauseMessage("Nereus Object ReadHandle is closed");
+            releaseDelivery.countDown();
+            callback.get(30, TimeUnit.SECONDS);
+            providerCompletion.get(30, TimeUnit.SECONDS);
+            close.get(30, TimeUnit.SECONDS);
+            repeatedClose.get(30, TimeUnit.SECONDS);
+            assertThat(nativeHandle.closeAsync()).isCompleted();
+        } finally {
+            releaseDelivery.countDown();
+            providerCompletion.get(30, TimeUnit.SECONDS);
+            nativeHandle.closeAsync().get(30, TimeUnit.SECONDS);
+        }
+    }
 
     @Test
     void opensTheBoundedPairAndReadsExactRangesAcrossSparseBlocks() {
@@ -146,6 +261,16 @@ class PulsarObjectReadHandleV1Test {
         assertThat(failure(PulsarObjectReadHandleV1.open(missing.store, LIMITS, missing.prepared.attempt(), KEY))
                         .kind())
                 .isEqualTo(ReadFailureKind.NOT_FOUND);
+    }
+
+    @Test
+    void rejectsUnboundProviderBeforeAnyRange() {
+        Fixture fixture = fixture();
+        fixture.store.supportsVersionBinding = false;
+        assertThat(failure(PulsarObjectReadHandleV1.open(fixture.store, LIMITS, fixture.prepared.attempt(), KEY))
+                        .kind())
+                .isEqualTo(ReadFailureKind.UNAVAILABLE);
+        assertThat(fixture.store.rangeReadCount).isZero();
     }
 
     @Test
@@ -262,6 +387,10 @@ class PulsarObjectReadHandleV1Test {
         private String shortReadKey;
         private long corruptOffset = -1;
         private int rangeReadCount;
+        private boolean holdNextRange;
+        private boolean supportsVersionBinding = true;
+        private final CompletableFuture<byte[]> heldRange = new CompletableFuture<>();
+        private byte[] pendingRange;
 
         @Override
         public Capabilities capabilities() {
@@ -297,6 +426,22 @@ class PulsarObjectReadHandleV1Test {
         }
 
         @Override
+        public CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+            if (!supportsVersionBinding) {
+                return PulsarOffloadObjectStoreV1.super.readRange(key, expected, offset, length);
+            }
+            StoredObject stored = objects.get(key);
+            if (stored == null) {
+                return CompletableFuture.failedFuture(new ObjectStoreException(FailureKind.NOT_FOUND, "absent"));
+            }
+            if (!stored.proof().equals(expected)) {
+                return CompletableFuture.failedFuture(
+                        new ObjectStoreException(FailureKind.INTEGRITY, "range proof differs"));
+            }
+            return readRange(key, offset, length);
+        }
+
+        @Override
         public CompletionStage<byte[]> readRange(String key, long offset, int length) {
             rangeReadCount++;
             StoredObject stored = objects.get(key);
@@ -311,6 +456,11 @@ class PulsarObjectReadHandleV1Test {
                     Arrays.copyOfRange(stored.bytes, Math.toIntExact(offset), Math.toIntExact(offset + actualLength));
             if (offset == corruptOffset && result.length > 0) {
                 result[result.length / 2] ^= 1;
+            }
+            if (holdNextRange) {
+                holdNextRange = false;
+                pendingRange = result;
+                return heldRange;
             }
             return CompletableFuture.completedFuture(result);
         }

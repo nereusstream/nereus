@@ -65,6 +65,13 @@ public final class KafkaObjectCheckpointRecoveryV1 {
             if (value.isEmpty()) {
                 return fallback();
             }
+            if (com.nereusstream.storage.object.control.WalRunKafkaProtocolEmptyClosureV1.hasMagic(
+                    value.orElseThrow())) {
+                // A persisted closed domain is authoritative; it must never be treated as corrupt/missing Head
+                // and silently replaced by suffix replay.
+                KafkaProtocolCheckpointHeadCodecV1.decode(walRunPrefix, rootSha, value.orElseThrow());
+                throw new KafkaObjectCheckpointException("closed protocol domain cannot enter checkpoint recovery");
+            }
             KafkaProtocolCheckpointHeadV1 head;
             try {
                 head = KafkaProtocolCheckpointHeadCodecV1.decode(walRunPrefix, rootSha, value.get());

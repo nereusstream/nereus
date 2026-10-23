@@ -106,6 +106,50 @@ class KafkaPartitionPublicationCellV1Test {
     }
 
     @Test
+    void sourceRetirementCannotChangeTheLiveTailOrPublishOverAStaleRoot() {
+        var initial = KafkaProtocolStateFixtures.initialState();
+        var events = new ArrayList<KafkaPartitionPublicationEventV1>();
+        var cell = new KafkaPartitionPublicationCellV1(initial, events::add);
+        var old = initial.references();
+        var sources = KafkaProtocolStateFixtures.reference(1, 90);
+        var checkpoint = KafkaProtocolStateFixtures.reference(1, 91);
+        var valid = new KafkaPartitionStateReferencesV1(
+                sources,
+                old.activeTail(),
+                sources,
+                old.committedProducerState(),
+                old.speculativeProducerQueue(),
+                old.transactionIndex(),
+                old.leaderEpochIndex(),
+                checkpoint,
+                sources);
+        var alteredTail = new KafkaPartitionStateReferencesV1(
+                sources,
+                sources,
+                sources,
+                old.committedProducerState(),
+                old.speculativeProducerQueue(),
+                old.transactionIndex(),
+                old.leaderEpochIndex(),
+                checkpoint,
+                sources);
+        assertThat(cell.retireBookKeeperSources(initial, alteredTail).outcome())
+                .isEqualTo(KafkaPartitionPublicationOutcomeV1.INVALID_COMMIT_REPLACEMENT);
+        assertThat(cell.capture()).isSameAs(initial);
+        assertThat(events).isEmpty();
+        assertThat(cell.retireBookKeeperSources(initial, valid).published()).isTrue();
+        assertThat(cell.capture().frontiers()).isEqualTo(initial.frontiers());
+        assertThat(events)
+                .singleElement()
+                .extracting(KafkaPartitionPublicationEventV1::kind)
+                .isEqualTo(KafkaPartitionPublicationKindV1.BOOKKEEPER_SOURCE_RETIREMENT);
+        var selected = cell.capture();
+        assertThat(cell.retireBookKeeperSources(initial, valid).outcome())
+                .isEqualTo(KafkaPartitionPublicationOutcomeV1.STATE_VERSION_MISMATCH);
+        assertThat(cell.capture()).isSameAs(selected);
+    }
+
+    @Test
     void notificationFailureIsClosedAsPublishedAndNeverRollsBackState() {
         KafkaPartitionProtocolStateV1 initial = KafkaProtocolStateFixtures.initialState();
         KafkaPartitionPublicationCellV1 cell = new KafkaPartitionPublicationCellV1(initial, event -> {

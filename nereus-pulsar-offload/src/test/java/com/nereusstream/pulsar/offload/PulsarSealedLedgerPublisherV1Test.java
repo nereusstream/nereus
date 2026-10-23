@@ -18,7 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Body;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Capabilities;
+import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.FailureKind;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ImmutableObject;
+import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ObjectStoreException;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.DeleteState;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1.PreparedAttempt;
@@ -174,7 +176,7 @@ class PulsarSealedLedgerPublisherV1Test {
     }
 
     @Test
-    void cleanupProvesRootAbsentBeforeDataThenMultipartResidue() {
+    void attemptCleanupRejectsBeforeProviderMutationWithoutM5Authority() {
         PreparedAttempt prepared = prepared(ATTEMPT);
         InMemoryStore store = new InMemoryStore();
         PulsarSealedLedgerPublisherV1 publisher =
@@ -182,48 +184,16 @@ class PulsarSealedLedgerPublisherV1Test {
         publisher.publish(prepared).toCompletableFuture().join();
         store.calls.clear();
 
-        publisher.deleteAttempt(prepared.attempt()).toCompletableFuture().join();
-
-        PulsarOffloadKeysV1 keys = prepared.attempt().keys();
-        assertThat(store.calls)
-                .containsExactly(
-                        "delete:" + keys.rootKey(), "delete:" + keys.dataKey(), "cleanup:" + keys.attemptPrefix());
-        assertThat(store.objects).doesNotContainKeys(keys.rootKey(), keys.dataKey());
-    }
-
-    @Test
-    void cleanupNeverDeletesDataWhenRootAbsenceIsUnproven() {
-        PreparedAttempt prepared = prepared(ATTEMPT);
-        InMemoryStore store = new InMemoryStore();
-        store.failDelete.add(prepared.attempt().keys().rootKey());
-
-        assertThatThrownBy(() -> publisher(store, publication -> CompletableFuture.completedFuture(null))
+        assertThatThrownBy(() -> publisher
                         .deleteAttempt(prepared.attempt())
                         .toCompletableFuture()
                         .join())
-                .hasRootCauseMessage("delete unavailable");
-        assertThat(store.calls)
-                .containsExactly("delete:" + prepared.attempt().keys().rootKey());
-    }
+                .hasRootCauseMessage(
+                        "Pulsar attempt cleanup requires M5 intent, release and native reference-free proof");
 
-    @Test
-    void attemptUuidKeepsPublicationAndCleanupIsolated() {
-        PreparedAttempt first = prepared(ATTEMPT);
-        PreparedAttempt second = prepared(UUID.fromString("223e4567-e89b-12d3-a456-426614174000"));
-        InMemoryStore store = new InMemoryStore();
-        PulsarSealedLedgerPublisherV1 publisher =
-                publisher(store, publication -> CompletableFuture.completedFuture(null));
-        publisher.publish(first).toCompletableFuture().join();
-        publisher.publish(second).toCompletableFuture().join();
-
-        publisher.deleteAttempt(first.attempt()).toCompletableFuture().join();
-
-        assertThat(store.objects)
-                .containsKeys(
-                        second.attempt().keys().dataKey(),
-                        second.attempt().keys().rootKey())
-                .doesNotContainKeys(
-                        first.attempt().keys().dataKey(), first.attempt().keys().rootKey());
+        PulsarOffloadKeysV1 keys = prepared.attempt().keys();
+        assertThat(store.calls).isEmpty();
+        assertThat(store.objects).containsKeys(keys.rootKey(), keys.dataKey());
     }
 
     private PulsarSealedLedgerPublisherV1 publisher(
@@ -327,6 +297,19 @@ class PulsarSealedLedgerPublisherV1Test {
             return stored == null
                     ? CompletableFuture.failedFuture(new IOException("absent"))
                     : CompletableFuture.completedFuture(stored.proof());
+        }
+
+        @Override
+        public CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+            StoredObject stored = objects.get(key);
+            if (stored == null) {
+                return CompletableFuture.failedFuture(new ObjectStoreException(FailureKind.NOT_FOUND, "absent"));
+            }
+            if (!stored.proof().equals(expected)) {
+                return CompletableFuture.failedFuture(
+                        new ObjectStoreException(FailureKind.INTEGRITY, "range proof differs"));
+            }
+            return readRange(key, offset, length);
         }
 
         @Override

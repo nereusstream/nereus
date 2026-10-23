@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2.retention;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
@@ -24,13 +25,20 @@ import com.nereusstream.metadata.oxia.v2.retention.M5PermanentDoneOxiaIntegratio
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2.BirthResult;
 import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2.Result;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Head;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Layout;
+import com.nereusstream.storage.object.gc.M5ObjectBirthCreditV3;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteDoneV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
+import com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.retention.M5MaterializationWorkerV1;
 import io.oxia.client.api.GetResult;
 import io.oxia.client.api.RangeScanConsumer;
 import java.util.Optional;
@@ -45,6 +53,255 @@ import org.junit.jupiter.api.Timeout;
 /** Real source-locked native metadata and CAS; deletion eligibility, owner and absence remain synthetic fixtures. */
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
 class M5GcQuotaOxiaIntegrationTest {
+    @Test
+    void nativeOriginalArmedBodyRecoversAtEveryConditionalWriteWithoutCapacityRefund() throws Exception {
+        var output = new com.nereusstream.storage.object.provider.ObjectIdentity(
+                declaredSlot().objectKey(), 8, SyntheticDeleteAuthorityFixturesV2.digest("declared-original-output"));
+        for (int write = 1; write <= 3; write++) {
+            String root = Fixture.root();
+            try (var original = new QFixture(root);
+                    var independent = new QFixture(root)) {
+                Fixture.await(original.route.initialize(birthCapacity(original.layout)));
+                Fixture.await(original.route.quota().reserveBirth(declaredWorker(), declaredSlot()));
+                long charged = Fixture.await(original.route.quota().snapshot()).chargedCanonicalBytes();
+                var claim = declaredClaim(original.layout);
+                original.faults.stopAfterWrites = write;
+                assertThatThrownBy(() -> Fixture.await(original.route.quota().armBirth(claim.key(), output)))
+                        .hasRootCauseMessage("injected quota client stopped");
+                assertThat(Fixture.await(independent.route.quota().recover())).isTrue();
+                assertThat(Fixture.await(independent.route.quota().armBirth(claim.key(), output)))
+                        .isEqualTo(BirthResult.WRITE_ARMED);
+                var armed = Fixture.await(independent.route.quota().readBirth(claim.key()))
+                        .orElseThrow();
+                assertThat(armed.output()).contains(output);
+                assertThat(armed.resource()).isEmpty();
+                assertThat(Fixture.await(independent.route.quota().snapshot()).chargedCanonicalBytes())
+                        .isEqualTo(charged);
+                assertThat(Fixture.await(
+                                independent.route.quota().assignBirth(claim.key(), (PhysicalResourceIdV2.ObjectVersion)
+                                        resource(1))))
+                        .isEqualTo(BirthResult.ASSIGNED);
+                var assigned = Fixture.await(independent.route.quota().readBirth(claim.key()))
+                        .orElseThrow();
+                assertThat(assigned.output()).contains(output);
+                assertThat(M5ObjectBirthCreditV3.decode(assigned.encode())).isEqualTo(assigned);
+                assertThat(Fixture.await(independent.route.quota().snapshot()).chargedCanonicalBytes())
+                        .isEqualTo(charged);
+            }
+        }
+    }
+
+    @Test
+    void nativeBirthQuotaRecoversEveryGrantAndAssignmentWriteWithoutDoubleAccounting() throws Exception {
+        for (int write = 1; write <= 3; write++) {
+            String root = Fixture.root();
+            try (var original = new QFixture(root);
+                    var independent = new QFixture(root)) {
+                Fixture.await(original.route.initialize(birthCapacity(original.layout)));
+                original.faults.stopAfterWrites = write;
+                assertThatThrownBy(() ->
+                                Fixture.await(original.route.quota().reserveBirth(declaredWorker(), declaredSlot())))
+                        .hasRootCauseMessage("injected quota client stopped");
+                assertThat(Fixture.await(independent.route.quota().recover())).isTrue();
+                assertThat(Fixture.await(independent.route.quota().reserveBirth(declaredWorker(), declaredSlot())))
+                        .isEqualTo(BirthResult.RESERVED);
+                var snapshot = Fixture.await(independent.route.quota().snapshot());
+                assertThat(snapshot.head().births().orElseThrow().issued()).isEqualTo(1);
+                assertThat(snapshot.head().reservedResources()).isZero();
+                assertThat(snapshot.availableCanonicalBytes()).isZero();
+            }
+        }
+        for (int write = 1; write <= 5; write++) {
+            String root = Fixture.root();
+            try (var original = new QFixture(root);
+                    var independent = new QFixture(root)) {
+                Fixture.await(original.route.initialize(birthCapacity(original.layout)));
+                Fixture.await(original.route.quota().reserveBirth(declaredWorker(), declaredSlot()));
+                var claim = declaredClaim(original.layout);
+                long charged = Fixture.await(original.route.quota().snapshot()).chargedCanonicalBytes();
+                original.faults.stopAfterWrites = write;
+                assertThatThrownBy(() -> Fixture.await(
+                                original.route.quota().assignBirth(claim.key(), (PhysicalResourceIdV2.ObjectVersion)
+                                        resource(1))))
+                        .hasRootCauseMessage("injected quota client stopped");
+                assertThat(Fixture.await(independent.route.quota().recover())).isTrue();
+                assertThat(Fixture.await(
+                                independent.route.quota().assignBirth(claim.key(), (PhysicalResourceIdV2.ObjectVersion)
+                                        resource(1))))
+                        .isEqualTo(BirthResult.ASSIGNED);
+                var snapshot = Fixture.await(independent.route.quota().snapshot());
+                assertThat(snapshot.chargedCanonicalBytes()).isEqualTo(charged);
+                assertThat(snapshot.head().reservedResources()).isEqualTo(1);
+                assertThat(snapshot.head().births().orElseThrow().assigned()).isEqualTo(1);
+                assertThat(snapshot.head().pending()).isEmpty();
+                assertThat(snapshot.head().births().orElseThrow().pending()).isEmpty();
+                assertThat(Fixture.await(independent.route.quota().readBirth(claim.key()))
+                                .orElseThrow()
+                                .resource())
+                        .contains((PhysicalResourceIdV2.ObjectVersion) resource(1));
+            }
+        }
+    }
+
+    @Test
+    void nativeBirthHistoryBlocksReinitializationAndStaleNoDispatchCannotRefundTwice() throws Exception {
+        try (var orphan = new QFixture(Fixture.root())) {
+            var claim = declaredClaim(orphan.layout);
+            Fixture.await(orphan.nativeFixture.client.put(
+                    orphan.layout.nativeKey(claim.key()), claim.encode().toByteArray()));
+            assertThatThrownBy(() -> Fixture.await(orphan.route.initialize(birthCapacity(orphan.layout))))
+                    .hasRootCauseMessage("durable GC quota is not initialized");
+        }
+        String root = Fixture.root();
+        try (var original = new QFixture(root);
+                var independent = new QFixture(root)) {
+            Fixture.await(original.route.initialize(birthCapacity(original.layout)));
+            Fixture.await(original.route.quota().reserveBirth(declaredWorker(), declaredSlot()));
+            var claim = declaredClaim(original.layout);
+            original.faults.hold = (key, bytes) -> key.equals(original.layout.nativeKey(M5GcQuotaRecordsV2.HEAD_KEY));
+            var delayed =
+                    original.route.quota().cancelNoDispatchBirth(claim.key()).toCompletableFuture();
+            Fixture.await(original.faults.held);
+            assertThat(Fixture.await(independent.route.quota().cancelNoDispatchBirth(claim.key())))
+                    .isEqualTo(BirthResult.CANCELLED_NO_DISPATCH);
+            var terminal = Fixture.await(independent.route.quota().snapshot());
+            original.faults.release.get().run();
+            assertThat(Fixture.await(delayed)).isEqualTo(BirthResult.CANCELLED_NO_DISPATCH);
+            assertThat(Fixture.await(original.route.quota().snapshot())).isEqualTo(terminal);
+            assertThat(terminal.head().births().orElseThrow().cancelled()).isEqualTo(1);
+            assertThat(terminal.availableCanonicalBytes()).isEqualTo(original.layout.reservationCharge());
+            assertThat(Fixture.await(original.route.quota().reserveBirth(declaredWorker(), declaredSlot())))
+                    .isEqualTo(BirthResult.CANCELLED_NO_DISPATCH);
+        }
+    }
+
+    /** These record declarations exercise real native CAS only, not SDK/Worker/delete qualification. */
+    static M5MaterializationWorkerV1 declaredWorker() {
+        var digest = SyntheticDeleteAuthorityFixturesV2.digest("declared-quota-worker");
+        return new M5MaterializationWorkerV1(
+                new IdentityEnvelope(
+                        digest,
+                        digest,
+                        new BindingIdentity(new TopicBindingId(digest), digest, digest),
+                        1,
+                        1,
+                        1,
+                        new CapabilityBinding(1, digest)),
+                digest,
+                digest,
+                digest,
+                digest,
+                digest,
+                digest);
+    }
+
+    static M5PendingOutputInventoryV2.Slot declaredSlot() {
+        return new M5PendingOutputInventoryV2.Slot(
+                M5PendingOutputInventoryV2.Role.PAYLOAD,
+                0,
+                ((PhysicalResourceIdV2.ObjectVersion) resource(1)).objectKey().value());
+    }
+
+    static M5ObjectBirthCreditV3 declaredClaim(Layout layout) {
+        return new M5ObjectBirthCreditV3(
+                layout.scope(),
+                declaredWorker(),
+                declaredSlot(),
+                2,
+                M5ObjectBirthCreditV3.State.RESERVED,
+                Optional.empty());
+    }
+
+    static long birthCapacity(Layout layout) {
+        return layout.headCharge()
+                + M5GcQuotaRecordsV2.BIRTH_HEAD_BYTES
+                - M5GcQuotaRecordsV2.HEAD_BYTES
+                + layout.birthRecordCharge()
+                + layout.reservationCharge();
+    }
+
+    @Test
+    void memberProfileRejectsOldHeadAndOrphanNativeMemberRecords() throws Exception {
+        String root = Fixture.root();
+        var memberLayout = Layout.withPhysicalMembers(root, resource(0).namespace());
+        try (var legacy = new QFixture(root);
+                var members = new QFixture(root, memberLayout)) {
+            legacy.initialize(1);
+            var before = Fixture.await(
+                    legacy.nativeFixture.client.get(legacy.layout.nativeKey(M5GcQuotaRecordsV2.HEAD_KEY)));
+            assertThatThrownBy(() -> members.initialize(1))
+                    .hasRootCauseMessage("quota head scope or accounted capacity differs");
+            assertThat(Fixture.await(
+                            legacy.nativeFixture.client.get(legacy.layout.nativeKey(M5GcQuotaRecordsV2.HEAD_KEY))))
+                    .isEqualTo(before);
+            assertThatThrownBy(() -> legacy.route.members())
+                    .hasMessage("physical member accounting profile is not installed");
+        }
+        root = Fixture.root();
+        memberLayout = Layout.withPhysicalMembers(root, resource(0).namespace());
+        try (var members = new QFixture(root, memberLayout)) {
+            Fixture.await(members.nativeFixture.client.put(
+                    memberLayout.nativeKey(
+                            M5GcQuotaRecordsV2.physicalMemberKey(resource(1).sha256())),
+                    memberValue(1).toByteArray()));
+            assertThatThrownBy(() -> members.initialize(1)).hasRootCauseMessage("durable GC quota is not initialized");
+            assertThat(Fixture.await(
+                            members.nativeFixture.client.get(memberLayout.nativeKey(M5GcQuotaRecordsV2.HEAD_KEY))))
+                    .isNull();
+        }
+    }
+
+    @Test
+    void memberHistoryStaysChargedAfterPermanentDoneAndNativeReopen() throws Exception {
+        String root = Fixture.root();
+        var layout = Layout.withPhysicalMembers(root, resource(0).namespace());
+        var member = memberValue(1);
+        String key = layout.nativeKey(
+                M5GcQuotaRecordsV2.physicalMemberKey(resource(1).sha256()));
+        long charged;
+        try (var q = new QFixture(root, layout)) {
+            q.initialize(1);
+            assertThat(q.reserve(1)).isEqualTo(Result.GRANTED);
+            assertThat(q.reserve(2)).isEqualTo(Result.EXHAUSTED);
+            Fixture.await(q.nativeFixture.client.put(key, member.toByteArray()));
+            q.intent(1);
+            var done = q.complete(1);
+            assertThat(q.settle(1)).isEqualTo(Result.SETTLED);
+            charged = Fixture.await(q.route.quota().snapshot()).chargedCanonicalBytes();
+            assertThat(charged)
+                    .isEqualTo(layout.headCharge()
+                            + layout.entryCharge()
+                            + layout.authorityKeyCharge()
+                            + done.encode().length()
+                            + layout.permanentMemberCharge())
+                    .isGreaterThanOrEqualTo(q.actualCanonicalBytes());
+        }
+        try (var q = new QFixture(root, layout)) {
+            assertThat(Fixture.await(q.route.quota().snapshot()).chargedCanonicalBytes())
+                    .isEqualTo(charged);
+            assertThat(CanonicalBytes.copyOf(
+                            Fixture.await(q.nativeFixture.client.get(key)).value()))
+                    .isEqualTo(member);
+            assertThat(q.reserve(1)).isEqualTo(Result.SETTLED);
+            assertThat(q.reserve(2)).isEqualTo(Result.EXHAUSTED);
+        }
+    }
+
+    static CanonicalBytes memberValue(int id) {
+        var digest = com.nereusstream.domain.bytes.Sha256Digest.hash(CanonicalBytes.copyOf(new byte[] {(byte) id}));
+        var binding = new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity(
+                new com.nereusstream.domain.identity.TopicBindingId(digest), digest, digest);
+        return new OxiaPhysicalMemberInventoryV2.Inventory(
+                        resource(id).sha256(),
+                        digest,
+                        java.util.List.of(new OxiaPhysicalMemberInventoryV2.Member(
+                                com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1
+                                        .PositionDomain.KAFKA_OFFSET,
+                                digest,
+                                binding)))
+                .encode();
+    }
+
     @Test
     void initializationRejectsLegacyOrForeignAccountingAndNeverSilentlyImports() throws Exception {
         try (var q = new QFixture(Fixture.root())) {
@@ -271,8 +528,12 @@ class M5GcQuotaOxiaIntegrationTest {
         final OxiaQuotaTargetDeleteStoreV2 route;
 
         QFixture(String root) throws Exception {
+            this(root, new Layout(root, resource(0).namespace()));
+        }
+
+        QFixture(String root, Layout layout) throws Exception {
             nativeFixture = new Fixture(root);
-            layout = new Layout(root, resource(0).namespace());
+            this.layout = layout;
             faults = new Faults(new AsyncOxiaConditionalClient(nativeFixture.client));
             route = new OxiaQuotaTargetDeleteStoreV2(nativeFixture.client, faults, layout, nativeFixture.route);
         }

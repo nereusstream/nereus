@@ -23,6 +23,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.storage.api.bookkeeper.AppendQuorumProofV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
+import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
 import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
@@ -315,19 +316,76 @@ public final class KafkaBookKeeperRunLifecycleV1 {
         }
         RunLedgerConfigurationV1 configuration =
                 RunLedgerConfigurationV1.from(session.capabilitySnapshot(), runBinding.runId());
-        return session.createRunLedger(configuration).thenCompose(createResult -> {
-            RunLedgerHandleV1 exactHandle = requireExactHandle(createResult, runBinding, configuration);
-            Nbke2RunHeaderV1 header =
-                    new Nbke2RunHeaderV1(runBinding, kafkaStartOffset, 1, configuration.configurationDigest());
-            byte[] headerBytes =
-                    Nbke2CodecV1.encode(exactHandle.ledgerIdentity().ledgerId(), 0, header);
-            KafkaRunRootSnapshotV1 candidate = activeRoot(runBinding, exactHandle, kafkaStartOffset, predecessor);
-            return appendExact(session, exactHandle, 0, headerBytes)
-                    .thenCompose(ignored -> rootMutation.apply(candidate))
-                    .thenApply(rootResult -> requireExactRoot(rootResult, candidate))
-                    .thenApply(exactRoot -> new KafkaBookKeeperRunLifecycleV1(
-                            session, rootAuthority, runBinding, exactHandle, exactRoot));
+        return session.reserveLedgerIdentity(configuration).thenCompose(reservation -> {
+            if (reservation == null || reservation.outcome() != ProviderMutationOutcomeV1.APPLIED_EXACT) {
+                throw new IllegalStateException("run ledger ID reservation was not established exactly");
+            }
+            BookKeeperLedgerIdentity allocated = reservation.exactProof().orElseThrow();
+            RunLedgerHandleV1 reservedHandle = new RunLedgerHandleV1(
+                    configuration.providerScopeId(),
+                    runBinding.runId(),
+                    allocated,
+                    configuration.configurationDigest());
+            KafkaRunRootSnapshotV1 proposed = activeRoot(runBinding, reservedHandle, kafkaStartOffset, predecessor);
+            return rootAuthority.reserveRunBirth(proposed).thenCompose(birthResult -> {
+                if (birthResult == null || birthResult.outcome() != ProviderMutationOutcomeV1.APPLIED_EXACT) {
+                    throw new IllegalStateException("run birth choice was not established exactly");
+                }
+                KafkaRunRootSnapshotV1 candidate = birthResult.exactProof().orElseThrow();
+                if (!sameRunPlacement(proposed, candidate)) {
+                    throw new IllegalStateException("run birth winner differs from the requested run placement");
+                }
+                return session.createReservedRunLedger(configuration, candidate.ledgerIdentity())
+                        .thenCompose(createResult -> finishCreate(
+                                session,
+                                rootAuthority,
+                                runBinding,
+                                kafkaStartOffset,
+                                rootMutation,
+                                configuration,
+                                candidate,
+                                createResult));
+            });
         });
+    }
+
+    private static CompletionStage<KafkaBookKeeperRunLifecycleV1> finishCreate(
+            BookKeeperCellSession session,
+            KafkaRunRootAuthority rootAuthority,
+            Nbke2RunBindingV1 runBinding,
+            long kafkaStartOffset,
+            Function<KafkaRunRootSnapshotV1, CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>>>
+                    rootMutation,
+            RunLedgerConfigurationV1 configuration,
+            KafkaRunRootSnapshotV1 candidate,
+            ProviderMutationResultV1<RunLedgerHandleV1> createResult) {
+        RunLedgerHandleV1 exactHandle = requireExactHandle(createResult, runBinding, configuration);
+        if (!exactHandle.ledgerIdentity().equals(candidate.ledgerIdentity())) {
+            throw new IllegalStateException("native create used another ledger than the durable run birth choice");
+        }
+        Nbke2RunHeaderV1 header =
+                new Nbke2RunHeaderV1(runBinding, kafkaStartOffset, 1, configuration.configurationDigest());
+        byte[] headerBytes = Nbke2CodecV1.encode(exactHandle.ledgerIdentity().ledgerId(), 0, header);
+        return appendExact(session, exactHandle, 0, headerBytes)
+                .thenCompose(ignored -> rootMutation.apply(candidate))
+                .thenApply(rootResult -> requireExactRoot(rootResult, candidate))
+                .thenApply(exactRoot ->
+                        new KafkaBookKeeperRunLifecycleV1(session, rootAuthority, runBinding, exactHandle, exactRoot));
+    }
+
+    private static boolean sameRunPlacement(KafkaRunRootSnapshotV1 proposed, KafkaRunRootSnapshotV1 winner) {
+        return proposed.bindingId().equals(winner.bindingId())
+                && proposed.topicIncarnation().equals(winner.topicIncarnation())
+                && proposed.partitionId() == winner.partitionId()
+                && proposed.storageEpochId().equals(winner.storageEpochId())
+                && proposed.creatorOwnerEpoch() == winner.creatorOwnerEpoch()
+                && proposed.kafkaLeaderEpoch() == winner.kafkaLeaderEpoch()
+                && proposed.providerScopeId().equals(winner.providerScopeId())
+                && proposed.runId().equals(winner.runId())
+                && proposed.kafkaStartOffset() == winner.kafkaStartOffset()
+                && proposed.predecessorRunId().equals(winner.predecessorRunId())
+                && winner.state() == KafkaRunRootStateV1.ACTIVE
+                && winner.kafkaEndOffsetExclusive().isEmpty();
     }
 
     private static CompletionStage<Void> appendExact(

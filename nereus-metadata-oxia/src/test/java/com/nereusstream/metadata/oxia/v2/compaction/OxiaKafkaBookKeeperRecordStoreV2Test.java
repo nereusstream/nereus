@@ -31,6 +31,31 @@ class OxiaKafkaBookKeeperRecordStoreV2Test {
     private static final String TASK = PREFIX + Sha256Digest.hash(VALUE).toHex() + "/task";
 
     @Test
+    void nativeFactRequiresTheExactPhysicalVersionAndRoute() {
+        var client = new DeterministicOxiaConditionalClient();
+        var store = new OxiaKafkaBookKeeperRecordStoreV2(client, "/cell/a");
+        store.putIfAbsent(TASK, VALUE);
+        var captured = store.getVersioned(TASK).toCompletableFuture().join().orElseThrow();
+        var nativeFact = store.nativeFact(captured).toCompletableFuture().join();
+        assertThat(new com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1(client)
+                        .read(nativeFact.key())
+                        .toCompletableFuture()
+                        .join())
+                .contains(nativeFact);
+        assertThat(nativeFact.key()).isEqualTo(store.nativeKey(TASK));
+        assertThat(nativeFact.metadataVersion()).isNotEqualTo(captured.metadataVersion());
+        var other = new OxiaKafkaBookKeeperRecordStoreV2(client, "/cell/b");
+        client.seed(other.nativeKey(TASK), VALUE, 0);
+        assertThatThrownBy(
+                        () -> other.nativeFact(captured).toCompletableFuture().join())
+                .hasRootCauseMessage("native BK record differs from its exact logical observation");
+        client.seed(store.nativeKey(TASK), VALUE, 1);
+        assertThatThrownBy(
+                        () -> store.nativeFact(captured).toCompletableFuture().join())
+                .hasRootCauseMessage("native BK record differs from its exact logical observation");
+    }
+
+    @Test
     void exactNativeKeyMaximumAndClosedFamiliesRejectBeforeIo() {
         var client = new DeterministicOxiaConditionalClient();
         String descriptor = PREFIX + "views/" + "1".repeat(64) + "/descriptor";
@@ -62,6 +87,10 @@ class OxiaKafkaBookKeeperRecordStoreV2Test {
         var store = new OxiaKafkaBookKeeperRecordStoreV2(client, "/cell/a");
         assertThat(store.putIfAbsent(TASK, VALUE)).isEqualTo(ControlMutationOutcome.APPLIED);
         assertThat(store.get(TASK)).contains(VALUE);
+        var observed = store.getVersioned(TASK).toCompletableFuture().join().orElseThrow();
+        assertThat(observed.key()).isEqualTo(TASK);
+        assertThat(observed.canonicalStoredBytes()).isEqualTo(VALUE);
+        assertThat(store.getVersioned(TASK).toCompletableFuture().join()).contains(observed);
         for (String key : List.of(
                 PREFIX + "1".repeat(64) + "/task",
                 PREFIX + "views/" + "1".repeat(64) + "/descriptor",
@@ -110,5 +139,17 @@ class OxiaKafkaBookKeeperRecordStoreV2Test {
         assertThat(second.get(TASK)).isEmpty();
         assertThatThrownBy(() -> second.get(first.nativeKey(TASK))).hasMessageContaining("closed");
         assertThat(first.get(TASK)).contains(VALUE);
+        client.seed(
+                second.nativeKey(TASK),
+                VALUE,
+                client.read(first.nativeKey(TASK))
+                        .toCompletableFuture()
+                        .join()
+                        .orElseThrow()
+                        .versionId());
+        var firstFact = first.getVersioned(TASK).toCompletableFuture().join().orElseThrow();
+        var secondFact = second.getVersioned(TASK).toCompletableFuture().join().orElseThrow();
+        assertThat(firstFact.canonicalStoredBytes()).isEqualTo(secondFact.canonicalStoredBytes());
+        assertThat(firstFact.metadataVersion()).isNotEqualTo(secondFact.metadataVersion());
     }
 }

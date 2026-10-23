@@ -27,6 +27,7 @@ import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerAppendRequestV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -103,13 +104,30 @@ class M5BookKeeperNativeCreateV2RealTest {
                             .outcome())
                     .isEqualTo(ProviderMutationOutcomeV1.APPLIED_EXACT);
             assertThat(payload.release()).isTrue();
+            var nativeHeader =
+                    client.readNativeRunHeader(handle).toCompletableFuture().get(10, TimeUnit.SECONDS);
+            assertThat(nativeHeader.handle()).isEqualTo(handle);
+            assertThat(nativeHeader.entryId()).isZero();
+            assertThat(nativeHeader.payload().toByteArray()).containsExactly((byte) 1, (byte) 2, (byte) 3);
             assertThat(session.closeRunLedger(handle)
                             .toCompletableFuture()
                             .get(10, TimeUnit.SECONDS)
                             .outcome())
                     .isEqualTo(ProviderMutationOutcomeV1.APPLIED_EXACT);
+            var openScope = client.driver()
+                    .guard()
+                    .readSealedExistingScope(spec, handle, CAPABILITY)
+                    .get(10, TimeUnit.SECONDS);
+            assertThat(openScope.taskFence().nativeVersion()).isZero();
+            assertThat(openScope.reservation().nativeVersion()).isZero();
             client.fenceCreates().get(10, TimeUnit.SECONDS);
             client.fenceCreates().get(10, TimeUnit.SECONDS);
+            var fencedScope = client.driver()
+                    .guard()
+                    .readSealedExistingScope(spec, handle, CAPABILITY)
+                    .get(10, TimeUnit.SECONDS);
+            assertThat(fencedScope.taskFence().nativeVersion()).isEqualTo(1);
+            assertThat(fencedScope.reservation()).isEqualTo(openScope.reservation());
             var reader = client.newSession();
             assertThat(reader.openRunLedger(handle)
                             .toCompletableFuture()
@@ -196,6 +214,36 @@ class M5BookKeeperNativeCreateV2RealTest {
                     .hasRootCauseInstanceOf(
                             org.apache.bookkeeper.client.BKException.BKNoSuchLedgerExistsOnMetadataServerException
                                     .class);
+            session.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void freshClientFencesExactLaterRunAfterIntermediateScopeWithoutRecreatingOldTask() throws Exception {
+        var initial = spec();
+        var skipped = spec().configurations().get(0);
+        var target = spec().configurations().get(0);
+        var expected = M5BookKeeperNativeCreateSpecV2.laterRun(initial, target);
+        try (var old = connect(initial)) {
+            old.admitCreateConfiguration(skipped);
+            assertThat(old.admitCreateConfiguration(target)).isEqualTo(expected);
+            var session = old.newSession();
+            var id = session.reserveLedgerIdentity()
+                    .toCompletableFuture()
+                    .get(10, TimeUnit.SECONDS)
+                    .exactProof()
+                    .orElseThrow();
+            var handle =
+                    new RunLedgerHandleV1(target.providerScopeId(), target.runId(), id, target.configurationDigest());
+            try (var fresh = connect(spec())) {
+                fresh.fenceExistingScope(expected, handle).toCompletableFuture().get(10, TimeUnit.SECONDS);
+                fresh.fenceExistingScope(expected, handle).toCompletableFuture().get(10, TimeUnit.SECONDS);
+                assertThat(session.createReservedRunLedger(target, id)
+                                .toCompletableFuture()
+                                .get(10, TimeUnit.SECONDS)
+                                .exactProof())
+                        .isEmpty();
+            }
             session.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
         }
     }
@@ -298,6 +346,10 @@ class M5BookKeeperNativeCreateV2RealTest {
     @Test
     void lostAppliedNativeReservationCreateAndFenceResponsesReconcileExactDurableState() throws Exception {
         try (var fault = new NativeFaults(spec())) {
+            var open =
+                    fault.guard.readTaskCreateScopeFact(fault.spec, CAPABILITY).get(10, TimeUnit.SECONDS);
+            assertThat(open.nativeVersion()).isZero();
+            assertThat(open.rawStoredBytes().toByteArray()[0]).isZero();
             long id = fault.allocate();
             fault.zk.loseNextMulti = true;
             fault.guard.reserve(id).get(10, TimeUnit.SECONDS);
@@ -312,6 +364,33 @@ class M5BookKeeperNativeCreateV2RealTest {
                     .isEqualTo(created.getValue().getCToken());
             fault.zk.loseNextSet = true;
             fault.guard.fenceCreates().get(10, TimeUnit.SECONDS);
+            var fenced =
+                    fault.guard.readTaskCreateScopeFact(fault.spec, CAPABILITY).get(10, TimeUnit.SECONDS);
+            assertThat(fenced.nativeVersion()).isEqualTo(1);
+            assertThat(fenced.rawStoredBytes().toByteArray()[0]).isEqualTo((byte) 1);
+            assertThat(fenced.nativePath()).isEqualTo(open.nativePath());
+            assertThat(fenced.rawStoredBytes().toByteArray())
+                    .containsExactly(
+                            java.nio.ByteBuffer.allocate(fault.spec.encode().length() + 1)
+                                    .put((byte) 1)
+                                    .put(fault.spec.encode().toByteArray())
+                                    .array());
+            var missing = spec();
+            assertThatThrownBy(() -> fault.guard
+                            .readTaskCreateScopeFact(missing, CAPABILITY)
+                            .get(10, TimeUnit.SECONDS))
+                    .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.NoNodeException.class);
+            String hash = missing.taskId().toHex();
+            assertThat(fault.zk.exists(
+                            java.net.URI.create(uri).getPath() + "/nereus-m5-native-v2/tasks/" + hash.substring(0, 2)
+                                    + "/" + hash,
+                            false))
+                    .isNull();
+            fault.zk.failNextGetData = true;
+            assertThatThrownBy(() -> fault.guard
+                            .readTaskCreateScopeFact(fault.spec, CAPABILITY)
+                            .get(10, TimeUnit.SECONDS))
+                    .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.ConnectionLossException.class);
             assertThat(fault.zk.lost.get()).isEqualTo(3);
             assertThat(fault.zk.multis.get()).isEqualTo(2);
             fault.client.newDeleteLedgerOp().withLedgerId(id).execute().get(30, TimeUnit.SECONDS);
@@ -374,7 +453,8 @@ class M5BookKeeperNativeCreateV2RealTest {
                     zk, java.net.URI.create(uri).getPath(), spec, acls, binding);
             var delegate = (org.apache.bookkeeper.meta.AbstractZkLedgerManager)
                     client.getLedgerManagerFactory().newLedgerManager();
-            manager = new M5BookKeeperNativeLedgerManagerV2(delegate, guard, spec, zk, acls);
+            manager = new M5BookKeeperNativeLedgerManagerV2(
+                    delegate, () -> new M5BookKeeperNativeMetadataDriverV2.CreateScope(spec, guard), zk, acls);
         }
 
         long allocate() throws Exception {

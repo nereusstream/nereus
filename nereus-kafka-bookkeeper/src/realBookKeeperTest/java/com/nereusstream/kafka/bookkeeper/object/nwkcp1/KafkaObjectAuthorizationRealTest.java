@@ -1069,6 +1069,8 @@ class KafkaObjectAuthorizationRealTest {
 
     static final class Fixture implements AutoCloseable {
         final AsyncOxiaClient oxia;
+        final boolean closeOxia;
+        final String authorityRoot;
         final FaultMetadata metadata;
         final FaultProvider provider;
         final KafkaObjectAuthorizationV1 authority;
@@ -1078,6 +1080,7 @@ class KafkaObjectAuthorizationRealTest {
         final List<WalCheckpointPublisher> publishers = new ArrayList<>();
         WalRunRootRecord root;
         WalRunObjectSession session;
+        C1ObjectProviderSession admittedProvider;
         Nwg1VerificationContextV1 verification;
         KafkaNwg1ObjectPipelineV1 pipeline;
         volatile Runnable beforeNativeValidation;
@@ -1125,30 +1128,60 @@ class KafkaObjectAuthorizationRealTest {
                 long epoch,
                 boolean createRunKey)
                 throws Exception {
-            String attempt = "t4" + UUID.randomUUID().toString().replace("-", "");
-            oxia = OxiaClientBuilder.create(System.getProperty("nereus.nsip1.object.oxia"))
-                    .namespace("default")
-                    .requestTimeout(Duration.ofSeconds(10))
-                    .asyncClient()
-                    .get();
-            metadata = new FaultMetadata(new OxiaCanonicalControlMetadataStore(oxia, "/nsip1/" + attempt, 7));
-            var client = S3Client.builder()
-                    .endpointOverride(URI.create(System.getProperty("nereus.nsip1.object.endpoint")))
-                    .credentialsProvider(StaticCredentialsProvider.create(
-                            AwsBasicCredentials.create("nereus-m3-evidence", "nereus-m3-evidence-secret")))
-                    .region(Region.US_EAST_1)
-                    .forcePathStyle(true)
-                    .overrideConfiguration(c -> c.addExecutionInterceptor(http))
-                    .build();
-            client.createBucket(b -> b.bucket(attempt));
+            this(maxDebt, versioned, policy, recoveryConcurrency, sharedKms, epoch, createRunKey, null, null);
+        }
+
+        record SharedServices(S3Client objects, AsyncOxiaClient metadata, String bucket, String authorityRoot) {}
+
+        Fixture(int maxDebt, WalRunRootRecord template, KmsCellSession kms, SharedServices services) throws Exception {
+            this(maxDebt, false, null, 4, kms, template.shardRunEpoch(), true, template, services);
+        }
+
+        private Fixture(
+                int maxDebt,
+                boolean versioned,
+                WalCheckpointPolicy policy,
+                int recoveryConcurrency,
+                KmsCellSession sharedKms,
+                long epoch,
+                boolean createRunKey,
+                WalRunRootRecord template,
+                SharedServices services)
+                throws Exception {
+            var old = template == null ? StorageObjectNwkcp1BackendV1Test.root() : template;
+            String attempt =
+                    services == null ? "t4" + UUID.randomUUID().toString().replace("-", "") : services.bucket();
+            String rootNamespace = services == null ? attempt : attempt + "/shards/" + old.shardId() + "/runs/" + epoch;
+            closeOxia = services == null;
+            oxia = services != null
+                    ? services.metadata()
+                    : OxiaClientBuilder.create(System.getProperty("nereus.nsip1.object.oxia"))
+                            .namespace("default")
+                            .requestTimeout(Duration.ofSeconds(10))
+                            .asyncClient()
+                            .get();
+            authorityRoot = services == null ? "/nsip1/" + attempt : services.authorityRoot();
+            metadata = new FaultMetadata(new OxiaCanonicalControlMetadataStore(oxia, authorityRoot, old.shardId()));
+            var client = services != null
+                    ? services.objects()
+                    : S3Client.builder()
+                            .endpointOverride(URI.create(System.getProperty("nereus.nsip1.object.endpoint")))
+                            .credentialsProvider(StaticCredentialsProvider.create(
+                                    AwsBasicCredentials.create("nereus-m3-evidence", "nereus-m3-evidence-secret")))
+                            .region(Region.US_EAST_1)
+                            .forcePathStyle(true)
+                            .overrideConfiguration(c -> c.addExecutionInterceptor(http))
+                            .build();
+            if (services == null) {
+                client.createBucket(b -> b.bucket(attempt));
+            }
             if (versioned) {
                 client.putBucketVersioning(b -> b.bucket(attempt)
                         .versioningConfiguration(v ->
                                 v.status(software.amazon.awssdk.services.s3.model.BucketVersioningStatus.ENABLED)));
             }
-            provider = new FaultProvider(
-                    new S3C1ObjectProviderTransport(client, attempt, "minio/RELEASE.2025-09-07T16-13-09Z", true, 100));
-            var old = StorageObjectNwkcp1BackendV1Test.root();
+            provider = new FaultProvider(new S3C1ObjectProviderTransport(
+                    client, attempt, "minio/RELEASE.2025-09-07T16-13-09Z", services == null, 100));
             try (var newRunKey =
                     createRunKey ? sharedKms.beginNewRunKey(new RunKeyCacheIdentity(old.shardId(), epoch)) : null) {
                 root = new WalRunRootRecord(
@@ -1166,7 +1199,7 @@ class KafkaObjectAuthorizationRealTest {
                                 ObjectProviderAccessProfile.C1_SINGLE_PUT_SINGLE_RANGE_STRONG_LIST,
                                 S3C1ObjectProviderTransport.ADAPTER_VERSION,
                                 "canonical-key-v1",
-                                attempt,
+                                rootNamespace,
                                 ProviderProofMode.NONE,
                                 0,
                                 1024 * 1024,
@@ -1183,16 +1216,17 @@ class KafkaObjectAuthorizationRealTest {
                         newRunKey == null ? old.wrappedRunKey() : newRunKey.wrappedRunKey(),
                         Optional.empty());
                 var lifecycle = new WalRunLifecycleManager(metadata);
-                var rootKey = WalRunControlKeys.rootKey(7, epoch);
+                var rootKey = WalRunControlKeys.rootKey(old.shardId(), epoch);
                 var created = newRunKey == null
                         ? lifecycle.createRootAndInitializePointer(rootKey, root)
                         : lifecycle.createRootAndInitializePointer(rootKey, root, newRunKey);
                 var rawProvider = new C1ObjectProviderSession(
                         provider,
                         root.providerScopeId(),
-                        attempt,
+                        rootNamespace,
                         1024 * 1024,
                         root.nwg1AdmissionCaps().maxDirectoryPrefixBytes());
+                admittedProvider = rawProvider;
                 session = newRunKey == null
                         ? WalRunObjectSession.openNew(
                                 created.ownerAuthority().orElseThrow(),
@@ -1241,12 +1275,12 @@ class KafkaObjectAuthorizationRealTest {
             sources.put(session.rootSha256(), session);
             roots.put(session.rootSha256(), root);
             authority = new KafkaObjectAuthorizationV1(
-                    metadata, 7, new KafkaObjectAuthorizationV1.Bounds(128, maxDebt, 1024 * 1024, 1024));
+                    metadata, root.shardId(), new KafkaObjectAuthorizationV1.Bounds(128, maxDebt, 1024 * 1024, 1024));
             var physical = new KafkaObjectPhysicalFrontiersV1(session.rootSha256());
             var publisher = new WalCheckpointPublisher(
                     metadata,
-                    WalRunControlKeys.checkpointHeadKey(7, epoch),
-                    WalRunControlKeys.checkpointPagePrefix(7, epoch),
+                    WalRunControlKeys.checkpointHeadKey(root.shardId(), epoch),
+                    WalRunControlKeys.checkpointPagePrefix(root.shardId(), epoch),
                     root,
                     WalCheckpointHeadV1.empty(session.rootSha256(), epoch, 1),
                     session);
@@ -1312,8 +1346,8 @@ class KafkaObjectAuthorizationRealTest {
         KafkaObjectAuthorizedRecoveryV1.Result recover(KafkaObjectAuthorizationV1.ClosedHistory closed)
                 throws IOException {
             // A fresh authority has no local pending candidates or protocol state. Shared physical service stays alive.
-            var fresh =
-                    new KafkaObjectAuthorizationV1(metadata, 7, closed.head().bounds());
+            var fresh = new KafkaObjectAuthorizationV1(
+                    metadata, root.shardId(), closed.head().bounds());
             return KafkaObjectAuthorizedRecoveryV1.recover(
                     fresh,
                     fresh.readClosed(closed.head().fence()),
@@ -1389,26 +1423,46 @@ class KafkaObjectAuthorizationRealTest {
                     List.of(),
                     List.of());
             var pool = new com.nereusstream.storage.object.read.BindingReadHazardPoolV1(8, 4);
-            var protection = new KafkaObjectSourceProtectionTrackerV1(
-                    KafkaObjectAuthorizationV1.binding(partition.fence), session.rootSha256());
+            var protections = new java.util.HashMap<Sha256Digest, KafkaObjectSourceProtectionTrackerV1>();
+            for (var locator : snapshot.activeTail().locators()) {
+                protections.computeIfAbsent(locator.extent().walRunRootSha(), sha -> {
+                    var protection = new KafkaObjectSourceProtectionTrackerV1(
+                            KafkaObjectAuthorizationV1.binding(partition.fence), sha);
+                    protection.registerM4RetirementGuard(() -> pool.scanBinding(partition.fence.bindingId())
+                            == com.nereusstream.storage.object.read.BindingReadHazardPoolV1.ScanOutcome.CLEAN);
+                    return protection;
+                });
+            }
             var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
             try {
                 var reader = new com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1(
                         snapshot,
                         selector,
-                        protection,
+                        locator -> java.util.Objects.requireNonNull(
+                                        protections.get(locator.extent().walRunRootSha()),
+                                        "selected read Root is absent")
+                                .pin(locator),
                         (locator, start, stop) -> {
                             try {
                                 var grant = authority.read(partition.fence).orElseThrow().grants().stream()
                                         .filter(g -> g.locator().equals(locator))
                                         .findFirst()
                                         .orElseThrow();
+                                var source = sources.get(locator.extent().walRunRootSha());
+                                var sourceRoot = roots.get(locator.extent().walRunRootSha());
                                 var output = new java.io.ByteArrayOutputStream();
                                 var context = new Nwg1VerificationContextV1(
-                                        root.protocolCellIdentity(),
-                                        root.providerScopeId().digest().bytes().toByteArray(),
-                                        session.rootSha256().bytes().toByteArray(),
-                                        verification.envelope(),
+                                        sourceRoot.protocolCellIdentity(),
+                                        sourceRoot
+                                                .providerScopeId()
+                                                .digest()
+                                                .bytes()
+                                                .toByteArray(),
+                                        source.rootSha256().bytes().toByteArray(),
+                                        Nwg1EnvelopeV1.decode(sourceRoot
+                                                .wrappedRunKey()
+                                                .framedBytes()
+                                                .toByteArray()),
                                         (binding, kind, version) -> Sha256Digest.hash(
                                                         CanonicalBytes.copyOf(grant.fence()
                                                                 .toString()
@@ -1418,7 +1472,7 @@ class KafkaObjectAuthorizationRealTest {
                                         verification.nativePayloadVerifier(),
                                         0,
                                         0);
-                                session.readRoutineNwg1AppendUnit(
+                                source.readRoutineNwg1AppendUnit(
                                         grant.object(), context, locator.firstDirectoryRow(), (frame, payload) -> {
                                             byte[] raw = new byte[payload.remaining()];
                                             payload.get(raw);
@@ -1473,7 +1527,8 @@ class KafkaObjectAuthorizationRealTest {
                     old.maxWallTimeNanos());
         }
 
-        void rollover(Partition partition) throws IOException {
+        com.nereusstream.storage.object.control.WalRunTerminalClosureProofV1 rollover(Partition partition)
+                throws IOException {
             var snapshot = partition.snapshot();
             long end = snapshot.root().frontiers().durableEndOffset();
             var common = new com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1(
@@ -1498,8 +1553,36 @@ class KafkaObjectAuthorizationRealTest {
             var predecessorSession = session;
             lifecycle = new WalRunLifecycleManager(
                     metadata, store, predecessor -> predecessorSession.terminalLineageProtocolObjectReader());
+            openSuccessor(partition, proof, binding, lifecycle, root.shardRunEpoch() + 1);
+            return proof;
+        }
+
+        void rolloverRetired(
+                Partition partition,
+                com.nereusstream.storage.object.control.WalRunTerminalClosureProofV1 proof,
+                com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectRunRecoveryRetirementV1.Retirement
+                        retired,
+                long nextEpoch)
+                throws IOException {
+            assertThat(retired.retiredRoot()).isEqualTo(proof.root());
+            var lifecycle = new WalRunLifecycleManager(
+                    metadata,
+                    com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1.failClosed(),
+                    com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1
+                            .ProtocolObjectRecoveryReaderFactoryV1.failClosed(),
+                    new com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectRunRecoveryRetirementV1(
+                            authority));
+            openSuccessor(partition, proof, retired.terminalBinding(), lifecycle, nextEpoch);
+        }
+
+        private void openSuccessor(
+                Partition partition,
+                com.nereusstream.storage.object.control.WalRunTerminalClosureProofV1 proof,
+                com.nereusstream.storage.object.control.TerminalProtocolCheckpointBindingV1 binding,
+                WalRunLifecycleManager lifecycle,
+                long epoch)
+                throws IOException {
             var old = root;
-            long epoch = old.shardRunEpoch() + 1;
             root = new WalRunRootRecord(
                     old.shardId(),
                     epoch,
@@ -1532,11 +1615,11 @@ class KafkaObjectAuthorizationRealTest {
             var seal = com.nereusstream.storage.object.control.WalRunControlCodec.decodeSeal(
                     metadata.get(proof.sealKey()).orElseThrow());
             var created = lifecycle.publishSuccessorAndAdvanceWithOwnerAuthority(
-                    WalRunControlKeys.pointerKey(7),
+                    WalRunControlKeys.pointerKey(root.shardId()),
                     new com.nereusstream.storage.object.control.CurrentWalRunPointer(proof.root()),
                     proof.sealKey(),
                     seal,
-                    WalRunControlKeys.rootKey(7, epoch),
+                    WalRunControlKeys.rootKey(root.shardId(), epoch),
                     root);
             session = WalRunObjectSession.openNew(
                     created.ownerAuthority().orElseThrow(),
@@ -1566,8 +1649,8 @@ class KafkaObjectAuthorizationRealTest {
                     0);
             var publisher = new WalCheckpointPublisher(
                     metadata,
-                    WalRunControlKeys.checkpointHeadKey(7, epoch),
-                    WalRunControlKeys.checkpointPagePrefix(7, epoch),
+                    WalRunControlKeys.checkpointHeadKey(root.shardId(), epoch),
+                    WalRunControlKeys.checkpointPagePrefix(root.shardId(), epoch),
                     root,
                     WalCheckpointHeadV1.empty(session.rootSha256(), epoch, 1),
                     session);
@@ -1674,7 +1757,7 @@ class KafkaObjectAuthorizationRealTest {
             }
             return new GroupEncodingPlanV1(
                     1,
-                    7,
+                    root.shardId(),
                     root.shardRunEpoch(),
                     lane,
                     root.formatContract().packingPolicyCatalogVersion(),
@@ -1700,7 +1783,9 @@ class KafkaObjectAuthorizationRealTest {
                 source.close();
             }
             provider.delegate.close();
-            oxia.close();
+            if (closeOxia) {
+                oxia.close();
+            }
         }
     }
 
@@ -1715,6 +1800,10 @@ class KafkaObjectAuthorizationRealTest {
         volatile Runnable afterPhysicalHead;
         volatile Runnable beforeSeal;
         volatile Runnable afterSeal;
+        Runnable afterRetirement;
+        Runnable afterProtocolHead;
+        final List<CanonicalBytes> protocolHeadCandidates = new ArrayList<>();
+        final List<CanonicalBytes> retirementCandidates = new ArrayList<>();
         volatile String failPhysicalReadKey;
         final List<PhysicalPage> physicalPages = java.util.Collections.synchronizedList(new ArrayList<>());
         final List<PhysicalHead> physicalHeads = java.util.Collections.synchronizedList(new ArrayList<>());
@@ -1759,6 +1848,15 @@ class KafkaObjectAuthorizationRealTest {
                 }
             }
             var result = delegate.putIfAbsent(key, value);
+            if (key.endsWith("/root/recovery-retirement-v1")) {
+                retirementCandidates.add(value);
+                var hook = afterRetirement;
+                afterRetirement = null;
+                if (hook != null) {
+                    hook.run();
+                    return ControlMutationOutcome.RESPONSE_UNKNOWN;
+                }
+            }
             if (key.endsWith("/seal")) {
                 var hook = afterSeal;
                 afterSeal = null;
@@ -1789,6 +1887,17 @@ class KafkaObjectAuthorizationRealTest {
                 }
                 return result;
             }
+            if (key.endsWith("/protocol/kafka/nwkcp1-v1/head")) {
+                protocolHeadCandidates.add(value);
+                var result = delegate.compareAndSet(key, expected, value);
+                var hook = afterProtocolHead;
+                afterProtocolHead = null;
+                if (hook != null) {
+                    hook.run();
+                    return ControlMutationOutcome.RESPONSE_UNKNOWN;
+                }
+                return result;
+            }
             if (key.contains("/authorize/") && expected.isPresent()) {
                 if (beforeGrant != null && (beforeKey == null || beforeKey.equals(key))) {
                     var hook = beforeGrant;
@@ -1811,6 +1920,8 @@ class KafkaObjectAuthorizationRealTest {
     static final class FaultProvider implements ObjectProviderTransport {
         final S3C1ObjectProviderTransport delegate;
         volatile Runnable beforeNwgPut;
+        volatile java.util.function.Consumer<ObjectIdentity> afterNwgPut;
+        volatile String losePutKey;
         volatile Runnable beforeFullGet;
         boolean losePut;
         boolean loseListResponse;
@@ -1825,6 +1936,7 @@ class KafkaObjectAuthorizationRealTest {
         int lists;
         int ranges;
         int fullGets;
+        java.util.function.Consumer<String> beforeRead;
 
         FaultProvider(S3C1ObjectProviderTransport delegate) {
             this.delegate = delegate;
@@ -1870,9 +1982,15 @@ class KafkaObjectAuthorizationRealTest {
             var result = delegate.putIfAbsentWithEvidence(identity, counting(body, nwg, true));
             if (nwg) {
                 lastResponse = result;
+                var hook = afterNwgPut;
+                afterNwgPut = null;
+                if (hook != null) {
+                    hook.accept(identity);
+                }
             }
-            if (losePut) {
+            if (losePut || identity.key().equals(losePutKey)) {
                 losePut = false;
+                losePutKey = null;
                 return ConditionalCreateResponse.outcome(ConditionalCreateResult.RESPONSE_UNKNOWN);
             }
             if (dropCreationEvidence && result.outcome() == ConditionalCreateResult.CREATED) {
@@ -1883,6 +2001,9 @@ class KafkaObjectAuthorizationRealTest {
 
         @Override
         public StreamingObject get(String key, Optional<CanonicalBytes> version) throws IOException {
+            if (beforeRead != null) {
+                beforeRead.accept(key);
+            }
             if (key.endsWith(".nwg")) {
                 fullGets++;
             }
@@ -1903,8 +2024,17 @@ class KafkaObjectAuthorizationRealTest {
         @Override
         public StreamingObject getRange(String key, long start, long end, Optional<CanonicalBytes> version)
                 throws IOException {
+            if (beforeRead != null) {
+                beforeRead.accept(key);
+            }
             ranges++;
-            return delegate.getRange(key, start, end, version);
+            var result = delegate.getRange(key, start, end, version);
+            return new StreamingObject(
+                    result.bodyLength(),
+                    result.inclusiveStart(),
+                    result.exclusiveEnd(),
+                    result.immutableVersionToken(),
+                    counting(result.body(), key.endsWith(".nwg"), false));
         }
 
         @Override

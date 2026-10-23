@@ -31,7 +31,9 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Proof
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterTicketV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.retention.M5RetentionCodecV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.FloorClassV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceFreeProofV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceKindV1;
@@ -43,6 +45,145 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class M5DeleteEligibilityV2Test {
+    @Test
+    void legacyV2WireBytesRemainExact() {
+        var legacy = List.of(
+                replacement(),
+                M5DeleteEligibilityTestFixtures.snapshot(
+                        resource(), ReclamationReason.REPLACED_REPRESENTATION, 1, 0, PositionDomain.PULSAR_ENTRY),
+                typedExpiry(new M5PulsarCoverageV2.Position(7, 4)));
+        // Captured with the original v2 encoder before adding typed semantic coverage.
+        var lengths = List.of(6876, 6250, 6784);
+        var digests = List.of(
+                "09219bf360eaf38a107f705e904a38f671e4134cae50d16188fca1d41f514734",
+                "b98084febf9d337cd5209f1e628f6e785a5f77dedb24177df8f0cdb25f9eb399",
+                "c97d490db7563ccbef7539a6b1242bccee129a2f1e97e638f0b51e079b423ceb");
+        for (int index = 0; index < legacy.size(); index++) {
+            var encoded = DeleteEligibilityCodecV2.encode(legacy.get(index));
+            assertThat(ByteBuffer.wrap(encoded.toByteArray()).getInt(4)).isEqualTo(2);
+            assertThat(encoded.length()).isEqualTo(lengths.get(index));
+            assertThat(com.nereusstream.domain.bytes.Sha256Digest.hash(encoded).toHex())
+                    .isEqualTo(digests.get(index));
+            assertThat(DeleteEligibilityCodecV2.decode(encoded)).isEqualTo(legacy.get(index));
+            assertThat(DeleteEligibilityCodecV2.encode(DeleteEligibilityCodecV2.decode(encoded)))
+                    .isEqualTo(encoded);
+        }
+    }
+
+    @Test
+    void typedPulsarReplacementRoundTripsWithStableDigest() {
+        var snapshot = typedReplacement();
+        var encoded = DeleteEligibilityCodecV2.encode(snapshot);
+        assertThat(ByteBuffer.wrap(encoded.toByteArray()).getInt(4)).isEqualTo(3);
+        var decoded = DeleteEligibilityCodecV2.decode(encoded);
+        assertThat(decoded).isEqualTo(snapshot);
+        assertThat(DeleteEligibilityCodecV2.encode(decoded)).isEqualTo(encoded);
+        assertThat(decoded.sha256()).isEqualTo(snapshot.sha256());
+    }
+
+    @Test
+    void typedTransferWireRejectsMalformedAndNoncanonicalForms() {
+        var snapshot = typedReplacement();
+        var encoded = DeleteEligibilityCodecV2.encode(snapshot).toByteArray();
+        var coverage = snapshot.members()
+                .get(0)
+                .physicalReferences()
+                .coverage()
+                .pulsarCoverage()
+                .orElseThrow()
+                .encode()
+                .toByteArray();
+        int typedOffset = lastIndexOf(encoded, coverage);
+        assertThat(typedOffset).isGreaterThan(5);
+        var wrongDomain = encoded.clone();
+        wrongDomain[typedOffset - 5] = (byte) PositionDomain.KAFKA_OFFSET.ordinal();
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(CanonicalBytes.copyOf(wrongDomain)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("typed semantic coverage");
+        var oversized = encoded.clone();
+        ByteBuffer.wrap(oversized).putInt(typedOffset - 4, M5PulsarCoverageV2.MAX_BYTES + 1);
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(CanonicalBytes.copyOf(oversized)))
+                .isInstanceOf(IllegalArgumentException.class);
+        var wrongVersion = encoded.clone();
+        ByteBuffer.wrap(wrongVersion).putInt(4, 4);
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(CanonicalBytes.copyOf(wrongVersion)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(
+                        CanonicalBytes.copyOf(Arrays.copyOf(encoded, encoded.length - 1))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(
+                        CanonicalBytes.copyOf(Arrays.copyOf(encoded, encoded.length + 1))))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        // A structurally valid v3 carrying only legacy scalar transfers has no canonical v3 identity.
+        var legacy = replacement();
+        byte[] noncanonical = DeleteEligibilityCodecV2.encode(legacy).toByteArray();
+        for (var transfer : legacy.members().get(0).replacement().orElseThrow().transfers()) {
+            var marker = ByteBuffer.allocate(82)
+                    .put((byte) transfer.aspect().ordinal())
+                    .put((byte) transfer.coverage().domain().ordinal())
+                    .putLong(transfer.coverage().inclusiveStart())
+                    .putLong(transfer.coverage().exclusiveEnd())
+                    .put(transfer.priorSemanticRoot().bytes().toByteArray())
+                    .put(transfer.replacementSemanticRoot().bytes().toByteArray())
+                    .array();
+            int offset = lastIndexOf(noncanonical, marker) + 1;
+            assertThat(offset).isGreaterThan(0);
+            var withMarker = Arrays.copyOf(noncanonical, noncanonical.length + 1);
+            System.arraycopy(noncanonical, offset, withMarker, offset + 1, noncanonical.length - offset);
+            withMarker[offset] = 0;
+            noncanonical = withMarker;
+        }
+        ByteBuffer.wrap(noncanonical).putInt(4, 3);
+        var scalarV3 = CanonicalBytes.copyOf(noncanonical);
+        assertThatThrownBy(() -> DeleteEligibilityCodecV2.decode(scalarV3))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("noncanonical");
+    }
+
+    private static int lastIndexOf(byte[] encoded, byte[] needle) {
+        for (int index = encoded.length - needle.length; index >= 0; index--) {
+            if (Arrays.mismatch(encoded, index, index + needle.length, needle, 0, needle.length) == -1) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static DeleteEligibilitySnapshotV2 typedReplacement() {
+        var expired = typedExpiry(new M5PulsarCoverageV2.Position(7, 4));
+        var member = expired.members().get(0);
+        var basis = M5DeleteEligibilityTestFixtures.snapshot(
+                        resource(), ReclamationReason.REPLACED_REPRESENTATION, 1, 0, PositionDomain.PULSAR_ENTRY)
+                .members()
+                .get(0)
+                .replacement()
+                .orElseThrow();
+        var transfers = basis.transfers().stream()
+                .map(transfer -> new SemanticTransfer(
+                        transfer.aspect(),
+                        member.physicalReferences().coverage(),
+                        transfer.priorSemanticRoot(),
+                        transfer.replacementSemanticRoot(),
+                        transfer.verifierAuthority()))
+                .toList();
+        return new DeleteEligibilitySnapshotV2(
+                expired.resource(),
+                ReclamationReason.REPLACED_REPRESENTATION,
+                expired.generation(),
+                expired.namespaceAdmission(),
+                expired.completeMemberInventory(),
+                List.of(new MemberSnapshot(
+                        member.floors(),
+                        member.physicalReferences(),
+                        member.nativeAuthority(),
+                        NativeDisposition.REPLACEMENT_ALLOWED,
+                        Optional.of(new ReplacementEvidence(
+                                member.physicalReferences().manifestRoot(), basis.replacementResources(), transfers)),
+                        Optional.empty(),
+                        Optional.empty())));
+    }
+
     @Test
     void replacementReleasesOldPhysicalEligibilityWhileLogicalMessagesRemainRetained() {
         var snapshot = replacement();
@@ -69,6 +210,106 @@ class M5DeleteEligibilityV2Test {
                         resource(), ReclamationReason.LOGICAL_EXPIRY, 1, 99, PositionDomain.KAFKA_OFFSET))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("full-range trim");
+    }
+
+    @Test
+    void typedExpiryRequiresEveryLedgerRangeAndMatchingFloorChain() {
+        var expired = typedExpiry(new M5PulsarCoverageV2.Position(7, 4));
+        assertThat(DeleteEligibilityCodecV2.decode(DeleteEligibilityCodecV2.encode(expired)))
+                .isEqualTo(expired);
+        assertThatThrownBy(() -> typedExpiry(new M5PulsarCoverageV2.Position(91, 3)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("full-range trim");
+        assertThatThrownBy(() -> typedExpiry(new M5PulsarCoverageV2.Position(7, 3)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("full-range trim");
+    }
+
+    private static DeleteEligibilitySnapshotV2 typedExpiry(M5PulsarCoverageV2.Position end) {
+        var scalar = M5DeleteEligibilityTestFixtures.snapshot(
+                resource(), ReclamationReason.LOGICAL_EXPIRY, 1, 100, PositionDomain.PULSAR_ENTRY);
+        var member = scalar.members().get(0);
+        var basis = member.floors();
+        var context = M5PulsarCoverageV2.of(
+                basis.identity().binding(),
+                digest("typed-expiry-chain"),
+                List.of(
+                        new M5PulsarCoverageV2.ChainLedger(91, false, 3, digest("typed-91")),
+                        new M5PulsarCoverageV2.ChainLedger(7, false, 4, digest("typed-7"))),
+                List.of(new M5PulsarCoverageV2.EntryRange(91, 0, 3), new M5PulsarCoverageV2.EntryRange(7, 0, 4)));
+        var floorRows = basis.rows().stream()
+                .map(row -> new M5RetentionRecordsV1.RetentionFloorObservationV1(
+                        row.floorClass(), row.authority(), row.domain(), -1, true, true, Optional.of(end)))
+                .toList();
+        var prior = new M5PulsarCoverageV2.Position(91, 0);
+        var floors = M5RetentionCodecV1.finalizeSnapshot(new M5RetentionRecordsV1.RetentionFloorSnapshotV1(
+                basis.identity(),
+                basis.domain(),
+                basis.generation(),
+                -1,
+                basis.retentionPolicyRootSha256(),
+                basis.ownerFence(),
+                basis.storageFence(),
+                basis.pageCount(),
+                basis.scannedBytes(),
+                floorRows,
+                digest("placeholder"),
+                Optional.of(new M5RetentionRecordsV1.PulsarFloorContextV2(context, prior))));
+        var trim = new M5RetentionRecordsV1.BindingTrimFrontierV1(
+                floors.identity(),
+                floors.domain(),
+                -1,
+                -1,
+                floors.retentionPolicyRootSha256(),
+                floors.snapshotRootSha256(),
+                floors.ownerFence(),
+                floors.storageFence(),
+                1,
+                floors.identity().capability(),
+                Optional.of(new M5RetentionRecordsV1.PulsarTrimContextV2(context, prior, end)));
+        var coverage = ProtocolCoverage.pulsar(context);
+        var oldProof = member.physicalReferences();
+        var references = oldProof.observations().stream()
+                .map(row -> new M5RetentionRecordsV1.ReferenceObservationV1(
+                        row.kind(),
+                        row.authority(),
+                        row.targetIdentitySha256(),
+                        coverage,
+                        row.disposition(),
+                        row.enumerationComplete()))
+                .toList();
+        var trimAuthority =
+                M5DeleteEligibilityTestFixtures.fact("/typed-trim", M5RetentionCodecV1.encodeTrimFrontier(trim));
+        var proof = M5RetentionCodecV1.finalizeProof(new ReferenceFreeProofV1(
+                oldProof.identity(),
+                oldProof.targetKind(),
+                oldProof.targetIdentitySha256(),
+                coverage,
+                oldProof.selectorRoot(),
+                oldProof.manifestRoot(),
+                trimAuthority,
+                floors.snapshotRootSha256(),
+                M5RetentionCodecV1.calculateObservationsRoot(references),
+                oldProof.m4Releases(),
+                oldProof.ownerFence(),
+                oldProof.workerFence(),
+                oldProof.storageFence(),
+                oldProof.providerFence(),
+                oldProof.auditGraceDeadlineMillis(),
+                oldProof.observedAuthorityTimeMillis(),
+                oldProof.scanSummaries(),
+                references,
+                digest("placeholder")));
+        return withMember(
+                scalar,
+                new MemberSnapshot(
+                        floors,
+                        proof,
+                        member.nativeAuthority(),
+                        member.nativeDisposition(),
+                        Optional.empty(),
+                        Optional.of(trim),
+                        Optional.empty()));
     }
 
     @Test

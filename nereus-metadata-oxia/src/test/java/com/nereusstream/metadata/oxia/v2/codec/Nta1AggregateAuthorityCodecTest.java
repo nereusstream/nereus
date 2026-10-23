@@ -88,4 +88,31 @@ class Nta1AggregateAuthorityCodecTest {
         assertThat(snapshot.canonicalStoredDigest()).isEqualTo(candidate.canonicalStoredDigest());
         assertThat(authority).isNotEqualTo(candidate.canonicalStoredBytes());
     }
+
+    @Test
+    void immutableAggregateSourceVersionSurvivesEnvelopeSuccessorWithoutChangingPhysicalCasVersion() {
+        var candidate = O2TestValues.productionAggregateCandidate();
+        var originalVersion = MetadataVersionMapper.fromOxia(7);
+        var exact = com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue.of(
+                "/nereus/test/aggregates/v1/key", candidate.canonicalStoredBytes(), originalVersion);
+        var migrated = M5PulsarAggregateAuthorityCodecV1.migrateLegacy(
+                exact, new CapabilityBinding(7, Sha256Digest.hash(O2TestValues.bytes("m5-capability"))));
+        var successor = M5PulsarAggregateAuthorityCodecV1.successor(
+                migrated, migrated.state(), java.util.Optional.empty(), java.util.List.of());
+        var physical = MetadataVersionMapper.fromOxia(19);
+        var bytes = M5PulsarAggregateAuthorityCodecV1.encodeAuthority(successor);
+        var snapshot = codec.decode(exact.key(), O2TestValues.incarnation(1), bytes, physical);
+        assertThat(snapshot.canonicalStoredBytes()).isEqualTo(candidate.canonicalStoredBytes());
+        assertThat(snapshot.metadataVersion()).isEqualTo(physical);
+        assertThat(snapshot.aggregateSourceVersion()).isEqualTo(originalVersion);
+        assertThat(M5PulsarAggregateAuthorityCodecV1.decodeAuthority(bytes).originalAggregateVersion())
+                .contains(originalVersion);
+        assertThat(java.nio.ByteBuffer.wrap(bytes.toByteArray()).getInt(4)).isEqualTo(2);
+        var legacy = M5PulsarAggregateAuthorityCodecV1.encodeAuthority(M5PulsarAggregateAuthorityCodecV1.migrateLegacy(
+                candidate.canonicalStoredBytes(), migrated.capability()));
+        assertThat(java.nio.ByteBuffer.wrap(legacy.toByteArray()).getInt(4)).isEqualTo(1);
+        assertThat(codec.decode(exact.key(), O2TestValues.incarnation(1), legacy, physical)
+                        .aggregateSourceVersion())
+                .isEqualTo(physical);
+    }
 }

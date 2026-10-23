@@ -4,6 +4,9 @@
   "wire": {
     "magic": "M5ES",
     "version": 2,
+    "typedSemanticTransferVersion": 3,
+    "typedSemanticTransferRequiredForV3": true,
+    "legacyV2BytesAndDigestsPreserved": true,
     "maximumSnapshotBytes": 786432,
     "maximumMembers": 64,
     "maximumReplacements": 256,

@@ -122,6 +122,14 @@ class KafkaBookKeeperM4RecoveryV2RealTest {
                     .isEqualTo(1);
             assertThat(hazards.scan(selected.binding().bindingId(), selected.sourceGeneration()))
                     .isEqualTo(ScanOutcome.CLEAN);
+            var cacheRead = recovery.readSelected(result.view(), 0, 2, 1).get(30, TimeUnit.SECONDS);
+            assertThat(cacheRead.capturedAuthority()).isSameAs(next);
+            assertThat(cacheRead.batches()).singleElement().satisfies(batch -> {
+                assertThat(batch.startOffset()).isEqualTo(1);
+                assertThat(batch.rawRecordBatch()).isEqualTo(result.view().readBatch(0));
+            });
+            assertThat(hazards.scan(selected.binding().bindingId(), next.sourceGeneration()))
+                    .isEqualTo(ScanOutcome.CLEAN);
         } finally {
             release.complete(null);
             owner.shutdown();

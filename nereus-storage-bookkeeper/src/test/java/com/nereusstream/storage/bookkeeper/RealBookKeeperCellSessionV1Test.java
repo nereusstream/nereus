@@ -24,13 +24,17 @@ import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperProtocolModeV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperTimeoutClassV1;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.bookkeeper.ProviderMutationOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerOpenOutcomeV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.LedgerMetadataBuilder;
 import org.apache.bookkeeper.client.api.BookKeeper;
 import org.apache.bookkeeper.client.api.DigestType;
@@ -39,6 +43,49 @@ import org.apache.bookkeeper.net.BookieId;
 import org.junit.jupiter.api.Test;
 
 class RealBookKeeperCellSessionV1Test {
+    @Test
+    void missingLedgerWriteFailureRetainsUnknownAppendForExactRecovery() {
+        assertThat(RealBookKeeperCellSessionV1.appendFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsException))
+                        .outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        assertThat(RealBookKeeperCellSessionV1.appendFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsOnMetadataServerException))
+                        .outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        assertThat(RealBookKeeperCellSessionV1.appendFailure(
+                                BKException.create(BKException.Code.IncorrectParameterException))
+                        .outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.DEFINITIVELY_NOT_APPLIED);
+    }
+
+    @Test
+    void onlyMissingMetadataProvesThatAnUnselectedRunWasNeverCreated() {
+        assertThat(RealBookKeeperCellSessionV1.openFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsOnMetadataServerException))
+                        .outcome())
+                .isEqualTo(RunLedgerOpenOutcomeV1.ABSENT);
+        assertThat(RealBookKeeperCellSessionV1.openFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsException))
+                        .outcome())
+                .isEqualTo(RunLedgerOpenOutcomeV1.PROVIDER_FAILURE);
+    }
+
+    @Test
+    void missingEntryOrLedgerDuringExactReadCannotResolveAnUnknownAppendAsAbsent() {
+        assertThat(RealBookKeeperCellSessionV1.readFailure(BKException.create(BKException.Code.NoSuchEntryException))
+                        .outcome())
+                .isEqualTo(RunLedgerReadOutcomeV1.PROVIDER_FAILURE);
+        assertThat(RealBookKeeperCellSessionV1.readFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsException))
+                        .outcome())
+                .isEqualTo(RunLedgerReadOutcomeV1.PROVIDER_FAILURE);
+        assertThat(RealBookKeeperCellSessionV1.readFailure(
+                                BKException.create(BKException.Code.NoSuchLedgerExistsOnMetadataServerException))
+                        .outcome())
+                .isEqualTo(RunLedgerReadOutcomeV1.PROVIDER_FAILURE);
+    }
+
     @Test
     void ledgerMetadataRoundTripsTheExactCellRunAndConfigurationIdentity() {
         RunLedgerConfigurationV1 configuration = configuration();
@@ -104,7 +151,7 @@ class RealBookKeeperCellSessionV1Test {
                 new RealBookKeeperCellSessionV1(noopClient(transportCloseCalls), capability(), new byte[0]);
 
         assertThat(session.closeAsync().toCompletableFuture()).isCompletedWithValue(null);
-        assertThat(session.closeAsync()).isSameAs(session.closeAsync());
+        assertThat(session.closeAsync().toCompletableFuture()).isCompletedWithValue(null);
         assertThat(transportCloseCalls).hasValue(0);
     }
 

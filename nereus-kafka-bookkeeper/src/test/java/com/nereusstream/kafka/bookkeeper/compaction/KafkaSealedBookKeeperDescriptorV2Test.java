@@ -98,6 +98,14 @@ class KafkaSealedBookKeeperDescriptorV2Test {
         assertThat(KafkaRecordBatchCodecV1.parse(recovered.readBatch(0)).records())
                 .extracting(KafkaCompactionRecordsV1.RecordValue::offset)
                 .containsExactly(1L);
+        assertThat(recovered.selectBatches(0, 2, 1)).singleElement().satisfies(batch -> {
+            assertThat(batch.startOffset()).isEqualTo(1);
+            assertThat(batch.endOffsetExclusive()).isEqualTo(2);
+            assertThat(batch.firstPart()).isZero();
+            assertThat(batch.firstEntry()).isZero();
+            assertThat(batch.rawRecordBatch()).isEqualTo(recovered.readBatch(0));
+        });
+        assertThat(recovered.selectBatches(0, 1, 1_000_000)).isEmpty();
         for (IndexKind kind : IndexKind.values()) {
             assertThat(recovered.index(kind))
                     .isEqualTo(fixture.input.semantic().indexes().get(kind.ordinal()));
@@ -115,6 +123,7 @@ class KafkaSealedBookKeeperDescriptorV2Test {
         assertThat(view.lookup(0)).isEmpty();
         assertThat(view.allowsPredecessorOffset(0)).isFalse();
         assertThat(view.gaps()).containsExactly(new KafkaCompactionRecordsV1.Gap(0, 1));
+        assertThat(view.selectBatches(0, 1, 1_000_000)).isEmpty();
         assertThat(view.index(IndexKind.CHECKSUM_COVERAGE).rows()).hasSize(1);
     }
 
@@ -384,7 +393,9 @@ class KafkaSealedBookKeeperDescriptorV2Test {
                                 fixture.input.plan(),
                                 losing,
                                 () -> CompletableFuture.completedFuture(PublicationOutcome.OUTCOME_UNKNOWN),
-                                currentDecision)
+                                currentDecision,
+                                fixture.store,
+                                () -> true)
                         .toCompletableFuture()
                         .join())
                 .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
@@ -404,7 +415,9 @@ class KafkaSealedBookKeeperDescriptorV2Test {
                                     retriedMutation.incrementAndGet();
                                     return CompletableFuture.completedFuture(PublicationOutcome.CONFLICT);
                                 },
-                                currentDecision)
+                                currentDecision,
+                                fixture.store,
+                                () -> true)
                         .toCompletableFuture()
                         .join())
                 .isEqualTo(PublicationOutcome.CONFLICT);
@@ -467,12 +480,24 @@ class KafkaSealedBookKeeperDescriptorV2Test {
         final M4ReadControlCoordinatorV1 m4;
         final List<com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity>
                 sources;
+        final Optional<KafkaCompactionRecoveryStateV1> recoveryState;
         long nextLedger;
         int reads;
         int captures;
 
         Fixture(boolean empty) {
-            input = KafkaBookKeeperCompactionTestSupportV2.input(empty, 1);
+            this(KafkaBookKeeperCompactionTestSupportV2.input(empty, 1), Optional.empty());
+        }
+
+        Fixture(KafkaBookKeeperCompactionTestSupportV2.Input input, KafkaCompactionRecoveryStateV1 recoveryState) {
+            this(input, Optional.of(recoveryState));
+        }
+
+        private Fixture(
+                KafkaBookKeeperCompactionTestSupportV2.Input input,
+                Optional<KafkaCompactionRecoveryStateV1> recoveryState) {
+            this.input = input;
+            this.recoveryState = recoveryState;
             session = (BookKeeperCellSession) Proxy.newProxyInstance(
                     BookKeeperCellSession.class.getClassLoader(),
                     new Class<?>[] {BookKeeperCellSession.class},
@@ -525,13 +550,23 @@ class KafkaSealedBookKeeperDescriptorV2Test {
                 seals.put(part.resource().ledgerId(), seal);
                 entries.put(part.resource().ledgerId(), body.entries());
             }
-            descriptor =
-                    KafkaSealedBookKeeperDescriptorV2.create(input.plan(), input.semantic(), input.layout(), verified);
+            descriptor = recoveryState.isPresent()
+                    ? KafkaSealedBookKeeperDescriptorV2.create(
+                            input.plan(), input.semantic(), input.layout(), verified, recoveryState.orElseThrow())
+                    : KafkaSealedBookKeeperDescriptorV2.create(
+                            input.plan(), input.semantic(), input.layout(), verified);
             sources = KafkaBookKeeperCompactionTestSupportV2.installReadAuthority(store, input);
             m4 = new M4ReadControlCoordinatorV1(
                     store, 7, input.plan().sourceCut().identity().binding());
             publication = new KafkaBookKeeperCompactionPublicationV2(
-                    store, 7, input.plan().sourceCut().identity().binding(), reader(1_000_000));
+                    store,
+                    7,
+                    input.plan().sourceCut().identity().binding(),
+                    reader(Math.toIntExact(Math.max(
+                            1_000_000,
+                            input.layout().task().parts().stream()
+                                    .mapToLong(KafkaBookKeeperInventoryV2.PartPlan::length)
+                                    .sum()))));
         }
 
         KafkaSealedBookKeeperReaderV2 reader(int bound) {
@@ -547,6 +582,18 @@ class KafkaSealedBookKeeperDescriptorV2Test {
         }
 
         PublicationOutcome publish() {
+            if (recoveryState.isPresent()) {
+                return publication
+                        .publish(
+                                input.plan(),
+                                input.semantic(),
+                                descriptor,
+                                sources,
+                                () -> new KafkaCompactionPublicationFenceV1().expected(input.plan()),
+                                recoveryState.orElseThrow())
+                        .toCompletableFuture()
+                        .join();
+            }
             return publication
                     .publish(
                             input.plan(),

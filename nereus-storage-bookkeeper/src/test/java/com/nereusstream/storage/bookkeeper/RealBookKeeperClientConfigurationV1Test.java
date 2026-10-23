@@ -36,6 +36,7 @@ class RealBookKeeperClientConfigurationV1Test {
 
         assertThat(configuration.getMetadataServiceUri()).isEqualTo("zk://localhost:2181/ledgers");
         assertThat(configuration.getUseV2WireProtocol()).isFalse();
+        assertThat(configuration.isBatchReadEnabled()).isFalse();
         assertThat(configuration.getPreserveMdcForTaskExecution()).isFalse();
         assertThat(configuration.getClientConnectTimeoutMillis()).isEqualTo(10_000);
         assertThat(configuration.getAddEntryTimeout()).isEqualTo(5);

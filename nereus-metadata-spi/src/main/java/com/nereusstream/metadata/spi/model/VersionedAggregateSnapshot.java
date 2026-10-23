@@ -20,17 +20,38 @@ import com.nereusstream.domain.aggregate.TopicBindingV1;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import java.util.Objects;
+import java.util.Optional;
 
 /** One exact versioned aggregate snapshot and its same-instance projections. */
 public record VersionedAggregateSnapshot(
         TopicBindingAggregateV1 aggregate,
         CanonicalBytes canonicalStoredBytes,
         Sha256Digest canonicalStoredDigest,
-        MetadataVersion metadataVersion) {
+        MetadataVersion metadataVersion,
+        Optional<MetadataVersion> originalAggregateVersion) {
+    public VersionedAggregateSnapshot(
+            TopicBindingAggregateV1 aggregate,
+            CanonicalBytes canonicalStoredBytes,
+            Sha256Digest canonicalStoredDigest,
+            MetadataVersion metadataVersion) {
+        this(aggregate, canonicalStoredBytes, canonicalStoredDigest, metadataVersion, Optional.empty());
+    }
+
     public VersionedAggregateSnapshot {
         Objects.requireNonNull(aggregate, "aggregate");
         Objects.requireNonNull(metadataVersion, "metadataVersion");
+        originalAggregateVersion = Objects.requireNonNull(originalAggregateVersion, "originalAggregateVersion");
+        originalAggregateVersion.ifPresent(value -> {
+            if (value.value().isEmpty()) {
+                throw new IllegalArgumentException("original aggregate version is empty");
+            }
+        });
         ExactStoredValue.requireMatchingDigest(canonicalStoredBytes, canonicalStoredDigest);
+    }
+
+    /** Actual immutable NTA1 predecessor token; metadataVersion remains the physical envelope CAS version. */
+    public MetadataVersion aggregateSourceVersion() {
+        return originalAggregateVersion.orElse(metadataVersion);
     }
 
     public TopicBindingV1 binding() {

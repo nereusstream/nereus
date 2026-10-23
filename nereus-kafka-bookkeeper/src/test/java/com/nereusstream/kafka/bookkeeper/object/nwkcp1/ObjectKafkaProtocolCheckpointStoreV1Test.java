@@ -56,6 +56,33 @@ class ObjectKafkaProtocolCheckpointStoreV1Test {
     }
 
     @Test
+    void observerCancellationDoesNotCancelOriginalMutationOrItsCompletion() {
+        var root = ObjectKafkaTestFixtures.digest(12);
+        var backend = new InMemoryNwkcp1Backend(ROOT_PREFIX, root);
+        var originalRead =
+                new java.util.concurrent.CompletableFuture<Optional<com.nereusstream.domain.bytes.CanonicalBytes>>();
+        backend.nextHeadRead = originalRead;
+        var store = new ObjectKafkaProtocolCheckpointStoreV1(
+                ROOT_PREFIX, new KafkaNwkcp1WalRunContextV1(root, ObjectKafkaTestFixtures.runBinding()), 9, backend);
+        var observer = store.publish(ObjectKafkaTestFixtures.checkpoint(100)).toCompletableFuture();
+        assertThat(observer.cancel(false)).isTrue();
+        assertThat(originalRead.isCancelled()).isFalse();
+        assertThatThrownBy(() -> store.takeover(10)).hasMessageContaining("already in flight");
+        originalRead.complete(Optional.empty());
+        assertThat(store.currentHead()
+                        .toCompletableFuture()
+                        .join()
+                        .orElseThrow()
+                        .checkpointOrdinal())
+                .isZero();
+        assertThat(store.publish(ObjectKafkaTestFixtures.checkpoint(101))
+                        .toCompletableFuture()
+                        .join()
+                        .physicalIdentity())
+                .isEqualTo(1);
+    }
+
+    @Test
     void missingHeadWithoutAuthenticatedReplayFailsClosed() {
         var root = ObjectKafkaTestFixtures.digest(12);
         InMemoryNwkcp1Backend backend = new InMemoryNwkcp1Backend(ROOT_PREFIX, root);

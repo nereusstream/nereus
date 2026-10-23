@@ -47,7 +47,25 @@ public final class KafkaProtocolCheckpointCodecV1 {
         return new KafkaProtocolCheckpointSectionsV1(
                 encodeProducers(state.producerState()),
                 encodeTransactions(state.transactionState()),
-                encodeLeaderEpochs(state));
+                encodeLeaderEpochs(state.leaderEpochIndex(), state.readIndexes()));
+    }
+
+    public static KafkaProtocolCheckpointSectionsV1 encodeComponents(KafkaProtocolCheckpointComponentsV1 state) {
+        return new KafkaProtocolCheckpointSectionsV1(
+                encodeProducers(state.producerState()),
+                encodeTransactions(state.transactionState()),
+                encodeLeaderEpochs(state.leaderEpochIndex(), List.of()));
+    }
+
+    public static KafkaProtocolCheckpointComponentsV1 decodeComponents(KafkaProtocolCheckpointSectionsV1 sections) {
+        var source = decodeLeaderEpochs(sections.leaderEpochIndex());
+        if (!source.indexes().isEmpty()) {
+            throw new IllegalArgumentException("independent protocol state contains physical source locators");
+        }
+        return new KafkaProtocolCheckpointComponentsV1(
+                decodeProducers(sections.producerState()),
+                decodeTransactions(sections.transactionIndex()),
+                source.epochs());
     }
 
     public static KafkaProtocolCheckpointStateV1 decode(
@@ -186,17 +204,18 @@ public final class KafkaProtocolCheckpointCodecV1 {
         });
     }
 
-    private static CanonicalBytes encodeLeaderEpochs(KafkaProtocolCheckpointStateV1 state) {
+    private static CanonicalBytes encodeLeaderEpochs(
+            KafkaLeaderEpochIndexV1 epochs, List<KafkaCheckpointReadIndexV1> indexes) {
         return encode(out -> {
-            out.writeInt(state.readIndexes().isEmpty() ? LEADER_EPOCH_MAGIC : 0x4b4c4332);
-            out.writeInt(state.leaderEpochIndex().startOffsets().size());
-            for (var entry : state.leaderEpochIndex().startOffsets().entrySet()) {
+            out.writeInt(indexes.isEmpty() ? LEADER_EPOCH_MAGIC : 0x4b4c4332);
+            out.writeInt(epochs.startOffsets().size());
+            for (var entry : epochs.startOffsets().entrySet()) {
                 out.writeInt(entry.getKey());
                 out.writeLong(entry.getValue());
             }
-            if (!state.readIndexes().isEmpty()) {
-                out.writeInt(state.readIndexes().size());
-                for (var source : state.readIndexes()) {
+            if (!indexes.isEmpty()) {
+                out.writeInt(indexes.size());
+                for (var source : indexes) {
                     out.write(source.runId().value().bytes().toByteArray());
                     out.writeInt(source.rows().size());
                     for (var row : source.rows()) {

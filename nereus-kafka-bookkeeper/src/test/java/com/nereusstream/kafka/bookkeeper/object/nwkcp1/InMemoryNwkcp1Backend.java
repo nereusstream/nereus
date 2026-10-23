@@ -32,6 +32,7 @@ final class InMemoryNwkcp1Backend implements Nwkcp1BackendV1 {
     boolean unknownNextCas;
     boolean conflictNextCreate;
     int objectReads;
+    CompletableFuture<Optional<CanonicalBytes>> nextHeadRead;
 
     InMemoryNwkcp1Backend(String walRunPrefix, Sha256Digest rootSha) {
         this.walRunPrefix = Objects.requireNonNull(walRunPrefix, "walRunPrefix");
@@ -108,6 +109,11 @@ final class InMemoryNwkcp1Backend implements Nwkcp1BackendV1 {
 
     @Override
     public synchronized CompletionStage<Optional<CanonicalBytes>> readHead(String key) {
+        if (nextHeadRead != null) {
+            var original = nextHeadRead;
+            nextHeadRead = null;
+            return original;
+        }
         return CompletableFuture.completedFuture(Optional.ofNullable(heads.get(key)));
     }
 

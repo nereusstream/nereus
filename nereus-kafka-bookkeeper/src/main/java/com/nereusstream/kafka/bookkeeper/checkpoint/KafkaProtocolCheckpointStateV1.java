@@ -43,27 +43,11 @@ public record KafkaProtocolCheckpointStateV1(
                 throw new IllegalArgumentException("checkpoint sources repeat or escape common coverage");
             }
         }
-        long producerCoveredThrough = vector.producerStateCoveredThrough();
-        producerState.producers().values().forEach(producer -> {
-            if (Math.max(producer.lastOffset(), producer.lastMarkerOffset()) >= producerCoveredThrough) {
-                throw new IllegalArgumentException("producer checkpoint state escapes its component coverage");
-            }
-        });
-        transactionState.ongoingTransactions().values().forEach(transaction -> {
-            if (transaction.firstOffset() >= vector.transactionIndexCoveredThrough()) {
-                throw new IllegalArgumentException("ongoing transaction escapes its checkpoint coverage");
-            }
-        });
-        transactionState.completedTransactions().forEach(transaction -> {
-            if (transaction.markerEndOffsetExclusive() > vector.transactionIndexCoveredThrough()) {
-                throw new IllegalArgumentException("completed transaction escapes its checkpoint coverage");
-            }
-        });
-        leaderEpochIndex.startOffsets().values().forEach(startOffset -> {
-            if (startOffset >= vector.leaderEpochCoveredThrough()) {
-                throw new IllegalArgumentException("leader-epoch state escapes its checkpoint coverage");
-            }
-        });
+        new KafkaProtocolCheckpointComponentsV1(producerState, transactionState, leaderEpochIndex)
+                .requireCoverage(
+                        vector.producerStateCoveredThrough(),
+                        vector.transactionIndexCoveredThrough(),
+                        vector.leaderEpochCoveredThrough());
     }
 
     public KafkaProtocolCheckpointStateV1(
@@ -96,6 +80,10 @@ public record KafkaProtocolCheckpointStateV1(
                 sections.producerState(),
                 sections.transactionIndex(),
                 sections.leaderEpochIndex());
+    }
+
+    public KafkaProtocolCheckpointComponentsV1 components() {
+        return new KafkaProtocolCheckpointComponentsV1(producerState, transactionState, leaderEpochIndex);
     }
 
     public static KafkaProtocolCheckpointStateV1 fromNbke2(Nbke2ProtocolCheckpointV1 checkpoint) {

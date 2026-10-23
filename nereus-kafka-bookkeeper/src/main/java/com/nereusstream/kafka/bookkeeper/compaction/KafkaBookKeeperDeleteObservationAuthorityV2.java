@@ -31,6 +31,7 @@ import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
 import com.nereusstream.storage.object.gc.DeleteObservationContextV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityStateMachineV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
@@ -98,10 +99,50 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
 
     public CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
             BoundPhysicalDeleteAuthorityRouteV2 route, VersionedValue exactIntent) {
+        var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());
+        if (intent.epochGrace().isPresent()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("epoch grace requires original producer readiness"));
+        }
         CompletionStage<M5BookKeeperNativeDeleteIntentV2> operation = requireRoute(route)
                 .thenCompose(ignored -> bindIntent((ExactMetadataTransactionStoreV1) route, exactIntent))
                 .thenCompose(value -> requireRoute(route).thenApply(ignored -> value));
         return operation.thenApply(value -> value);
+    }
+
+    public CompletionStage<M5BookKeeperNativeDeleteIntentV2> bindIntent(
+            BoundPhysicalDeleteAuthorityRouteV2 route,
+            VersionedValue exactIntent,
+            M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady ready) {
+        var intent = M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactIntent.canonicalStoredBytes());
+        return requireElapsed(intent, Optional.of(Objects.requireNonNull(ready, "ready")))
+                .thenCompose(ignored -> requireRoute(route))
+                .thenCompose(ignored -> bindIntent((ExactMetadataTransactionStoreV1) route, exactIntent))
+                .thenCompose(bound -> requireElapsed(intent, Optional.of(ready)).thenApply(ignored -> bound));
+    }
+
+    private CompletionStage<Void> requireElapsed(
+            TargetDeleteAuthorityV1 intent, Optional<M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady> ready) {
+        if (intent.recoveryVeto().isPresent()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("epoch grace renewal requires fresh eligibility before dispatch"));
+        }
+        if (intent.epochGrace().isEmpty()) {
+            return ready.isEmpty()
+                    ? CompletableFuture.completedFuture(null)
+                    : CompletableFuture.failedFuture(
+                            new IllegalArgumentException("native epoch qualification has no persisted mark"));
+        }
+        if (ready.isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("epoch grace requires original producer readiness"));
+        }
+        var mark = intent.epochGrace().orElseThrow();
+        if (!M5TargetDeleteAuthorityStateMachineV1.dispatchContext(intent).equals(mark.authority())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native intent has another epoch grace owner"));
+        }
+        return ready.orElseThrow().requireAdmittedCurrent(resource, mark);
     }
 
     /**
@@ -114,6 +155,25 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
             M5BookKeeperDeleteCellBudgetV2 budget,
             VersionedValue exactIntent,
             M5BookKeeperNativeDeleteIntentV2 bound) {
+        return dispatchBoundDelete(route, budget, exactIntent, bound, Optional.empty());
+    }
+
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> dispatchBoundDelete(
+            BoundPhysicalDeleteAuthorityRouteV2 route,
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            VersionedValue exactIntent,
+            M5BookKeeperNativeDeleteIntentV2 bound,
+            M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady ready) {
+        return dispatchBoundDelete(
+                route, budget, exactIntent, bound, Optional.of(Objects.requireNonNull(ready, "ready")));
+    }
+
+    private CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> dispatchBoundDelete(
+            BoundPhysicalDeleteAuthorityRouteV2 route,
+            M5BookKeeperDeleteCellBudgetV2 budget,
+            VersionedValue exactIntent,
+            M5BookKeeperNativeDeleteIntentV2 bound,
+            Optional<M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady> ready) {
         Objects.requireNonNull(budget, "budget");
         Objects.requireNonNull(exactIntent, "exactIntent");
         Objects.requireNonNull(bound, "bound");
@@ -126,7 +186,8 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
         var context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(intent);
         var eligibility = intent.eligibilitySnapshot().orElseThrow();
         var external = intent.externalIdentity().orElseThrow();
-        CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> operation = requireRoute(route)
+        CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> operation = requireElapsed(intent, ready)
+                .thenCompose(ignored -> requireRoute(route))
                 .thenCompose(ignored -> requireExactIntent(route, exactIntent))
                 .thenCompose(ignored -> requireCurrent(resource, context))
                 .thenCompose(ignored -> requireFreshEligibility(route, eligibility))
@@ -143,6 +204,7 @@ public final class KafkaBookKeeperDeleteObservationAuthorityV2 implements Delete
                             .thenCompose(ignored -> requireCurrent(resource, context))
                             .thenCompose(ignored -> requireFreshEligibility(route, eligibility))
                             .thenCompose(ignored -> nativeAuthority.requireIntent(bound))
+                            .thenCompose(ignored -> requireElapsed(intent, ready))
                             .thenCompose(ignored -> nativeAuthority.deleteExact(budget, bound, exactTarget));
                 });
         // The exposed observer cannot cancel an admitted native deletion or its Cell cleanup.

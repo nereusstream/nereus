@@ -36,6 +36,10 @@ public final class WalRunControlKeys {
         return runPrefix(shardId, shardRunEpoch) + "/checkpoint/head";
     }
 
+    public static String kafkaProtocolCheckpointHeadKey(int shardId, long shardRunEpoch) {
+        return runPrefix(shardId, shardRunEpoch) + "/protocol/kafka/nwkcp1-v1/head";
+    }
+
     public static String checkpointPagePrefix(int shardId, long shardRunEpoch) {
         return runPrefix(shardId, shardRunEpoch) + "/checkpoint/pages";
     }

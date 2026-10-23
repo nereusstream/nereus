@@ -71,18 +71,16 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
             throw new IllegalArgumentException(
                     "Object checkpoint differs from the expected ProviderScope/StorageRun context");
         }
-        beginMutation();
+        beginMutation(false);
         try {
             Nwkcp1EncodedObjectV1 encoded =
                     Nwkcp1CodecV1.encode(walRunPrefix, new Nwkcp1ObjectV1(rootSha, List.of(checkpoint)));
-            return preflight(checkpoint, encoded)
-                    .thenCompose(existing -> {
-                        if (existing.isPresent()) {
-                            return CompletableFuture.completedFuture(existing.orElseThrow());
-                        }
-                        return createAndVerify(encoded).thenCompose(ignored -> select(encoded, checkpoint));
-                    })
-                    .whenComplete((result, failure) -> endMutation());
+            return finishMutation(preflight(checkpoint, encoded).thenCompose(existing -> {
+                if (existing.isPresent()) {
+                    return CompletableFuture.completedFuture(existing.orElseThrow());
+                }
+                return createAndVerify(encoded).thenCompose(ignored -> select(encoded, checkpoint));
+            }));
         } catch (RuntimeException failure) {
             endMutation();
             throw failure;
@@ -128,25 +126,23 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("checkpoint publisher takeover epoch does not advance"));
         }
-        beginMutation();
+        beginMutation(false);
         String headKey = backend.protocolHeadKey(walRunPrefix);
         try {
-            return backend.readHead(headKey)
-                    .thenCompose(current -> {
-                        CanonicalBytes currentBytes = current.orElseThrow(
-                                () -> new KafkaObjectCheckpointException("cannot take over an absent checkpoint Head"));
-                        KafkaProtocolCheckpointHeadV1 before = decodeHead(currentBytes);
-                        requireRoot(before);
-                        KafkaProtocolCheckpointHeadV1 replacement = before.takeover(newPublisherEpoch);
-                        return convergeHeadCas(headKey, Optional.of(currentBytes), replacement)
-                                .thenApply(selected -> {
-                                    synchronized (ObjectKafkaProtocolCheckpointStoreV1.this) {
-                                        publisherEpoch = newPublisherEpoch;
-                                    }
-                                    return selected;
-                                });
-                    })
-                    .whenComplete((result, failure) -> endMutation());
+            return finishMutation(backend.readHead(headKey).thenCompose(current -> {
+                CanonicalBytes currentBytes = current.orElseThrow(
+                        () -> new KafkaObjectCheckpointException("cannot take over an absent checkpoint Head"));
+                KafkaProtocolCheckpointHeadV1 before = decodeHead(currentBytes);
+                requireRoot(before);
+                KafkaProtocolCheckpointHeadV1 replacement = before.takeover(newPublisherEpoch);
+                return convergeHeadCas(headKey, Optional.of(currentBytes), replacement)
+                        .thenApply(selected -> {
+                            synchronized (ObjectKafkaProtocolCheckpointStoreV1.this) {
+                                publisherEpoch = newPublisherEpoch;
+                            }
+                            return selected;
+                        });
+            }));
         } catch (RuntimeException failure) {
             endMutation();
             throw failure;
@@ -160,38 +156,35 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
             return CompletableFuture.failedFuture(
                     new KafkaObjectCheckpointException("physical closure proof belongs to another WalRun Root"));
         }
-        beginMutation();
+        beginMutation(true);
         String headKey = backend.protocolHeadKey(walRunPrefix);
         try {
-            return backend.readHead(headKey)
-                    .thenCompose(current -> {
-                        CanonicalBytes currentBytes = current.orElseThrow(
-                                () -> new KafkaObjectCheckpointException("cannot terminate an absent checkpoint Head"));
-                        KafkaProtocolCheckpointHeadV1 before = decodeHead(currentBytes);
-                        requireRoot(before);
-                        if (before.publisherEpoch() != publisherEpoch) {
-                            throw new KafkaObjectCheckpointException(
-                                    "stale publisher cannot terminate the checkpoint Head");
-                        }
-                        Nwkcp1BackendV1.SelectedObjectToken selectedToken =
-                                backend.selectObjectFromHead(headKey, currentBytes, Sha256Digest.hash(currentBytes));
-                        return backend.readSelectedObject(selectedToken, false).thenCompose(body -> {
-                            KafkaProtocolCheckpointStateV1 finalState = requireSelectedObject(
-                                    before,
-                                    body.orElseThrow(() -> new KafkaObjectCheckpointException(
-                                            "final selected NWKCP1 Object is absent")));
-                            backend.verifyPhysicalClosure(closureProof, expectedRunBinding, finalState);
-                            if (before.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL) {
-                                return CompletableFuture.completedFuture(binding(headKey, currentBytes));
-                            }
-                            KafkaProtocolCheckpointHeadV1 terminal = before.terminal();
-                            CanonicalBytes terminalBytes =
-                                    KafkaProtocolCheckpointHeadCodecV1.encode(walRunPrefix, rootSha, terminal);
-                            return convergeHeadCas(headKey, Optional.of(currentBytes), terminal)
-                                    .thenApply(ignored -> binding(headKey, terminalBytes));
-                        });
-                    })
-                    .whenComplete((result, failure) -> endMutation());
+            return finishMutation(backend.readHead(headKey).thenCompose(current -> {
+                CanonicalBytes currentBytes = current.orElseThrow(
+                        () -> new KafkaObjectCheckpointException("cannot terminate an absent checkpoint Head"));
+                KafkaProtocolCheckpointHeadV1 before = decodeHead(currentBytes);
+                requireRoot(before);
+                if (before.publisherEpoch() != publisherEpoch) {
+                    throw new KafkaObjectCheckpointException("stale publisher cannot terminate the checkpoint Head");
+                }
+                Nwkcp1BackendV1.SelectedObjectToken selectedToken =
+                        backend.selectObjectFromHead(headKey, currentBytes, Sha256Digest.hash(currentBytes));
+                return backend.readSelectedObject(selectedToken, false).thenCompose(body -> {
+                    KafkaProtocolCheckpointStateV1 finalState = requireSelectedObject(
+                            before,
+                            body.orElseThrow(() ->
+                                    new KafkaObjectCheckpointException("final selected NWKCP1 Object is absent")));
+                    backend.verifyPhysicalClosure(closureProof, expectedRunBinding, finalState);
+                    if (before.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL) {
+                        return CompletableFuture.completedFuture(binding(headKey, currentBytes));
+                    }
+                    KafkaProtocolCheckpointHeadV1 terminal = before.terminal();
+                    CanonicalBytes terminalBytes =
+                            KafkaProtocolCheckpointHeadCodecV1.encode(walRunPrefix, rootSha, terminal);
+                    return convergeHeadCas(headKey, Optional.of(currentBytes), terminal)
+                            .thenApply(ignored -> binding(headKey, terminalBytes));
+                });
+            }));
         } catch (RuntimeException failure) {
             endMutation();
             throw failure;
@@ -359,9 +352,18 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
         return KafkaProtocolCheckpointHeadCodecV1.decode(walRunPrefix, rootSha, bytes);
     }
 
-    private synchronized void beginMutation() {
+    private <T> CompletionStage<T> finishMutation(CompletionStage<T> original) {
+        return original.whenComplete((result, failure) -> endMutation())
+                .toCompletableFuture()
+                .copy();
+    }
+
+    private synchronized void beginMutation(boolean terminal) {
         if (publicationInFlight) {
             throw new IllegalStateException("Kafka protocol checkpoint mutation is already in flight");
+        }
+        if (!terminal) {
+            backend.requirePublicationAdmission();
         }
         publicationInFlight = true;
     }

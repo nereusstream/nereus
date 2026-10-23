@@ -253,6 +253,7 @@ public final class M5BindingRetirementCoordinatorV1 {
         BindingRetirementAuthorityV1 current = exactAuthority(request.exactOpenAuthority());
         if (current.state() != BindingAuthorityStateV1.OPEN_V1
                 || !current.referenceMutationTickets().isEmpty()
+                || !current.trimMutationTickets().isEmpty()
                 || current.writerEnrollment().isEmpty()) {
             return CompletableFuture.completedFuture(Outcome.RETAIN);
         }

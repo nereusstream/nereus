@@ -36,7 +36,13 @@ public final class KafkaCompactionCanonicalV1 {
     public static Sha256Digest planRoot(CompactionPlan plan) {
         Objects.requireNonNull(plan, "plan");
         // V2 fixes producer-specific aborted classification; never reuse an older immutable output/task key.
-        return hash("NEREUS_V2_M5_B_COMPACTION_PLAN_V2", output -> {
+        String domain =
+                plan.policy().rewritePolicyVersion().equals(KafkaCompactionRecordsV1.NATIVE_REWRITE_POLICY_VERSION)
+                        ? "NEREUS_V2_M5_B_NATIVE_COMPACTION_PLAN_V4"
+                        : plan.policy().compressionPolicy() == KafkaCompactionRecordsV1.OutputCompressionPolicy.PRODUCER
+                                ? "NEREUS_V2_M5_B_COMPACTION_PLAN_V3"
+                                : "NEREUS_V2_M5_B_COMPACTION_PLAN_V2";
+        return hash(domain, output -> {
             writeBytes(output, M5MaterializationCodecV1.encodeSourceCut(plan.sourceCut()));
             var policy = plan.policy();
             output.writeInt(policy.kafkaFeatureLevel());
@@ -48,7 +54,7 @@ public final class KafkaCompactionCanonicalV1 {
             output.writeLong(policy.policyGeneration());
             writeText(output, policy.rewritePolicyVersion());
             writeText(output, policy.nativeKafkaOracleVersion());
-            output.writeByte(policy.outputCompression().id);
+            output.writeByte(policy.compressionPolicy().canonicalId());
             var caps = policy.caps();
             output.writeLong(caps.maximumDirtyBytes());
             output.writeInt(caps.maximumInputBatches());

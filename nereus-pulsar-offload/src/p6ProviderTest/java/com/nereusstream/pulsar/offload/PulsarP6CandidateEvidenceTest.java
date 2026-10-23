@@ -535,6 +535,11 @@ class PulsarP6CandidateEvidenceTest {
         }
 
         @Override
+        public CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+            return measured(length, () -> delegate.readRange(key, expected, offset, length));
+        }
+
+        @Override
         public CompletionStage<byte[]> readRange(String key, long offset, int length) {
             return measured(length, () -> delegate.readRange(key, offset, length));
         }

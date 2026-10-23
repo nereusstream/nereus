@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2.compaction;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1;
@@ -39,7 +40,9 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Proof
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Completion;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Context;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,6 +59,27 @@ import java.util.function.Supplier;
 public final class OxiaKafkaRunRootAuthorityV2
         implements KafkaRunRootAuthority, KafkaRunRootCatalogV2, KafkaBookKeeperOwnerAuthorityV1 {
     private record Stored(AuthorityRecord nativeValue, KafkaRunRootRecordV2 value) {}
+
+    private record StoredBirths(AuthorityRecord nativeValue, KafkaOwnerAdmissionV1 value) {}
+
+    private record StoredClosed(AuthorityRecord nativeValue, KafkaOwnerAdmissionV1 value) {}
+
+    /** Exact native versions behind one closed owner's selected and unselected run-birth inventory. */
+    public record RunBirthFacts(AuthorityFactV1 closedArchive, AuthorityFactV1 inventory, List<BirthFact> births) {
+        public RunBirthFacts {
+            Objects.requireNonNull(closedArchive, "closedArchive");
+            Objects.requireNonNull(inventory, "inventory");
+            births = List.copyOf(Objects.requireNonNull(births, "births"));
+        }
+    }
+
+    public record BirthFact(KafkaRunRootRecordV2 record, AuthorityFactV1 root, Optional<AuthorityFactV1> parent) {
+        public BirthFact {
+            Objects.requireNonNull(record, "record");
+            Objects.requireNonNull(root, "root");
+            parent = Objects.requireNonNull(parent, "parent");
+        }
+    }
 
     private record Terminal(ProviderMutationResultV1<KafkaRunRootSnapshotV1> result, Sha256Digest proof) {}
 
@@ -105,13 +129,47 @@ public final class OxiaKafkaRunRootAuthorityV2
         return prefix + "/closed-owners-v1/" + ownerEpoch;
     }
 
+    public String nativeBirthInventoryKey(long ownerEpoch) {
+        if (ownerEpoch <= 0) {
+            throw new IllegalArgumentException("birth owner epoch must be positive");
+        }
+        return prefix + "/birth-inventory-v1/" + ownerEpoch;
+    }
+
     @Override
     public CompletionStage<Optional<KafkaOwnerAdmissionV1>> readOwnerAdmission() {
         return readOwnerHead().thenApply(value -> value.map(this::decodeAdmission));
     }
 
+    /** Exact current native Owner value and backend version; a capture grants no future admission or time authority. */
+    public CompletionStage<Optional<OwnerAdmissionFact>> readOwnerAdmissionFact() {
+        return readOwnerHead()
+                .thenApply(value -> value.map(stored -> new OwnerAdmissionFact(decodeAdmission(stored), fact(stored))));
+    }
+
+    public record OwnerAdmissionFact(KafkaOwnerAdmissionV1 admission, AuthorityFactV1 authority) {
+        public OwnerAdmissionFact {
+            Objects.requireNonNull(admission, "admission");
+            Objects.requireNonNull(authority, "authority");
+            if (!authority.valueSha256().equals(Sha256Digest.hash(admission.encode()))) {
+                throw new IllegalArgumentException("native Owner admission fact differs from its exact value");
+            }
+        }
+    }
+
     @Override
     public CompletionStage<Optional<KafkaOwnerAdmissionV1>> readClosedOwner(long ownerEpoch) {
+        return readClosedArchive(ownerEpoch).thenApply(value -> value.map(StoredClosed::value));
+    }
+
+    /** Exact immutable predecessor admission used by the actual cold recovery path. */
+    public CompletionStage<Optional<OwnerAdmissionFact>> readClosedOwnerFact(long ownerEpoch) {
+        return readClosedArchive(ownerEpoch)
+                .thenApply(value ->
+                        value.map(stored -> new OwnerAdmissionFact(stored.value(), fact(stored.nativeValue()))));
+    }
+
+    private CompletionStage<Optional<StoredClosed>> readClosedArchive(long ownerEpoch) {
         String key = nativeClosedOwnerKey(ownerEpoch);
         return client.read(key)
                 .thenApply(observed -> observed.map(value -> {
@@ -121,7 +179,99 @@ public final class OxiaKafkaRunRootAuthorityV2
                             || admission.owner().ownerEpoch() != ownerEpoch) {
                         throw new IllegalStateException("closed owner archive differs from its native identity");
                     }
-                    return admission;
+                    return new StoredClosed(value, admission);
+                }));
+    }
+
+    @Override
+    public CompletionStage<Optional<List<KafkaRunRootRecordV2>>> readRunBirths(KafkaOwnerAdmissionV1 closedOwner) {
+        return readRunBirthFacts(closedOwner)
+                .thenApply(value -> value.map(
+                        facts -> facts.births().stream().map(BirthFact::record).toList()));
+    }
+
+    /** Versioned source facts for later complete reference scans; this view grants no cleanup authority. */
+    public CompletionStage<Optional<RunBirthFacts>> readRunBirthFacts(KafkaOwnerAdmissionV1 closedOwner) {
+        Objects.requireNonNull(closedOwner, "closedOwner");
+        if (!closedOwner.closed() || !closedOwner.scopeSha256().equals(scopeDigest())) {
+            throw new IllegalArgumentException("birth inventory requires an exact closed owner in this scope");
+        }
+        return readClosedArchive(closedOwner.owner().ownerEpoch()).thenCompose(archived -> {
+            if (archived.isEmpty() || !archived.orElseThrow().value().equals(closedOwner)) {
+                throw new IllegalStateException("birth inventory owner differs from the closed native archive");
+            }
+            return readBirthInventory(closedOwner.owner().ownerEpoch()).thenCompose(inventory -> {
+                if (inventory.isEmpty()) {
+                    return CompletableFuture.completedFuture(Optional.empty());
+                }
+                if (!inventory.orElseThrow().value().owner().equals(closedOwner.owner())) {
+                    throw new IllegalStateException("birth inventory belongs to another native owner");
+                }
+                CompletionStage<List<BirthFact>> records = CompletableFuture.completedFuture(new ArrayList<>());
+                for (var link : inventory.orElseThrow().value().runs()) {
+                    records = records.thenCompose(prefix -> read(link.runId()).thenCompose(observed -> {
+                        var stored = observed.orElseThrow(
+                                () -> new IllegalStateException("inventoried run birth root is absent"));
+                        var record = stored.value();
+                        if (!record.initialLink().equals(link)
+                                || record.root().creatorOwnerEpoch()
+                                        != closedOwner.owner().ownerEpoch()
+                                || record.root().kafkaLeaderEpoch()
+                                        != closedOwner.owner().kafkaLeaderEpoch()) {
+                            throw new IllegalStateException("inventoried run birth differs from its exact root");
+                        }
+                        CompletionStage<Optional<AuthorityFactV1>> noAdoption =
+                                closedOwner.runs().contains(link)
+                                        ? CompletableFuture.completedFuture(Optional.empty())
+                                        : requireUnselectedBirth(record);
+                        return noAdoption.thenApply(parent -> {
+                            prefix.add(new BirthFact(record, fact(stored.nativeValue()), parent));
+                            return prefix;
+                        });
+                    }));
+                }
+                return records.thenApply(value -> Optional.of(new RunBirthFacts(
+                        fact(archived.orElseThrow().nativeValue()),
+                        fact(inventory.orElseThrow().nativeValue()),
+                        value)));
+            });
+        });
+    }
+
+    private CompletionStage<Optional<AuthorityFactV1>> requireUnselectedBirth(KafkaRunRootRecordV2 record) {
+        if (record.admitted() || record.retired()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("closed owner excluded an admitted run birth"));
+        }
+        if (record.root().predecessorRunId().isEmpty()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return read(record.root().predecessorRunId().orElseThrow()).thenApply(parent -> {
+            var exact = parent.orElseThrow(() -> new IllegalStateException("unselected birth parent is absent"));
+            if (exact.value().successor().equals(Optional.of(record.initialLink()))) {
+                throw new IllegalStateException("unselected birth has a selected parent successor");
+            }
+            return Optional.of(fact(exact.nativeValue()));
+        });
+    }
+
+    private static AuthorityFactV1 fact(AuthorityRecord value) {
+        return new AuthorityFactV1(
+                value.key(), MetadataVersionMapper.fromOxia(value.versionId()), Sha256Digest.hash(value.storedBytes()));
+    }
+
+    private CompletionStage<Optional<StoredBirths>> readBirthInventory(long ownerEpoch) {
+        String key = nativeBirthInventoryKey(ownerEpoch);
+        return client.read(key)
+                .thenApply(observed -> observed.map(nativeValue -> {
+                    var value = decodeAdmission(nativeValue);
+                    if (!nativeValue.key().equals(key)
+                            || value.owner().ownerEpoch() != ownerEpoch
+                            || value.closed()
+                            || value.previous().isPresent()) {
+                        throw new IllegalStateException("native birth inventory differs from its exact owner route");
+                    }
+                    return new StoredBirths(nativeValue, value);
                 }));
     }
 
@@ -142,41 +292,62 @@ public final class OxiaKafkaRunRootAuthorityV2
                 expectedClosed.map(value -> new KafkaOwnerAdmissionV1.Previous(
                         value.owner().ownerEpoch(), Sha256Digest.hash(value.encode()), value.tail())),
                 List.of());
-        var work = readOwnerHead().thenCompose(before -> {
-            if (before.isPresent()) {
-                var current = decodeAdmission(before.orElseThrow());
-                if (current.owner().equals(owner)) {
-                    return CompletableFuture.completedFuture(
-                            current.closed() || !current.previous().equals(candidate.previous())
-                                    ? ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict()
-                                    : ProviderMutationResultV1.appliedExact(current));
-                }
-                if (!expectedClosed.equals(Optional.of(current))) {
-                    return CompletableFuture.completedFuture(
-                            ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict());
-                }
-            } else if (expectedClosed.isPresent()) {
-                return CompletableFuture.completedFuture(
-                        ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict());
-            }
-            CompletionStage<Void> archive =
-                    expectedClosed.map(this::archiveClosed).orElseGet(() -> CompletableFuture.completedFuture(null));
-            return archive.thenCompose(ignored -> before.isPresent()
-                            ? client.compareAndSet(
-                                    nativeOwnerKey(),
-                                    candidate.encode(),
-                                    before.orElseThrow().versionId())
-                            : client.createIfAbsent(nativeOwnerKey(), candidate.encode()))
-                    .handle((ignored, failure) -> null)
-                    .thenCompose(ignored -> readOwnerAdmission())
-                    .thenApply(after -> after.filter(value -> value.owner().equals(owner)
-                                    && !value.closed()
-                                    && value.previous().equals(candidate.previous()))
-                            .map(ProviderMutationResultV1::appliedExact)
-                            .orElseGet(ProviderMutationResultV1::fencedOrConflict));
-        });
+        CompletionStage<ProviderMutationResultV1<KafkaOwnerAdmissionV1>> work = readOwnerHead()
+                .thenCompose(before -> {
+                    if (before.isPresent()) {
+                        var current = decodeAdmission(before.orElseThrow());
+                        if (current.owner().equals(owner)) {
+                            if (current.closed() || !current.previous().equals(candidate.previous())) {
+                                return CompletableFuture.completedFuture(
+                                        ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict());
+                            }
+                            return readBirthInventory(owner.ownerEpoch()).thenApply(inventory -> inventory
+                                    .filter(value -> value.value().owner().equals(owner))
+                                    .map(value -> ProviderMutationResultV1.appliedExact(current))
+                                    .orElseGet(ProviderMutationResultV1::outcomeUnknown));
+                        }
+                        if (!expectedClosed.equals(Optional.of(current))) {
+                            return CompletableFuture.completedFuture(
+                                    ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict());
+                        }
+                    } else if (expectedClosed.isPresent()) {
+                        return CompletableFuture.completedFuture(
+                                ProviderMutationResultV1.<KafkaOwnerAdmissionV1>fencedOrConflict());
+                    }
+                    return prepareBirthInventory(candidate).thenCompose(ready -> {
+                        if (!ready) {
+                            return CompletableFuture.completedFuture(
+                                    ProviderMutationResultV1.<KafkaOwnerAdmissionV1>outcomeUnknown());
+                        }
+                        CompletionStage<Void> archive = expectedClosed
+                                .map(this::archiveClosed)
+                                .orElseGet(() -> CompletableFuture.completedFuture(null));
+                        return archive.thenCompose(ignored -> before.isPresent()
+                                        ? client.compareAndSet(
+                                                nativeOwnerKey(),
+                                                candidate.encode(),
+                                                before.orElseThrow().versionId())
+                                        : client.createIfAbsent(nativeOwnerKey(), candidate.encode()))
+                                .handle((ignored, failure) -> null)
+                                .thenCompose(ignored -> readOwnerAdmission())
+                                .thenApply(after -> after.filter(
+                                                value -> value.owner().equals(owner)
+                                                        && !value.closed()
+                                                        && value.previous().equals(candidate.previous()))
+                                        .map(ProviderMutationResultV1::appliedExact)
+                                        .orElseGet(ProviderMutationResultV1::fencedOrConflict));
+                    });
+                });
         return work.exceptionally(failure -> ProviderMutationResultV1.outcomeUnknown())
                 .thenApply(value -> value);
+    }
+
+    private CompletionStage<Boolean> prepareBirthInventory(KafkaOwnerAdmissionV1 candidate) {
+        var empty = new KafkaOwnerAdmissionV1(scopeDigest(), candidate.owner(), false, Optional.empty(), List.of());
+        return create(nativeBirthInventoryKey(candidate.owner().ownerEpoch()), empty.encode())
+                .thenCompose(ignored -> readBirthInventory(candidate.owner().ownerEpoch()))
+                .thenApply(observed -> observed.isPresent()
+                        && observed.orElseThrow().value().owner().equals(candidate.owner()));
     }
 
     @Override
@@ -255,11 +426,16 @@ public final class OxiaKafkaRunRootAuthorityV2
     }
 
     private CompletionStage<Optional<KafkaOwnerAdmissionV1>> admissionFor(long epoch) {
-        return readOwnerAdmission()
-                .thenCompose(current -> current.filter(value -> value.owner().ownerEpoch() == epoch)
-                                .isPresent()
-                        ? CompletableFuture.completedFuture(current)
-                        : readClosedOwner(epoch));
+        return admissionFactFor(epoch).thenApply(value -> value.map(OwnerAdmissionFact::admission));
+    }
+
+    private CompletionStage<Optional<OwnerAdmissionFact>> admissionFactFor(long epoch) {
+        return readOwnerAdmissionFact()
+                .thenCompose(current ->
+                        current.filter(value -> value.admission().owner().ownerEpoch() == epoch)
+                                        .isPresent()
+                                ? CompletableFuture.completedFuture(current)
+                                : readClosedOwnerFact(epoch));
     }
 
     private CompletionStage<Void> admitCandidate(KafkaRunRootRecordV2 candidate) {
@@ -283,6 +459,19 @@ public final class OxiaKafkaRunRootAuthorityV2
 
     @Override
     public CompletionStage<Optional<KafkaRunRootRecordV2>> readSelectedRoot(String nativeKey) {
+        return readSelectedRootFact(nativeKey).thenApply(value -> value.map(RunRootFact::record));
+    }
+
+    /** Exact admitted root and native version, including retired read sources that remain physically present. */
+    public record RunRootFact(KafkaRunRootRecordV2 record, AuthorityFactV1 authority, OwnerAdmissionFact owner) {
+        public RunRootFact {
+            Objects.requireNonNull(record, "record");
+            Objects.requireNonNull(authority, "authority");
+            Objects.requireNonNull(owner, "owner");
+        }
+    }
+
+    public CompletionStage<Optional<RunRootFact>> readSelectedRootFact(String nativeKey) {
         Objects.requireNonNull(nativeKey, "nativeKey");
         String start = prefix + "/";
         if (nativeKey.length() != start.length() + 32 + "/root-v2".length()
@@ -301,7 +490,17 @@ public final class OxiaKafkaRunRootAuthorityV2
                 return CompletableFuture.completedFuture(Optional.empty());
             }
             var value = current.orElseThrow().value();
-            return selected(value).thenApply(chosen -> chosen ? Optional.of(value) : Optional.empty());
+            if (value.retired()) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+            return guard.isRootMetadataReadable(value.resource())
+                    .thenCompose(readable -> readable
+                            ? admissionFactFor(value.root().creatorOwnerEpoch()).thenApply(owner -> owner.filter(
+                                            admitted ->
+                                                    admitted.admission().runs().contains(value.initialLink()))
+                                    .map(admitted -> new RunRootFact(
+                                            value, fact(current.orElseThrow().nativeValue()), admitted)))
+                            : CompletableFuture.completedFuture(Optional.empty()));
         });
     }
 
@@ -383,6 +582,129 @@ public final class OxiaKafkaRunRootAuthorityV2
     }
 
     @Override
+    public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> reserveRunBirth(
+            KafkaRunRootSnapshotV1 activeCandidate) {
+        var proposed = candidate(activeCandidate);
+        return readOwnerAdmission()
+                .thenCompose(owner -> {
+                    if (!canReserveBirth(owner, activeCandidate)) {
+                        return CompletableFuture.completedFuture(
+                                ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict());
+                    }
+                    CompletionStage<Boolean> parentReady = activeCandidate
+                            .predecessorRunId()
+                            .map(parentId ->
+                                    read(parentId).thenCompose(parent -> birthParentReady(parent, activeCandidate)))
+                            .orElseGet(() -> CompletableFuture.completedFuture(true));
+                    return parentReady.thenCompose(ready -> {
+                        if (!ready) {
+                            return CompletableFuture.completedFuture(
+                                    ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict());
+                        }
+                        return create(nativeRootKey(activeCandidate.runId()), proposed.encode())
+                                .thenCompose(ignored -> read(activeCandidate.runId()))
+                                .thenCompose(observed -> {
+                                    if (observed.isEmpty()) {
+                                        return CompletableFuture.completedFuture(
+                                                ProviderMutationResultV1.<KafkaRunRootSnapshotV1>outcomeUnknown());
+                                    }
+                                    var winner = observed.orElseThrow().value();
+                                    if (winner.admitted()
+                                            || winner.retired()
+                                            || !sameBirthPlacement(activeCandidate, winner.root())) {
+                                        return CompletableFuture.completedFuture(
+                                                ProviderMutationResultV1.<KafkaRunRootSnapshotV1>fencedOrConflict());
+                                    }
+                                    return appendBirthInventory(owner.orElseThrow(), winner.initialLink(), 8)
+                                            .thenCompose(registered -> readOwnerAdmission()
+                                                    .thenApply(after -> registered
+                                                                    && canReserveBirth(after, activeCandidate)
+                                                            ? ProviderMutationResultV1.appliedExact(winner.root())
+                                                            : ProviderMutationResultV1
+                                                                    .<KafkaRunRootSnapshotV1>fencedOrConflict()));
+                                });
+                    });
+                })
+                .exceptionally(failure -> ProviderMutationResultV1.outcomeUnknown());
+    }
+
+    private CompletionStage<Boolean> birthParentReady(Optional<Stored> parent, KafkaRunRootSnapshotV1 activeCandidate) {
+        if (parent.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        var value = parent.orElseThrow().value();
+        if (value.root().state() != KafkaRunRootStateV1.SEALED
+                || value.root().kafkaEndOffsetExclusive().orElseThrow() != activeCandidate.kafkaStartOffset()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        if (value.retired()
+                && (activeCandidate.creatorOwnerEpoch() <= value.root().creatorOwnerEpoch()
+                        || activeCandidate.kafkaLeaderEpoch() <= value.root().kafkaLeaderEpoch())) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return value.retired()
+                ? verifier.permitsRetiredSuccessor(value, activeCandidate)
+                : CompletableFuture.completedFuture(true);
+    }
+
+    private CompletionStage<Boolean> appendBirthInventory(KafkaOwnerAdmissionV1 owner, Link link, int attemptsLeft) {
+        return readBirthInventory(owner.owner().ownerEpoch()).thenCompose(observed -> {
+            if (observed.isPresent()) {
+                var current = observed.orElseThrow().value();
+                if (!current.owner().equals(owner.owner())) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                if (current.runs().contains(link)) {
+                    return CompletableFuture.completedFuture(true);
+                }
+                if (attemptsLeft == 0
+                        || current.runs().size() == KafkaOwnerAdmissionV1.MAX_RUNS
+                        || current.runs().stream()
+                                .anyMatch(value -> value.runId().equals(link.runId()))) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                var links = new ArrayList<>(current.runs());
+                links.add(link);
+                var next = new KafkaOwnerAdmissionV1(scopeDigest(), owner.owner(), false, Optional.empty(), links);
+                return client.compareAndSet(
+                                nativeBirthInventoryKey(owner.owner().ownerEpoch()),
+                                next.encode(),
+                                observed.orElseThrow().nativeValue().versionId())
+                        .handle((ignored, failure) -> null)
+                        .thenCompose(ignored -> appendBirthInventory(owner, link, attemptsLeft - 1));
+            }
+            // A newly opened owner seeds the empty inventory before its head can become visible.
+            // Its absence here is unknown history and cannot authorize physical creation.
+            return CompletableFuture.completedFuture(false);
+        });
+    }
+
+    private boolean canReserveBirth(Optional<KafkaOwnerAdmissionV1> admission, KafkaRunRootSnapshotV1 root) {
+        return admission
+                .filter(owner -> !owner.closed()
+                        && owner.owner().ownerEpoch() == root.creatorOwnerEpoch()
+                        && owner.owner().kafkaLeaderEpoch() == root.kafkaLeaderEpoch()
+                        && owner.tail().map(Link::runId).equals(root.predecessorRunId())
+                        && owner.runs().size() < KafkaOwnerAdmissionV1.MAX_RUNS)
+                .isPresent();
+    }
+
+    private static boolean sameBirthPlacement(KafkaRunRootSnapshotV1 expected, KafkaRunRootSnapshotV1 observed) {
+        return expected.bindingId().equals(observed.bindingId())
+                && expected.topicIncarnation().equals(observed.topicIncarnation())
+                && expected.partitionId() == observed.partitionId()
+                && expected.storageEpochId().equals(observed.storageEpochId())
+                && expected.creatorOwnerEpoch() == observed.creatorOwnerEpoch()
+                && expected.kafkaLeaderEpoch() == observed.kafkaLeaderEpoch()
+                && expected.providerScopeId().equals(observed.providerScopeId())
+                && expected.runId().equals(observed.runId())
+                && expected.kafkaStartOffset() == observed.kafkaStartOffset()
+                && expected.predecessorRunId().equals(observed.predecessorRunId())
+                && observed.state() == KafkaRunRootStateV1.ACTIVE
+                && observed.kafkaEndOffsetExclusive().isEmpty();
+    }
+
+    @Override
     public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(KafkaRunRootSnapshotV1 active) {
         var candidate = candidate(active);
         if (active.predecessorRunId().isPresent()) {
@@ -400,21 +722,41 @@ public final class OxiaKafkaRunRootAuthorityV2
         var parent = new KafkaRunRootRecordV2(resource(sealed), sealed, true, Optional.empty());
         var child = candidate(active);
         parent.select(child);
-        return guarded(child, Optional.of(parent), () -> verifier.requireNative(child)
-                .thenCompose(ignored -> read(sealed.runId()))
+        return read(sealed.runId())
                 .thenCompose(observed -> {
                     var exact = observed.orElseThrow(() -> new IllegalStateException("successor parent is absent"));
                     if (!exact.value().root().equals(sealed)) {
                         throw new IllegalStateException("successor parent differs from the exact sealed root");
                     }
-                    var selected = exact.value().select(child);
-                    return prewrite(child)
-                            .thenCompose(ignored -> admitCandidate(child))
-                            .thenCompose(ignored -> selected.equals(exact.value())
-                                    ? CompletableFuture.completedFuture(null)
-                                    : cas(exact, selected));
+                    // The same logical parent bytes bind every retry; its selected child never changes the Context.
+                    var lineage = exact.value().retired() ? parent.retire() : parent;
+                    return guarded(child, Optional.of(lineage), () -> verifier.requireNative(child)
+                            .thenCompose(ignored -> selectSuccessor(sealed, child))
+                            .thenCompose(ignored -> promote(child)));
                 })
-                .thenCompose(ignored -> promote(child)));
+                .exceptionally(failure -> ProviderMutationResultV1.outcomeUnknown());
+    }
+
+    private CompletionStage<Void> selectSuccessor(KafkaRunRootSnapshotV1 sealed, KafkaRunRootRecordV2 child) {
+        return read(sealed.runId()).thenCompose(observed -> {
+            var exact = observed.orElseThrow(() -> new IllegalStateException("successor parent is absent"));
+            if (!exact.value().root().equals(sealed)) {
+                throw new IllegalStateException("successor parent differs from the exact sealed root");
+            }
+            return birthParentReady(observed, child.root()).thenCompose(ready -> {
+                if (!ready) {
+                    throw new IllegalStateException("successor lacks its exact native recovery anchor admission");
+                }
+                var selected = exact.value().retired()
+                        ? exact.value().selectRecoveredSuccessor(child)
+                        : exact.value().select(child);
+                return prewrite(child)
+                        .thenCompose(ignored -> admitCandidate(child))
+                        .thenCompose(ignored -> selected.equals(exact.value())
+                                ? CompletableFuture.completedFuture(null)
+                                : cas(exact, selected));
+            });
+        });
     }
 
     @Override
@@ -503,7 +845,9 @@ public final class OxiaKafkaRunRootAuthorityV2
             KafkaRunRootRecordV2 candidate,
             Optional<KafkaRunRootRecordV2> parent,
             Supplier<CompletionStage<Void>> mutation) {
-        var resources = parent.<List<PhysicalResourceIdV2>>map(value -> List.of(value.resource(), candidate.resource()))
+        var resources = parent.<List<PhysicalResourceIdV2>>map(value -> value.retired()
+                        ? List.of(candidate.resource())
+                        : List.of(value.resource(), candidate.resource()))
                 .orElseGet(() -> List.of(candidate.resource()));
         var candidateBytes = candidate.encode();
         var parentBytes = parent.map(KafkaRunRootRecordV2::encode).orElse(CanonicalBytes.empty());
@@ -601,9 +945,16 @@ public final class OxiaKafkaRunRootAuthorityV2
             }
             return candidate.root().predecessorRunId().isEmpty()
                     ? CompletableFuture.completedFuture(Optional.empty())
-                    : read(candidate.root().predecessorRunId().orElseThrow()).thenApply(parent -> parent.filter(
-                                    value -> value.value().retired())
-                            .map(value -> conflict(value.value().encode())));
+                    : read(candidate.root().predecessorRunId().orElseThrow()).thenCompose(parent -> {
+                        if (parent.isEmpty() || !parent.orElseThrow().value().retired()) {
+                            return CompletableFuture.completedFuture(Optional.empty());
+                        }
+                        return birthParentReady(parent, candidate.root())
+                                .thenApply(ready -> ready
+                                        ? Optional.empty()
+                                        : Optional.of(conflict(
+                                                parent.orElseThrow().value().encode())));
+                    });
         });
     }
 

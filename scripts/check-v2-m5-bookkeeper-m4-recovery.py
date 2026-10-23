@@ -55,8 +55,8 @@ def validate(root):
         raise ValueError("BK M4 recovery mutates authority or bypasses async source ownership")
     compact = "".join(source.split())
     required = ("new BindingReadAsyncExecutorV1(ownerEventLoop, hazards.capacity())", "executor.execute(current, hazards",
-                "BindingReadPlannerV1.plan(", "!plan.route(0).equals(expectedRoute)", "plan.size() != 1",
-                "!captured.selectedViewSha256().equals(digest)", "!selected.equals(descriptor)",
+                "BindingReadPlannerV1.plan(", "!plan.route(0).equals(route(descriptor))", "plan.size() != 1",
+                "!captured.selectedViewSha256().equals(descriptor.descriptorSha256())", "!selected.equals(descriptor)",
                 "reader.recover(descriptor).thenApply(view -> new RecoveryResult(captured, view))",
                 "selector.admissionState() == AdmissionState.ADMITTING", "new BindingReadPlanBufferV1(1)",
                 "source, null, 0, BindingReadRouteV1.SourcePurity.KAFKA_APPEND_UNIT")

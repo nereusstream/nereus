@@ -25,6 +25,13 @@ import java.util.concurrent.CompletionStage;
  * <p>This is deliberately not generic metadata CRUD and is never invoked once per Produce, RecordBatch, or Fetch.
  */
 public interface KafkaRunRootAuthority {
+    /**
+     * Persist one unselected run-to-ledger choice before native creation. A competing allocator adopts the exact
+     * winner for this run ID; an unknown result cannot authorize a different physical create.
+     */
+    CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> reserveRunBirth(
+            KafkaRunRootSnapshotV1 activeCandidate);
+
     CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(
             KafkaRunRootSnapshotV1 activeCandidate);
 

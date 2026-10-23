@@ -27,6 +27,7 @@ import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Fro
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.InputBatch;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.LatestKeyProof;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.LeaderEpochRange;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.OutputCompressionPolicy;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Policy;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.ProtocolRoots;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.TransactionOutcome;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.ControlRecordType;
@@ -68,9 +70,224 @@ import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
+import org.apache.kafka.common.utils.BufferSupplier;
 import org.junit.jupiter.api.Test;
 
 class KafkaSemanticCompactorV1Test {
+    @Test
+    void emptyNonNullKeyHasItsOwnLatestValueAndTombstoneProof() {
+        var body = records(
+                0,
+                3,
+                Compression.gzip().build(),
+                new SimpleRecord(10, bytes(""), bytes("old")),
+                new SimpleRecord(11, bytes(""), null),
+                new SimpleRecord(12, (byte[]) null, bytes("keyless")));
+        var fixture = new Fixture(List.of(body), 0, 3);
+        var plan = withCompression(
+                fixture.plan(List.of(proof("", 1, 0, true)), List.of(), List.of(), 100, CompressionType.NONE),
+                OutputCompressionPolicy.PRODUCER);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, output);
+        assertThat(output.batchOutputs())
+                .extracting(batch -> batch.outputBody().orElseThrow())
+                .containsExactlyElementsOf(nativeFilter(List.of(body), java.util.Set.of(1L, 2L), 100, 1_000));
+        var retained = output.batchOutputs().get(0).output().orElseThrow().records();
+        assertThat(retained)
+                .extracting(KafkaCompactionRecordsV1.RecordValue::offset)
+                .containsExactly(1L, 2L);
+        assertThat(retained.get(0).key()).contains(CanonicalBytes.empty());
+        assertThat(retained.get(0).tombstone()).isTrue();
+        assertThat(retained.get(1).key()).isEmpty();
+    }
+
+    @Test
+    void producerCompressionPreservesMixedInputCodecsDuringSparseRewrite() {
+        List<CanonicalBytes> bodies = new ArrayList<>();
+        List<LatestKeyProof> proofs = new ArrayList<>();
+        var codecs = List.of(
+                CompressionType.GZIP,
+                CompressionType.SNAPPY,
+                CompressionType.LZ4,
+                CompressionType.ZSTD,
+                CompressionType.NONE);
+        for (int index = 0; index < codecs.size(); index++) {
+            long offset = 3L * index;
+            String key = "mixed-" + index;
+            bodies.add(records(
+                    offset,
+                    3,
+                    Compression.of(codecs.get(index)).build(),
+                    new SimpleRecord(offset, bytes(key), bytes("old")),
+                    new SimpleRecord(offset + 1, bytes(key), bytes("new")),
+                    new SimpleRecord(offset + 2, bytes("shared"), bytes("superseded"))));
+            proofs.add(proof(key, offset + 1, 1_000, false));
+        }
+        proofs.add(proof("shared", 14, 1_000, false));
+        var fixture = new Fixture(bodies, 0, 15);
+        var fixed = fixture.plan(proofs, List.of(), List.of(), 100, CompressionType.NONE);
+        var plan = withCompression(fixed, OutputCompressionPolicy.PRODUCER);
+        var oracleBatches = nativeFilter(bodies, java.util.Set.of(1L, 4L, 7L, 10L, 13L, 14L), 100, 1_000);
+        var compiler = new KafkaSemanticCompactorV1();
+        for (KafkaCompactionSemanticViewV2 result :
+                List.of(compiler.compileSemantic(plan), compiler.compact(plan).candidate())) {
+            assertThat(result.batchOutputs())
+                    .extracting(batch -> batch.output().orElseThrow().compressionType())
+                    .containsExactlyElementsOf(codecs);
+            assertThat(result.batchOutputs())
+                    .extracting(batch -> batch.outputBody().orElseThrow())
+                    .containsExactlyElementsOf(oracleBatches);
+            assertThat(result.batchOutputs())
+                    .flatExtracting(batch -> batch.output().orElseThrow().records())
+                    .extracting(KafkaCompactionRecordsV1.RecordValue::offset)
+                    .containsExactly(1L, 4L, 7L, 10L, 13L, 14L);
+        }
+        assertThat(KafkaCompactionCanonicalV1.planRoot(plan)).isNotEqualTo(KafkaCompactionCanonicalV1.planRoot(fixed));
+        assertThat(KafkaCompactionCanonicalV1.planRoot(withCompression(fixed, OutputCompressionPolicy.NONE)))
+                .isEqualTo(KafkaCompactionCanonicalV1.planRoot(fixed));
+    }
+
+    @Test
+    void nativeFixedCodecPolicyRetainsOffsetHeadersAndFirstCleanHorizon() {
+        var body = records(
+                0,
+                3,
+                Compression.gzip().build(),
+                new SimpleRecord(500, bytes("k"), bytes("old")),
+                new SimpleRecord(501, bytes("k"), null),
+                new SimpleRecord(502, bytes("tail"), bytes("old")));
+        var next = records(3, 3, Compression.gzip().build(), new SimpleRecord(503, bytes("tail"), bytes("new")));
+        var original = new Fixture(List.of(body, next), 0, 4)
+                .plan(
+                        List.of(proof("k", 1, 1_100, false), proof("tail", 3, 1_100, false)),
+                        List.of(),
+                        List.of(),
+                        100,
+                        CompressionType.GZIP);
+        var previous = original.policy();
+        var plan = new CompactionPlan(
+                original.sourceCut(),
+                new Policy(
+                        previous.kafkaFeatureLevel(),
+                        previous.messageMagic(),
+                        previous.cleanupPolicy(),
+                        previous.minimumCleanableRatioPartsPerMillion(),
+                        previous.deleteRetentionMs(),
+                        previous.capturedNowMs(),
+                        previous.policyGeneration(),
+                        KafkaCompactionRecordsV1.NATIVE_REWRITE_POLICY_VERSION,
+                        previous.nativeKafkaOracleVersion(),
+                        previous.compressionPolicy(),
+                        previous.caps()),
+                original.frontiers(),
+                original.protocolRoots(),
+                original.inputBatches(),
+                original.keyProofs(),
+                original.transactions(),
+                original.leaderEpochs(),
+                original.undecidableOffsets(),
+                original.recoveryRequiredOffsets());
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        assertThat(output.batchOutputs())
+                .extracting(batch -> batch.outputBody().orElseThrow())
+                .containsExactlyElementsOf(nativeFilter(List.of(body, next), java.util.Set.of(1L, 3L), 100, 1_000));
+        assertThat(KafkaCompactionCanonicalV1.planRoot(plan))
+                .isNotEqualTo(KafkaCompactionCanonicalV1.planRoot(original));
+        var batch = output.batchOutputs().get(0);
+        var invalidBody = KafkaRecordBatchCodecV1.rewrite(
+                        batch.input(), batch.output().orElseThrow().records(), CompressionType.GZIP)
+                .orElseThrow();
+        var invalid = semanticCopy(
+                output,
+                List.of(
+                        new KafkaSemanticCompactorV1.BatchOutput(
+                                batch.input(),
+                                Optional.of(KafkaRecordBatchCodecV1.parse(invalidBody)),
+                                Optional.of(invalidBody),
+                                batch.outputBatchOrdinal(),
+                                batch.payloadOffset()),
+                        output.batchOutputs().get(1)),
+                output.gaps(),
+                output.indexes());
+        var checkedPlan = plan;
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(checkedPlan, invalid))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("native batch header");
+    }
+
+    @Test
+    void independentValidationRejectsWrongCodecUnderProducerCompression() {
+        var body = records(
+                0,
+                3,
+                Compression.gzip().build(),
+                new SimpleRecord(0, bytes("k"), bytes("old")),
+                new SimpleRecord(1, bytes("k"), bytes("new")));
+        var fixture = new Fixture(List.of(body), 0, 2);
+        var fixed = fixture.plan(List.of(proof("k", 1, 1_000, false)), List.of(), List.of(), 100, CompressionType.NONE);
+        var plan = withCompression(fixed, OutputCompressionPolicy.PRODUCER);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        var previous = output.batchOutputs().get(0);
+        var wrongBody = KafkaRecordBatchCodecV1.rewrite(
+                        previous.input(), previous.output().orElseThrow().records(), CompressionType.NONE)
+                .orElseThrow();
+        var changed = new KafkaSemanticCompactorV1.BatchOutput(
+                previous.input(),
+                Optional.of(KafkaRecordBatchCodecV1.parse(wrongBody)),
+                Optional.of(wrongBody),
+                previous.outputBatchOrdinal(),
+                previous.payloadOffset());
+        var invalid = semanticCopy(output, List.of(changed), output.gaps(), output.indexes());
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, invalid))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("record/batch semantics");
+    }
+
+    @Test
+    void producerCompressionPreservesFirstCleanTombstoneHorizonAcrossFurtherCleaning() {
+        var body = records(
+                0,
+                3,
+                Compression.gzip().build(),
+                new SimpleRecord(500, bytes("k"), bytes("old")),
+                new SimpleRecord(501, bytes("k"), null));
+        var fixture = new Fixture(List.of(body), 0, 2);
+        var plan = withCompression(
+                fixture.plan(List.of(proof("k", 1, 1_100, false)), List.of(), List.of(), 100, CompressionType.NONE),
+                OutputCompressionPolicy.PRODUCER);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        var batch = output.batchOutputs().get(0);
+        var compacted = batch.outputBody().orElseThrow();
+        assertThat(nativeFilter(List.of(body), java.util.Set.of(1L), 100, 1_000))
+                .containsExactly(compacted);
+        var nativeBatch = MemoryRecords.readableRecords(ByteBuffer.wrap(compacted.toByteArray()))
+                .batches()
+                .iterator()
+                .next();
+        assertThat(nativeBatch.deleteHorizonMs()).hasValue(1_100);
+        assertThat(batch.output().orElseThrow().records().get(0).timestamp()).isEqualTo(501);
+        assertThat(KafkaRecordBatchCodecV1.rewriteProducer(
+                        batch.output().orElseThrow(),
+                        batch.output().orElseThrow().records(),
+                        200,
+                        1_000))
+                .contains(compacted);
+
+        var wrongHorizon = KafkaRecordBatchCodecV1.rewriteProducer(
+                        batch.input(), batch.output().orElseThrow().records(), 100, 1_001)
+                .orElseThrow();
+        var wrongBatch = new KafkaSemanticCompactorV1.BatchOutput(
+                batch.input(),
+                Optional.of(KafkaRecordBatchCodecV1.parse(wrongHorizon)),
+                Optional.of(wrongHorizon),
+                batch.outputBatchOrdinal(),
+                batch.payloadOffset());
+        var invalid = semanticCopy(output, List.of(wrongBatch), output.gaps(), output.indexes());
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, invalid))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("native batch header");
+    }
+
     @Test
     void persistedCellAdmissionReservesAllCompactionResourcesBeforeDispatch() {
         CanonicalBytes body = records(80, 12, Compression.NONE, new SimpleRecord(80, bytes("admission"), bytes("one")));
@@ -87,6 +304,9 @@ class KafkaSemanticCompactorV1Test {
                 .isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
         assertThat(admission.reserve(plan, 1_000, 1_000, 5, 0, 9, 1, 9, 2))
                 .isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
+        var reserved = admission.read().orElseThrow();
+        assertThat(admission.install(caps)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
+        assertThat(admission.read()).contains(reserved);
         assertThat(KafkaCompactionAdmissionV1.decode(
                         KafkaCompactionAdmissionV1.encode(admission.read().orElseThrow())))
                 .isEqualTo(admission.read().orElseThrow());
@@ -95,6 +315,81 @@ class KafkaSemanticCompactorV1Test {
         Sha256Digest task = admission.read().orElseThrow().reservations().get(0).compactionTaskIdSha256();
         assertThat(admission.release(task)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
         assertThat(admission.read().orElseThrow().reservations()).isEmpty();
+    }
+
+    @Test
+    void replacesPreparationAllowanceWithoutDroppingTheCellReservation() {
+        var admission = new KafkaCompactionAdmissionV1(new Store(), digest("preparation-cell"));
+        var caps = new KafkaCompactionAdmissionV1.CellCaps(
+                1, 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+        assertThat(admission.install(caps)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+        var preparation = new KafkaCompactionAdmissionV1.Reservation(
+                digest("preparation"), 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+        var task = new KafkaCompactionAdmissionV1.Reservation(
+                digest("complete-task"), 90, 9, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90);
+        assertThat(admission.reserve(preparation)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+        assertThat(admission.reserve(task)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.REJECTED_CAP);
+        assertThat(admission.replace(preparation, task)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+        assertThat(admission.read().orElseThrow().reservations()).containsExactly(task);
+        assertThat(admission.replace(preparation, task)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
+        assertThat(admission.read().orElseThrow().generation()).isEqualTo(3);
+        assertThat(admission.install(caps)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
+        assertThat(admission.read().orElseThrow().reservations()).containsExactly(task);
+    }
+
+    @Test
+    void rejectsChangedPreparationOrOverCapTaskWithoutLosingTheOriginalAllowance() {
+        var admission = new KafkaCompactionAdmissionV1(new Store(), digest("preparation-cell"));
+        var caps = new KafkaCompactionAdmissionV1.CellCaps(
+                1, 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+        admission.install(caps);
+        var preparation = new KafkaCompactionAdmissionV1.Reservation(
+                digest("preparation"), 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+        admission.reserve(preparation);
+        var overCap = new KafkaCompactionAdmissionV1.Reservation(
+                digest("complete-task"), 101, 9, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90);
+        var changed = new KafkaCompactionAdmissionV1.Reservation(
+                preparation.compactionTaskIdSha256(),
+                99,
+                10,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100,
+                100);
+        var exact = admission.read().orElseThrow();
+        assertThat(admission.replace(preparation, overCap)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.REJECTED_CAP);
+        assertThat(admission.replace(changed, overCap)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.CONFLICT);
+        assertThat(admission.read()).contains(exact);
+    }
+
+    @Test
+    void unknownReservationReplyRetainsUncertaintyAndTerminalCasRejectsLateArrival() {
+        var store = new Store();
+        var admission = new KafkaCompactionAdmissionV1(store, digest("preparation-cell"));
+        admission.install(new KafkaCompactionAdmissionV1.CellCaps(
+                1, 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100));
+        var preparation = new KafkaCompactionAdmissionV1.Reservation(
+                digest("preparation"), 100, 10, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+        var original = admission.read().orElseThrow();
+        store.holdNextCas = true;
+        assertThat(admission.reserve(preparation)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.OUTCOME_UNKNOWN);
+        assertThat(admission.read()).contains(original);
+        assertThat(admission.cancelPreparation(preparation.compactionTaskIdSha256()))
+                .isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+        var terminal = admission.read().orElseThrow();
+        assertThat(terminal.generation()).isEqualTo(2);
+        assertThat(terminal.reservations()).isEmpty();
+        assertThat(store.deliverHeldCas()).isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThat(admission.read()).contains(terminal);
     }
 
     @Test
@@ -558,6 +853,66 @@ class KafkaSemanticCompactorV1Test {
         }
     }
 
+    private static List<CanonicalBytes> nativeFilter(
+            List<CanonicalBytes> bodies, java.util.Set<Long> offsets, long nowMs, long retentionMs) {
+        var oracleBuffer = ByteBuffer.allocate(16_384);
+        var oracleInput = MemoryRecords.readableRecords(
+                ByteBuffer.wrap(concatenate(bodies).toByteArray()));
+        var filter = new MemoryRecords.RecordFilter(nowMs, retentionMs) {
+            @Override
+            protected BatchRetentionResult checkBatchRetention(RecordBatch batch) {
+                return new BatchRetentionResult(BatchRetention.DELETE_EMPTY, false);
+            }
+
+            @Override
+            protected boolean shouldRetainRecord(RecordBatch batch, org.apache.kafka.common.record.Record record) {
+                return offsets.contains(record.offset());
+            }
+        };
+        var oracle = oracleInput
+                .filterTo(
+                        new TopicPartition("compression-oracle", 0),
+                        filter,
+                        oracleBuffer,
+                        16_384,
+                        BufferSupplier.NO_CACHING)
+                .outputBuffer();
+        oracle.flip();
+        List<CanonicalBytes> oracleBatches = new ArrayList<>();
+        for (var batch : MemoryRecords.readableRecords(oracle).batches()) {
+            var buffer = ByteBuffer.allocate(batch.sizeInBytes());
+            batch.writeTo(buffer);
+            oracleBatches.add(CanonicalBytes.copyOf(buffer.array()));
+        }
+        return List.copyOf(oracleBatches);
+    }
+
+    private static CompactionPlan withCompression(CompactionPlan plan, OutputCompressionPolicy compression) {
+        var policy = plan.policy();
+        return new CompactionPlan(
+                plan.sourceCut(),
+                new Policy(
+                        policy.kafkaFeatureLevel(),
+                        policy.messageMagic(),
+                        policy.cleanupPolicy(),
+                        policy.minimumCleanableRatioPartsPerMillion(),
+                        policy.deleteRetentionMs(),
+                        policy.capturedNowMs(),
+                        policy.policyGeneration(),
+                        policy.rewritePolicyVersion(),
+                        policy.nativeKafkaOracleVersion(),
+                        compression,
+                        policy.caps()),
+                plan.frontiers(),
+                plan.protocolRoots(),
+                plan.inputBatches(),
+                plan.keyProofs(),
+                plan.transactions(),
+                plan.leaderEpochs(),
+                plan.undecidableOffsets(),
+                plan.recoveryRequiredOffsets());
+    }
+
     private static KafkaCompactionSemanticOutputV2 semanticCopy(
             KafkaCompactionSemanticOutputV2 original,
             List<KafkaSemanticCompactorV1.BatchOutput> outputs,
@@ -579,8 +934,8 @@ class KafkaSemanticCompactorV1Test {
     static final class Fixture {
         private final List<CanonicalBytes> batches;
         private final CanonicalBytes sourceBody;
-        private final BindingIdentity binding = new BindingIdentity(
-                new TopicBindingId(digest("binding")), digest("incarnation"), digest("storage-epoch"));
+        private final BindingIdentity binding;
+        private final Sha256Digest recoveryCheckpoint;
         private final CapabilityBinding capability;
         private final BindingReadSelector selector;
         private final IdentityEnvelope envelope;
@@ -595,6 +950,25 @@ class KafkaSemanticCompactorV1Test {
         }
 
         Fixture(List<CanonicalBytes> batches, long start, long end, CapabilityBinding capability) {
+            this(
+                    batches,
+                    start,
+                    end,
+                    capability,
+                    new BindingIdentity(
+                            new TopicBindingId(digest("binding")), digest("incarnation"), digest("storage-epoch")),
+                    digest("recovery"));
+        }
+
+        Fixture(
+                List<CanonicalBytes> batches,
+                long start,
+                long end,
+                CapabilityBinding capability,
+                BindingIdentity binding,
+                Sha256Digest recoveryCheckpoint) {
+            this.binding = binding;
+            this.recoveryCheckpoint = recoveryCheckpoint;
             this.capability = capability;
             this.batches = List.copyOf(batches);
             this.start = start;
@@ -657,7 +1031,7 @@ class KafkaSemanticCompactorV1Test {
                     end,
                     start,
                     digest("protocol-state"),
-                    digest("recovery"),
+                    recoveryCheckpoint,
                     digest("materialization-policy"),
                     digest("output-policy"),
                     com.nereusstream.storage.object.materialization.M5MaterializationCodecV1.calculateSourceSetSha256(
@@ -732,7 +1106,7 @@ class KafkaSemanticCompactorV1Test {
                             digest("aborted"),
                             digest("leader-epoch"),
                             digest("timestamp"),
-                            digest("recovery"),
+                            recoveryCheckpoint,
                             digest("active-tail"),
                             digest("key-domain")),
                     inputs,
@@ -760,6 +1134,14 @@ class KafkaSemanticCompactorV1Test {
 
     private static final class Store implements CanonicalControlMetadataStore {
         private final Map<String, CanonicalBytes> values = new LinkedHashMap<>();
+        private boolean holdNextCas;
+        private String heldKey;
+        private Optional<CanonicalBytes> heldExpected;
+        private CanonicalBytes heldCandidate;
+
+        private ControlMutationOutcome deliverHeldCas() {
+            return compareAndSet(heldKey, heldExpected, heldCandidate);
+        }
 
         @Override
         public Optional<CanonicalBytes> get(String key) {
@@ -776,6 +1158,13 @@ class KafkaSemanticCompactorV1Test {
         @Override
         public ControlMutationOutcome compareAndSet(
                 String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
+            if (holdNextCas) {
+                holdNextCas = false;
+                heldKey = key;
+                heldExpected = exactExpected;
+                heldCandidate = exactCandidate;
+                return ControlMutationOutcome.RESPONSE_UNKNOWN;
+            }
             CanonicalBytes current = values.get(key);
             if (!Objects.equals(current, exactExpected.orElse(null))) {
                 return ControlMutationOutcome.DEFINITIVE_CONFLICT;

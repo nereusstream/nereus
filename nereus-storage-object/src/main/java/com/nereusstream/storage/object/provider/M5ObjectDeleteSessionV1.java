@@ -17,10 +17,11 @@ package com.nereusstream.storage.object.provider;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +31,7 @@ import java.util.Set;
 public final class M5ObjectDeleteSessionV1 {
     public enum ReconciliationKindV1 {
         AUTHORITATIVELY_ABSENT,
+        EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT,
         EXACT_OLD_VERSION_REMAINS,
         DIFFERENT_VERSION_OR_BODY,
         OUTCOME_UNKNOWN
@@ -59,6 +61,8 @@ public final class M5ObjectDeleteSessionV1 {
             }
             if ((kind == ReconciliationKindV1.AUTHORITATIVELY_ABSENT
                             && (exactKeyListed || observedVersionToken.isPresent()))
+                    || (kind == ReconciliationKindV1.EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT
+                            && (!exactKeyListed || observedVersionToken.isEmpty()))
                     || (kind == ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS && observedVersionToken.isEmpty())) {
                 throw new IllegalArgumentException("delete reconciliation kind and facts disagree");
             }
@@ -124,7 +128,7 @@ public final class M5ObjectDeleteSessionV1 {
 
     public ExactDeleteReadV1 readExactForDelete(ObjectIdentity identity) throws IOException {
         requireOwned(identity);
-        ReadObservation observation = readCurrent(identity);
+        ReadObservation observation = read(identity, Optional.empty());
         if (observation.kind != ReadKind.EXACT || observation.versionToken.isEmpty()) {
             throw new IOException("M5-D full GET did not return the exact body and immutable version token");
         }
@@ -145,55 +149,73 @@ public final class M5ObjectDeleteSessionV1 {
             throws IOException {
         requireOwned(identity);
         requireOwnedPrefix(leafPrefix);
+        if (!identity.key().startsWith(leafPrefix)) {
+            throw new IllegalArgumentException("delete reconciliation prefix does not contain the exact target key");
+        }
         CanonicalBytes expectedOld = copyRequired(oldVersionToken, "oldVersionToken");
         ListObservation list = completeList(leafPrefix, identity.key());
-        ReadObservation read = readCurrent(identity);
-        if (read.kind == ReadKind.NOT_FOUND) {
-            return new ReconciliationV1(
-                    list.exactKeyListed
-                            ? ReconciliationKindV1.OUTCOME_UNKNOWN
-                            : ReconciliationKindV1.AUTHORITATIVELY_ABSENT,
-                    list.pages,
-                    list.keys,
-                    list.exactKeyListed,
-                    Optional.empty());
-        }
-        if (read.kind == ReadKind.UNKNOWN) {
+        ReadObservation current = read(identity, Optional.empty());
+        // A versioned bucket may hide the old physical version behind a delete marker. Current-key LIST/GET
+        // absence alone cannot prove that the exact version named by the intent has been deleted.
+        ReadObservation old = read(identity, Optional.of(expectedOld));
+        if (current.kind == ReadKind.UNKNOWN || old.kind == ReadKind.UNKNOWN) {
             return new ReconciliationV1(
                     ReconciliationKindV1.OUTCOME_UNKNOWN, list.pages, list.keys, list.exactKeyListed, Optional.empty());
         }
-        if (read.kind == ReadKind.DIFFERENT
-                || read.versionToken.isEmpty()
-                || !read.versionToken.orElseThrow().equals(expectedOld)) {
+        if (old.kind == ReadKind.EXACT) {
             return new ReconciliationV1(
-                    ReconciliationKindV1.DIFFERENT_VERSION_OR_BODY,
+                    ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS,
                     list.pages,
                     list.keys,
                     list.exactKeyListed,
-                    read.versionToken);
+                    Optional.of(expectedOld));
+        }
+        if (old.kind == ReadKind.NOT_FOUND && current.kind == ReadKind.NOT_FOUND && !list.exactKeyListed) {
+            return new ReconciliationV1(
+                    ReconciliationKindV1.AUTHORITATIVELY_ABSENT, list.pages, list.keys, false, Optional.empty());
+        }
+        boolean inconsistentAbsence = old.kind == ReadKind.NOT_FOUND
+                        && current.kind == ReadKind.EXACT
+                        && current.versionToken.equals(Optional.of(expectedOld))
+                || current.kind == ReadKind.NOT_FOUND && list.exactKeyListed;
+        if (inconsistentAbsence) {
+            return new ReconciliationV1(
+                    ReconciliationKindV1.OUTCOME_UNKNOWN, list.pages, list.keys, list.exactKeyListed, Optional.empty());
+        }
+        if (old.kind == ReadKind.NOT_FOUND
+                && list.exactKeyListed
+                && current.versionToken.isPresent()
+                && !current.versionToken.equals(Optional.of(expectedOld))) {
+            return new ReconciliationV1(
+                    ReconciliationKindV1.EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT,
+                    list.pages,
+                    list.keys,
+                    true,
+                    current.versionToken);
         }
         return new ReconciliationV1(
-                ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS,
+                ReconciliationKindV1.DIFFERENT_VERSION_OR_BODY,
                 list.pages,
                 list.keys,
                 list.exactKeyListed,
-                read.versionToken);
+                current.versionToken.isPresent() ? current.versionToken : old.versionToken);
     }
 
-    private ReadObservation readCurrent(ObjectIdentity identity) throws IOException {
-        try (ObjectProviderTransport.StreamingObject response = transport.get(identity.key(), Optional.empty())) {
+    private ReadObservation read(ObjectIdentity identity, Optional<CanonicalBytes> exactVersionToken)
+            throws IOException {
+        try (ObjectProviderTransport.StreamingObject response = transport.get(identity.key(), exactVersionToken)) {
             if (response.bodyLength() <= 0
                     || response.bodyLength() > maximumObjectBytes
                     || response.inclusiveStart() != 0
-                    || response.exclusiveEnd() != response.bodyLength()
-                    || response.bodyLength() > Integer.MAX_VALUE) {
+                    || response.exclusiveEnd() != response.bodyLength()) {
                 return new ReadObservation(ReadKind.DIFFERENT, Optional.empty());
             }
-            CanonicalBytes body = readExact(response.body(), Math.toIntExact(response.bodyLength()));
+            Sha256Digest bodySha256 = readExactDigest(response.body(), response.bodyLength());
             Optional<CanonicalBytes> token = response.immutableVersionToken()
                     .map(value -> copyRequired(value, "Provider immutable version token"));
             if (response.bodyLength() != identity.bodyLength()
-                    || !Sha256Digest.hash(body).equals(identity.bodySha256())) {
+                    || !bodySha256.equals(identity.bodySha256())
+                    || exactVersionToken.isPresent() && !token.equals(exactVersionToken)) {
                 return new ReadObservation(ReadKind.DIFFERENT, token);
             }
             return new ReadObservation(ReadKind.EXACT, token);
@@ -263,12 +285,17 @@ public final class M5ObjectDeleteSessionV1 {
         }
     }
 
-    private static CanonicalBytes readExact(InputStream input, int length) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream(length);
-        byte[] buffer = new byte[Math.min(64 * 1024, length)];
-        int remaining = length;
+    private static Sha256Digest readExactDigest(InputStream input, long length) throws IOException {
+        MessageDigest sha;
+        try {
+            sha = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("JDK has no SHA-256 provider", failure);
+        }
+        byte[] buffer = new byte[64 * 1024];
+        long remaining = length;
         while (remaining > 0) {
-            int read = input.read(buffer, 0, Math.min(buffer.length, remaining));
+            int read = input.read(buffer, 0, (int) Math.min(buffer.length, remaining));
             if (read < 0) {
                 throw new IOException("Provider full GET ended before the declared length");
             }
@@ -277,17 +304,17 @@ public final class M5ObjectDeleteSessionV1 {
                 if (one < 0) {
                     throw new IOException("Provider full GET ended before the declared length");
                 }
-                output.write(one);
+                sha.update((byte) one);
                 remaining--;
             } else {
-                output.write(buffer, 0, read);
+                sha.update(buffer, 0, read);
                 remaining -= read;
             }
         }
         if (input.read() != -1) {
             throw new IOException("Provider full GET exceeded the declared length");
         }
-        return CanonicalBytes.copyOf(output.toByteArray());
+        return Sha256Digest.copyOf(sha.digest());
     }
 
     private static CanonicalBytes copyRequired(CanonicalBytes value, String label) {

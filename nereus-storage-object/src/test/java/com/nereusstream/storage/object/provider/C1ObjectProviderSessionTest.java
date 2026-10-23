@@ -46,6 +46,85 @@ import org.junit.jupiter.api.Test;
 
 class C1ObjectProviderSessionTest {
     @Test
+    void streamingConsumerVerifiesFullBodyAndSameResponseVersion() throws Exception {
+        var transport = new FakeTransport();
+        byte[] bytes = new byte[200_000];
+        Arrays.fill(bytes, (byte) 37);
+        String key = "cell-a/streamed";
+        transport.objects.put(key, bytes);
+        var identity = new ObjectIdentity(key, bytes.length, Sha256Digest.hash(CanonicalBytes.copyOf(bytes)));
+        var version = Optional.of(FakeTransport.version(key));
+        try (var session = session(transport, "cell-a")) {
+            var consumed = session.consumeVerifiedObject(identity, version, input -> {
+                byte[] buffer = new byte[65_536];
+                long count = 0;
+                for (int read = input.read(buffer); read != -1; read = input.read(buffer)) {
+                    count += read;
+                }
+                return count;
+            });
+            assertThat(consumed.value()).isEqualTo(200_000);
+            assertThat(consumed.immutableVersionToken()).isEqualTo(version);
+            assertThat(transport.lastRequestedVersion).isEqualTo(version);
+            assertThat(session.acceptedOperations()).isZero();
+        }
+    }
+
+    @Test
+    void streamingConsumerCannotSkipEofHashOrExactVersion() throws Exception {
+        var transport = new FakeTransport();
+        String key = "cell-a/streamed-invalid";
+        transport.objects.put(key, new byte[] {1, 2, 3});
+        var identity = identity(key, 1, 2, 3);
+        try (var session = session(transport, "cell-a")) {
+            assertThatThrownBy(() -> session.consumeVerifiedObject(identity, Optional.empty(), input -> 1))
+                    .hasMessageContaining("before consuming");
+            transport.objects.put(key, new byte[] {1, 2, 4});
+            assertThatThrownBy(() -> session.consumeVerifiedObject(identity, Optional.empty(), input -> {
+                        input.transferTo(java.io.OutputStream.nullOutputStream());
+                        return 1;
+                    }))
+                    .hasMessageContaining("SHA-256");
+            transport.objects.put(key, new byte[] {1, 2, 3});
+            assertThatThrownBy(() -> session.consumeVerifiedObject(
+                            identity, Optional.of(CanonicalBytes.copyOf(new byte[] {1})), input -> {
+                                throw new AssertionError("Wrong version must reject before the consumer");
+                            }))
+                    .hasMessageContaining("immutable version differs");
+            assertThat(session.acceptedOperations()).isZero();
+        }
+    }
+
+    @Test
+    void failedStreamingResponseCloseRetainsOriginalCleanupWithoutAnotherGet() throws Exception {
+        var transport = new FakeTransport();
+        String key = "cell-a/streamed-close";
+        transport.objects.put(key, new byte[] {1, 2, 3});
+        transport.fullGetCloseFailures = 1;
+        var session = session(transport, "cell-a");
+        C1ObjectProviderSession.VerifiedReadCleanupException retained = null;
+        try {
+            session.consumeVerifiedObject(identity(key, 1, 2, 3), Optional.empty(), input -> {
+                throw new IOException("original decode rejection");
+            });
+            throw new AssertionError("Failed original close must not return a verified value");
+        } catch (C1ObjectProviderSession.VerifiedReadCleanupException failure) {
+            retained = failure;
+        }
+        assertThat(retained.getCause()).hasMessage("original decode rejection");
+        assertThat(retained.getSuppressed()).hasSize(1);
+        assertThat(session.acceptedOperations()).isEqualTo(1);
+        assertThatThrownBy(session::close).hasMessageContaining("accepted operations");
+        int gets = transport.fullGetCalls;
+        retained.reconcileCleanup();
+        retained.reconcileCleanup();
+        assertThat(transport.fullGetCalls).isEqualTo(gets);
+        assertThat(transport.fullGetCloseCalls).isEqualTo(2);
+        assertThat(session.acceptedOperations()).isZero();
+        session.close();
+    }
+
+    @Test
     void conditionalCreateAndExistingExactConvergeWithoutOverwrite() throws Exception {
         FakeTransport transport = new FakeTransport();
         C1ObjectProviderSession session = session(transport, "cell-a");
@@ -854,6 +933,9 @@ class C1ObjectProviderSessionTest {
         private boolean fullGetBodyReachedEof;
         private int putCalls;
         private int fullGetCalls;
+        private int fullGetCloseFailures;
+        private int fullGetCloseCalls;
+        private Optional<CanonicalBytes> lastRequestedVersion;
         private int rangeGetCalls;
         private int listCalls;
         private CountDownLatch fullGetEntered;
@@ -903,6 +985,7 @@ class C1ObjectProviderSessionTest {
         @Override
         public StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException {
             fullGetCalls++;
+            lastRequestedVersion = exactVersionToken;
             awaitFullGetPermit();
             byte[] value = required(key);
             return new StreamingObject(
@@ -975,6 +1058,16 @@ class C1ObjectProviderSessionTest {
 
         private InputStream trackedFullGetBody(byte[] value) {
             return new ByteArrayInputStream(value) {
+                @Override
+                public void close() throws IOException {
+                    fullGetCloseCalls++;
+                    if (fullGetCloseFailures > 0) {
+                        fullGetCloseFailures--;
+                        throw new IOException("original fixture close unresolved");
+                    }
+                    super.close();
+                }
+
                 @Override
                 public synchronized int read() {
                     int read = super.read();

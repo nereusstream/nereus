@@ -552,6 +552,60 @@ public final class KafkaObjectAuthorizationV1 {
         return Optional.of(object.rows().get(0));
     }
 
+    CanonicalControlMetadataStore retirementMetadata() {
+        return metadata;
+    }
+
+    KafkaObjectAuthorizationV1 retirementReader(CanonicalControlMetadataStore reader, int shardId) {
+        var result = new KafkaObjectAuthorizationV1(reader, shardId, bounds);
+        if (!result.prefix.equals(prefix)) {
+            throw new IllegalArgumentException("retirement substituted the authorization shard");
+        }
+        return result;
+    }
+
+    static CanonicalBytes closedSnapshotBytes(ClosedHistory closed) {
+        return closed.bytes;
+    }
+
+    ClosedHistory verifyRetirementSnapshot(CanonicalBytes exactSnapshot) {
+        Head decoded = decodeChecked(exactSnapshot);
+        if (!decoded.closed()) {
+            throw new IllegalArgumentException("retirement snapshot is not a closed Owner");
+        }
+        ClosedHistory selected = readClosed(decoded.fence());
+        if (!selected.bytes.equals(exactSnapshot)) {
+            throw new IllegalStateException("retirement snapshot differs from the selected closed history");
+        }
+        return selected;
+    }
+
+    List<KafkaPartitionFenceV1> retirementClosedOwners(ClosedHistory selected) {
+        var result = new ArrayList<KafkaPartitionFenceV1>();
+        Head current = selected.head;
+        while (true) {
+            result.add(current.fence());
+            if (current.previousClosed().isEmpty()) {
+                return List.copyOf(result);
+            }
+            if (result.size() >= bounds.maxClosedOwners()) {
+                throw new IllegalStateException("retirement closed Owner chain exceeds its persisted bound");
+            }
+            Sha256Digest sha = current.previousClosed().orElseThrow();
+            CanonicalBytes bytes = metadata.get(recordKey(current.fence(), sha)).orElseThrow();
+            if (!Sha256Digest.hash(bytes).equals(sha)) {
+                throw new IllegalStateException("retirement closed Owner chain digest differs");
+            }
+            Head prior = decodeChecked(bytes);
+            if (!prior.closed()
+                    || !binding(prior.fence()).equals(binding(current.fence()))
+                    || prior.fence().ownerEpoch() >= current.fence().ownerEpoch()) {
+                throw new IllegalStateException("retirement closed Owner chain substituted or regressed its scope");
+            }
+            current = prior;
+        }
+    }
+
     public String headKey(KafkaPartitionFenceV1 fence) {
         return prefix + scope(fence) + "/head";
     }

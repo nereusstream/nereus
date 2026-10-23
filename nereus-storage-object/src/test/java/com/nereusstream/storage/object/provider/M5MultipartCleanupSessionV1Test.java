@@ -77,6 +77,82 @@ class M5MultipartCleanupSessionV1Test {
     }
 
     @Test
+    void readOnlyOwnedObservationRejectsSameKeyForeignAndIgnoresSiblingWithoutAbort() throws Exception {
+        FakeMultipartTransport transport = new FakeMultipartTransport();
+        var owned = upload("cell-a/attempt/data", "owned");
+        var foreign = upload("cell-a/attempt/data", "foreign");
+        var sibling = upload("cell-a/attempt/data-sibling", "unrelated");
+        transport.uploads.addAll(Set.of(owned, sibling));
+        M5MultipartCleanupSessionV1 session = session(transport);
+        Set<ObjectProviderTransport.MultipartUploadIdentity> inventory = Set.of(owned);
+        var root = session.inventoryRoot(inventory);
+
+        assertThat(session.observeOwned(root, inventory).kind()).isEqualTo(CleanupKindV1.EXACT_OWNED_RESIDUE_REMAINS);
+        transport.uploads.add(foreign);
+        assertThat(session.observeOwned(root, inventory).kind()).isEqualTo(CleanupKindV1.DIFFERENT_OR_FOREIGN_IDENTITY);
+        transport.uploads.remove(foreign);
+        transport.uploads.remove(owned);
+        assertThat(session.observeOwned(root, inventory).kind()).isEqualTo(CleanupKindV1.AUTHORITATIVELY_ABSENT);
+        assertThat(transport.abortCalls).isZero();
+        assertThat(transport.uploads).containsExactly(sibling);
+    }
+
+    @Test
+    void siblingKeySharingListPrefixDoesNotVetoExactOwnedCleanup() throws Exception {
+        FakeMultipartTransport transport = new FakeMultipartTransport();
+        transport.pageSize = 1;
+        var owned = upload("cell-a/attempt/data", "owned");
+        var sibling = upload("cell-a/attempt/data-sibling", "unrelated");
+        transport.uploads.addAll(Set.of(owned, sibling));
+        M5MultipartCleanupSessionV1 session = session(transport);
+        Set<ObjectProviderTransport.MultipartUploadIdentity> inventory = Set.of(owned);
+
+        var result = session.cleanupOwned(session.inventoryRoot(inventory), inventory);
+
+        assertThat(result.kind()).isEqualTo(CleanupKindV1.AUTHORITATIVELY_ABSENT);
+        assertThat(result.totalListPages()).isGreaterThanOrEqualTo(3);
+        assertThat(result.totalListedUploads()).isEqualTo(3);
+        assertThat(result.exactAbortAttempts()).isEqualTo(1);
+        assertThat(transport.uploads).containsExactly(sibling);
+    }
+
+    @Test
+    void siblingRowsExceedingScanCapFailBeforeAbort() {
+        FakeMultipartTransport transport = new FakeMultipartTransport();
+        var owned = upload("cell-a/attempt/data", "owned");
+        var sibling = upload("cell-a/attempt/data-sibling", "unrelated");
+        transport.uploads.addAll(Set.of(owned, sibling));
+        M5MultipartCleanupSessionV1 session =
+                new M5MultipartCleanupSessionV1(transport, scope(), "cell-a", 8, 1, 16_384, 1_024);
+        Set<ObjectProviderTransport.MultipartUploadIdentity> inventory = Set.of(owned);
+
+        assertThatThrownBy(() -> session.cleanupOwned(session.inventoryRoot(inventory), inventory))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("upload/byte cap");
+        assertThat(transport.abortCalls).isZero();
+        assertThat(transport.uploads).containsExactlyInAnyOrder(owned, sibling);
+    }
+
+    @Test
+    void multipleExactKeysCannotSpendAnotherKeysListPageBudget() {
+        FakeMultipartTransport transport = new FakeMultipartTransport();
+        transport.pageSize = 1;
+        var data = upload("cell-a/attempt/data", "owned-data");
+        var sibling = upload("cell-a/attempt/data-sibling", "unrelated");
+        var root = upload("cell-a/attempt/root", "owned-root");
+        transport.uploads.addAll(Set.of(data, sibling, root));
+        M5MultipartCleanupSessionV1 session =
+                new M5MultipartCleanupSessionV1(transport, scope(), "cell-a", 2, 64, 16_384, 1_024);
+        Set<ObjectProviderTransport.MultipartUploadIdentity> inventory = Set.of(data, root);
+
+        assertThatThrownBy(() -> session.cleanupOwned(session.inventoryRoot(inventory), inventory))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("aggregate LIST page cap");
+        assertThat(transport.listCalls).isEqualTo(2);
+        assertThat(transport.abortCalls).isZero();
+    }
+
+    @Test
     void lostAbortResponseAdvancesOnlyAfterCompleteEmptyRelist() throws Exception {
         FakeMultipartTransport transport = new FakeMultipartTransport();
         transport.unknownAfterAbort = true;
@@ -140,6 +216,24 @@ class M5MultipartCleanupSessionV1Test {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exact Cell namespace");
         assertThat(transport.listCalls).isZero();
+    }
+
+    @Test
+    void ownedInventoryMustFitTheConfiguredScanBoundsBeforeHashingOrProviderIo() {
+        FakeMultipartTransport transport = new FakeMultipartTransport();
+        var first = upload("cell-a/attempt/data", "upload-1");
+        var second = upload("cell-a/attempt/root", "upload-2");
+        var countBounded = new M5MultipartCleanupSessionV1(transport, scope(), "cell-a", 8, 1, 16_384, 1_024);
+        var byteBounded = new M5MultipartCleanupSessionV1(transport, scope(), "cell-a", 8, 2, 20, 1_024);
+
+        assertThatThrownBy(() -> countBounded.inventoryRoot(Set.of(first, second)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("upload cap");
+        assertThatThrownBy(() -> byteBounded.inventoryRoot(Set.of(first)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("byte cap");
+        assertThat(transport.listCalls).isZero();
+        assertThat(transport.abortCalls).isZero();
     }
 
     private static M5MultipartCleanupSessionV1 session(ObjectProviderTransport transport) {

@@ -78,7 +78,11 @@ public final class Nta1AggregateAuthorityCodec implements AggregateAuthorityCode
         if (!canonical.equals(projectedBytes)) {
             throw new IllegalArgumentException("stored aggregate projection is not canonical NTA1");
         }
-        return new VersionedAggregateSnapshot(aggregate, canonical, Sha256Digest.hash(canonical), metadataVersion);
+        var sourceVersion = M5PulsarAggregateAuthorityCodecV1.isAuthorityValue(storedBytes)
+                ? M5PulsarAggregateAuthorityCodecV1.decodeAuthority(storedBytes).originalAggregateVersion()
+                : java.util.Optional.<MetadataVersion>empty();
+        return new VersionedAggregateSnapshot(
+                aggregate, canonical, Sha256Digest.hash(canonical), metadataVersion, sourceVersion);
     }
 
     private static PulsarTopicIncarnationIdentity requireExpectedPulsarIncarnation(

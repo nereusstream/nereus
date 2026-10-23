@@ -18,7 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2;
 import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
 import com.nereusstream.storage.object.provider.M5ObjectDeleteSessionV1;
 import com.nereusstream.storage.object.provider.M5ObjectDeleteSessionV1.ReconciliationKindV1;
@@ -41,6 +43,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketVersioningRequest;
 import software.amazon.awssdk.services.s3.model.VersioningConfiguration;
 
@@ -52,6 +56,87 @@ class M5MinioVersionMatchDeleteTest {
     private static final String SECRET_KEY = "nereus-m5-delete-secret";
     private static final String VERSIONED_BUCKET = "nereus-m5-versioned-delete";
     private static final String UNVERSIONED_BUCKET = "nereus-m5-unversioned-delete";
+
+    @Test
+    void nativeObjectNamespaceBindsOneOxiaAndFencesMarkerRecreation() throws Exception {
+        try (DockerCliEvidenceContainer minio = DockerCliEvidenceContainer.start(
+                "m5-object-namespace",
+                IMAGE,
+                9000,
+                List.of("MINIO_ROOT_USER=" + ACCESS_KEY, "MINIO_ROOT_PASSWORD=" + SECRET_KEY),
+                List.of("server", "/data", "--console-address", ":9001"))) {
+            awaitHealthy(minio.endpoint().resolve("/minio/health/ready"));
+            try (S3Client client = client(minio.endpoint())) {
+                client.createBucket(
+                        CreateBucketRequest.builder().bucket(VERSIONED_BUCKET).build());
+                client.putBucketVersioning(PutBucketVersioningRequest.builder()
+                        .bucket(VERSIONED_BUCKET)
+                        .versioningConfiguration(VersioningConfiguration.builder()
+                                .status(BucketVersioningStatus.ENABLED)
+                                .build())
+                        .build());
+                var firstMetadata = new MetadataNamespaceIdentityV2(new Id128(1, 2), 1);
+                var secondMetadata = new MetadataNamespaceIdentityV2(new Id128(3, 4), 1);
+                var backend = S3M5PhysicalNamespaceAuthorityV2.provision(client, VERSIONED_BUCKET, firstMetadata);
+                var original = backend.namespace();
+                assertThat(backend.bind(firstMetadata)
+                                .toCompletableFuture()
+                                .join()
+                                .physicalNamespace())
+                        .isEqualTo(original);
+                assertThat(S3M5PhysicalNamespaceAuthorityV2.connect(client, VERSIONED_BUCKET, original)
+                                .readBinding()
+                                .toCompletableFuture()
+                                .join()
+                                .orElseThrow()
+                                .metadataNamespace())
+                        .isEqualTo(firstMetadata);
+                assertThatThrownBy(() -> backend.bind(secondMetadata)
+                                .toCompletableFuture()
+                                .join())
+                        .hasMessageContaining("another Oxia namespace");
+                try (var transport = backend.openVersionMatchDeleteTransport(2)) {
+                    assertThat(transport.capabilities().providerIdentity())
+                            .isEqualTo(original.serviceIdentity().value());
+                }
+                client.deleteObject(DeleteObjectRequest.builder()
+                        .bucket(VERSIONED_BUCKET)
+                        .key(S3M5PhysicalNamespaceAuthorityV2.MARKER_KEY)
+                        .build());
+                assertThatThrownBy(() ->
+                                backend.readBinding().toCompletableFuture().join())
+                        .hasMessageContaining("deleted");
+                var versions = client.listObjectVersions(ListObjectVersionsRequest.builder()
+                        .bucket(VERSIONED_BUCKET)
+                        .build());
+                for (var marker : versions.deleteMarkers()) {
+                    client.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(VERSIONED_BUCKET)
+                            .key(marker.key())
+                            .versionId(marker.versionId())
+                            .build());
+                }
+                for (var version : versions.versions()) {
+                    client.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(VERSIONED_BUCKET)
+                            .key(version.key())
+                            .versionId(version.versionId())
+                            .build());
+                }
+                var successor = S3M5PhysicalNamespaceAuthorityV2.provision(client, VERSIONED_BUCKET, secondMetadata);
+                assertThat(successor.namespace()).isNotEqualTo(original);
+                assertThatThrownBy(() -> S3M5PhysicalNamespaceAuthorityV2.connect(client, VERSIONED_BUCKET, original))
+                        .hasMessageContaining("incarnation differs");
+                assertThat(successor
+                                .readBinding()
+                                .toCompletableFuture()
+                                .join()
+                                .orElseThrow()
+                                .metadataNamespace())
+                        .isEqualTo(secondMetadata);
+            }
+        }
+    }
 
     @Test
     void exactVersionDeleteReconcilesLossAndNeverDeletesARecreatedVersion() throws Exception {
@@ -85,7 +170,11 @@ class M5MinioVersionMatchDeleteTest {
                     transport.deleteCapabilities().requireVersionMatchDeleteV1();
                     CellProviderScopeId scope = scope();
                     M5ObjectDeleteSessionV1 delete = deleteSession(transport, scope);
-                    Body first = new Body("m5-delete/objects/first", bytes("first-body"));
+                    byte[] large = new byte[200_000];
+                    for (int i = 0; i < large.length; i++) {
+                        large[i] = (byte) i;
+                    }
+                    Body first = new Body("m5-delete/objects/first", CanonicalBytes.copyOf(large));
                     try (C1ObjectProviderSession create = createSession(transport, scope)) {
                         assertThat(create.conditionalCreate(first).outcome().name())
                                 .isEqualTo("APPLIED_EXACT");
@@ -109,6 +198,60 @@ class M5MinioVersionMatchDeleteTest {
                     delete.deleteExactVersion(first.identity(), firstVersion);
                     assertThat(delete.readExactForDelete(recreated.identity()).immutableVersionToken())
                             .isEqualTo(recreatedVersion);
+                    assertThat(delete.reconcile(first.identity(), "m5-delete/objects/", firstVersion)
+                                    .kind())
+                            .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT);
+
+                    Body hidden = new Body("m5-delete/objects/hidden", bytes("hidden-old-version"));
+                    try (C1ObjectProviderSession create = createSession(transport, scope)) {
+                        assertThat(create.conditionalCreate(hidden).outcome().name())
+                                .isEqualTo("APPLIED_EXACT");
+                    }
+                    CanonicalBytes hiddenVersion =
+                            delete.readExactForDelete(hidden.identity()).immutableVersionToken();
+                    client.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(VERSIONED_BUCKET)
+                            .key(hidden.identity().key())
+                            .build());
+                    assertThat(delete.reconcile(hidden.identity(), "m5-delete/objects/", hiddenVersion)
+                                    .kind())
+                            .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS);
+                    assertThat(delete.deleteExactVersion(hidden.identity(), hiddenVersion))
+                            .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.DELETED_EXACT);
+                    assertThat(delete.reconcile(hidden.identity(), "m5-delete/objects/", hiddenVersion)
+                                    .kind())
+                            .isEqualTo(ReconciliationKindV1.AUTHORITATIVELY_ABSENT);
+
+                    Body overlap = new Body("m5-delete/objects/overlap", bytes("overlap-old"));
+                    try (C1ObjectProviderSession create = createSession(transport, scope)) {
+                        assertThat(create.conditionalCreate(overlap).outcome().name())
+                                .isEqualTo("APPLIED_EXACT");
+                    }
+                    CanonicalBytes overlapVersion =
+                            delete.readExactForDelete(overlap.identity()).immutableVersionToken();
+                    client.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(VERSIONED_BUCKET)
+                            .key(overlap.identity().key())
+                            .build());
+                    Body overlapNew = new Body(overlap.identity().key(), bytes("overlap-new"));
+                    try (C1ObjectProviderSession create = createSession(transport, scope)) {
+                        assertThat(create.conditionalCreate(overlapNew)
+                                        .outcome()
+                                        .name())
+                                .isEqualTo("APPLIED_EXACT");
+                    }
+                    CanonicalBytes overlapNewVersion =
+                            delete.readExactForDelete(overlapNew.identity()).immutableVersionToken();
+                    assertThat(delete.reconcile(overlap.identity(), "m5-delete/objects/", overlapVersion)
+                                    .kind())
+                            .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS);
+                    assertThat(delete.deleteExactVersion(overlap.identity(), overlapVersion))
+                            .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.DELETED_EXACT);
+                    assertThat(delete.reconcile(overlap.identity(), "m5-delete/objects/", overlapVersion)
+                                    .kind())
+                            .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT);
+                    assertThat(delete.readExactForDelete(overlapNew.identity()).immutableVersionToken())
+                            .isEqualTo(overlapNewVersion);
 
                     Body responseLoss = new Body("m5-delete/objects/response-loss", bytes("response-loss-body"));
                     try (C1ObjectProviderSession create = createSession(transport, scope)) {
@@ -134,11 +277,11 @@ class M5MinioVersionMatchDeleteTest {
     }
 
     private static C1ObjectProviderSession createSession(ObjectProviderTransport transport, CellProviderScopeId scope) {
-        return new C1ObjectProviderSession(transport, scope, "m5-delete", 1_024, 1_024);
+        return new C1ObjectProviderSession(transport, scope, "m5-delete", 1_024 * 1_024, 1_024);
     }
 
     private static M5ObjectDeleteSessionV1 deleteSession(ObjectProviderTransport transport, CellProviderScopeId scope) {
-        return new M5ObjectDeleteSessionV1(transport, scope, "m5-delete", 1_024, 8, 128, 64_000, 1_024);
+        return new M5ObjectDeleteSessionV1(transport, scope, "m5-delete", 1_024 * 1_024, 8, 128, 64_000, 1_024);
     }
 
     private static S3Client client(URI endpoint) {

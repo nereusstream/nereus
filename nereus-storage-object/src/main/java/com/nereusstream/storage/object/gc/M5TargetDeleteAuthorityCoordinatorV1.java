@@ -153,6 +153,193 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         this.observationAuthority = Objects.requireNonNull(observationAuthority, "observationAuthority");
     }
 
+    /**
+     * Owns one exact mark candidate and its in-process monotonic clock. The caller retains this original session
+     * across response uncertainty; reconstructing a session selects another domain and must wait from the start.
+     * This component proves elapsed grace only, never completeness of the caller's initial observation or rescan.
+     */
+    public final class EpochGraceSession {
+        private final TargetDeleteAuthorityV1 candidate;
+        private final VersionedValue predecessor;
+        private final DeleteEpochGraceMarkV1 mark;
+        private boolean started;
+        private boolean invalidated;
+        private long confirmedTick;
+        private VersionedValue confirmedMark;
+
+        private EpochGraceSession(VersionedValue predecessor, DeleteEpochGraceMarkV1 mark) {
+            this.predecessor = predecessor;
+            this.mark = mark;
+            var current = exactAuthority(predecessor.key(), predecessor).authority();
+            candidate = switch (current.state()) {
+                case READ_FENCED_V1 -> M5TargetDeleteAuthorityStateMachineV1.renewReadEpochGrace(current, mark);
+                case DELETE_INTENT_V1 -> M5TargetDeleteAuthorityStateMachineV1.renewIntentEpochGrace(current, mark);
+                default -> M5TargetDeleteAuthorityStateMachineV1.markEpochGrace(current, mark);
+            };
+        }
+
+        public DeleteEpochGraceMarkV1 mark() {
+            return mark;
+        }
+
+        /** A cancelled observer cannot cancel the original CAS/reconciliation or start the clock early. */
+        public CompletionStage<Void> confirmMark() {
+            CompletionStage<Void> original = observationAuthority
+                    .requireCurrent(candidate.target().resourceId(), mark.authority())
+                    .thenCompose(ignored -> requireRenewalPredecessor())
+                    .thenCompose(ignored -> mutate(
+                            candidate.authorityKey(),
+                            Optional.of(predecessor),
+                            M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                            false))
+                    .thenCompose(result -> {
+                        if (!result.exactCandidateIsAuthoritative()) {
+                            return CompletableFuture.failedFuture(
+                                    new IllegalStateException("epoch grace mark is not exactly confirmed"));
+                        }
+                        return requireMarkCurrent().thenAccept(actual -> {
+                            if (!result.observed().equals(Optional.of(actual))) {
+                                throw new IllegalStateException("epoch grace mark changed before clock confirmation");
+                            }
+                            startConfirmedClock(actual);
+                        });
+                    });
+            return original.thenApply(ignored -> null);
+        }
+
+        private CompletionStage<Void> requireRenewalPredecessor() {
+            if (candidate.state() == TargetDeleteAuthorityStateV1.OPEN_V1) {
+                return CompletableFuture.completedFuture(null);
+            }
+            var previous = candidate.state() == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                    ? M5TargetDeleteAuthorityStateMachineV1.dispatchContext(candidate)
+                    : candidate.readFence().orElseThrow().observationContext();
+            return previous.coordinatorOwner().equals(mark.authority().coordinatorOwner())
+                    ? CompletableFuture.completedFuture(null)
+                    : observationAuthority.requirePredecessorFenced(
+                            candidate.target().resourceId(), previous, mark.authority());
+        }
+
+        private synchronized void startConfirmedClock(VersionedValue actual) {
+            if (invalidated) {
+                throw new IllegalStateException("epoch grace clock is invalidated");
+            }
+            if (started && !actual.equals(confirmedMark)) {
+                throw new IllegalStateException("epoch grace confirmed authority changed");
+            }
+            if (!started) {
+                confirmedMark = actual;
+                confirmedTick = System.nanoTime();
+                started = true;
+            }
+        }
+
+        private synchronized void requireConfirmedMark(VersionedValue actual) {
+            if (started && !actual.equals(confirmedMark)) {
+                throw new IllegalStateException("epoch grace confirmed authority changed");
+            }
+            if (!started
+                    && !actual.canonicalStoredBytes()
+                            .equals(M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate))) {
+                throw new IllegalStateException("epoch grace original candidate changed");
+            }
+        }
+
+        private synchronized void requireElapsedClock() {
+            if (!started || invalidated) {
+                throw new IllegalStateException("epoch grace has no confirmed local clock");
+            }
+            long elapsed = System.nanoTime() - confirmedTick;
+            if (elapsed < 0) {
+                invalidated = true;
+                throw new IllegalStateException("epoch grace monotonic clock is uncertain");
+            }
+            if (elapsed < Math.multiplyExact(mark.durationMillis(), 1_000_000)) {
+                throw new IllegalStateException("epoch grace duration has not elapsed");
+            }
+        }
+
+        private CompletionStage<VersionedValue> requireMarkCurrent() {
+            return observationAuthority
+                    .requireCurrent(candidate.target().resourceId(), mark.authority())
+                    .thenCompose(ignored -> metadata.read(candidate.authorityKey()))
+                    .thenApply(observed -> {
+                        var stored = observed.orElseThrow(
+                                () -> new IllegalStateException("epoch grace authority is absent"));
+                        var current = exactAuthority(stored.key(), stored).authority();
+                        if (!current.target().equals(candidate.target())
+                                || !current.epochGrace().equals(Optional.of(mark))) {
+                            throw new IllegalStateException("epoch grace mark was changed or invalidated by a writer");
+                        }
+                        requireConfirmedMark(stored);
+                        return stored;
+                    })
+                    .thenCompose(stored -> observationAuthority
+                            .requireCurrent(candidate.target().resourceId(), mark.authority())
+                            .thenApply(ignored -> stored));
+        }
+
+        private CompletionStage<Void> requireNativeClockCurrent() {
+            return observationAuthority
+                    .requireCurrent(candidate.target().resourceId(), mark.authority())
+                    .thenRun(this::requireElapsedClock);
+        }
+
+        /** Readiness is issued by this original producer after actual elapsed time and current durable fencing. */
+        public CompletionStage<EpochGraceReady> requireElapsed() {
+            CompletionStage<EpochGraceReady> original = requireMarkCurrent().thenApply(ignored -> {
+                requireElapsedClock();
+                return new EpochGraceReady(this);
+            });
+            return original.thenApply(value -> value);
+        }
+    }
+
+    /** Opaque local qualification; a numeric deadline or a reconstructed persisted mark cannot instantiate it. */
+    public static final class EpochGraceReady {
+        private final EpochGraceSession session;
+
+        private EpochGraceReady(EpochGraceSession session) {
+            this.session = session;
+        }
+
+        public DeleteEpochGraceMarkV1 mark() {
+            return session.mark();
+        }
+
+        public CompletionStage<Void> requireCurrent() {
+            return session.requireElapsed().thenApply(ignored -> null);
+        }
+
+        /** After qualification the target has a new version; its exact mark and native clock must still match. */
+        public CompletionStage<Void> requireAdmittedCurrent(
+                com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2 resource, DeleteEpochGraceMarkV1 expected) {
+            if (!session.candidate.target().resourceId().equals(resource) || !mark().equals(expected)) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("elapsed readiness belongs to another resource or mark"));
+            }
+            return session.requireNativeClockCurrent();
+        }
+    }
+
+    public EpochGraceSession prepareEpochGrace(
+            VersionedValue exactOpenAuthority,
+            com.nereusstream.storage.object.retention.M5RetentionEvidenceAssemblerV1.ReferenceCapture initial,
+            long admittedDurationMillis) {
+        return prepareEpochGrace(
+                exactOpenAuthority, initial.epochAuthority(), admittedDurationMillis, initial.rootSha256());
+    }
+
+    public EpochGraceSession prepareEpochGrace(
+            VersionedValue exactOpenAuthority,
+            DeleteObservationContextV2 authority,
+            long admittedDurationMillis,
+            Sha256Digest completeInitialObservationRoot) {
+        var mark = new DeleteEpochGraceMarkV1(
+                java.util.UUID.randomUUID(), authority, admittedDurationMillis, completeInitialObservationRoot);
+        return new EpochGraceSession(exactOpenAuthority, mark);
+    }
+
     /** Active/full compatibility view. Use inspect to include permanent compact terminals. */
     public CompletionStage<Optional<VersionedAuthorityV1>> read(String authorityKey) {
         String key = M5TargetDeleteAuthorityRecordsV1.requireKey(authorityKey);
@@ -184,6 +371,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 || initial.predecessorAuthoritySha256().isPresent()) {
             throw new IllegalArgumentException("initial target authority must be revision-one OPEN_V1");
         }
+        requireLegacyGrace(initial, initial.eligibilitySnapshot());
         CanonicalBytes candidate = M5TargetDeleteAuthorityCodecV1.encodeAuthority(initial);
         CompletionStage<Void> admission = initial.eligibilitySnapshot()
                 .map(this::requireFreshEligibility)
@@ -220,6 +408,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     public CompletionStage<MutationResultV1> qualifyEligibility(
             VersionedValue exactOpenAuthority, DeleteEligibilitySnapshotV2 snapshot) {
         VersionedAuthorityV1 exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
+        requireLegacyGrace(exact.authority(), Optional.of(snapshot));
         TargetDeleteAuthorityV1 candidate =
                 M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(exact.authority(), snapshot);
         return requireFreshEligibility(snapshot)
@@ -230,9 +419,57 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                         false));
     }
 
+    private static void requireLegacyGrace(
+            TargetDeleteAuthorityV1 authority, Optional<DeleteEligibilitySnapshotV2> snapshot) {
+        if (authority.epochGrace().isPresent()
+                || snapshot.stream()
+                        .flatMap(value -> value.members().stream())
+                        .anyMatch(member ->
+                                member.physicalReferences().epochGrace().isPresent())) {
+            throw new IllegalArgumentException("epoch grace requires original producer readiness");
+        }
+    }
+
+    private static void requireEpochProof(
+            TargetDeleteAuthorityV1 authority, DeleteEligibilitySnapshotV2 snapshot, EpochGraceReady ready) {
+        var mark = authority
+                .epochGrace()
+                .orElseThrow(() -> new IllegalArgumentException("target lacks the original epoch grace mark"));
+        if (!authority
+                        .target()
+                        .resourceId()
+                        .equals(ready.session.candidate.target().resourceId())
+                || !mark.equals(ready.mark())
+                || snapshot.members().stream()
+                        .anyMatch(member ->
+                                !member.physicalReferences().epochGrace().equals(Optional.of(mark)))) {
+            throw new IllegalArgumentException("eligibility has another epoch grace qualification");
+        }
+    }
+
+    public CompletionStage<MutationResultV1> qualifyEligibility(
+            VersionedValue exactOpenAuthority, DeleteEligibilitySnapshotV2 snapshot, EpochGraceReady ready) {
+        var exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
+        requireEpochProof(exact.authority(), snapshot, ready);
+        var candidate = M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(exact.authority(), snapshot);
+        var encoded = M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate);
+        return metadata.read(exactOpenAuthority.key()).thenCompose(current -> {
+            boolean alreadyApplied = current.map(
+                            value -> value.canonicalStoredBytes().equals(encoded))
+                    .orElse(false);
+            var elapsed = alreadyApplied
+                    ? ready.requireAdmittedCurrent(candidate.target().resourceId(), ready.mark())
+                    : ready.requireCurrent();
+            return elapsed.thenCompose(ignored -> requireFreshEligibility(snapshot))
+                    .thenCompose(ignored ->
+                            mutate(candidate.authorityKey(), Optional.of(exactOpenAuthority), encoded, false));
+        });
+    }
+
     public CompletionStage<MutationResultV1> prepareIdentityRead(
             VersionedValue exactOpenAuthority, Sha256Digest attemptIdSha256, DeleteObservationContextV2 context) {
         VersionedAuthorityV1 exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
+        requireLegacyGrace(exact.authority(), exact.authority().eligibilitySnapshot());
         TargetDeleteAuthorityV1 candidate =
                 M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(exact.authority(), attemptIdSha256, context);
         return requireObservationAuthority(candidate)
@@ -243,11 +480,35 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                         false));
     }
 
+    public CompletionStage<MutationResultV1> prepareIdentityRead(
+            VersionedValue exactOpenAuthority,
+            Sha256Digest attemptIdSha256,
+            DeleteObservationContextV2 context,
+            EpochGraceReady ready) {
+        var exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
+        var snapshot = exact.authority().eligibilitySnapshot().orElseThrow();
+        requireEpochProof(exact.authority(), snapshot, ready);
+        if (!context.equals(ready.mark().authority())) {
+            throw new IllegalArgumentException("read fence has another epoch grace owner");
+        }
+        var candidate =
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(exact.authority(), attemptIdSha256, context);
+        return ready.requireAdmittedCurrent(candidate.target().resourceId(), ready.mark())
+                .thenCompose(ignored -> requireFreshEligibility(snapshot))
+                .thenCompose(ignored -> requireObservationAuthority(candidate))
+                .thenCompose(ignored -> mutate(
+                        candidate.authorityKey(),
+                        Optional.of(exactOpenAuthority),
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                        false));
+    }
+
     public CompletionStage<MutationResultV1> refreshIdentityRead(
             VersionedValue exactFencedAuthority,
             DeleteObservationContextV2 successor,
             DeleteEligibilitySnapshotV2 snapshot) {
         VersionedAuthorityV1 exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
+        requireLegacyGrace(exact.authority(), Optional.of(snapshot));
         TargetDeleteAuthorityV1 candidate =
                 M5TargetDeleteAuthorityStateMachineV1.refreshIdentityRead(exact.authority(), successor, snapshot);
         DeleteObservationContextV2 previous =
@@ -262,11 +523,47 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 exact, candidate, successor, fenced.thenCompose(ignored -> requireObservationAuthority(candidate)));
     }
 
+    /** Completes a renewed closed read only with the original timer and a fully rescanned matching proof. */
+    public CompletionStage<MutationResultV1> refreshIdentityRead(
+            VersionedValue exactFencedAuthority,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot,
+            EpochGraceReady ready) {
+        var exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
+        requireEpochProof(exact.authority(), snapshot, ready);
+        if (!successor.equals(ready.mark().authority())
+                || !exact.authority()
+                        .recoveryVeto()
+                        .filter(veto -> veto.reason() == DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING)
+                        .isPresent()) {
+            throw new IllegalArgumentException("read refresh requires its exact pending epoch renewal");
+        }
+        var candidate =
+                M5TargetDeleteAuthorityStateMachineV1.refreshIdentityRead(exact.authority(), successor, snapshot);
+        var previous = exact.authority().readFence().orElseThrow().observationContext();
+        // Native readiness and predecessor checks may share the same original SDK admission. Start the
+        // predecessor check only after readiness completes, retaining both checks and their exact lifetimes.
+        Supplier<CompletionStage<Void>> fenced =
+                () -> previous.coordinatorOwner().equals(successor.coordinatorOwner())
+                        ? CompletableFuture.completedFuture(null)
+                        : checkedAuthority(
+                                () -> observationAuthority.requirePredecessorFenced(
+                                        exact.authority().target().resourceId(), previous, successor),
+                                DeleteRecoveryVetoV2.Reason.PREDECESSOR_OWNER_AUTHORITY_REJECTED);
+        return ready.requireCurrent()
+                .thenCompose(ignored -> validateOrRecordRecoveryVeto(
+                        exact,
+                        candidate,
+                        successor,
+                        fenced.get().thenCompose(unused -> requireObservationAuthority(candidate))));
+    }
+
     public CompletionStage<MutationResultV1> bindDeleteIntent(
             VersionedValue exactFencedAuthority,
             ExactExternalIdentityV1 externalIdentity,
             Sha256Digest deleteAttemptIdSha256) {
         VersionedAuthorityV1 exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
+        requireLegacyGrace(exact.authority(), exact.authority().eligibilitySnapshot());
         TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
                 exact.authority(), externalIdentity, deleteAttemptIdSha256);
         return validateOrRecordRecoveryVeto(
@@ -274,6 +571,24 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 candidate,
                 exact.authority().readFence().orElseThrow().observationContext(),
                 requireObservationAuthority(exact.authority()));
+    }
+
+    public CompletionStage<MutationResultV1> bindDeleteIntent(
+            VersionedValue exactFencedAuthority,
+            ExactExternalIdentityV1 externalIdentity,
+            Sha256Digest deleteAttemptIdSha256,
+            EpochGraceReady ready) {
+        var exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
+        requireEpochProof(
+                exact.authority(), exact.authority().eligibilitySnapshot().orElseThrow(), ready);
+        var candidate = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
+                exact.authority(), externalIdentity, deleteAttemptIdSha256);
+        return ready.requireAdmittedCurrent(candidate.target().resourceId(), ready.mark())
+                .thenCompose(ignored -> validateOrRecordRecoveryVeto(
+                        exact,
+                        candidate,
+                        exact.authority().readFence().orElseThrow().observationContext(),
+                        requireObservationAuthority(exact.authority())));
     }
 
     private CompletionStage<MutationResultV1> validateOrRecordRecoveryVeto(
@@ -360,6 +675,30 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             DeleteEligibilitySnapshotV2 snapshot) {
         VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
         TargetDeleteAuthorityV1 current = exact.authority();
+        requireLegacyGrace(current, Optional.of(snapshot));
+        return refreshDispatchChecked(exact, successor, snapshot);
+    }
+
+    public CompletionStage<MutationResultV1> refreshDispatch(
+            VersionedValue exactIntentAuthority,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot,
+            EpochGraceReady ready) {
+        var exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
+        requireEpochProof(exact.authority(), snapshot, ready);
+        if (!successor.equals(ready.mark().authority())
+                || exact.authority()
+                        .recoveryVeto()
+                        .filter(veto -> veto.reason() == DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING)
+                        .isEmpty()) {
+            throw new IllegalArgumentException("intent refresh requires its exact pending epoch renewal");
+        }
+        return ready.requireCurrent().thenCompose(ignored -> refreshDispatchChecked(exact, successor, snapshot));
+    }
+
+    private CompletionStage<MutationResultV1> refreshDispatchChecked(
+            VersionedAuthorityV1 exact, DeleteObservationContextV2 successor, DeleteEligibilitySnapshotV2 snapshot) {
+        var current = exact.authority();
         DeleteObservationContextV2 previous = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(current);
         // Validate the proposed shape before starting native work; no observation is persisted from this candidate.
         M5TargetDeleteAuthorityStateMachineV1.refreshDispatch(
@@ -384,7 +723,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                     return requireObservationAuthority(candidate, successor, snapshot)
                             .thenCompose(ignored -> mutate(
                                     current.authorityKey(),
-                                    Optional.of(exactIntentAuthority),
+                                    Optional.of(exact.exactStoredValue()),
                                     M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
                                     false));
                 });
@@ -398,6 +737,28 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 throw new IllegalStateException("dispatch authority changed before native identity read");
             }
         });
+    }
+
+    /** Revalidates the exact persisted INTENT, native owner, facts and physical identity for dispatch. */
+    public CompletionStage<M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1> requireCurrentDispatch(
+            VersionedValue exactIntentAuthority) {
+        VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
+        TargetDeleteAuthorityV1 current = exact.authority();
+        if (current.recoveryVeto().isPresent()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("epoch grace renewal requires fresh eligibility before dispatch"));
+        }
+        DeleteObservationContextV2 context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(current);
+        DeleteEligibilitySnapshotV2 snapshot = current.eligibilitySnapshot().orElseThrow();
+        CompletionStage<M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1> operation =
+                requireObservationAuthority(current, context, snapshot)
+                        .thenCompose(ignored -> requireExactCurrent(exact))
+                        .thenCompose(ignored -> externalReader.rereadExact(
+                                current.externalIdentity().orElseThrow()))
+                        .thenCompose(observation -> requireObservationAuthority(current, context, snapshot)
+                                .thenCompose(ignored -> requireExactCurrent(exact))
+                                .thenApply(ignored -> Objects.requireNonNull(observation, "native observation")));
+        return operation.thenApply(observation -> observation);
     }
 
     /** Read-only reconciliation of historical terminal candidates; supplied hashes can never create a terminal. */
@@ -421,6 +782,10 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     public CompletionStage<MutationResultV1> completeAbsent(VersionedValue exactIntentAuthority) {
         VersionedAuthorityV1 exact = exactAuthority(exactIntentAuthority.key(), exactIntentAuthority);
         TargetDeleteAuthorityV1 current = exact.authority();
+        if (current.recoveryVeto().isPresent()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("epoch grace renewal requires fresh eligibility before dispatch"));
+        }
         DeleteObservationContextV2 context = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(current);
         DeleteEligibilitySnapshotV2 snapshot = current.eligibilitySnapshot().orElseThrow();
         Sha256Digest absence = Sha256Digest.hash(

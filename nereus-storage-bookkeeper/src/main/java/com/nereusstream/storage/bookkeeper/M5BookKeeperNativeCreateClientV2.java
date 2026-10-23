@@ -20,14 +20,17 @@ import com.nereusstream.storage.api.bookkeeper.BookKeeperCapabilitySnapshotV1;
 import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver;
 
@@ -36,6 +39,8 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
     private final BookKeeper client;
     private final BookKeeperCapabilitySnapshotV1 capability;
     private final M5BookKeeperNativeCreateSpecV2 spec;
+    private final Set<RealBookKeeperCellSessionV1> headerReaders = ConcurrentHashMap.newKeySet();
+    private boolean headerReadsDraining;
 
     private M5BookKeeperNativeCreateClientV2(
             BookKeeper client, BookKeeperCapabilitySnapshotV1 capability, M5BookKeeperNativeCreateSpecV2 spec) {
@@ -123,13 +128,7 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
         if (!configuration.equals(RunLedgerConfigurationV1.from(capability, configuration.runId()))) {
             throw new IllegalArgumentException("new run changes the admitted capability");
         }
-        var next = M5BookKeeperNativeCreateSpecV2.of(
-                spec.nativeInstanceId(),
-                Sha256Digest.hash(
-                        CanonicalBytes.copyOf(("M5-NATIVE-RUN/" + spec.taskId().toHex() + "/"
-                                        + configuration.runId().value().toHex())
-                                .getBytes(StandardCharsets.US_ASCII))),
-                java.util.List.of(configuration));
+        var next = M5BookKeeperNativeCreateSpecV2.laterRun(spec, configuration);
         driver().activateCreateScope(next);
         return next;
     }
@@ -186,63 +185,291 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
      * admission obligations. Every call validates native run metadata and closes its independent read handle.
      */
     public CompletionStage<ExactLedgerEntryV1> readNativeRunHeader(RunLedgerHandleV1 handle) {
-        var configuration = RunLedgerConfigurationV1.from(capability, handle.runId());
         if (!handle.providerScopeId().equals(capability.providerScopeId())
                 || !handle.configurationDigest().equals(capability.configurationDigest())) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("header handle is outside native scope"));
         }
-        var digest = org.apache.bookkeeper.client.api.DigestType.valueOf(
-                capability.digestType().name());
-        return client.newOpenLedgerOp()
-                .withLedgerId(handle.ledgerIdentity().ledgerId())
-                .withDigestType(digest)
-                .withPassword(new byte[0])
-                .withRecovery(false)
-                .execute()
-                .thenCompose(open -> {
-                    CompletionStage<ExactLedgerEntryV1> read;
-                    try {
-                        var metadata = open.getLedgerMetadata();
-                        if (!RealBookKeeperCellSessionV1.metadataMatches(metadata, handle)
-                                || metadata.getEnsembleSize() != capability.ensembleSize()
-                                || metadata.getWriteQuorumSize() != capability.writeQuorumSize()
-                                || metadata.getAckQuorumSize() != capability.ackQuorumSize()
-                                || metadata.getDigestType() != digest
-                                || !Arrays.equals(metadata.getPassword(), new byte[0])) {
-                            throw new IllegalArgumentException("native run header metadata differs from its handle");
-                        }
-                        read = open.readUnconfirmedAsync(0, 0).thenApply(entries -> {
-                            try (var owned = entries) {
-                                var entry = owned.getEntry(0);
-                                if (entry.getLedgerId()
-                                                != handle.ledgerIdentity().ledgerId()
-                                        || entry.getEntryId() != 0) {
-                                    throw new IllegalStateException("native header read returned another entry");
-                                }
-                                var bytes = CanonicalBytes.copyOf(entry.getEntryBytes());
-                                return new ExactLedgerEntryV1(handle, 0, bytes, Sha256Digest.hash(bytes));
-                            }
-                        });
-                    } catch (RuntimeException failure) {
-                        read = CompletableFuture.failedFuture(failure);
-                    }
-                    var terminal = new CompletableFuture<ExactLedgerEntryV1>();
-                    read.whenComplete((entry, failure) -> open.closeAsync().whenComplete((ignored, closeFailure) -> {
-                        if (failure != null) {
-                            terminal.completeExceptionally(failure);
-                        } else if (closeFailure != null) {
-                            terminal.completeExceptionally(closeFailure);
-                        } else {
-                            terminal.complete(entry);
-                        }
-                    }));
-                    return terminal;
-                });
+        final RealBookKeeperCellSessionV1 reader;
+        synchronized (this) {
+            if (headerReadsDraining) {
+                return CompletableFuture.failedFuture(new IllegalStateException("native header owner is draining"));
+            }
+            reader = newSession();
+            headerReaders.add(reader);
+        }
+        var terminal = new CompletableFuture<ExactLedgerEntryV1>();
+        CompletionStage<ExactLedgerEntryV1> read;
+        try {
+            read = reader.readNativeRunHeader(handle);
+        } catch (Throwable failure) {
+            read = CompletableFuture.failedFuture(failure);
+        }
+        read.whenComplete((entry, failure) -> closeHeaderReader(reader).whenComplete((ignored, closeFailure) -> {
+            if (closeFailure != null) {
+                if (failure != null && failure != closeFailure) {
+                    closeFailure.addSuppressed(failure);
+                }
+                terminal.completeExceptionally(closeFailure);
+            } else if (failure != null) {
+                terminal.completeExceptionally(failure);
+            } else {
+                terminal.complete(entry);
+            }
+        }));
+        return terminal.thenApply(entry -> entry);
+    }
+
+    private CompletionStage<Void> closeHeaderReader(RealBookKeeperCellSessionV1 reader) {
+        try {
+            return reader.closeAsync().thenRun(() -> headerReaders.remove(reader));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
     }
 
     public CompletableFuture<Void> fenceCreates() {
         return driver().fenceCreates();
+    }
+
+    /** Exact existing-task fence only; protocol closure and delete eligibility must be established separately. */
+    public CompletionStage<Void> fenceExistingScope(M5BookKeeperNativeCreateSpecV2 expected, RunLedgerHandleV1 handle) {
+        return driver().guard().fenceExistingScope(expected, handle, capability);
+    }
+
+    /** Raw bytes and native version fields from one getData response; timestamps grant no grace authority. */
+    public record NativeRecordFact(
+            String nativePath,
+            CanonicalBytes rawStoredBytes,
+            long nativeCreateZxid,
+            long nativeModifyZxid,
+            int nativeVersion,
+            long nativeCreatedAtMillis) {
+        public NativeRecordFact {
+            Objects.requireNonNull(nativePath, "nativePath");
+            Objects.requireNonNull(rawStoredBytes, "rawStoredBytes");
+            if (!nativePath.startsWith("/") || rawStoredBytes.isEmpty() || nativeVersion < 0) {
+                throw new IllegalArgumentException("native record path/bytes/version differ");
+            }
+        }
+
+        public Sha256Digest rawStoredSha256() {
+            return Sha256Digest.hash(rawStoredBytes);
+        }
+    }
+
+    /** Actual native create admission; a fenced create scope alone is not SDK/read termination. */
+    public record TaskCreateScopeFact(
+            PhysicalNamespaceAuthorityBindingV2 namespaceBinding,
+            M5BookKeeperNativeCreateSpecV2 createScope,
+            NativeRecordFact instanceIdentity,
+            NativeRecordFact taskFence) {
+        public TaskCreateScopeFact {
+            Objects.requireNonNull(namespaceBinding, "namespaceBinding");
+            Objects.requireNonNull(createScope, "createScope");
+            Objects.requireNonNull(instanceIdentity, "instanceIdentity");
+            Objects.requireNonNull(taskFence, "taskFence");
+        }
+
+        public boolean fenced() {
+            return taskFence.nativeVersion() == 1;
+        }
+    }
+
+    /** Read-only full Task observation under the existing bound connection, followed by exact rereads. */
+    public CompletionStage<TaskCreateScopeFact> readTaskCreateScopeFact(M5BookKeeperNativeCreateSpecV2 expected) {
+        var guard = driver().guard();
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> guard.readInstanceFact()
+                        .thenCompose(instance -> guard.readTaskCreateScopeFact(expected, capability)
+                                .thenApply(fence -> new TaskCreateScopeFact(binding, expected, instance, fence))))
+                .thenCompose(fact -> guard.readTaskCreateScopeFact(expected, capability)
+                        .thenCompose(fence -> {
+                            if (!fence.equals(fact.taskFence())) {
+                                return CompletableFuture.failedFuture(new IllegalStateException(
+                                        "native Task create fence changed during fact capture"));
+                            }
+                            return guard.readInstanceFact().thenCompose(instance -> {
+                                if (!instance.equals(fact.instanceIdentity())) {
+                                    return CompletableFuture.failedFuture(new IllegalStateException(
+                                            "native Task instance changed during fact capture"));
+                                }
+                                return guard.requireNamespaceBinding().thenApply(binding -> {
+                                    if (!binding.equals(fact.namespaceBinding())) {
+                                        throw new IllegalStateException(
+                                                "native Task namespace changed during fact capture");
+                                    }
+                                    return fact;
+                                });
+                            });
+                        }));
+    }
+
+    /** Permanent original create fence/reservation, readable even after exact ledger deletion. */
+    public record FencedLedgerScopeFacts(
+            TaskCreateScopeFact scope, RunLedgerHandleV1 handle, NativeRecordFact reservation) {
+        public FencedLedgerScopeFacts {
+            Objects.requireNonNull(scope, "scope");
+            Objects.requireNonNull(handle, "handle");
+            Objects.requireNonNull(reservation, "reservation");
+            if (!scope.fenced()) {
+                throw new IllegalArgumentException("native ledger scope lacks its permanent create fence");
+            }
+        }
+    }
+
+    /** Reads permanent admission only; absence of ledger metadata is not inferred or manufactured here. */
+    public CompletionStage<FencedLedgerScopeFacts> readFencedLedgerScopeFacts(
+            M5BookKeeperNativeCreateSpecV2 expected, RunLedgerHandleV1 handle) {
+        return captureFencedLedgerScopeFacts(expected, handle).thenCompose(first -> captureFencedLedgerScopeFacts(
+                        expected, handle)
+                .thenApply(current -> {
+                    if (!first.equals(current)) {
+                        throw new IllegalStateException("native fenced ledger scope changed during fact capture");
+                    }
+                    return first;
+                }));
+    }
+
+    private CompletionStage<FencedLedgerScopeFacts> captureFencedLedgerScopeFacts(
+            M5BookKeeperNativeCreateSpecV2 expected, RunLedgerHandleV1 handle) {
+        return readTaskCreateScopeFact(expected).thenCompose(scope -> driver().guard()
+                .readSealedExistingScope(expected, handle, capability)
+                .thenApply(fenced -> {
+                    if (!scope.taskFence().equals(fenced.taskFence())) {
+                        throw new IllegalStateException("native ledger scope differs from its actual Task fence");
+                    }
+                    return new FencedLedgerScopeFacts(scope, handle, fenced.reservation());
+                }));
+    }
+
+    /** Exact post-recovery source observations; this value is not task, read-protection or delete eligibility. */
+    public record RecoveredScopeFacts(
+            PhysicalNamespaceAuthorityBindingV2 namespaceBinding,
+            M5BookKeeperNativeCreateSpecV2 createScope,
+            RunLedgerRecoveryProofV1 recovery,
+            NativeRecordFact instanceIdentity,
+            NativeRecordFact taskFence,
+            NativeRecordFact reservation,
+            NativeRecordFact ledgerMetadata,
+            M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1 closedMetadata) {
+        public RecoveredScopeFacts {
+            Objects.requireNonNull(namespaceBinding, "namespaceBinding");
+            Objects.requireNonNull(createScope, "createScope");
+            Objects.requireNonNull(recovery, "recovery");
+            Objects.requireNonNull(instanceIdentity, "instanceIdentity");
+            Objects.requireNonNull(taskFence, "taskFence");
+            Objects.requireNonNull(reservation, "reservation");
+            Objects.requireNonNull(ledgerMetadata, "ledgerMetadata");
+            Objects.requireNonNull(closedMetadata, "closedMetadata");
+        }
+    }
+
+    /** Reads only a physically present recovered birth; absence or uncertainty must retain its old writer ticket. */
+    public CompletionStage<RecoveredScopeFacts> readRecoveredScopeFacts(
+            M5BookKeeperNativeCreateSpecV2 expected, RunLedgerRecoveryProofV1 proof) {
+        Objects.requireNonNull(proof, "proof");
+        var guard = driver().guard();
+        if (!(client.getLedgerManager() instanceof org.apache.bookkeeper.meta.CleanupLedgerManager cleanup)
+                || !(cleanup.getUnderlying() instanceof M5BookKeeperNativeLedgerManagerV2 manager)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("native ledger manager differs"));
+        }
+        String path = manager.nativeLedgerPath(proof.handle().ledgerIdentity().ledgerId());
+        return guard.readInstanceFact().thenCompose(instance -> guard.requireNamespaceBinding()
+                .thenCompose(binding -> guard.readFencedExistingScope(expected, proof.handle(), capability)
+                        .thenCompose(scope -> guard.readNativeRecord(path)
+                                .thenApply(nativeValue -> new RecoveredScopeFacts(
+                                        binding,
+                                        expected,
+                                        proof,
+                                        instance,
+                                        scope.taskFence(),
+                                        scope.reservation(),
+                                        nativeValue,
+                                        requireRecoveredMetadata(nativeValue, proof))))));
+    }
+
+    /** Actual sealed identity under the owned native connection; it grants no writer, reference or delete closure. */
+    public record SealedScopeFacts(
+            PhysicalNamespaceAuthorityBindingV2 namespaceBinding,
+            M5BookKeeperNativeCreateSpecV2 createScope,
+            RunLedgerHandleV1 handle,
+            NativeRecordFact instanceIdentity,
+            NativeRecordFact taskFence,
+            NativeRecordFact reservation,
+            NativeRecordFact ledgerMetadata,
+            M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1 closedMetadata) {
+        public SealedScopeFacts {
+            Objects.requireNonNull(namespaceBinding, "namespaceBinding");
+            Objects.requireNonNull(createScope, "createScope");
+            Objects.requireNonNull(handle, "handle");
+            Objects.requireNonNull(instanceIdentity, "instanceIdentity");
+            Objects.requireNonNull(taskFence, "taskFence");
+            Objects.requireNonNull(reservation, "reservation");
+            Objects.requireNonNull(ledgerMetadata, "ledgerMetadata");
+            Objects.requireNonNull(closedMetadata, "closedMetadata");
+        }
+    }
+
+    /** Exact read-only native scope and CLOSED metadata, including an exact OPEN creating Task. */
+    public CompletionStage<SealedScopeFacts> readSealedScopeFacts(
+            M5BookKeeperNativeCreateSpecV2 expected, RunLedgerHandleV1 handle) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(handle, "handle");
+        return captureSealedScopeFacts(expected, handle)
+                .thenCompose(first -> captureSealedScopeFacts(expected, handle).thenApply(current -> {
+                    if (!current.equals(first)) {
+                        throw new IllegalStateException("sealed native scope changed during fact capture");
+                    }
+                    return first;
+                }));
+    }
+
+    private CompletionStage<SealedScopeFacts> captureSealedScopeFacts(
+            M5BookKeeperNativeCreateSpecV2 expected, RunLedgerHandleV1 handle) {
+        var guard = driver().guard();
+        if (!(client.getLedgerManager() instanceof org.apache.bookkeeper.meta.CleanupLedgerManager cleanup)
+                || !(cleanup.getUnderlying() instanceof M5BookKeeperNativeLedgerManagerV2 manager)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("native ledger manager differs"));
+        }
+        String path = manager.nativeLedgerPath(handle.ledgerIdentity().ledgerId());
+        return guard.readInstanceFact().thenCompose(instance -> guard.requireNamespaceBinding()
+                .thenCompose(binding -> guard.readSealedExistingScope(expected, handle, capability)
+                        .thenCompose(scope -> guard.readNativeRecord(path)
+                                .thenApply(nativeValue -> new SealedScopeFacts(
+                                        binding,
+                                        expected,
+                                        handle,
+                                        instance,
+                                        scope.taskFence(),
+                                        scope.reservation(),
+                                        nativeValue,
+                                        requireClosedMetadata(nativeValue, handle))))));
+    }
+
+    private M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1 requireRecoveredMetadata(
+            NativeRecordFact nativeValue, RunLedgerRecoveryProofV1 proof) {
+        var closed = requireClosedMetadata(nativeValue, proof.handle());
+        if (closed.sealedLastEntryId() != proof.lastAddConfirmed()) {
+            throw new IllegalStateException("recovered native ledger LAC differs from recovery proof");
+        }
+        return closed;
+    }
+
+    private M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1 requireClosedMetadata(
+            NativeRecordFact nativeValue, RunLedgerHandleV1 handle) {
+        final org.apache.bookkeeper.client.api.LedgerMetadata metadata;
+        try {
+            metadata = new org.apache.bookkeeper.meta.LedgerMetadataSerDe()
+                    .parseConfig(
+                            nativeValue.rawStoredBytes().toByteArray(),
+                            handle.ledgerIdentity().ledgerId(),
+                            Optional.of(nativeValue.nativeCreatedAtMillis()));
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException("native ledger metadata cannot be parsed", failure);
+        }
+        return M5BookKeeperDeleteAdapterV1.exactTarget(metadata, handle, capability, new byte[0])
+                .orElseThrow(() -> new IllegalStateException("native ledger is not the exact closed run"));
     }
 
     M5BookKeeperNativeMetadataDriverV2 driver() {
@@ -255,6 +482,15 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
+        final java.util.List<RealBookKeeperCellSessionV1> readers;
+        synchronized (this) {
+            headerReadsDraining = true;
+            readers = java.util.List.copyOf(headerReaders);
+        }
+        CompletableFuture.allOf(readers.stream()
+                        .map(reader -> closeHeaderReader(reader).toCompletableFuture())
+                        .toArray(CompletableFuture[]::new))
+                .join();
         client.close();
     }
 }

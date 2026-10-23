@@ -324,6 +324,15 @@ tasks.register<Test>("v2M5TaskSelectionTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5MaterializationWorkerTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test") }
+    outputs.upToDateWhen { false }
+}
+
 
 val m5DeleteTestFixtures by configurations.creating {
     isCanBeConsumed = true

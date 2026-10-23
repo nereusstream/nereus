@@ -68,6 +68,40 @@ public final class CumulativeRecoveryBudget {
                 canonicalBodyBytes, canonicalBytes, limits.maxCanonicalBodyBytes(), "canonical control metadata bytes");
     }
 
+    /** Reserves before metadata I/O; like LIST, only a successful bounded result releases unused capacity. */
+    public synchronized ControlMetadataReservation reserveControlMetadata(long maximumBytes) {
+        if (maximumBytes <= 0) {
+            throw new IllegalArgumentException("control metadata reservation must be positive");
+        }
+        chargeControlMetadata(maximumBytes);
+        return new ControlMetadataReservation(this, maximumBytes);
+    }
+
+    public static final class ControlMetadataReservation {
+        private final CumulativeRecoveryBudget owner;
+        private final long maximumBytes;
+        private boolean settled;
+
+        private ControlMetadataReservation(CumulativeRecoveryBudget owner, long maximumBytes) {
+            this.owner = owner;
+            this.maximumBytes = maximumBytes;
+        }
+
+        public void settle(long actualBytes) {
+            synchronized (owner) {
+                if (settled) {
+                    throw new IllegalStateException("control metadata reservation was settled twice");
+                }
+                if (actualBytes < 0 || actualBytes > maximumBytes) {
+                    throw new IllegalArgumentException("control metadata result exceeds its pre-call reservation");
+                }
+                owner.checkWallTime();
+                owner.canonicalBodyBytes = Math.subtractExact(owner.canonicalBodyBytes, maximumBytes - actualBytes);
+                settled = true;
+            }
+        }
+    }
+
     public synchronized void chargeListPage(int keys, long keyBytes) {
         checkWallTime();
         int nextListPages = addInt(listPages, 1, limits.maxListPages(), "LIST pages");

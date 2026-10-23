@@ -39,7 +39,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-/** Data-before-root publisher and deterministic root-first cleanup for one sealed-ledger attempt. */
+/** Data-before-root publisher for one sealed-ledger attempt. */
 public final class PulsarSealedLedgerPublisherV1 {
     public record PreparedAttempt(
             PulsarSealedLedgerAttemptV1 attempt,
@@ -123,11 +123,8 @@ public final class PulsarSealedLedgerPublisherV1 {
 
     public CompletionStage<Void> deleteAttempt(PulsarSealedLedgerAttemptV1 attempt) {
         Objects.requireNonNull(attempt, "attempt");
-        PulsarOffloadKeysV1 keys = attempt.keys();
-        return callStage(() -> objectStore.deleteAndProveAbsent(keys.rootKey()))
-                .thenCompose(ignored -> callStage(() -> objectStore.deleteAndProveAbsent(keys.dataKey())))
-                .thenCompose(
-                        ignored -> callStage(() -> objectStore.cleanupAttemptMultipartResidue(keys.attemptPrefix())));
+        return CompletableFuture.failedFuture(new IllegalStateException(
+                "Pulsar attempt cleanup requires M5 intent, release and native reference-free proof"));
     }
 
     private Draft draft(PreparedAttempt prepared, ImmutableObject dataProof) {

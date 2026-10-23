@@ -452,6 +452,44 @@ public final class KafkaObjectCompletionTrackerV1 {
         }
     }
 
+    /**
+     * Settles only an exactly resolved rejected unit beyond the original Owner's immutable selected end. Closing
+     * that same durable authority excludes late authorization; this never rolls back physical sequence/nonce state
+     * or releases a selected locator. A selected or still ambiguous position requires its normal recovery path.
+     */
+    public void reconcileRejectedAfterOwnerClose(AssignedTicket assigned) {
+        KafkaSpeculativeCommitV1 commit;
+        KafkaObjectAuthorizationV1 original;
+        synchronized (this) {
+            Slot slot = requireAssigned(assigned);
+            if (slot.stage != LifecycleStage.BINDING_REJECTED
+                    || authorization == null
+                    || slot.sequenceClaim != null
+                    || slot.rollbackPlan != null
+                    || !slot.commitSet.expectedFence().equals(authorizationFence)) {
+                throw new IllegalStateException("closed-Owner reconciliation requires a physically resolved rejection");
+            }
+            commit = slot.commitSet;
+            original = authorization;
+        }
+        var closed = original.readClosed(commit.expectedFence());
+        if (closed.head().endOffset() > commit.startOffset()) {
+            throw new IllegalStateException(
+                    "rejected position overlaps the closed selected prefix; recover it exactly");
+        }
+        synchronized (this) {
+            Slot slot = requireAssigned(assigned);
+            if (slot.stage != LifecycleStage.BINDING_REJECTED
+                    || slot.commitSet != commit
+                    || authorization != original
+                    || slot.sequenceClaim != null
+                    || slot.rollbackPlan != null) {
+                throw new IllegalStateException("rejected ticket changed during closed-Owner reconciliation");
+            }
+            releasePendingSlot(assigned.slot());
+        }
+    }
+
     public synchronized Optional<ReadyCompletion> readyAt(long bindingDurableFrontier) {
         if (bindingDurableFrontier < 0) {
             throw new IllegalArgumentException("binding durable frontier is negative");

@@ -28,6 +28,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Bindi
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1;
+import com.nereusstream.storage.object.retention.M5MaterializationWorkerCoordinatorV1;
 import com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2;
 import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.util.List;
@@ -125,6 +126,36 @@ class OxiaTaskSelectionRouteV2Test {
         assertThatThrownBy(() -> route.read(M5TaskSelectionDecisionV2.key(foreign, decision.taskId())))
                 .hasMessageContaining("outside");
         assertThat(client.createCount() + client.casCount()).isEqualTo(writes);
+    }
+
+    @Test
+    void workerReplacementAndTaskSelectionCompeteOnTheSameNativeVersion() {
+        var client = new DeterministicOxiaConditionalClient();
+        var route = initialized(client);
+        var workers = new M5MaterializationWorkerCoordinatorV1(route.rawControlMetadata(), 7, BINDING);
+        var first = workers.propose(
+                        INITIAL, digest("cell"), digest("scope"), 1, digest("native-worker"), digest("namespace"))
+                .orElseThrow()
+                .admit(digest("cut"), digest("plan"), digest("first"))
+                .orElseThrow();
+        var tasks = new M5TaskSelectionCoordinatorV2(route.rawControlMetadata(), 7, BINDING);
+        var late = tasks.prepare(digest("first"), first.worker()).orElseThrow();
+        var replacement = workers.propose(
+                        INITIAL, digest("cell"), digest("scope"), 1, digest("native-worker"), digest("namespace"))
+                .orElseThrow()
+                .admit(digest("cut"), digest("plan"), digest("replacement"))
+                .orElseThrow();
+        assertThat(first.isCurrent()).isFalse();
+        assertThat(replacement.isCurrent()).isTrue();
+        assertThat(late.cancelSelection(INITIAL)).isEmpty();
+        assertThat(tasks.prepare(digest("first"), first.worker())).isEmpty();
+        assertThat(route.controlMetadata().get(SELECTOR))
+                .contains(com.nereusstream.storage.object.read.control.M4ReadControlCodecV1.encodeSelector(INITIAL));
+        var before = route.read(SELECTOR).toCompletableFuture().join();
+        int writes = client.casCount();
+        var oldWire = M5BindingAuthorityCodecV1.encodeAuthority(M5BindingAuthorityCodecV1.initial(INITIAL));
+        assertThatThrownBy(() -> route.compareAndSet(before, SELECTOR, oldWire)).hasMessageContaining("downgrade");
+        assertThat(client.casCount()).isEqualTo(writes);
     }
 
     private static OxiaBindingLifecycleMetadataStoreV2 initialized(DeterministicOxiaConditionalClient client) {

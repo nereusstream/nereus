@@ -335,6 +335,60 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
         repository.retainCurrent(result.observedState().references());
     }
 
+    /** Caller owns the selected descriptor and actual old read drain; this CAS preserves the live protocol state. */
+    public synchronized void retireBookKeeperSources(
+            KafkaProtocolCheckpointStateV1 checkpoint, Sha256Digest sourceDigest) {
+        requireProfile(StorageProfile.BOOKKEEPER);
+        var before = capture();
+        var previous = captureRecoveryCheckpoint(before);
+        var vector = checkpoint.vector();
+        var oldVector = previous.vector();
+        var binding = vector.runBinding();
+        var oldBinding = oldVector.runBinding();
+        if (!before.speculativeQueue().commits().isEmpty()
+                || !checkpoint.components().equals(previous.components())
+                || vector.rangeIndexCoveredThrough() != oldVector.rangeIndexCoveredThrough()
+                || vector.producerStateCoveredThrough() != oldVector.producerStateCoveredThrough()
+                || vector.transactionIndexCoveredThrough() != oldVector.transactionIndexCoveredThrough()
+                || vector.leaderEpochCoveredThrough() != oldVector.leaderEpochCoveredThrough()
+                || !binding.bindingId().equals(oldBinding.bindingId())
+                || !binding.topicIncarnation().equals(oldBinding.topicIncarnation())
+                || binding.partitionId() != oldBinding.partitionId()
+                || !binding.storageEpochId().equals(oldBinding.storageEpochId())
+                || !binding.providerScopeId().equals(oldBinding.providerScopeId())
+                || binding.creatorOwnerEpoch() < oldBinding.creatorOwnerEpoch()
+                || binding.creatorOwnerEpoch() > before.root().fence().ownerEpoch()
+                || binding.kafkaLeaderEpoch() < oldBinding.kafkaLeaderEpoch()
+                || binding.kafkaLeaderEpoch() > before.root().fence().kafkaLeaderEpoch()
+                || !previous.readIndexes().containsAll(checkpoint.readIndexes())
+                || sourceDigest.isZero()) {
+            throw new IllegalArgumentException("BK source retirement changed its exact protocol checkpoint state");
+        }
+        var refs = before.root().references();
+        var replacement = new KafkaPartitionStateReferencesV1(
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.runTable().generation()), sourceDigest),
+                refs.activeTail(),
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.sourceMap().generation()), sourceDigest),
+                refs.committedProducerState(),
+                refs.speculativeProducerQueue(),
+                refs.transactionIndex(),
+                refs.leaderEpochIndex(),
+                repository.store(
+                        Math.incrementExact(refs.checkpointVector().generation()),
+                        KafkaProtocolStateCodecV1.checkpoint(checkpoint),
+                        checkpoint),
+                new KafkaPartitionStateReferenceV1(
+                        Math.incrementExact(refs.sourceProtection().generation()), sourceDigest));
+        var result = publicationCell.retireBookKeeperSources(before.root(), replacement);
+        if (!result.published()) {
+            throw new KafkaCoherentPublicationException(
+                    "BK source retirement root was not selected: " + result.outcome());
+        }
+        repository.retainCurrent(result.observedState().references());
+    }
+
     public KafkaAppendProtocolHooksV1 protocolHooks(KafkaProtocolAppendPlanV1 plan) {
         Objects.requireNonNull(plan, "plan");
         return new KafkaAppendProtocolHooksV1() {
@@ -443,6 +497,24 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
                 components.speculative(),
                 components.transactions(),
                 components.leaderEpochs());
+    }
+
+    /** Resolves the actual recovery checkpoint while the supplied coherent root is still current. */
+    public synchronized KafkaProtocolCheckpointStateV1 captureRecoveryCheckpoint(
+            KafkaCoherentProtocolSnapshotV1 snapshot) {
+        requireProfile(StorageProfile.BOOKKEEPER);
+        Objects.requireNonNull(snapshot, "snapshot");
+        if (!publicationCell.capture().equals(snapshot.root())) {
+            throw new IllegalStateException("recovery checkpoint capture names a superseded coherent root");
+        }
+        return repository.resolve(
+                snapshot.root().references().checkpointVector(), KafkaProtocolCheckpointStateV1.class);
+    }
+
+    /** The existing K1 component identity, including the exact vector and any checkpoint source locators. */
+    public static Sha256Digest recoveryCheckpointContentDigest(KafkaProtocolCheckpointStateV1 checkpoint) {
+        return Sha256Digest.hash(
+                KafkaProtocolStateCodecV1.checkpoint(Objects.requireNonNull(checkpoint, "checkpoint")));
     }
 
     public synchronized KafkaObjectCoherentProtocolSnapshotV1 captureObject() {

@@ -115,6 +115,14 @@ public final class OxiaPhysicalMetadataNamespaceV2 {
         });
     }
 
+    /** Cell profiles share the original physical authority root, assignment guard and exact native client. */
+    public CompletionStage<OxiaCellProviderScopeRegistryV2> openCellProviderScopes(
+            NativePhysicalNamespaceAuthorityV2 backend) {
+        return currentBinding(backend)
+                .thenApply(binding -> new OxiaCellProviderScopeRegistryV2(
+                        new Oxia09ExactMetadataTransactionStoreV1(guardedClient(backend)), binding));
+    }
+
     /** The physical backend selects the root; callers cannot supply another root or metadata client. */
     public CompletionStage<OxiaQuotaTargetDeleteStoreV2> openAuthorityRoute(
             NativePhysicalNamespaceAuthorityV2 backend, ExactMetadataTransactionStoreV1 authoritativeFacts) {
@@ -124,7 +132,7 @@ public final class OxiaPhysicalMetadataNamespaceV2 {
             return new OxiaQuotaTargetDeleteStoreV2(
                     client,
                     guardedClient(backend),
-                    new Layout(binding.authorityRoot(), binding.physicalNamespace()),
+                    Layout.withPhysicalMembers(binding.authorityRoot(), binding.physicalNamespace()),
                     authoritativeFacts,
                     () -> currentBinding(backend));
         });

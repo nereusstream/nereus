@@ -10,6 +10,9 @@ EXPECTED = {'schema': 'NEREUS_V2_M5_DELETE_ELIGIBILITY_PROJECTION_V2',
  'status': 'IMPLEMENTED_TYPED_PREDICATES_NON_PROMOTABLE',
  'wire': {'magic': 'M5ES',
           'version': 2,
+          'typedSemanticTransferVersion': 3,
+          'typedSemanticTransferRequiredForV3': True,
+          'legacyV2BytesAndDigestsPreserved': True,
           'maximumSnapshotBytes': 786432,
           'maximumMembers': 64,
           'maximumReplacements': 256,
@@ -59,6 +62,7 @@ def validate(root):
     state = (base / "M5TargetDeleteAuthorityStateMachineV1.java").read_text()
     coordinator = (base / "M5TargetDeleteAuthorityCoordinatorV1.java").read_text()
     codec = (base / "M5TargetDeleteAuthorityCodecV1.java").read_text()
+    eligibility_codec = (base / "DeleteEligibilityCodecV2.java").read_text()
     m4_keys = (root / "nereus-storage-object/src/main/java/com/nereusstream/storage/object/read/control/M4ReadControlKeysV1.java").read_text()
     if "matchesProtectionAuthority" not in m4_keys or "M4ReadControlKeysV1.matchesProtectionAuthority" not in records:
         raise ValueError("eligibility action no longer requires the canonical M4 protection key")
@@ -74,7 +78,11 @@ def validate(root):
         (records, EXPECTED["reasons"] + EXPECTED["referenceScopes"] + EXPECTED["semanticAspects"] + [
             "MAX_SNAPSHOT_BYTES = 786432", "MAX_MEMBERS = 64", "MAX_REPLACEMENTS = 256",
             "replacement omits",
-            "minimumSafeFloor() < trim.newFrontier()", "M4ReadControlCodecV1.decodeProtection",
+            "!expiryCoverageSatisfied(member.floors(), trim, proof.coverage())",
+            "context.compare(floors.minimumPulsarFloor(), frontier.newFrontier()) < 0",
+            "!context.contains(coverage.pulsarCoverage().orElseThrow())",
+            "trim.newFrontier() >= coverage.exclusiveEnd()",
+            "floors.minimumSafeFloor() >= trim.newFrontier()", "M4ReadControlCodecV1.decodeProtection",
             "neverAdmittedProtection().isEmpty()", "authorityFacts()"]),
         (state, ["qualifyEligibility", "CAS-1 requires a complete typed eligibility snapshot",
                  "snapshot.generation() != Math.addExact(current.authorityRevision(), 1)"]),
@@ -82,6 +90,9 @@ def validate(root):
                        "eligibility authority changed", "eligibility authority is absent"]),
         (codec, ["BASE_VERSION = 4", "DeleteEligibilityCodecV2.decode", "current.eligibilitySnapshot()",
                  "tickets.isEmpty()", "DeleteEligibilityCodecV2.encode"]),
+        (eligibility_codec, ["VERSION = 2", "TYPED_VERSION = 3", "transfer.coverage().typedPulsar()",
+                             "M5PulsarCoverageV2.decode(readBytes(in, M5PulsarCoverageV2.MAX_BYTES))",
+                             "!encode(snapshot).equals(bytes)"]),
     ):
         if any(literal not in source for literal in literals):
             raise ValueError("typed eligibility source omits a required predicate")

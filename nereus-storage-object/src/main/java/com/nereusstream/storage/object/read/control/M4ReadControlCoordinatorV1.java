@@ -83,6 +83,19 @@ public final class M4ReadControlCoordinatorV1 {
         return reconcileCreate(keys.capability(capability.generation()), candidate, ExistingKind.EXACT_ONLY);
     }
 
+    /** Rereads the durable capability bound to this Binding before installing a local read owner. */
+    public Optional<CapabilityEvidence> readCapability(long generation) {
+        return metadata.get(keys.capability(generation))
+                .map(M4ReadControlCodecV1::decodeCapability)
+                .map(value -> {
+                    requireBinding(value.binding());
+                    if (value.generation() != generation) {
+                        throw new IllegalStateException("M4 capability generation differs from its key");
+                    }
+                    return value;
+                });
+    }
+
     public Outcome revokeCapability(long generation) {
         String key = keys.capability(generation);
         Optional<CanonicalBytes> currentBytes = metadata.get(key);
@@ -119,7 +132,7 @@ public final class M4ReadControlCoordinatorV1 {
      * fallback-bearing predecessor closes its epoch and persists an inline closure anchor; a
      * preferred-only predecessor creates no proof liability.
      */
-    public Outcome grantTakeover(
+    public BindingReadSelector takeoverCandidate(
             BindingReadSelector expected,
             Sha256Digest successorViewSha256,
             long successorOwnerEpoch,
@@ -153,12 +166,29 @@ public final class M4ReadControlCoordinatorV1 {
                                     expected.fallbackSetSha256().orElseThrow())));
             anchors = append(anchors, anchor);
         }
-        BindingReadSelector candidate;
-        CanonicalBytes candidateBytes;
+        BindingReadSelector candidate = withInline(successorCore, anchors, expected.activeBatches());
+        requireAdmissionCapacity(candidate, M4ReadControlCodecV1.encodeSelector(candidate));
+        return candidate;
+    }
+
+    public Outcome grantTakeover(
+            BindingReadSelector expected,
+            Sha256Digest successorViewSha256,
+            long successorOwnerEpoch,
+            long successorSourceGeneration) {
+        validateSelector(expected);
+        Objects.requireNonNull(successorViewSha256, "successorViewSha256");
+        if (expected.admissionState() != AdmissionState.ADMITTING
+                || successorOwnerEpoch <= expected.ownerEpoch()
+                || successorSourceGeneration <= expected.sourceGeneration()) {
+            throw new IllegalArgumentException("takeover requires a newer owner and source generation");
+        }
+        final BindingReadSelector candidate;
+        final CanonicalBytes candidateBytes;
         try {
-            candidate = withInline(successorCore, anchors, expected.activeBatches());
+            candidate =
+                    takeoverCandidate(expected, successorViewSha256, successorOwnerEpoch, successorSourceGeneration);
             candidateBytes = M4ReadControlCodecV1.encodeSelector(candidate);
-            requireAdmissionCapacity(candidate, candidateBytes);
         } catch (IllegalArgumentException capExceeded) {
             return stopForCapacity(expected);
         }
@@ -878,10 +908,8 @@ public final class M4ReadControlCoordinatorV1 {
     }
 
     private CapabilityEvidence readCapability(CapabilityBinding capability) {
-        CapabilityEvidence value = metadata.get(keys.capability(capability.generation()))
-                .map(M4ReadControlCodecV1::decodeCapability)
+        CapabilityEvidence value = readCapability(capability.generation())
                 .orElseThrow(() -> new IllegalStateException("bound capability evidence is missing"));
-        requireBinding(value.binding());
         if (!M4ReadControlCodecV1.capabilityEvidenceSha256(value).equals(capability.evidenceSha256())) {
             throw new IllegalStateException("bound capability evidence digest differs");
         }

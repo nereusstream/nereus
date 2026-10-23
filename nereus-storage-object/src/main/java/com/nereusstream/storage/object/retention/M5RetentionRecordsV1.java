@@ -23,16 +23,19 @@ import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ProtectionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Closed immutable M5-C logical-retention, reference-proof, and tombstone values. */
 public final class M5RetentionRecordsV1 {
@@ -114,16 +117,61 @@ public final class M5RetentionRecordsV1 {
             PositionDomain domain,
             long safeFloor,
             boolean constraining,
-            boolean enumerationComplete) {
+            boolean enumerationComplete,
+            Optional<M5PulsarCoverageV2.Position> pulsarSafeFloor) {
+        public RetentionFloorObservationV1(
+                FloorClassV1 floorClass,
+                AuthorityFactV1 authority,
+                PositionDomain domain,
+                long safeFloor,
+                boolean constraining,
+                boolean enumerationComplete) {
+            this(floorClass, authority, domain, safeFloor, constraining, enumerationComplete, Optional.empty());
+        }
+
         public RetentionFloorObservationV1 {
             Objects.requireNonNull(floorClass, "floorClass");
             Objects.requireNonNull(authority, "authority");
             Objects.requireNonNull(domain, "domain");
+            pulsarSafeFloor = Objects.requireNonNull(pulsarSafeFloor, "pulsarSafeFloor");
             if (!enumerationComplete) {
                 throw new IllegalArgumentException("partial floor enumeration cannot enter a retention snapshot");
             }
-            if ((constraining && safeFloor < 0) || (!constraining && safeFloor != -1)) {
+            if (pulsarSafeFloor.isPresent()) {
+                if (domain != PositionDomain.PULSAR_ENTRY || safeFloor != -1 || !constraining) {
+                    throw new IllegalArgumentException("typed Pulsar floor has a scalar or foreign domain/policy");
+                }
+            } else if ((constraining && safeFloor < 0) || (!constraining && safeFloor != -1)) {
                 throw new IllegalArgumentException("floor value and constraining policy disagree");
+            }
+        }
+
+        @Override
+        public long safeFloor() {
+            if (pulsarSafeFloor.isPresent()) {
+                throw new IllegalStateException("Pulsar floor requires ledger-keyed positions");
+            }
+            return safeFloor;
+        }
+    }
+
+    /** One exact captured chain and explicit typed trim predecessor; no global numeric ledger ordering. */
+    public record PulsarFloorContextV2(M5PulsarCoverageV2 coverage, M5PulsarCoverageV2.Position priorTrimFrontier) {
+        public PulsarFloorContextV2 {
+            Objects.requireNonNull(coverage, "coverage");
+            Objects.requireNonNull(priorTrimFrontier, "priorTrimFrontier");
+            coverage.compare(priorTrimFrontier, priorTrimFrontier);
+        }
+    }
+
+    public record PulsarTrimContextV2(
+            M5PulsarCoverageV2 coverage,
+            M5PulsarCoverageV2.Position priorFrontier,
+            M5PulsarCoverageV2.Position newFrontier) {
+        public PulsarTrimContextV2 {
+            Objects.requireNonNull(coverage, "coverage");
+            if (coverage.compare(newFrontier, priorFrontier) < 0) {
+                throw new IllegalArgumentException("typed Pulsar trim frontier regresses");
             }
         }
     }
@@ -140,7 +188,35 @@ public final class M5RetentionRecordsV1 {
             int pageCount,
             long scannedBytes,
             List<RetentionFloorObservationV1> rows,
-            Sha256Digest snapshotRootSha256) {
+            Sha256Digest snapshotRootSha256,
+            Optional<PulsarFloorContextV2> pulsarContext) {
+        public RetentionFloorSnapshotV1(
+                IdentityEnvelope identity,
+                PositionDomain domain,
+                long generation,
+                long priorTrimFrontier,
+                Sha256Digest retentionPolicyRootSha256,
+                AuthorityFactV1 ownerFence,
+                AuthorityFactV1 storageFence,
+                int pageCount,
+                long scannedBytes,
+                List<RetentionFloorObservationV1> rows,
+                Sha256Digest snapshotRootSha256) {
+            this(
+                    identity,
+                    domain,
+                    generation,
+                    priorTrimFrontier,
+                    retentionPolicyRootSha256,
+                    ownerFence,
+                    storageFence,
+                    pageCount,
+                    scannedBytes,
+                    rows,
+                    snapshotRootSha256,
+                    Optional.empty());
+        }
+
         public RetentionFloorSnapshotV1 {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(domain, "domain");
@@ -149,8 +225,9 @@ public final class M5RetentionRecordsV1 {
             Objects.requireNonNull(storageFence, "storageFence");
             rows = sortedFloorRows(rows);
             requireDigest(snapshotRootSha256, "snapshotRootSha256");
+            pulsarContext = Objects.requireNonNull(pulsarContext, "pulsarContext");
             if (generation <= 0
-                    || priorTrimFrontier < 0
+                    || (pulsarContext.isPresent() ? priorTrimFrontier != -1 : priorTrimFrontier < 0)
                     || pageCount <= 0
                     || pageCount > MAX_SCAN_PAGES
                     || scannedBytes <= 0
@@ -168,13 +245,49 @@ public final class M5RetentionRecordsV1 {
             if (rows.stream().noneMatch(RetentionFloorObservationV1::constraining)) {
                 throw new IllegalArgumentException("retention snapshot has no constraining floor");
             }
+            if (pulsarContext.isPresent()) {
+                var context = pulsarContext.orElseThrow();
+                if (domain != PositionDomain.PULSAR_ENTRY
+                        || !context.coverage().binding().equals(identity.binding())) {
+                    throw new IllegalArgumentException("typed floor snapshot has a foreign Binding/domain");
+                }
+                for (var row : rows) {
+                    if (row.constraining() && row.pulsarSafeFloor().isEmpty()) {
+                        throw new IllegalArgumentException("typed floor snapshot contains a scalar floor");
+                    }
+                    row.pulsarSafeFloor()
+                            .ifPresent(position -> context.coverage().compare(position, position));
+                }
+            } else if (rows.stream().anyMatch(row -> row.pulsarSafeFloor().isPresent())) {
+                throw new IllegalArgumentException("typed floor has no captured chain context");
+            }
+        }
+
+        @Override
+        public long priorTrimFrontier() {
+            if (pulsarContext.isPresent()) {
+                throw new IllegalStateException("Pulsar trim predecessor requires ledger-keyed positions");
+            }
+            return priorTrimFrontier;
         }
 
         public long minimumSafeFloor() {
+            if (pulsarContext.isPresent()) {
+                throw new IllegalStateException("Pulsar floor minimum requires ledger-keyed positions");
+            }
             return rows.stream()
                     .filter(RetentionFloorObservationV1::constraining)
                     .mapToLong(RetentionFloorObservationV1::safeFloor)
                     .min()
+                    .orElseThrow();
+        }
+
+        public M5PulsarCoverageV2.Position minimumPulsarFloor() {
+            var context = pulsarContext.orElseThrow();
+            return rows.stream()
+                    .filter(RetentionFloorObservationV1::constraining)
+                    .map(row -> row.pulsarSafeFloor().orElseThrow())
+                    .min(context.coverage()::compare)
                     .orElseThrow();
         }
     }
@@ -190,7 +303,33 @@ public final class M5RetentionRecordsV1 {
             AuthorityFactV1 ownerFence,
             AuthorityFactV1 storageFence,
             long generation,
-            CapabilityBinding capability) {
+            CapabilityBinding capability,
+            Optional<PulsarTrimContextV2> pulsarContext) {
+        public BindingTrimFrontierV1(
+                IdentityEnvelope identity,
+                PositionDomain domain,
+                long priorFrontier,
+                long newFrontier,
+                Sha256Digest retentionPolicyRootSha256,
+                Sha256Digest floorSnapshotRootSha256,
+                AuthorityFactV1 ownerFence,
+                AuthorityFactV1 storageFence,
+                long generation,
+                CapabilityBinding capability) {
+            this(
+                    identity,
+                    domain,
+                    priorFrontier,
+                    newFrontier,
+                    retentionPolicyRootSha256,
+                    floorSnapshotRootSha256,
+                    ownerFence,
+                    storageFence,
+                    generation,
+                    capability,
+                    Optional.empty());
+        }
+
         public BindingTrimFrontierV1 {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(domain, "domain");
@@ -199,12 +338,37 @@ public final class M5RetentionRecordsV1 {
             Objects.requireNonNull(ownerFence, "ownerFence");
             Objects.requireNonNull(storageFence, "storageFence");
             Objects.requireNonNull(capability, "capability");
-            if (priorFrontier < 0 || newFrontier < priorFrontier || generation <= 0) {
+            pulsarContext = Objects.requireNonNull(pulsarContext, "pulsarContext");
+            if (generation <= 0
+                    || (pulsarContext.isPresent()
+                            ? priorFrontier != -1 || newFrontier != -1
+                            : priorFrontier < 0 || newFrontier < priorFrontier)) {
                 throw new IllegalArgumentException("logical trim frontier regresses or has an invalid generation");
+            }
+            if (pulsarContext.isPresent()
+                    && (domain != PositionDomain.PULSAR_ENTRY
+                            || !pulsarContext.orElseThrow().coverage().binding().equals(identity.binding()))) {
+                throw new IllegalArgumentException("typed trim frontier has a foreign Binding/domain");
             }
             if (!capability.equals(identity.capability())) {
                 throw new IllegalArgumentException("trim capability differs from its identity envelope");
             }
+        }
+
+        @Override
+        public long priorFrontier() {
+            if (pulsarContext.isPresent()) {
+                throw new IllegalStateException("Pulsar trim frontier requires ledger-keyed positions");
+            }
+            return priorFrontier;
+        }
+
+        @Override
+        public long newFrontier() {
+            if (pulsarContext.isPresent()) {
+                throw new IllegalStateException("Pulsar trim frontier requires ledger-keyed positions");
+            }
+            return newFrontier;
         }
     }
 
@@ -296,12 +460,60 @@ public final class M5RetentionRecordsV1 {
             long observedAuthorityTimeMillis,
             List<ReferenceScanSummaryV1> scanSummaries,
             List<ReferenceObservationV1> observations,
+            Optional<com.nereusstream.storage.object.gc.DeleteEpochGraceMarkV1> epochGrace,
             Sha256Digest proofSha256) {
+        public ReferenceFreeProofV1(
+                IdentityEnvelope identity,
+                ReferenceTargetKindV1 targetKind,
+                Sha256Digest targetIdentitySha256,
+                ProtocolCoverage coverage,
+                AuthorityFactV1 selectorRoot,
+                AuthorityFactV1 manifestRoot,
+                AuthorityFactV1 trimRoot,
+                Sha256Digest retentionSnapshotRootSha256,
+                Sha256Digest observationsRootSha256,
+                List<M4ReleaseBindingV1> m4Releases,
+                AuthorityFactV1 ownerFence,
+                AuthorityFactV1 workerFence,
+                AuthorityFactV1 storageFence,
+                AuthorityFactV1 providerFence,
+                long auditGraceDeadlineMillis,
+                long observedAuthorityTimeMillis,
+                List<ReferenceScanSummaryV1> scanSummaries,
+                List<ReferenceObservationV1> observations,
+                Sha256Digest proofSha256) {
+            this(
+                    identity,
+                    targetKind,
+                    targetIdentitySha256,
+                    coverage,
+                    selectorRoot,
+                    manifestRoot,
+                    trimRoot,
+                    retentionSnapshotRootSha256,
+                    observationsRootSha256,
+                    m4Releases,
+                    ownerFence,
+                    workerFence,
+                    storageFence,
+                    providerFence,
+                    auditGraceDeadlineMillis,
+                    observedAuthorityTimeMillis,
+                    scanSummaries,
+                    observations,
+                    Optional.empty(),
+                    proofSha256);
+        }
+
         public ReferenceFreeProofV1 {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(targetKind, "targetKind");
             requireDigest(targetIdentitySha256, "targetIdentitySha256");
             Objects.requireNonNull(coverage, "coverage");
+            if (coverage.typedPulsar()
+                    && !coverage.pulsarCoverage().orElseThrow().binding().equals(identity.binding())) {
+                throw new IllegalArgumentException("Pulsar reference coverage belongs to another Binding");
+            }
             Objects.requireNonNull(selectorRoot, "selectorRoot");
             Objects.requireNonNull(manifestRoot, "manifestRoot");
             Objects.requireNonNull(trimRoot, "trimRoot");
@@ -315,23 +527,52 @@ public final class M5RetentionRecordsV1 {
             scanSummaries = sortedScanSummaries(scanSummaries);
             observations = sortedReferenceRows(observations);
             requireDigest(proofSha256, "proofSha256");
-            if (auditGraceDeadlineMillis <= 0 || observedAuthorityTimeMillis < auditGraceDeadlineMillis) {
+            epochGrace = Objects.requireNonNull(epochGrace, "epochGrace");
+            if (epochGrace.isPresent()) {
+                if (auditGraceDeadlineMillis != 0 || observedAuthorityTimeMillis != 0) {
+                    throw new IllegalArgumentException("epoch grace cannot reinterpret legacy wall-clock fields");
+                }
+                var mark = epochGrace.orElseThrow();
+                mark.encode();
+                var auditFacts = observations.stream()
+                        .filter(row -> row.kind() == ReferenceKindV1.AUDIT_GRACE)
+                        .map(ReferenceObservationV1::authority)
+                        .toList();
+                if (!auditFacts.containsAll(mark.authority().authorityFacts())) {
+                    throw new IllegalArgumentException(
+                            "epoch grace lacks actual owner/capability reference observations");
+                }
+            } else if (auditGraceDeadlineMillis <= 0 || observedAuthorityTimeMillis < auditGraceDeadlineMillis) {
                 throw new IllegalArgumentException("reference-free proof audit grace is not satisfied");
             }
-            if (observations.stream()
-                    .anyMatch(row -> !row.targetIdentitySha256().equals(targetIdentitySha256)
-                            || !row.coverage().equals(coverage)
-                            || row.disposition() != ReferenceDispositionV1.ABSENT
-                            || !row.enumerationComplete())) {
-                throw new IllegalArgumentException("reference-free proof contains a present, partial, or foreign row");
-            }
-            if ((targetKind == ReferenceTargetKindV1.READABLE_SOURCE
-                            || targetKind == ReferenceTargetKindV1.RETIREMENT_BATCH)
-                    && m4Releases.isEmpty()) {
-                throw new IllegalArgumentException("readable-source retirement lacks exact M4 RELEASED bindings");
-            }
-            requireCompleteReferenceKinds(scanSummaries, observations);
+            requireReferenceInventory(
+                    targetKind, targetIdentitySha256, coverage, m4Releases, scanSummaries, observations);
         }
+    }
+
+    static void requireReferenceInventory(
+            ReferenceTargetKindV1 targetKind,
+            Sha256Digest targetIdentitySha256,
+            ProtocolCoverage coverage,
+            List<M4ReleaseBindingV1> m4Releases,
+            List<ReferenceScanSummaryV1> scanSummaries,
+            List<ReferenceObservationV1> observations) {
+        sortedReleases(m4Releases);
+        sortedScanSummaries(scanSummaries);
+        sortedReferenceRows(observations);
+        if (observations.stream()
+                .anyMatch(row -> !row.targetIdentitySha256().equals(targetIdentitySha256)
+                        || !row.coverage().equals(coverage)
+                        || row.disposition() != ReferenceDispositionV1.ABSENT
+                        || !row.enumerationComplete())) {
+            throw new IllegalArgumentException("reference-free proof contains a present, partial, or foreign row");
+        }
+        if ((targetKind == ReferenceTargetKindV1.READABLE_SOURCE
+                        || targetKind == ReferenceTargetKindV1.RETIREMENT_BATCH)
+                && m4Releases.isEmpty()) {
+            throw new IllegalArgumentException("readable-source retirement lacks exact M4 RELEASED bindings");
+        }
+        requireCompleteReferenceKinds(scanSummaries, observations);
     }
 
     /** Externalized canonical M4 batch. It is metadata only and grants no deletion authority. */
@@ -505,13 +746,28 @@ public final class M5RetentionRecordsV1 {
         }
         Comparator<ReferenceObservationV1> order = Comparator.comparing(ReferenceObservationV1::kind)
                 .thenComparing(row -> row.authority().key())
-                .thenComparingLong(row -> row.coverage().inclusiveStart())
-                .thenComparingLong(row -> row.coverage().exclusiveEnd());
+                .thenComparing(ReferenceObservationV1::coverage, M5RetentionRecordsV1::compareReferenceCoverage);
         if (!copy.equals(copy.stream().sorted(order).toList())
                 || copy.stream().distinct().count() != copy.size()) {
             throw new IllegalArgumentException("reference observations are not sorted unique");
         }
         return copy;
+    }
+
+    /** Scalar legacy ordering stays exact; typed coverage is ordered by its full canonical ledger-keyed value. */
+    static int compareReferenceCoverage(ProtocolCoverage left, ProtocolCoverage right) {
+        if (left.typedPulsar() || right.typedPulsar()) {
+            if (left.typedPulsar() != right.typedPulsar()) {
+                return Boolean.compare(left.typedPulsar(), right.typedPulsar());
+            }
+            return left.equals(right)
+                    ? 0
+                    : Arrays.compareUnsigned(
+                            left.pulsarCoverage().orElseThrow().encode().toByteArray(),
+                            right.pulsarCoverage().orElseThrow().encode().toByteArray());
+        }
+        int start = Long.compare(left.inclusiveStart(), right.inclusiveStart());
+        return start != 0 ? start : Long.compare(left.exclusiveEnd(), right.exclusiveEnd());
     }
 
     private static void requireCompleteReferenceKinds(

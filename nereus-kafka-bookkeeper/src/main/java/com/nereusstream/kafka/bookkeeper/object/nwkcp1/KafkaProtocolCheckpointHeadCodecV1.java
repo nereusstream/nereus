@@ -20,6 +20,8 @@ import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.domain.identity.KafkaTopicId;
 import com.nereusstream.domain.identity.StorageEpochId;
 import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.storage.object.control.WalRunControlCodec;
+import com.nereusstream.storage.object.control.WalRunRootRecord;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -98,9 +100,36 @@ public final class KafkaProtocolCheckpointHeadCodecV1 {
 
     public static KafkaProtocolCheckpointHeadV1 decode(
             String expectedWalRunPrefix, Sha256Digest expectedWalRunRootSha, CanonicalBytes bytes) {
+        if (com.nereusstream.storage.object.control.WalRunKafkaProtocolEmptyClosureV1.hasMagic(bytes)) {
+            var closed = com.nereusstream.storage.object.control.WalRunKafkaProtocolEmptyClosureV1.decode(bytes);
+            if (!closed.seal().root().rootSha256().equals(expectedWalRunRootSha)) {
+                throw new IllegalArgumentException("closed protocol domain belongs to a different Root");
+            }
+            throw new IllegalArgumentException("Root-scoped protocol domain is closed without a selected checkpoint");
+        }
         KafkaProtocolCheckpointHeadV1 head = decodeRaw(bytes);
         requireContext(expectedWalRunPrefix, expectedWalRunRootSha, head);
         return head;
+    }
+
+    /** Decodes the actual embedded Object prefix, bounded by the verified physical Root namespace. */
+    public static KafkaProtocolCheckpointHeadV1 decodeForRoot(WalRunRootRecord root, CanonicalBytes raw) {
+        var head = decodeRaw(raw);
+        String prefix = objectPrefix(head);
+        if (!prefix.startsWith(root.providerConfiguration().exclusiveNamespacePrefix() + "/")) {
+            throw new IllegalArgumentException("protocol Head Object escapes the actual Root namespace");
+        }
+        requireContext(prefix, WalRunControlCodec.rootSha256(root), head);
+        return head;
+    }
+
+    public static String objectPrefix(KafkaProtocolCheckpointHeadV1 head) {
+        String marker = "/" + Nwkcp1ConstantsV1.FAMILY_PREFIX + "/";
+        int offset = head.checkpointObjectKey().lastIndexOf(marker);
+        if (offset <= 0) {
+            throw new IllegalArgumentException("protocol Head Object has no canonical Root prefix");
+        }
+        return head.checkpointObjectKey().substring(0, offset);
     }
 
     private static KafkaProtocolCheckpointHeadV1 decodeRaw(CanonicalBytes bytes) {

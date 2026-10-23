@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.domain.identity.KafkaTopicId;
 import com.nereusstream.domain.identity.StorageEpochId;
@@ -30,6 +31,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
+import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRunBirthRecoveryV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperNativeRootVerifierV2;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunStateV1;
@@ -39,6 +41,8 @@ import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaKafkaBookKeeperM4ReadRouteV2;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespaceV2;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaQuotaTargetDeleteStoreV2;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
@@ -48,6 +52,7 @@ import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerAppendRequestV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2.Scope;
@@ -61,11 +66,23 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2;
 import com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1;
+import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
+import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.gc.M5GcQuotaCoordinatorV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
+import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityEvidence;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityKind;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
@@ -80,6 +97,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
@@ -114,7 +134,9 @@ class KafkaBookKeeperRunRootsV2RealTest {
             await(first.resign());
             var closed = await(f.roots.readClosedOwner(1)).orElseThrow();
             current.set(2);
-            var second = await(openBrokerPartition(f, 2, Optional.of(closed), envelope, global, current));
+            var faults = new Faults(f.nativeClient);
+            var second =
+                    await(openBrokerPartition(f, f.faulted(faults), 2, Optional.of(closed), envelope, global, current));
             assertThat(second.capture().root().frontiers().highWatermark()).isEqualTo(1);
             assertThat(second.capture().root().frontiers().lastStableOffset()).isZero();
             assertThat(second.capture()
@@ -150,7 +172,95 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     .extracting(
                             com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadBatchV1::rawAssignedRecordBatch)
                     .containsExactly(data, marker);
-            await(second.resign());
+            var namespace = await(OxiaPhysicalMetadataNamespaceV2.connect(f.oxia, f.binding.metadataNamespace()));
+            var m4 = new OxiaKafkaBookKeeperM4ReadRouteV2(f.oxia, namespace.identity(), f.scope);
+            m4.prepareSourceBootstrap(
+                    digest("synthetic-native-adapter"),
+                    f.session.capabilitySnapshot().configurationDigest(),
+                    digest("synthetic-read-contract"),
+                    digest("synthetic-verifier"),
+                    digest("synthetic-receipt-id"),
+                    digest("synthetic-receipt"),
+                    10_000,
+                    f.source.spec().sha256());
+            assertThat(m4.readSelector()).isEmpty();
+            var selectorKey = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                            0,
+                            new BindingIdentity(
+                                    f.scope.bindingId(),
+                                    Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(f.scope.topic())),
+                                    f.scope.storageEpoch().digest()))
+                    .selector();
+            var rawRoute = new OxiaBindingLifecycleMetadataStoreV2(
+                    f.oxia,
+                    "/nereus/cells/kafka_bk_"
+                            + namespace.identity().instanceId().toHex(),
+                    0,
+                    new BindingIdentity(
+                            f.scope.bindingId(),
+                            Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(f.scope.topic())),
+                            f.scope.storageEpoch().digest()));
+            var originalBootstrap = await(rawRoute.read(selectorKey)).orElseThrow();
+            var reopenedM4 = new OxiaKafkaBookKeeperM4ReadRouteV2(f.oxia, namespace.identity(), f.scope);
+            reopenedM4.prepareSourceBootstrap(
+                    digest("synthetic-native-adapter"),
+                    f.session.capabilitySnapshot().configurationDigest(),
+                    digest("synthetic-read-contract"),
+                    digest("synthetic-verifier"),
+                    digest("synthetic-receipt-id"),
+                    digest("synthetic-receipt"),
+                    10_000,
+                    digest("successor-native-scope"));
+            assertThat(await(rawRoute.read(selectorKey))).contains(originalBootstrap);
+            var selector = m4.provisionDurableDrainOnly(
+                    digest("synthetic-native-adapter"),
+                    f.session.capabilitySnapshot().configurationDigest(),
+                    digest("synthetic-read-contract"),
+                    digest("synthetic-verifier"),
+                    digest("synthetic-receipt-id"),
+                    digest("synthetic-receipt"),
+                    10_000,
+                    second.nativeReadSources().selectedViewSha256(),
+                    2);
+            var activated = com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1.decodeAuthority(
+                    await(rawRoute.read(selectorKey)).orElseThrow().canonicalStoredBytes());
+            assertThat(activated.bootstrap())
+                    .contains(com.nereusstream.storage.object.retention.M5BindingBootstrapV1.decode(
+                            originalBootstrap.canonicalStoredBytes()));
+            assertThat(activated.writerEnrollment()).isEmpty();
+            var cellSlots = new Semaphore(1);
+            var m4Loop = Executors.newSingleThreadExecutor(task -> {
+                var thread = new Thread(task, "test-native-m4-read-owner");
+                thread.setDaemon(true);
+                return thread;
+            });
+            try {
+                second.installM4ReadOwner(m4.control(), selector, m4Loop, 1, cellSlots);
+                var heldRead = new CompletableFuture<Void>();
+                f.readGate = heldRead;
+                var cancelledObserver = second.read(request).toCompletableFuture();
+                await(f.readBlocked);
+                assertThat(cellSlots.availablePermits()).isZero();
+                assertThat(cancelledObserver.cancel(true)).isTrue();
+                var cancelledResign = second.resign().toCompletableFuture();
+                assertThat(cancelledResign.isDone()).isFalse();
+                assertThat(await(f.roots.readClosedOwner(2))).isEmpty();
+                assertThat(cancelledResign.cancel(true)).isTrue();
+                var secondResign = second.resign();
+                faults.loseAdmission = true;
+                heldRead.complete(null);
+                assertThatThrownBy(() -> await(secondResign))
+                        .hasRootCauseMessage("BK authority mutation is unresolved: OUTCOME_UNKNOWN");
+                assertThat(await(f.roots.readOwnerAdmission()).orElseThrow().closed())
+                        .isTrue();
+                assertThat(await(f.roots.readClosedOwner(2))).isEmpty();
+                assertThat(cellSlots.availablePermits()).isEqualTo(1);
+                faults.blocked = false;
+                await(second.resign());
+                assertThat(cellSlots.availablePermits()).isEqualTo(1);
+            } finally {
+                m4Loop.shutdownNow();
+            }
             var closed2 = await(f.roots.readClosedOwner(2)).orElseThrow();
             current.set(3);
             var third = await(openBrokerPartition(f, 3, Optional.of(closed2), envelope, global, current));
@@ -206,7 +316,8 @@ class KafkaBookKeeperRunRootsV2RealTest {
                             f.admitting,
                             f.roots,
                             new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
-                            System::nanoTime)
+                            System::nanoTime,
+                            (oldOwner, record, candidate) -> CompletableFuture.completedFuture(null))
                     .recover(closed, fence, 0, envelope));
             assertThat(recovered.selectedCheckpointEndOffset()).hasValue(39);
             assertThat(recovered.progress().entries()).isEqualTo(3);
@@ -258,6 +369,105 @@ class KafkaBookKeeperRunRootsV2RealTest {
             assertThat(third.capture().root().frontiers().lastStableOffset()).isEqualTo(61);
             assertThat(await(third.read(request)).batches()).hasSize(61);
             await(third.resign());
+        }
+    }
+
+    @Test
+    void blockedOxiaSelectorCasDoesNotHoldPartitionFenceOrOldBkReadCompletion() throws Exception {
+        try (var f = new Fixture(System.currentTimeMillis(), "m4-rollover-cas", null)) {
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    8, 8_192, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            var current = new java.util.concurrent.atomic.AtomicInteger(1);
+            var first = await(openBrokerPartition(f, 1, Optional.empty(), envelope, global, current));
+            for (int offset = 0; offset < 6; offset++) {
+                var data = nativeTransactional(offset, 91, offset, "old BK source " + offset);
+                try (var admission = first.admit(List.of(data.length()))) {
+                    await(first.appendAssigned(admission, List.of(assigned(data))));
+                }
+            }
+
+            var namespace = await(OxiaPhysicalMetadataNamespaceV2.connect(f.oxia, f.binding.metadataNamespace()));
+            var identity = new BindingIdentity(
+                    f.scope.bindingId(),
+                    Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(f.scope.topic())),
+                    f.scope.storageEpoch().digest());
+            var route = new OxiaBindingLifecycleMetadataStoreV2(
+                    f.oxia,
+                    "/nereus/cells/kafka_bk_"
+                            + namespace.identity().instanceId().toHex(),
+                    f.scope.partition(),
+                    identity);
+            var heldCas = new HeldControlCas(route.rawControlMetadata());
+            var control = new M4ReadControlCoordinatorV1(heldCas, f.scope.partition(), identity);
+            var evidence = new CapabilityEvidence(
+                    identity,
+                    1,
+                    1,
+                    CapabilityKind.DURABLE_DRAIN_ONLY_V1,
+                    CapabilityState.ADMITTED,
+                    digest("synthetic-native-adapter"),
+                    f.session.capabilitySnapshot().configurationDigest(),
+                    digest("synthetic-read-contract"),
+                    digest("synthetic-verifier"),
+                    digest("synthetic-receipt-id"),
+                    digest("synthetic-receipt"),
+                    digest("synthetic-authority-time"),
+                    10_000,
+                    0,
+                    0);
+            assertThat(control.createCapability(evidence)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            var capability = new CapabilityBinding(1, M4ReadControlCodecV1.capabilityEvidenceSha256(evidence));
+            var selector = new BindingReadSelector(
+                    identity,
+                    first.nativeReadSources().selectedViewSha256(),
+                    1,
+                    1,
+                    1,
+                    SelectorMode.PREFERRED_ONLY,
+                    AdmissionState.ADMITTING,
+                    Optional.empty(),
+                    capability,
+                    List.of(),
+                    List.of());
+            assertThat(control.createSelector(selector)).isEqualTo(M4ReadControlCoordinatorV1.Outcome.APPLIED);
+            var loop = Executors.newSingleThreadExecutor();
+            try {
+                first.installM4ReadOwner(control, selector, loop, 4);
+                var gate = new CompletableFuture<Void>();
+                f.readGate = gate;
+                var request = new com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1(
+                        0,
+                        com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1.READ_UNCOMMITTED,
+                        50_000,
+                        Optional.empty());
+                var oldRead = first.read(request);
+                await(f.readBlocked);
+                heldCas.blockNext();
+                var next = nativeTransactional(6, 91, 6, "rollover fenced");
+                var rollover = CompletableFuture.supplyAsync(() -> {
+                    try (var ignored = first.admit(List.of(next.length()))) {
+                        return new AssertionError("rollover unexpectedly admitted the next append");
+                    } catch (Throwable failure) {
+                        return failure;
+                    }
+                });
+                assertThat(heldCas.entered.await(10, TimeUnit.SECONDS)).isTrue();
+                gate.complete(null);
+                assertThat(await(oldRead).outcome())
+                        .isEqualTo(com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadOutcomeV1.FOUND);
+                CompletableFuture.runAsync(first::fence).get(5, TimeUnit.SECONDS);
+                assertThat(rollover.isDone()).isFalse();
+                heldCas.release.countDown();
+                assertThat(rollover.get(30, TimeUnit.SECONDS))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("rollover");
+                await(first.resign());
+            } finally {
+                heldCas.release.countDown();
+                loop.shutdownNow();
+            }
         }
     }
 
@@ -334,7 +544,8 @@ class KafkaBookKeeperRunRootsV2RealTest {
                             f.admitting,
                             f.roots,
                             new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
-                            System::nanoTime)
+                            System::nanoTime,
+                            (oldOwner, record, candidate) -> CompletableFuture.completedFuture(null))
                     .recover(
                             closed,
                             new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
@@ -476,7 +687,9 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 envelope,
                 10_000,
                 ignored -> {},
-                () -> current.get() == epoch);
+                () -> current.get() == epoch,
+                f.controlExecutor,
+                (oldOwner, record, handle) -> CompletableFuture.completedFuture(null));
     }
 
     private static com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1 assigned(
@@ -518,7 +731,8 @@ class KafkaBookKeeperRunRootsV2RealTest {
                         reads,
                         f.roots,
                         new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
-                        System::nanoTime);
+                        System::nanoTime,
+                        (oldOwner, record, candidate) -> CompletableFuture.completedFuture(null));
                 var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
                         100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
                 var recovered = await(recovery.recover(closed, fence, 0, envelope));
@@ -643,6 +857,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     f.scope.bindingId(), f.scope.topic(), f.scope.partition(), 1, f.scope.storageEpoch(), 2, 2);
             var nativeAdapter = new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1();
             var reads = f.source.newSession();
+            var activeReaders = new java.util.concurrent.atomic.AtomicInteger();
             try {
                 var recovery = new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
                         reads,
@@ -659,10 +874,13 @@ class KafkaBookKeeperRunRootsV2RealTest {
                             }
                             return nativeAdapter.protocolDelta(batch);
                         },
-                        System::nanoTime);
+                        System::nanoTime,
+                        (oldOwner, record, candidate) -> CompletableFuture.completedFuture(null),
+                        ownedHistoryReads(f.source, activeReaders));
                 var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
                         100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
                 var recovered = await(recovery.recover(closed, fence, 0, envelope));
+                assertThat(activeReaders.get()).isZero();
                 assertThat(recovered.endOffset()).isEqualTo(3);
                 var state = recovered.protocolState().orElseThrow();
                 assertThat(state.producerState()
@@ -705,6 +923,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 var fence3 = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
                         f.scope.bindingId(), f.scope.topic(), f.scope.partition(), 1, f.scope.storageEpoch(), 3, 3);
                 var repeated = await(recovery.recover(closed2, fence3, 0, envelope));
+                assertThat(activeReaders.get()).isZero();
                 assertThat(repeated.endOffset()).isEqualTo(recovered.endOffset());
                 assertThat(repeated.protocolState()).isEqualTo(recovered.protocolState());
                 assertThat(repeated.runs().stream()
@@ -715,6 +934,34 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 await(reads.closeAsync());
             }
         }
+    }
+
+    private static com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner
+            ownedHistoryReads(
+                    M5BookKeeperNativeCreateClientV2 source, java.util.concurrent.atomic.AtomicInteger activeReaders) {
+        return new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner() {
+            @Override
+            public <T> CompletionStage<T> read(
+                    KafkaRunRootRecordV2 record,
+                    com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1.ReadPhase phase,
+                    java.util.function.Function<BookKeeperCellSession, CompletionStage<T>> operation) {
+                var owned = source.newSession();
+                assertThat(activeReaders.incrementAndGet()).isEqualTo(1);
+                CompletionStage<T> work;
+                try {
+                    work = operation.apply(owned);
+                } catch (Throwable failure) {
+                    work = CompletableFuture.failedFuture(failure);
+                }
+                return work.handle((value, failure) -> owned.closeAsync().thenCompose(ignored -> {
+                            activeReaders.decrementAndGet();
+                            return failure == null
+                                    ? CompletableFuture.completedFuture(value)
+                                    : CompletableFuture.<T>failedFuture(failure);
+                        }))
+                        .thenCompose(closing -> closing);
+            }
+        };
     }
 
     private static CanonicalBytes nativeTransactional(long offset, long producerId, int sequence, String value) {
@@ -825,9 +1072,18 @@ class KafkaBookKeeperRunRootsV2RealTest {
 
     @Test
     void nativeOwnerClosureFencesLateRolloverAndRepeatsTheSameLegalRunSet() throws Exception {
-        try (var f = new Fixture(1591, "orders", null)) {
+        try (var f = new Fixture(1591, "orders", null, true)) {
+            var initialScope = f.source.spec();
+            var orphanScope = M5BookKeeperNativeCreateSpecV2.laterRun(
+                    initialScope,
+                    RunLedgerConfigurationV1.from(
+                            f.session.capabilitySnapshot(), f.runBinding(1).runId()));
             var faults = new Faults(f.nativeClient);
             var roots = f.faulted(faults);
+            var openOwnerFact = await(f.roots.readOwnerAdmissionFact()).orElseThrow();
+            assertThat(openOwnerFact.authority().key()).isEqualTo(f.roots.nativeOwnerKey());
+            assertThat(openOwnerFact.authority().valueSha256())
+                    .isEqualTo(Sha256Digest.hash(openOwnerFact.admission().encode()));
             var run = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, roots, f.runBinding(0), 0));
             f.writeData(run);
             await(run.drain());
@@ -840,6 +1096,11 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 faults.held.get(30, TimeUnit.SECONDS);
                 var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
                 var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+                var closedFact = await(f.roots.readOwnerAdmissionFact()).orElseThrow();
+                assertThat(closedFact.admission()).isEqualTo(closed);
+                assertThat(closedFact.authority().metadataVersion())
+                        .isNotEqualTo(openOwnerFact.authority().metadataVersion());
+                assertThat(closedFact.authority().valueSha256()).isEqualTo(Sha256Digest.hash(closed.encode()));
                 assertThat(closed.runs()).containsExactly(f.record(sealed).initialLink());
                 var proof = await(f.session.fenceAndRecoverRunLedger(
                                 run.snapshot().handle()))
@@ -850,6 +1111,70 @@ class KafkaBookKeeperRunRootsV2RealTest {
                 assertThatThrownBy(() -> late.get(30, TimeUnit.SECONDS))
                         .hasRootCauseMessage("run-root mutation was not established exactly");
                 assertThat(await(f.roots.openRoot(f.runBinding(1).runId()))).isEmpty();
+                var restartedRoots = f.faulted(f.nativeClient);
+                var births = await(restartedRoots.readRunBirths(closed)).orElseThrow();
+                assertThat(births)
+                        .extracting(value -> value.root().runId())
+                        .containsExactly(sealed.runId(), f.runBinding(1).runId());
+                assertThat(births.get(0).admitted()).isTrue();
+                assertThat(births.get(1).admitted()).isFalse();
+                var birthFacts = await(restartedRoots.readRunBirthFacts(closed)).orElseThrow();
+                var exactMetadata = new Oxia09ExactMetadataTransactionStoreV1(f.oxia);
+                assertThat(birthFacts.births())
+                        .extracting(value -> value.record().root().runId())
+                        .containsExactly(sealed.runId(), f.runBinding(1).runId());
+                assertThat(birthFacts.closedArchive())
+                        .isEqualTo(nativeFact(exactMetadata, restartedRoots.nativeClosedOwnerKey(1)));
+                assertThat(birthFacts.inventory())
+                        .isEqualTo(nativeFact(exactMetadata, restartedRoots.nativeBirthInventoryKey(1)));
+                assertThat(birthFacts.births().get(1).root())
+                        .isEqualTo(nativeFact(
+                                exactMetadata,
+                                restartedRoots.nativeRootKey(f.runBinding(1).runId())));
+                assertThat(birthFacts.births().get(1).parent().orElseThrow())
+                        .isEqualTo(nativeFact(exactMetadata, restartedRoots.nativeRootKey(sealed.runId())));
+                var orphan = f.handles.get(f.runBinding(1).runId());
+                var recoveredFacts = new java.util.concurrent.atomic.AtomicReference<
+                        M5BookKeeperNativeCreateClientV2.RecoveredScopeFacts>();
+                var restartedSession = f.source.newSession();
+                try {
+                    var observations = await(new KafkaBookKeeperRunBirthRecoveryV1(
+                                    restartedSession,
+                                    restartedRoots,
+                                    new KafkaBookKeeperRunBirthRecoveryV1.UnselectedFence() {
+                                        @Override
+                                        public CompletionStage<Void> fence(
+                                                com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1 oldOwner,
+                                                KafkaRunRootRecordV2 record,
+                                                RunLedgerHandleV1 candidate) {
+                                            return f.source.fenceExistingScope(orphanScope, candidate);
+                                        }
+
+                                        @Override
+                                        public CompletionStage<Void> reconcileRecovered(
+                                                com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1 oldOwner,
+                                                KafkaRunRootRecordV2 record,
+                                                RunLedgerHandleV1 candidate,
+                                                com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1
+                                                        proof) {
+                                            return f.source
+                                                    .readRecoveredScopeFacts(orphanScope, proof)
+                                                    .thenAccept(recoveredFacts::set);
+                                        }
+                                    })
+                            .observe(closed));
+                    assertThat(observations)
+                            .extracting(KafkaBookKeeperRunBirthRecoveryV1.Observation::kind)
+                            .containsExactly(
+                                    KafkaBookKeeperRunBirthRecoveryV1.Kind.SELECTED,
+                                    KafkaBookKeeperRunBirthRecoveryV1.Kind.PHYSICALLY_CREATED_UNSELECTED);
+                    assertThat(observations.get(1).handle()).isEqualTo(orphan);
+                    assertThat(recoveredFacts.get().recovery().lastAddConfirmed())
+                            .isZero();
+                    assertNativeRecoveredFacts(f, orphanScope, recoveredFacts.get());
+                } finally {
+                    await(restartedSession.closeAsync());
+                }
                 assertThat(await(f.roots.closeOwner(owner)).exactProof()).contains(closed);
                 assertThat(await(f.roots.readClosedOwner(1))).contains(closed);
                 assertThat(await(f.roots.openOwner(
@@ -863,6 +1188,255 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     faults.release.run();
                 }
             }
+        }
+    }
+
+    @Test
+    void fencedNeverCreatedBirthDoesNotBlockEmptyClosedHistoryRecovery() throws Exception {
+        try (var f = new Fixture(1598, "birth-never-created", null)) {
+            var configuration = f.source.spec().configurations().get(0);
+            var ledger = await(f.session.reserveLedgerIdentity()).exactProof().orElseThrow();
+            var handle = new RunLedgerHandleV1(
+                    configuration.providerScopeId(),
+                    configuration.runId(),
+                    ledger,
+                    configuration.configurationDigest());
+            await(f.admit(handle));
+            var binding = f.runBinding(0);
+            var birth = new KafkaRunRootSnapshotV1(
+                    binding.bindingId(),
+                    binding.topicIncarnation(),
+                    binding.partitionId(),
+                    binding.storageEpochId(),
+                    binding.creatorOwnerEpoch(),
+                    binding.kafkaLeaderEpoch(),
+                    binding.providerScopeId(),
+                    binding.runId(),
+                    ledger,
+                    0,
+                    OptionalLong.empty(),
+                    KafkaRunRootStateV1.ACTIVE,
+                    Optional.empty());
+            assertThat(await(f.roots.reserveRunBirth(birth)).exactProof()).contains(birth);
+            var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
+            var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+            assertThat(closed.runs()).isEmpty();
+            var fence = new com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1(
+                    f.scope.bindingId(), f.scope.topic(), 0, 1, f.scope.storageEpoch(), 2, 2);
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
+            var result = await(new com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1(
+                            f.session,
+                            f.roots,
+                            new com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1(),
+                            System::nanoTime,
+                            (oldOwner, record, candidate) -> f.source.fenceCreates())
+                    .recover(closed, fence, 0, envelope));
+            assertThat(result.runs()).isEmpty();
+            assertThat(result.lastRoot()).isEmpty();
+            assertThat(result.endOffset()).isZero();
+            assertThat(await(f.session.openRunLedger(handle)).outcome())
+                    .isEqualTo(com.nereusstream.storage.api.bookkeeper.RunLedgerOpenOutcomeV1.ABSENT);
+            assertThat(await(f.roots.readOwnerAdmission())).contains(closed);
+        }
+    }
+
+    @Test
+    void lostNativeCreateResponseDistinguishesPresentAndNeverCreatedBirths() throws Exception {
+        try (var f = new Fixture(1597, "birth-create-lost", null, true)) {
+            var initialScope = f.source.spec();
+            f.loseReservedCreateResult = true;
+            assertThatThrownBy(() ->
+                            await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0)))
+                    .hasRootCauseMessage("run-ledger creation was not established exactly");
+            var second = f.runBinding(1);
+            var secondConfiguration = RunLedgerConfigurationV1.from(f.session.capabilitySnapshot(), second.runId());
+            var secondScope = f.source.admitCreateConfiguration(secondConfiguration);
+            var unusedId = await(f.session.reserveLedgerIdentity()).exactProof().orElseThrow();
+            var neverCreated = new KafkaRunRootSnapshotV1(
+                    second.bindingId(),
+                    second.topicIncarnation(),
+                    second.partitionId(),
+                    second.storageEpochId(),
+                    second.creatorOwnerEpoch(),
+                    second.kafkaLeaderEpoch(),
+                    second.providerScopeId(),
+                    second.runId(),
+                    unusedId,
+                    0,
+                    OptionalLong.empty(),
+                    KafkaRunRootStateV1.ACTIVE,
+                    Optional.empty());
+            assertThat(await(f.roots.reserveRunBirth(neverCreated)).exactProof())
+                    .contains(neverCreated);
+            var owner = new com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1(1, 1, 1, 1, 1);
+            var closed = await(f.roots.closeOwner(owner)).exactProof().orElseThrow();
+            assertThat(closed.runs()).isEmpty();
+            var births = await(f.faulted(f.nativeClient).readRunBirths(closed)).orElseThrow();
+            assertThat(births).hasSize(2);
+            var birth = births.get(0);
+            assertThat(birth.admitted()).isFalse();
+            assertThat(await(f.roots.openRoot(birth.root().runId()))).isEmpty();
+            var handle = f.handles.get(birth.root().runId());
+            assertThat(handle.ledgerIdentity()).isEqualTo(birth.root().ledgerIdentity());
+            assertThat(await(f.route.read(birth.resource().authorityKey()))).isPresent();
+            var restartedSession = f.source.newSession();
+            var recoveredFacts = new java.util.concurrent.atomic.AtomicReference<
+                    M5BookKeeperNativeCreateClientV2.RecoveredScopeFacts>();
+            try {
+                var reconciliations = new java.util.ArrayList<String>();
+                var observations = await(new KafkaBookKeeperRunBirthRecoveryV1(
+                                restartedSession,
+                                f.faulted(f.nativeClient),
+                                new KafkaBookKeeperRunBirthRecoveryV1.UnselectedFence() {
+                                    public CompletionStage<Void> fence(
+                                            com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1 oldOwner,
+                                            KafkaRunRootRecordV2 record,
+                                            RunLedgerHandleV1 candidate) {
+                                        assertThat(oldOwner).isEqualTo(closed);
+                                        assertThat(candidate.runId())
+                                                .isEqualTo(record.root().runId());
+                                        reconciliations.add("fence:" + candidate.runId());
+                                        return f.source.fenceExistingScope(
+                                                candidate.equals(handle) ? initialScope : secondScope, candidate);
+                                    }
+
+                                    public CompletionStage<Void> reconcileAbsent(
+                                            com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1 oldOwner,
+                                            KafkaRunRootRecordV2 record,
+                                            RunLedgerHandleV1 candidate) {
+                                        assertThat(oldOwner).isEqualTo(closed);
+                                        assertThat(candidate.runId())
+                                                .isEqualTo(record.root().runId());
+                                        reconciliations.add("absent:" + candidate.runId());
+                                        return CompletableFuture.completedFuture(null);
+                                    }
+
+                                    public CompletionStage<Void> reconcileRecovered(
+                                            com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1 oldOwner,
+                                            KafkaRunRootRecordV2 record,
+                                            RunLedgerHandleV1 candidate,
+                                            com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1 proof) {
+                                        assertThat(oldOwner).isEqualTo(closed);
+                                        assertThat(candidate).isEqualTo(proof.handle());
+                                        assertThat(candidate.runId())
+                                                .isEqualTo(record.root().runId());
+                                        reconciliations.add("recovered:" + candidate.runId());
+                                        return f.source
+                                                .readRecoveredScopeFacts(initialScope, proof)
+                                                .thenAccept(recoveredFacts::set);
+                                    }
+                                })
+                        .observe(closed));
+                assertThat(observations)
+                        .extracting(KafkaBookKeeperRunBirthRecoveryV1.Observation::kind)
+                        .containsExactly(
+                                KafkaBookKeeperRunBirthRecoveryV1.Kind.PHYSICALLY_CREATED_UNSELECTED,
+                                KafkaBookKeeperRunBirthRecoveryV1.Kind.NEVER_CREATED);
+                assertThat(observations.get(0).handle()).isEqualTo(handle);
+                assertThat(observations.get(0).recoveryProof()).isPresent();
+                assertThat(observations.get(0).recoveryProof().orElseThrow().handle())
+                        .isEqualTo(handle);
+                assertThat(observations.get(1).recoveryProof()).isEmpty();
+                assertThat(observations.get(1).handle().ledgerIdentity()).isEqualTo(unusedId);
+                assertThat(recoveredFacts.get().recovery().lastAddConfirmed()).isEqualTo(-1);
+                assertNativeRecoveredFacts(f, initialScope, recoveredFacts.get());
+                assertThatThrownBy(() -> await(f.source.readRecoveredScopeFacts(
+                                initialScope, new RunLedgerRecoveryProofV1(handle, 0, true, true))))
+                        .hasRootCauseMessage("recovered native ledger LAC differs from recovery proof");
+                var wrongScope = M5BookKeeperNativeCreateSpecV2.of(
+                        initialScope.nativeInstanceId(), digest("another-old-task"), initialScope.configurations());
+                assertThatThrownBy(() -> await(f.source.readRecoveredScopeFacts(
+                                wrongScope, recoveredFacts.get().recovery())))
+                        .hasRootCauseMessage("native ledger reservation differs from exact existing scope");
+                assertThat(reconciliations)
+                        .containsExactly(
+                                "fence:" + birth.root().runId(),
+                                "recovered:" + birth.root().runId(),
+                                "fence:" + neverCreated.runId(),
+                                "absent:" + neverCreated.runId());
+            } finally {
+                await(restartedSession.closeAsync());
+            }
+            var envelope = new com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1(
+                    100, 1_000_000, TimeUnit.SECONDS.toNanos(30));
+            var global = new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1(
+                    new com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityBudgetV1(8, 16, 1_000_000));
+            assertThatThrownBy(() -> await(openBrokerPartition(
+                            f,
+                            2,
+                            Optional.of(closed),
+                            envelope,
+                            global,
+                            new java.util.concurrent.atomic.AtomicInteger(2))))
+                    .hasRootCauseMessage("unselected physical birth has no writer ticket reconciliation");
+            assertThat(await(f.roots.readOwnerAdmission())).contains(closed);
+            try (var nativeClient = nativeBookKeeper(f)) {
+                var zk = ((org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver) nativeClient.getMetadataClientDriver())
+                        .getZk();
+                var reservation = recoveredFacts.get().reservation();
+                zk.setData(
+                        reservation.nativePath(),
+                        reservation.rawStoredBytes().toByteArray(),
+                        reservation.nativeVersion());
+                assertThatThrownBy(() -> await(f.source.readRecoveredScopeFacts(
+                                initialScope, recoveredFacts.get().recovery())))
+                        .hasRootCauseMessage("native ledger reservation differs from exact existing scope");
+                zk.delete(reservation.nativePath(), reservation.nativeVersion() + 1);
+                assertThatThrownBy(() -> await(f.source.readRecoveredScopeFacts(
+                                initialScope, recoveredFacts.get().recovery())))
+                        .hasRootCauseInstanceOf(org.apache.zookeeper.KeeperException.NoNodeException.class);
+            }
+        }
+    }
+
+    private static org.apache.bookkeeper.client.BookKeeper nativeBookKeeper(Fixture f) throws Exception {
+        return (org.apache.bookkeeper.client.BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(
+                        com.nereusstream.storage.bookkeeper.RealBookKeeperClientConfigurationV1.from(
+                                System.getProperty("nereus.bookkeeper.metadataServiceUri"),
+                                f.session.capabilitySnapshot()))
+                .build();
+    }
+
+    private static void assertNativeRecoveredFacts(
+            Fixture f,
+            M5BookKeeperNativeCreateSpecV2 expected,
+            M5BookKeeperNativeCreateClientV2.RecoveredScopeFacts facts)
+            throws Exception {
+        assertThat(facts.namespaceBinding()).isEqualTo(f.binding);
+        assertThat(facts.createScope()).isEqualTo(expected);
+        assertThat(facts.closedMetadata().handle()).isEqualTo(facts.recovery().handle());
+        assertThat(facts.closedMetadata().sealedLastEntryId())
+                .isEqualTo(facts.recovery().lastAddConfirmed());
+        assertThat(facts.instanceIdentity().rawStoredBytes())
+                .isEqualTo(CanonicalBytes.copyOf(
+                        expected.nativeInstanceId().getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        assertThat(facts.taskFence().nativeVersion()).isEqualTo(1);
+        assertThat(facts.reservation().nativeVersion()).isZero();
+        assertThat(facts.ledgerMetadata().rawStoredSha256())
+                .isNotEqualTo(facts.closedMetadata().metadataSha256());
+        try (var nativeClient = nativeBookKeeper(f)) {
+            var zk = ((org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver) nativeClient.getMetadataClientDriver())
+                    .getZk();
+            for (var fact :
+                    List.of(facts.instanceIdentity(), facts.taskFence(), facts.reservation(), facts.ledgerMetadata())) {
+                var stat = new org.apache.zookeeper.data.Stat();
+                var bytes = CanonicalBytes.copyOf(zk.getData(fact.nativePath(), false, stat));
+                assertThat(fact.rawStoredBytes()).isEqualTo(bytes);
+                assertThat(fact.rawStoredSha256()).isEqualTo(Sha256Digest.hash(bytes));
+                assertThat(fact.nativeCreateZxid()).isEqualTo(stat.getCzxid());
+                assertThat(fact.nativeModifyZxid()).isEqualTo(stat.getMzxid());
+                assertThat(fact.nativeVersion()).isEqualTo(stat.getVersion());
+                assertThat(fact.nativeCreatedAtMillis()).isEqualTo(stat.getCtime());
+            }
+            var ledger = facts.ledgerMetadata();
+            zk.setData(ledger.nativePath(), ledger.rawStoredBytes().toByteArray(), ledger.nativeVersion());
+            var reread = await(f.source.readRecoveredScopeFacts(expected, facts.recovery()))
+                    .ledgerMetadata();
+            assertThat(reread.rawStoredSha256()).isEqualTo(ledger.rawStoredSha256());
+            assertThat(reread.nativeCreateZxid()).isEqualTo(ledger.nativeCreateZxid());
+            assertThat(reread.nativeModifyZxid()).isGreaterThan(ledger.nativeModifyZxid());
+            assertThat(reread.nativeVersion()).isEqualTo(ledger.nativeVersion() + 1);
         }
     }
 
@@ -1183,6 +1757,59 @@ class KafkaBookKeeperRunRootsV2RealTest {
         };
     }
 
+    private static AuthorityFactV1 nativeFact(Oxia09ExactMetadataTransactionStoreV1 metadata, String key)
+            throws Exception {
+        var actual = await(metadata.read(key)).orElseThrow();
+        return new AuthorityFactV1(key, actual.metadataVersion(), actual.canonicalStoredSha256());
+    }
+
+    private static final class HeldControlCas implements CanonicalControlMetadataStore {
+        private final CanonicalControlMetadataStore delegate;
+        final CountDownLatch entered = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        private boolean blockNext;
+
+        HeldControlCas(CanonicalControlMetadataStore delegate) {
+            this.delegate = delegate;
+        }
+
+        synchronized void blockNext() {
+            blockNext = true;
+        }
+
+        @Override
+        public Optional<CanonicalBytes> get(String key) {
+            return delegate.get(key);
+        }
+
+        @Override
+        public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes exactValue) {
+            return delegate.putIfAbsent(key, exactValue);
+        }
+
+        @Override
+        public ControlMutationOutcome compareAndSet(
+                String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
+            synchronized (this) {
+                if (blockNext) {
+                    blockNext = false;
+                    entered.countDown();
+                } else {
+                    return delegate.compareAndSet(key, exactExpected, exactCandidate);
+                }
+            }
+            try {
+                if (!release.await(30, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("held Oxia selector CAS was not released");
+                }
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("held Oxia selector CAS was interrupted", failure);
+            }
+            return delegate.compareAndSet(key, exactExpected, exactCandidate);
+        }
+    }
+
     static final class Fixture implements AutoCloseable {
         final long attempt;
         final Scope scope;
@@ -1198,12 +1825,20 @@ class KafkaBookKeeperRunRootsV2RealTest {
         final OxiaQuotaTargetDeleteStoreV2 route;
         final BookKeeperCellSession admitting;
         final OxiaKafkaRunRootAuthorityV2 roots;
+        final java.util.concurrent.ExecutorService controlExecutor = Executors.newSingleThreadExecutor();
         final Map<StorageRunId, RunLedgerHandleV1> handles = new ConcurrentHashMap<>();
         volatile boolean loseCheckpoint;
         volatile boolean loseClose;
+        volatile boolean loseReservedCreateResult;
         volatile RunLedgerAppendRequestV1 lostCheckpoint;
+        volatile CompletableFuture<Void> readGate;
+        final CompletableFuture<Void> readBlocked = new CompletableFuture<>();
 
         Fixture(long attempt, String topic, List<String> restore) throws Exception {
+            this(attempt, topic, restore, false);
+        }
+
+        Fixture(long attempt, String topic, List<String> restore, boolean singletonCreateScope) throws Exception {
             this.attempt = attempt;
             var input = KafkaBookKeeperNativeCreateV2RealTest.nativeInput(false, attempt);
             var capability = input.layout().task().capability();
@@ -1255,7 +1890,11 @@ class KafkaBookKeeperRunRootsV2RealTest {
                     : M5BookKeeperNativeCreateSpecV2.decode(
                             CanonicalBytes.copyOf(java.util.HexFormat.of().parseHex(restore.get(0))));
             configurations = spec.configurations();
-            source = M5BookKeeperNativeCreateClientV2.connect(uri, capability, spec, binding);
+            var createScope = singletonCreateScope
+                    ? M5BookKeeperNativeCreateSpecV2.of(
+                            spec.nativeInstanceId(), spec.taskId(), List.of(configurations.get(0)))
+                    : spec;
+            source = M5BookKeeperNativeCreateClientV2.connect(uri, capability, createScope, binding);
             session = source.newSession();
             verifier = new KafkaBookKeeperNativeRootVerifierV2(source);
             route = await(namespace.openAuthorityRoute(backend, new Oxia09ExactMetadataTransactionStoreV1(oxia)));
@@ -1451,6 +2090,7 @@ class KafkaBookKeeperRunRootsV2RealTest {
         }
 
         public void close() throws Exception {
+            controlExecutor.shutdownNow();
             try {
                 verifier.close();
             } finally {
@@ -1502,6 +2142,36 @@ class KafkaBookKeeperRunRootsV2RealTest {
                             : CompletableFuture.completedFuture(result));
         }
 
+        public CompletionStage<ProviderMutationResultV1<BookKeeperLedgerIdentity>> reserveLedgerIdentity(
+                RunLedgerConfigurationV1 configuration) {
+            if (!f.source.spec().configurations().contains(configuration)) {
+                try {
+                    f.source.admitCreateConfiguration(configuration);
+                } catch (Exception failure) {
+                    return CompletableFuture.failedFuture(failure);
+                }
+            }
+            return f.session.reserveLedgerIdentity();
+        }
+
+        public CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createReservedRunLedger(
+                RunLedgerConfigurationV1 configuration, BookKeeperLedgerIdentity reservedIdentity) {
+            var handle = new RunLedgerHandleV1(
+                    configuration.providerScopeId(),
+                    configuration.runId(),
+                    reservedIdentity,
+                    configuration.configurationDigest());
+            return f.admit(handle)
+                    .thenCompose(ignored -> f.session.createReservedRunLedger(configuration, reservedIdentity))
+                    .thenApply(result -> {
+                        if (f.loseReservedCreateResult && result.exactProof().isPresent()) {
+                            f.loseReservedCreateResult = false;
+                            return ProviderMutationResultV1.<RunLedgerHandleV1>outcomeUnknown();
+                        }
+                        return result;
+                    });
+        }
+
         public CompletionStage<com.nereusstream.storage.api.bookkeeper.RunLedgerOpenResultV1> openRunLedger(
                 RunLedgerHandleV1 handle) {
             return f.session.openRunLedger(handle);
@@ -1527,6 +2197,12 @@ class KafkaBookKeeperRunRootsV2RealTest {
 
         public CompletionStage<com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1> readExactEntry(
                 RunLedgerHandleV1 handle, long entry) {
+            CompletableFuture<Void> gate = f.readGate;
+            if (gate != null) {
+                f.readGate = null;
+                f.readBlocked.complete(null);
+                return gate.thenCompose(ignored -> f.session.readExactEntry(handle, entry));
+            }
             if (f.lostCheckpoint != null
                     && f.lostCheckpoint.handle().equals(handle)
                     && f.lostCheckpoint.expectedEntryId() == entry) {

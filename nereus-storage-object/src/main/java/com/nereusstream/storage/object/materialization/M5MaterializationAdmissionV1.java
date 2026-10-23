@@ -130,7 +130,12 @@ public final class M5MaterializationAdmissionV1 {
     public M5MaterializationAdmissionV1(CanonicalControlMetadataStore metadata, Sha256Digest protocolCellSha256) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         requireDigest(protocolCellSha256, "protocolCellSha256");
-        stateKey = "v2/object-wal/cells/" + protocolCellSha256.toHex() + "/read-m5/materialization-admission";
+        stateKey = stateKey(protocolCellSha256);
+    }
+
+    public static String stateKey(Sha256Digest protocolCellSha256) {
+        requireDigest(protocolCellSha256, "protocolCellSha256");
+        return "v2/object-wal/cells/" + protocolCellSha256.toHex() + "/read-m5/materialization-admission";
     }
 
     public Outcome install(Caps caps) {

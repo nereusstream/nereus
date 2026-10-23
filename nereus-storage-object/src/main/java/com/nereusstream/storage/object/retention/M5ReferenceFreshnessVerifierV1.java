@@ -61,6 +61,11 @@ public final class M5ReferenceFreshnessVerifierV1 {
         return loadExact(deduplicate(facts));
     }
 
+    /** Rechecks a captured production inventory before it is promoted into a floor or reference proof. */
+    public CompletionStage<List<VersionedValue>> requireFreshFacts(List<AuthorityFactV1> facts) {
+        return loadExact(deduplicate(facts));
+    }
+
     private CompletionStage<List<VersionedValue>> loadExact(List<AuthorityFactV1> facts) {
         CompletionStage<List<VersionedValue>> stage = CompletableFuture.completedFuture(new ArrayList<>());
         for (AuthorityFactV1 fact : facts) {

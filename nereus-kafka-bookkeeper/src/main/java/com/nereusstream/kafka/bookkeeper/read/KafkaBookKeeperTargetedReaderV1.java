@@ -17,6 +17,7 @@ package com.nereusstream.kafka.bookkeeper.read;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionStateV1.CompletedTransactionV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadViewV2;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2FrameV1;
@@ -35,12 +36,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 
 /** K6 exact-entry reader with bounded validated index-block cache and disposable sequential cursors. */
 public final class KafkaBookKeeperTargetedReaderV1 {
     private final BookKeeperCellSession session;
     private final int maximumCachedIndexBlocks;
     private final Map<IndexCacheKey, KafkaPackedBatchLocatorIndexV1> indexCache;
+    private final BiFunction<RunLedgerHandleV1, Long, CompletionStage<RunLedgerReadResultV1>> exactReads;
 
     public KafkaBookKeeperTargetedReaderV1(BookKeeperCellSession session, int maximumCachedIndexBlocks) {
         this.session = Objects.requireNonNull(session, "session");
@@ -49,6 +52,24 @@ public final class KafkaBookKeeperTargetedReaderV1 {
         }
         this.maximumCachedIndexBlocks = maximumCachedIndexBlocks;
         this.indexCache = new LinkedHashMap<>(16, 0.75f, true);
+        this.exactReads = session::readExactEntry;
+    }
+
+    private KafkaBookKeeperTargetedReaderV1(
+            KafkaBookKeeperTargetedReaderV1 source,
+            BiFunction<RunLedgerHandleV1, Long, CompletionStage<RunLedgerReadResultV1>> exactReads) {
+        this.session = source.session;
+        this.maximumCachedIndexBlocks = source.maximumCachedIndexBlocks;
+        this.indexCache = source.indexCache;
+        this.exactReads = Objects.requireNonNull(exactReads, "exactReads");
+    }
+
+    /** One captured Fetch supplies its owned physical reads while retaining this partition's index cache. */
+    public CompletionStage<KafkaBookKeeperReadResultV1> readSequential(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            BiFunction<RunLedgerHandleV1, Long, CompletionStage<RunLedgerReadResultV1>> exactReads) {
+        return new KafkaBookKeeperTargetedReaderV1(this, exactReads).readSequential(snapshot, request);
     }
 
     public CompletionStage<KafkaBookKeeperReadResultV1> readOne(
@@ -116,8 +137,112 @@ public final class KafkaBookKeeperTargetedReaderV1 {
         });
     }
 
-    public synchronized int cachedIndexBlockCount() {
-        return indexCache.size();
+    public int cachedIndexBlockCount() {
+        synchronized (indexCache) {
+            return indexCache.size();
+        }
+    }
+
+    /**
+     * Combines one independently recovered compacted prefix with this coherent snapshot's raw tail.
+     * The caller owns exact M4 selection and both source lifetimes; this method grants no read admission.
+     * Offsets inside the complete cut are never recovered from obsolete raw predecessors.
+     */
+    public CompletionStage<KafkaBookKeeperReadResultV1> readSequential(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            KafkaBookKeeperReadViewV2 preferred) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(preferred, "preferred");
+        requirePreferredPrefix(snapshot, preferred);
+        var boundFailure = initialBoundResult(snapshot, request.requestedOffset(), request.isolation());
+        if (boundFailure.isPresent()) {
+            return completed(boundFailure.orElseThrow());
+        }
+        long cutEnd = preferred.descriptor().sourceCut().coverage().exclusiveEnd();
+        if (request.requestedOffset() >= cutEnd) {
+            return readSequential(snapshot, request);
+        }
+        long upperBound = snapshot.root().readUpperBound(request.isolation());
+        var selected = preferred.selectBatches(request.requestedOffset(), upperBound, request.byteBudget());
+        List<KafkaBookKeeperReadBatchV1> batches = new ArrayList<>();
+        long usedBytes = 0;
+        for (var batch : selected) {
+            batches.add(new KafkaBookKeeperReadBatchV1(
+                    batch.startOffset(), batch.endOffsetExclusive(), batch.firstEntry(), batch.rawRecordBatch()));
+            usedBytes = Math.addExact(usedBytes, batch.rawRecordBatch().length());
+        }
+        long nextOffset = batches.isEmpty()
+                ? request.requestedOffset()
+                : batches.get(batches.size() - 1).endOffsetExclusive();
+        if (upperBound <= cutEnd
+                || usedBytes >= request.byteBudget()
+                || !preferred.selectBatches(nextOffset, upperBound, 1).isEmpty()) {
+            return completed(preferredResult(snapshot, request, batches, Optional.empty()));
+        }
+        long remaining = request.byteBudget() - usedBytes;
+        var tailRequest =
+                new KafkaBookKeeperSequentialReadRequestV1(cutEnd, request.isolation(), remaining, Optional.empty());
+        return readSequential(snapshot, tailRequest).thenApply(tail -> {
+            if (tail.outcome() != KafkaBookKeeperReadOutcomeV1.FOUND
+                    && tail.outcome() != KafkaBookKeeperReadOutcomeV1.END_OF_SNAPSHOT) {
+                return tail;
+            }
+            long tailBytes = 0;
+            for (var batch : tail.batches()) {
+                if (batch.startOffset() < cutEnd) {
+                    throw new IllegalStateException("raw tail batch overlaps the complete preferred cut");
+                }
+                tailBytes =
+                        Math.addExact(tailBytes, batch.rawAssignedRecordBatch().length());
+            }
+            // K6 permits a first oversized raw batch. A preceding preferred batch has already spent that exception.
+            if (!batches.isEmpty() && tailBytes > remaining) {
+                return preferredResult(snapshot, request, batches, Optional.empty());
+            }
+            batches.addAll(tail.batches());
+            return preferredResult(snapshot, request, batches, tail.nextCursor());
+        });
+    }
+
+    /** Supplies the same Fetch-owned exact reads used by ordinary raw K6 reads. */
+    public CompletionStage<KafkaBookKeeperReadResultV1> readSequential(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            KafkaBookKeeperReadViewV2 preferred,
+            BiFunction<RunLedgerHandleV1, Long, CompletionStage<RunLedgerReadResultV1>> exactReads) {
+        return new KafkaBookKeeperTargetedReaderV1(this, exactReads).readSequential(snapshot, request, preferred);
+    }
+
+    private static void requirePreferredPrefix(
+            KafkaBookKeeperReadSnapshotV1 snapshot, KafkaBookKeeperReadViewV2 preferred) {
+        var recovery = preferred
+                .recoveryState()
+                .orElseThrow(() ->
+                        new IllegalStateException("preferred prefix lacks its independently recovered protocol state"));
+        var source = recovery.sourceFence();
+        var current = snapshot.root().fence();
+        var coverage = preferred.descriptor().sourceCut().coverage();
+        if (!source.samePartitionIdentity(current)
+                || !source.storageEpochId().equals(current.storageEpochId())
+                || source.bindingGeneration() != current.bindingGeneration()
+                || source.ownerEpoch() > current.ownerEpoch()
+                || source.kafkaLeaderEpoch() > current.kafkaLeaderEpoch()
+                || coverage.inclusiveStart() > snapshot.root().frontiers().trimStartOffset()
+                || coverage.exclusiveEnd() > snapshot.root().frontiers().durableEndOffset()) {
+            throw new IllegalStateException("preferred prefix differs from its coherent partition identity/frontier");
+        }
+    }
+
+    private KafkaBookKeeperReadResultV1 preferredResult(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            List<KafkaBookKeeperReadBatchV1> batches,
+            Optional<KafkaBookKeeperReadCursorV1> cursor) {
+        return batches.isEmpty()
+                ? emptyResult(Failure.end("no complete batch remains below the captured isolation upper bound"), false)
+                : foundResult(snapshot, request.isolation(), request.requestedOffset(), batches, cursor, false);
     }
 
     private CompletionStage<KafkaBookKeeperReadResultV1> collectSequential(
@@ -368,7 +493,7 @@ public final class KafkaBookKeeperTargetedReaderV1 {
             KafkaBookKeeperReadRunV1 run, KafkaIndexBlockPointerV1 pointer) {
         IndexCacheKey key = new IndexCacheKey(run.handle(), run.sourceGeneration(), pointer.indexBlockEntryId());
         KafkaPackedBatchLocatorIndexV1 cached;
-        synchronized (this) {
+        synchronized (indexCache) {
             cached = indexCache.get(key);
         }
         if (cached != null) {
@@ -393,7 +518,7 @@ public final class KafkaBookKeeperTargetedReaderV1 {
                 }
                 KafkaPackedBatchLocatorIndexV1 index =
                         KafkaPackedBatchLocatorIndexV1.fromRangeIndexBlock(pointer.indexBlockEntryId(), block);
-                synchronized (this) {
+                synchronized (indexCache) {
                     indexCache.put(key, index);
                     while (indexCache.size() > maximumCachedIndexBlocks) {
                         IndexCacheKey eldest = indexCache.keySet().iterator().next();
@@ -449,8 +574,7 @@ public final class KafkaBookKeeperTargetedReaderV1 {
     private CompletionStage<EntryRead> readExact(RunLedgerHandleV1 handle, long entryId) {
         CompletionStage<RunLedgerReadResultV1> accepted;
         try {
-            accepted = Objects.requireNonNull(
-                    session.readExactEntry(handle, entryId), "provider returned a null read stage");
+            accepted = Objects.requireNonNull(exactReads.apply(handle, entryId), "provider returned a null read stage");
         } catch (RuntimeException failure) {
             return completed(EntryRead.failed(Failure.provider("provider rejected the exact-entry read")));
         }

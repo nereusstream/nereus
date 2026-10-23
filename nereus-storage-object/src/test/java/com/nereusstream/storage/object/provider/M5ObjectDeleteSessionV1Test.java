@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,11 +59,11 @@ class M5ObjectDeleteSessionV1Test {
         var reconciliation = session.reconcile(target, "cell-a/objects/", token);
         assertThat(reconciliation.kind()).isEqualTo(ReconciliationKindV1.AUTHORITATIVELY_ABSENT);
         assertThat(reconciliation.listPages()).isEqualTo(1);
-        assertThat(transport.getCalls).isEqualTo(2);
+        assertThat(transport.getCalls).isEqualTo(3);
     }
 
     @Test
-    void exactOldVersionMayRetryButRecreationQuarantinesWithoutDeletingIt() throws Exception {
+    void exactOldVersionMayRetryWhileRecreatedVersionRemainsIndependent() throws Exception {
         FakeVersionedTransport transport = new FakeVersionedTransport();
         ObjectIdentity target = transport.put("cell-a/objects/retry", bytes("old"), "version-3");
         M5ObjectDeleteSessionV1 session = session(transport, "cell-a");
@@ -73,10 +74,26 @@ class M5ObjectDeleteSessionV1Test {
 
         ObjectIdentity recreated = transport.put("cell-a/objects/retry", bytes("new"), "version-4");
         assertThat(session.reconcile(target, "cell-a/objects/", token).kind())
-                .isEqualTo(ReconciliationKindV1.DIFFERENT_VERSION_OR_BODY);
+                .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_ABSENT_OTHER_CURRENT);
         assertThat(session.deleteExactVersion(recreated, token))
                 .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.VERSION_PRECONDITION_FAILED);
         assertThat(transport.objects).containsKey(recreated.key());
+    }
+
+    @Test
+    void hiddenOldVersionIsNotMistakenForPhysicalAbsence() throws Exception {
+        FakeVersionedTransport transport = new FakeVersionedTransport();
+        ObjectIdentity target = transport.put("cell-a/objects/hidden", bytes("old"), "version-hidden");
+        M5ObjectDeleteSessionV1 session = session(transport, "cell-a");
+        CanonicalBytes token = session.readExactForDelete(target).immutableVersionToken();
+        transport.hideCurrent(target.key());
+
+        assertThat(session.reconcile(target, "cell-a/objects/", token).kind())
+                .isEqualTo(ReconciliationKindV1.EXACT_OLD_VERSION_REMAINS);
+        assertThat(session.deleteExactVersion(target, token))
+                .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.DELETED_EXACT);
+        assertThat(session.reconcile(target, "cell-a/objects/", token).kind())
+                .isEqualTo(ReconciliationKindV1.AUTHORITATIVELY_ABSENT);
     }
 
     @Test
@@ -96,8 +113,63 @@ class M5ObjectDeleteSessionV1Test {
         assertThat(transport.deleteCalls).isZero();
     }
 
+    @Test
+    void unrelatedSameCellListPrefixIsRejectedBeforeProviderIo() {
+        FakeVersionedTransport transport = new FakeVersionedTransport();
+        ObjectIdentity target = transport.put("cell-a/objects/target", bytes("old"), "version-1");
+        M5ObjectDeleteSessionV1 session = session(transport, "cell-a");
+
+        assertThatThrownBy(() -> session.reconcile(target, "cell-a/other/", bytes("version-1")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not contain the exact target key");
+        assertThat(transport.listCalls).isZero();
+        assertThat(transport.getCalls).isZero();
+    }
+
+    @Test
+    void fullGetDigestStreamsLargeBodyAndRejectsShortOrExtraBytes() throws Exception {
+        FakeVersionedTransport transport = new FakeVersionedTransport();
+        transport.maximumObjectBytes = 1_024 * 1_024;
+        byte[] raw = new byte[200_000];
+        for (int i = 0; i < raw.length; i++) {
+            raw[i] = (byte) i;
+        }
+        ObjectIdentity target = transport.put("cell-a/objects/large", CanonicalBytes.copyOf(raw), "version-large");
+        M5ObjectDeleteSessionV1 session = session(transport, "cell-a", transport.maximumObjectBytes);
+
+        assertThat(session.readExactForDelete(target).immutableVersionToken()).isEqualTo(bytes("version-large"));
+        transport.getBodyAdjustment = -1;
+        assertThatThrownBy(() -> session.readExactForDelete(target))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("ended before the declared length");
+        transport.getBodyAdjustment = 1;
+        assertThatThrownBy(() -> session.readExactForDelete(target))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("exceeded the declared length");
+    }
+
+    @Test
+    void fullGetLongLengthFailsClosedOnEarlyEofWithoutIntegerLengthBarrier() {
+        FakeVersionedTransport transport = new FakeVersionedTransport();
+        transport.maximumObjectBytes = 1L << 32;
+        transport.getDeclaredLengthOverride = (long) Integer.MAX_VALUE + 1;
+        transport.put("cell-a/objects/huge", bytes("x"), "version-huge");
+        ObjectIdentity target = new ObjectIdentity(
+                "cell-a/objects/huge", transport.getDeclaredLengthOverride, Sha256Digest.hash(bytes("x")));
+        M5ObjectDeleteSessionV1 session = session(transport, "cell-a", transport.maximumObjectBytes);
+
+        assertThatThrownBy(() -> session.readExactForDelete(target))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("ended before the declared length");
+    }
+
     private static M5ObjectDeleteSessionV1 session(FakeVersionedTransport transport, String namespace) {
-        return new M5ObjectDeleteSessionV1(transport, scope(1), namespace, 1_024, 4, 64, 16_384, 1_024);
+        return session(transport, namespace, 1_024);
+    }
+
+    private static M5ObjectDeleteSessionV1 session(
+            FakeVersionedTransport transport, String namespace, long maximumObjectBytes) {
+        return new M5ObjectDeleteSessionV1(transport, scope(1), namespace, maximumObjectBytes, 4, 64, 16_384, 1_024);
     }
 
     private static CellProviderScopeId scope(int value) {
@@ -120,9 +192,14 @@ class M5ObjectDeleteSessionV1Test {
 
     private static final class FakeVersionedTransport implements ObjectProviderTransport {
         private final Map<String, VersionedObject> objects = new LinkedHashMap<>();
+        private final Map<String, VersionedObject> hiddenVersions = new LinkedHashMap<>();
+        private long maximumObjectBytes = 1_024;
+        private Long getDeclaredLengthOverride;
+        private int getBodyAdjustment;
         private boolean deleteSupported = true;
         private boolean unknownAfterDelete;
         private int getCalls;
+        private int listCalls;
         private int deleteCalls;
 
         private ObjectIdentity put(String key, CanonicalBytes body, String version) {
@@ -130,9 +207,14 @@ class M5ObjectDeleteSessionV1Test {
             return identity(key, body);
         }
 
+        private void hideCurrent(String key) {
+            hiddenVersions.put(key, objects.remove(key));
+        }
+
         @Override
         public ObjectProviderCapabilities capabilities() {
-            return new ObjectProviderCapabilities("fake-versioned", true, true, true, true, true, 1_024, 1_024, 16);
+            return new ObjectProviderCapabilities(
+                    "fake-versioned", true, true, true, true, true, maximumObjectBytes, 1_024, 16);
         }
 
         @Override
@@ -151,15 +233,23 @@ class M5ObjectDeleteSessionV1Test {
         public StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException {
             getCalls++;
             VersionedObject value = objects.get(key);
+            if (exactVersionToken.isPresent()) {
+                CanonicalBytes token = exactVersionToken.orElseThrow();
+                if (value == null || !value.version.equals(token)) {
+                    value = hiddenVersions.get(key);
+                }
+                if (value != null && !value.version.equals(token)) {
+                    value = null;
+                }
+            }
             if (value == null) {
                 throw new MissingObjectException();
             }
+            byte[] body = value.body.toByteArray();
+            body = Arrays.copyOf(body, body.length + getBodyAdjustment);
+            long declared = getDeclaredLengthOverride == null ? value.body.length() : getDeclaredLengthOverride;
             return new StreamingObject(
-                    value.body.length(),
-                    0,
-                    value.body.length(),
-                    Optional.of(value.version),
-                    new ByteArrayInputStream(value.body.toByteArray()));
+                    declared, 0, declared, Optional.of(value.version), new ByteArrayInputStream(body));
         }
 
         @Override
@@ -170,6 +260,7 @@ class M5ObjectDeleteSessionV1Test {
 
         @Override
         public ListPage list(String prefix, Optional<CanonicalBytes> continuationToken, int maximumKeys) {
+            listCalls++;
             List<ListedObject> rows = new ArrayList<>();
             objects.forEach((key, value) -> {
                 if (key.startsWith(prefix)) {
@@ -182,6 +273,11 @@ class M5ObjectDeleteSessionV1Test {
         @Override
         public ConditionalDeleteResult deleteExactVersion(String key, CanonicalBytes exactVersionToken) {
             deleteCalls++;
+            VersionedObject hidden = hiddenVersions.get(key);
+            if (hidden != null && hidden.version.equals(exactVersionToken)) {
+                hiddenVersions.remove(key);
+                return ConditionalDeleteResult.DELETED_EXACT;
+            }
             VersionedObject current = objects.get(key);
             if (current == null) {
                 return ConditionalDeleteResult.DEFINITIVELY_NOT_FOUND;

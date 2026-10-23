@@ -23,6 +23,16 @@ public interface KafkaRunRootVerifierV2 {
 
     CompletionStage<Void> requireNative(KafkaRunRootRecordV2 root);
 
+    /**
+     * A retired physical parent can supply lineage only when the actual native cold owner has independently
+     * recovered the selected replacement and still owns its exact closed predecessor and current selection.
+     * This never reopens the parent's read admission or authorizes a read of its deleted ledger.
+     */
+    default CompletionStage<Boolean> permitsRetiredSuccessor(
+            KafkaRunRootRecordV2 parent, KafkaRunRootSnapshotV1 successor) {
+        return java.util.concurrent.CompletableFuture.completedFuture(false);
+    }
+
     /** Independently verifies the fixed native closed ledger and complete continuous prefix in a crash cut. */
     default CompletionStage<Void> requireRecovered(KafkaRunRootRecordV2 root, KafkaOwnerAdmissionV1 closedOwner) {
         return java.util.concurrent.CompletableFuture.failedFuture(

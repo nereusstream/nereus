@@ -16,6 +16,7 @@ package com.nereusstream.storage.api.kafka;
 
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerRecoveryProofV1;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
@@ -32,6 +33,12 @@ public interface KafkaBookKeeperOwnerAuthorityV1 {
     CompletionStage<ProviderMutationResultV1<KafkaOwnerAdmissionV1>> closeOwner(KafkaOwnerIdentityV1 expectedOwner);
 
     CompletionStage<Optional<KafkaOwnerAdmissionV1>> readClosedOwner(long ownerEpoch);
+
+    /**
+     * Closed owner's durable birth inventory, including unselected roots. An absent inventory is unknown legacy
+     * history, not proof that no physical resource was created.
+     */
+    CompletionStage<Optional<List<KafkaRunRootRecordV2>>> readRunBirths(KafkaOwnerAdmissionV1 closedOwner);
 
     /** Exact admitted initial identity, including a prewrite whose admission response was lost. */
     CompletionStage<Optional<KafkaRunRootRecordV2>> readAdmittedRun(KafkaRunRootRecordV2.Link link);

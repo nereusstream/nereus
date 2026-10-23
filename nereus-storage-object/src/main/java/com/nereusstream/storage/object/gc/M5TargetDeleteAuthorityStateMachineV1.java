@@ -82,6 +82,74 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 zeroDigest()));
     }
 
+    /** A clock mark does not qualify eligibility; a subsequent native producer must complete its full rescan. */
+    public static TargetDeleteAuthorityV1 markEpochGrace(TargetDeleteAuthorityV1 current, DeleteEpochGraceMarkV1 mark) {
+        requireOpen(current);
+        Objects.requireNonNull(mark, "mark");
+        if (!current.activeWriterTickets().isEmpty()) {
+            throw new IllegalStateException("epoch grace cannot start with active resource writers");
+        }
+        return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
+                current.authorityKey(),
+                current.target(),
+                Math.addExact(current.authorityRevision(), 1),
+                Optional.of(Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current))),
+                TargetDeleteAuthorityStateV1.OPEN_V1,
+                0,
+                current.writerEnrollment(),
+                mark.initialObservationRootSha256(),
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(mark),
+                zeroDigest()));
+    }
+
+    /** Rewait under a new clock while preserving the closed read attempt and its historical qualification. */
+    public static TargetDeleteAuthorityV1 renewReadEpochGrace(
+            TargetDeleteAuthorityV1 current, DeleteEpochGraceMarkV1 mark) {
+        requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        if (current.epochGrace().isEmpty()) {
+            throw new IllegalArgumentException("read grace renewal requires an existing epoch profile");
+        }
+        var previous = current.readFence().orElseThrow().observationContext();
+        var successor = mark.authority();
+        if (successor.observationEpoch() != Math.addExact(previous.observationEpoch(), 1)
+                || (!previous.coordinatorOwner().equals(successor.coordinatorOwner()))
+                        != successor.predecessorOwnerFenced().isPresent()
+                || current.epochGrace().orElseThrow().clockDomain().equals(mark.clockDomain())) {
+            throw new IllegalArgumentException("read grace renewal has a reused clock or stale/unfenced context");
+        }
+        return recoveryVetoAuthority(
+                current, DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING, successor, Optional.of(mark));
+    }
+
+    /** Retains the original intent/identity while a successor owner reconfirms and waits its own grace. */
+    public static TargetDeleteAuthorityV1 renewIntentEpochGrace(
+            TargetDeleteAuthorityV1 current, DeleteEpochGraceMarkV1 mark) {
+        requireState(current, TargetDeleteAuthorityStateV1.DELETE_INTENT_V1);
+        if (current.epochGrace().isEmpty()) {
+            throw new IllegalArgumentException("intent grace renewal requires an existing epoch profile");
+        }
+        var previous = dispatchContext(current);
+        var successor = mark.authority();
+        if (previous.coordinatorOwner().equals(successor.coordinatorOwner())) {
+            throw new IllegalArgumentException("intent renewal requires a fenced successor native owner");
+        }
+        if (successor.observationEpoch() != Math.addExact(previous.observationEpoch(), 1)
+                || (!previous.coordinatorOwner().equals(successor.coordinatorOwner()))
+                        != successor.predecessorOwnerFenced().isPresent()
+                || current.epochGrace().orElseThrow().clockDomain().equals(mark.clockDomain())) {
+            throw new IllegalArgumentException("intent grace renewal has a reused clock or stale/unfenced context");
+        }
+        return recoveryVetoAuthority(
+                current, DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING, successor, Optional.of(mark));
+    }
+
     /** Installs complete evidence at one exact revision; callers must revalidate its external authority vector. */
     public static TargetDeleteAuthorityV1 qualifyEligibility(
             TargetDeleteAuthorityV1 current, DeleteEligibilitySnapshotV2 snapshot) {
@@ -110,6 +178,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                current.epochGrace(),
                 zeroDigest()));
     }
 
@@ -151,7 +220,17 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             TargetDeleteAuthorityV1 current, Sha256Digest attemptIdSha256, DeleteObservationContextV2 context) {
         requireOpen(current);
         Objects.requireNonNull(context, "context");
-        if (context.observationEpoch() != 1 || context.predecessorOwnerFenced().isPresent()) {
+        if (current.epochGrace().isPresent()) {
+            var mark = current.epochGrace().orElseThrow();
+            if (!context.equals(mark.authority())
+                    || current.eligibilitySnapshot().isEmpty()
+                    || current.eligibilitySnapshot().orElseThrow().members().stream()
+                            .anyMatch(member ->
+                                    !member.physicalReferences().epochGrace().equals(Optional.of(mark)))) {
+                throw new IllegalArgumentException("CAS-1 lacks the current epoch mark and complete rescan proof");
+            }
+        } else if (context.observationEpoch() != 1
+                || context.predecessorOwnerFenced().isPresent()) {
             throw new IllegalArgumentException("CAS-1 requires initial observation epoch without a predecessor");
         }
         M5TargetDeleteAuthorityRecordsV1.requireDigest(attemptIdSha256, "attemptIdSha256");
@@ -226,6 +305,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                current.epochGrace(),
                 zeroDigest()));
     }
 
@@ -236,6 +316,20 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             DeleteObservationContextV2 rejectedContext) {
         requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
         Objects.requireNonNull(rejectedContext, "rejectedContext");
+        if (current.recoveryVeto()
+                .filter(veto -> veto.reason() == DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING)
+                .isPresent()) {
+            reason = DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING;
+            rejectedContext = current.epochGrace().orElseThrow().authority();
+        }
+        return recoveryVetoAuthority(current, reason, rejectedContext, current.epochGrace());
+    }
+
+    private static TargetDeleteAuthorityV1 recoveryVetoAuthority(
+            TargetDeleteAuthorityV1 current,
+            DeleteRecoveryVetoV2.Reason reason,
+            DeleteObservationContextV2 rejectedContext,
+            Optional<DeleteEpochGraceMarkV1> mark) {
         long revision = Math.addExact(current.authorityRevision(), 1);
         var previous = current.readFence().orElseThrow();
         var predecessorSha = Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current));
@@ -244,14 +338,16 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 rejectedContext.observationEpoch(),
                 M5TargetDeleteAuthorityCodecV1.observationContextSha256(rejectedContext),
                 predecessorSha);
-        var fence = new TargetReadFenceV1(
-                previous.attemptIdSha256(),
-                revision,
-                previous.fenceEpoch(),
-                previous.openAuthorityValueSha256(),
-                previous.proofSnapshotDigest(),
-                previous.eligibilityRootSha256(),
-                previous.observationContext());
+        var fence = current.state() == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                ? previous
+                : new TargetReadFenceV1(
+                        previous.attemptIdSha256(),
+                        revision,
+                        previous.fenceEpoch(),
+                        previous.openAuthorityValueSha256(),
+                        previous.proofSnapshotDigest(),
+                        previous.eligibilityRootSha256(),
+                        previous.observationContext());
         return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
                 current.authorityKey(),
                 current.target(),
@@ -264,10 +360,11 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 current.eligibilitySnapshot(),
                 List.of(),
                 Optional.of(fence),
-                Optional.empty(),
-                Optional.empty(),
+                current.externalIdentity(),
+                current.deleteIntent(),
                 Optional.empty(),
                 Optional.of(veto),
+                mark,
                 zeroDigest()));
     }
 
@@ -410,6 +507,7 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.of(intent),
                 Optional.empty(),
                 Optional.empty(),
+                current.epochGrace(),
                 Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH])));
     }
 

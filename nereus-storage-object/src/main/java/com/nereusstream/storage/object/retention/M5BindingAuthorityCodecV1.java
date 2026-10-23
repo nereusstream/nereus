@@ -74,6 +74,52 @@ public final class M5BindingAuthorityCodecV1 {
                 PLACEHOLDER));
     }
 
+    /** Activate the original initialization fence only after the first real selected view exists. */
+    public static BindingRetirementAuthorityV1 activateBootstrap(
+            M5BindingBootstrapV1 bootstrap, BindingReadSelector selector) {
+        if (!bootstrap.binding().equals(selector.binding())
+                || !bootstrap.capability().equals(selector.capability())
+                || selector.readAdmissionEpoch() != 1
+                || selector.sourceGeneration() != 1
+                || selector.mode()
+                        != com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode
+                                .PREFERRED_ONLY
+                || selector.admissionState()
+                        != com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState.ADMITTING
+                || !selector.activeBatches().isEmpty()
+                || !selector.pendingAnchors().isEmpty()) {
+            throw new IllegalArgumentException("bootstrap activation requires the first exact Binding selector");
+        }
+        return finalizeAuthority(new BindingRetirementAuthorityV1(
+                selector.binding(),
+                1,
+                Optional.of(Sha256Digest.hash(bootstrap.encode())),
+                BindingAuthorityStateV1.OPEN_V1,
+                selector,
+                List.of(),
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                selector.capability(),
+                bootstrap.kafkaPolicy().isPresent() ? 7 : 6,
+                0,
+                M5RetiredBatchHistoryV2.emptyRoot(selector.binding()),
+                Optional.empty(),
+                Optional.empty(),
+                PLACEHOLDER,
+                Optional.empty(),
+                List.of(),
+                Optional.of(bootstrap)));
+    }
+
+    /** Startup provenance is immutable, and cannot be attached to an existing selector. */
+    public static void requireBootstrapTransition(
+            BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 next) {
+        if (!current.bootstrap().equals(next.bootstrap())) {
+            throw new IllegalArgumentException("Binding startup provenance cannot be changed or imported");
+        }
+    }
+
     /** Wrap one exact legacy selector without changing its M4 projection bytes. */
     public static BindingRetirementAuthorityV1 migrateLegacy(CanonicalBytes exactLegacySelector) {
         BindingReadSelector selector = M4ReadControlCodecV1.decodeSelector(exactLegacySelector);
@@ -240,7 +286,13 @@ public final class M5BindingAuthorityCodecV1 {
                 Math.addExact(current.retiredHistory().count(), slots.size()),
                 current.retiredHistory(),
                 current.taskSelectionDecision(),
-                PLACEHOLDER));
+                current.materializationWorker(),
+                PLACEHOLDER,
+                current.logicalTrim(),
+                current.trimMutationTickets(),
+                current.bootstrap(),
+                current.kafkaPolicy(),
+                current.sourceScan()));
     }
 
     static BindingRetirementAuthorityV1 fold(
@@ -279,12 +331,20 @@ public final class M5BindingAuthorityCodecV1 {
                 current.lastActivationOrdinal(),
                 insertion.successor(),
                 current.taskSelectionDecision(),
-                PLACEHOLDER));
+                current.materializationWorker(),
+                PLACEHOLDER,
+                current.logicalTrim(),
+                current.trimMutationTickets(),
+                current.bootstrap(),
+                current.kafkaPolicy(),
+                current.sourceScan()));
     }
 
     /** Validates the inline transition shape; the native route separately checks immutable archive authority. */
     public static void requireTaskSelectionTransition(
             BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 successor) {
+        requireBootstrapTransition(current, successor);
+        requireKafkaPolicyTransition(current, successor);
         if (successor.wireVersion() < current.wireVersion()) {
             throw new IllegalArgumentException("Binding authority cannot downgrade its task-decision wire version");
         }
@@ -303,11 +363,22 @@ public final class M5BindingAuthorityCodecV1 {
                 || !successor.scanFence().equals(current.scanFence())
                 || !successor.referenceMutationTickets().equals(current.referenceMutationTickets())
                 || !successor.writerEnrollment().equals(current.writerEnrollment())
+                || !successor.materializationWorker().equals(current.materializationWorker())
                 || !successor.capability().equals(current.capability())) {
             throw new IllegalArgumentException("task selection transition changes another authority domain");
         }
         if (successor.taskSelectionDecision().isPresent()) {
             var decision = successor.taskSelectionDecision().orElseThrow();
+            if (decision.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTED
+                    && current.materializationWorker().isPresent()) {
+                var worker = current.materializationWorker().orElseThrow();
+                if (!worker.taskIdSha256().equals(decision.taskId())
+                        || !worker.predecessorSelectorSha256()
+                                .equals(Sha256Digest.hash(
+                                        M4ReadControlCodecV1.encodeSelector(current.selectorProjection())))) {
+                    throw new IllegalArgumentException("task selection differs from its admitted worker/selector");
+                }
+            }
             if (!decision.equals(M5TaskSelectionDecisionV2.of(
                             decision.taskId(),
                             decision.outcome(),
@@ -383,11 +454,263 @@ public final class M5BindingAuthorityCodecV1 {
                 value.referenceMutationTickets(),
                 value.writerEnrollment(),
                 value.capability(),
-                3,
+                Math.max(3, value.wireVersion()),
                 value.lastActivationOrdinal(),
                 value.retiredHistory(),
                 decision,
-                PLACEHOLDER));
+                value.materializationWorker(),
+                PLACEHOLDER,
+                value.logicalTrim(),
+                value.trimMutationTickets(),
+                value.bootstrap(),
+                value.kafkaPolicy(),
+                value.sourceScan()));
+    }
+
+    /** A replacement worker competes with publication on the same exact authority CAS. */
+    public static BindingRetirementAuthorityV1 admitWorker(
+            BindingRetirementAuthorityV1 current, M5MaterializationWorkerV1 worker) {
+        var successor = buildSuccessor(
+                current,
+                current.state(),
+                current.selectorProjection(),
+                current.batchSlots(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment());
+        var admitted = finalizeAuthority(new BindingRetirementAuthorityV1(
+                successor.binding(),
+                successor.authorityGeneration(),
+                successor.predecessorValueSha256(),
+                successor.state(),
+                successor.selectorProjection(),
+                successor.batchSlots(),
+                successor.scanFence(),
+                successor.referenceMutationTickets(),
+                successor.writerEnrollment(),
+                successor.capability(),
+                Math.max(4, successor.wireVersion()),
+                successor.lastActivationOrdinal(),
+                successor.retiredHistory(),
+                successor.taskSelectionDecision(),
+                Optional.of(worker),
+                PLACEHOLDER,
+                successor.logicalTrim(),
+                successor.trimMutationTickets(),
+                successor.bootstrap(),
+                successor.kafkaPolicy(),
+                successor.sourceScan()));
+        requireWorkerTransition(current, admitted);
+        return admitted;
+    }
+
+    /** Ordinary M4/retention transitions preserve the last grant, including after it becomes stale. */
+    public static void requireWorkerTransition(
+            BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 successor) {
+        if (successor.wireVersion() < current.wireVersion()) {
+            throw new IllegalArgumentException("Binding authority cannot downgrade its worker wire version");
+        }
+        if (successor.materializationWorker().equals(current.materializationWorker())) {
+            return;
+        }
+        if (successor.materializationWorker().isEmpty()
+                || current.state() != BindingAuthorityStateV1.OPEN_V1
+                || successor.state() != current.state()
+                || !successor.selectorProjection().equals(current.selectorProjection())
+                || !successor.batchSlots().equals(current.batchSlots())
+                || !successor.retiredHistory().equals(current.retiredHistory())
+                || successor.lastActivationOrdinal() != current.lastActivationOrdinal()
+                || !successor.scanFence().equals(current.scanFence())
+                || !successor.referenceMutationTickets().equals(current.referenceMutationTickets())
+                || !successor.writerEnrollment().equals(current.writerEnrollment())
+                || !successor.taskSelectionDecision().equals(current.taskSelectionDecision())
+                || !successor.capability().equals(current.capability())) {
+            throw new IllegalArgumentException("worker admission changes another authority domain or clears its epoch");
+        }
+        var worker = successor.materializationWorker().orElseThrow();
+        var selector = current.selectorProjection();
+        long epoch = current.materializationWorker()
+                .map(value -> value.identity().workerEpoch())
+                .orElse(0L);
+        if (selector.admissionState()
+                        != com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState.ADMITTING
+                || worker.identity().workerEpoch() != Math.addExact(epoch, 1)
+                || worker.identity().ownerEpoch() != selector.ownerEpoch()
+                || !worker.identity().binding().equals(current.binding())
+                || !worker.identity().capability().equals(current.capability())
+                || !worker.predecessorSelectorSha256()
+                        .equals(Sha256Digest.hash(M4ReadControlCodecV1.encodeSelector(selector)))) {
+            throw new IllegalArgumentException(
+                    "worker admission lacks the exact current owner/selector and next epoch");
+        }
+        current.materializationWorker().ifPresent(previous -> {
+            if (!worker.identity()
+                            .protocolCellSha256()
+                            .equals(previous.identity().protocolCellSha256())
+                    || !worker.identity()
+                            .providerScopeSha256()
+                            .equals(previous.identity().providerScopeSha256())
+                    || worker.identity().storageFence() != previous.identity().storageFence()
+                    || !worker.nativeNamespaceBindingSha256().equals(previous.nativeNamespaceBindingSha256())) {
+                throw new IllegalArgumentException("worker admission changes its immutable native Cell/storage scope");
+            }
+        });
+    }
+
+    private static void requireKafkaPolicyTransition(
+            BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 next) {
+        if (current.kafkaPolicy().equals(next.kafkaPolicy())
+                && current.sourceScan().equals(next.sourceScan())) {
+            return;
+        }
+        BindingRetirementAuthorityV1 expected;
+        if (!current.kafkaPolicy().equals(next.kafkaPolicy())) {
+            expected = kafkaPolicySuccessor(
+                    current,
+                    next.kafkaPolicy()
+                            .orElseThrow(() -> new IllegalArgumentException("Kafka policy cannot be removed")));
+        } else if (next.sourceScan().isPresent()) {
+            expected =
+                    sourceScanSuccessor(current, next.sourceScan().orElseThrow().attemptId());
+        } else {
+            expected = abortSourceScan(current);
+        }
+        if (!encodeAuthority(expected).equals(encodeAuthority(next))) {
+            throw new IllegalArgumentException("Kafka policy/scan transition changed unrelated authority fields");
+        }
+    }
+
+    public static BindingRetirementAuthorityV1 kafkaPolicySuccessor(
+            BindingRetirementAuthorityV1 current, M5KafkaBindingPolicyV1 policy) {
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                || !current.referenceMutationTickets().isEmpty()
+                || !current.trimMutationTickets().isEmpty()
+                || current.kafkaPolicy().isEmpty()
+                || policy.generation()
+                        != Math.addExact(current.kafkaPolicy().orElseThrow().generation(), 1)) {
+            throw new IllegalArgumentException("Kafka policy update requires its exact quiescent OPEN generation");
+        }
+        return kafkaPolicyState(current, BindingAuthorityStateV1.OPEN_V1, policy, Optional.empty());
+    }
+
+    public static BindingRetirementAuthorityV1 sourceScanSuccessor(
+            BindingRetirementAuthorityV1 current, Sha256Digest attemptId) {
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                || current.kafkaPolicy().isEmpty()
+                || current.writerEnrollment().isEmpty()
+                || !current.referenceMutationTickets().isEmpty()
+                || !current.trimMutationTickets().isEmpty()) {
+            throw new IllegalArgumentException("Kafka source scan requires its quiescent enrolled policy authority");
+        }
+        return kafkaPolicyState(
+                current,
+                BindingAuthorityStateV1.SOURCE_SCAN_FENCED_V2,
+                current.kafkaPolicy().orElseThrow(),
+                Optional.of(new M5BindingAuthorityRecordsV1.BindingSourceScanFenceV2(
+                        attemptId, Sha256Digest.hash(encodeAuthority(current)))));
+    }
+
+    public static BindingRetirementAuthorityV1 abortSourceScan(BindingRetirementAuthorityV1 current) {
+        if (current.state() != BindingAuthorityStateV1.SOURCE_SCAN_FENCED_V2) {
+            throw new IllegalArgumentException("Kafka source scan is not fenced");
+        }
+        return kafkaPolicyState(
+                current, BindingAuthorityStateV1.OPEN_V1, current.kafkaPolicy().orElseThrow(), Optional.empty());
+    }
+
+    private static BindingRetirementAuthorityV1 kafkaPolicyState(
+            BindingRetirementAuthorityV1 current,
+            BindingAuthorityStateV1 state,
+            M5KafkaBindingPolicyV1 policy,
+            Optional<M5BindingAuthorityRecordsV1.BindingSourceScanFenceV2> scan) {
+        return finalizeAuthority(new BindingRetirementAuthorityV1(
+                current.binding(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                state,
+                current.selectorProjection(),
+                current.batchSlots(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                7,
+                current.lastActivationOrdinal(),
+                current.retiredHistory(),
+                current.taskSelectionDecision(),
+                current.materializationWorker(),
+                PLACEHOLDER,
+                current.logicalTrim(),
+                current.trimMutationTickets(),
+                current.bootstrap(),
+                Optional.of(policy),
+                scan));
+    }
+
+    public static BindingRetirementAuthorityV1 logicalTrimSuccessor(
+            BindingRetirementAuthorityV1 current,
+            M5LogicalTrimRecordsV2.LogicalTrimStateV2 trim,
+            List<M5LogicalTrimRecordsV2.LogicalTrimMutationV2> mutations) {
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                && current.state() != BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2) {
+            throw new IllegalArgumentException("retirement fence cannot become a logical trim fence");
+        }
+        return finalizeAuthority(new BindingRetirementAuthorityV1(
+                current.binding(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                trim.fence().isPresent()
+                        ? BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2
+                        : BindingAuthorityStateV1.OPEN_V1,
+                current.selectorProjection(),
+                current.batchSlots(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                Math.max(5, current.wireVersion()),
+                current.lastActivationOrdinal(),
+                current.retiredHistory(),
+                current.taskSelectionDecision(),
+                current.materializationWorker(),
+                PLACEHOLDER,
+                Optional.of(trim),
+                mutations,
+                current.bootstrap(),
+                current.kafkaPolicy(),
+                current.sourceScan()));
+    }
+
+    /** A trim transition changes no selector, retirement, Task or worker field. */
+    public static void requireLogicalTrimTransition(
+            BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 next) {
+        if (next.logicalTrim().equals(current.logicalTrim())
+                && next.trimMutationTickets().equals(current.trimMutationTickets())) {
+            return;
+        }
+        if (next.logicalTrim().isEmpty() || next.wireVersion() < 5) {
+            throw new IllegalArgumentException("Binding logical trim facts cannot be discarded");
+        }
+        var expected = logicalTrimSuccessor(current, next.logicalTrim().orElseThrow(), next.trimMutationTickets());
+        if (!encodeAuthority(expected).equals(encodeAuthority(next))) {
+            throw new IllegalArgumentException("logical trim transition changed unrelated authority fields");
+        }
+        var oldFrontier = current.logicalTrim().flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::frontier);
+        var newFrontier = next.logicalTrim().flatMap(M5LogicalTrimRecordsV2.LogicalTrimStateV2::frontier);
+        if (!oldFrontier.equals(newFrontier) && oldFrontier.isPresent()) {
+            var old = oldFrontier.orElseThrow();
+            var value = newFrontier.orElseThrow(() -> new IllegalArgumentException("trim frontier cannot be removed"));
+            if (value.generation() != Math.addExact(old.generation(), 1)
+                    || current.state() != BindingAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2) {
+                throw new IllegalArgumentException("trim advancement requires its exact scan fence and generation");
+            }
+        }
+        if (current.state() == BindingAuthorityStateV1.OPEN_V1
+                && next.state() == current.state()
+                && current.logicalTrim().isPresent()
+                && !oldFrontier.equals(newFrontier)) {
+            throw new IllegalArgumentException("ordinary writer admission cannot change the trim frontier");
+        }
     }
 
     public static CanonicalBytes encodeAuthority(BindingRetirementAuthorityV1 value) {
@@ -409,7 +732,13 @@ public final class M5BindingAuthorityCodecV1 {
                 throw new IllegalArgumentException("Binding authority preamble differs");
             }
             int wireVersion = input.readInt();
-            if (wireVersion != 1 && wireVersion != VERSION && wireVersion != 3) {
+            if (wireVersion != 1
+                    && wireVersion != VERSION
+                    && wireVersion != 3
+                    && wireVersion != 4
+                    && wireVersion != 5
+                    && wireVersion != 6
+                    && wireVersion != 7) {
                 throw new IllegalArgumentException("Binding authority version differs");
             }
             long generation = input.readLong();
@@ -510,6 +839,37 @@ public final class M5BindingAuthorityCodecV1 {
                     decision = Optional.of(M5TaskSelectionDecisionV2.decode(readBytes(input)));
                 }
             }
+            Optional<M5MaterializationWorkerV1> worker = Optional.empty();
+            if (wireVersion >= 4) {
+                int present = input.readUnsignedByte();
+                if (present > 1) {
+                    throw new IllegalArgumentException("worker grant presence is not canonical");
+                }
+                if (present == 1) {
+                    worker = Optional.of(M5MaterializationWorkerV1.decode(readBytes(input)));
+                }
+            }
+            Optional<M5LogicalTrimRecordsV2.LogicalTrimStateV2> trim = Optional.empty();
+            List<M5LogicalTrimRecordsV2.LogicalTrimMutationV2> trimMutations = new ArrayList<>();
+            if (wireVersion == 5 || wireVersion >= 6 && input.readBoolean()) {
+                trim = Optional.of(M5LogicalTrimCodecV2.readState(input));
+                int count = input.readInt();
+                if (count < 0 || count > M5LogicalTrimRecordsV2.MAX_MUTATIONS) {
+                    throw new IllegalArgumentException("trim mutation count exceeds its bound");
+                }
+                for (int i = 0; i < count; i++) {
+                    trimMutations.add(M5LogicalTrimCodecV2.readMutation(input));
+                }
+            }
+            Optional<M5BindingBootstrapV1> bootstrap =
+                    wireVersion >= 6 ? Optional.of(M5BindingBootstrapV1.decode(readBytes(input))) : Optional.empty();
+            Optional<M5KafkaBindingPolicyV1> kafkaPolicy =
+                    wireVersion >= 7 ? Optional.of(M5KafkaBindingPolicyV1.decode(readBytes(input))) : Optional.empty();
+            Optional<M5BindingAuthorityRecordsV1.BindingSourceScanFenceV2> sourceScan = Optional.empty();
+            if (wireVersion >= 7 && input.readBoolean()) {
+                sourceScan = Optional.of(
+                        new M5BindingAuthorityRecordsV1.BindingSourceScanFenceV2(readDigest(input), readDigest(input)));
+            }
             Sha256Digest canonicalSha = readDigest(input);
             return new BindingRetirementAuthorityV1(
                     projection.binding(),
@@ -526,7 +886,13 @@ public final class M5BindingAuthorityCodecV1 {
                     lastOrdinal,
                     history,
                     decision,
-                    canonicalSha);
+                    worker,
+                    canonicalSha,
+                    trim,
+                    trimMutations,
+                    bootstrap,
+                    kafkaPolicy,
+                    sourceScan);
         });
         if (!Arrays.equals(encoded.toByteArray(), encodeAuthority(value).toByteArray())) {
             throw new IllegalArgumentException("Binding authority value is not canonical");
@@ -562,7 +928,13 @@ public final class M5BindingAuthorityCodecV1 {
                 value.lastActivationOrdinal(),
                 value.retiredHistory(),
                 value.taskSelectionDecision(),
-                canonicalSha);
+                value.materializationWorker(),
+                canonicalSha,
+                value.logicalTrim(),
+                value.trimMutationTickets(),
+                value.bootstrap(),
+                value.kafkaPolicy(),
+                value.sourceScan());
     }
 
     private static CanonicalBytes encodeUnchecked(BindingRetirementAuthorityV1 value) {
@@ -636,6 +1008,33 @@ public final class M5BindingAuthorityCodecV1 {
                 out.writeByte(value.taskSelectionDecision().isPresent() ? 1 : 0);
                 if (value.taskSelectionDecision().isPresent()) {
                     writeBytes(out, value.taskSelectionDecision().orElseThrow().encode());
+                }
+            }
+            if (value.wireVersion() >= 4) {
+                out.writeByte(value.materializationWorker().isPresent() ? 1 : 0);
+                if (value.materializationWorker().isPresent()) {
+                    writeBytes(out, value.materializationWorker().orElseThrow().encode());
+                }
+            }
+            if (value.wireVersion() >= 6) {
+                out.writeBoolean(value.logicalTrim().isPresent());
+            }
+            if (value.logicalTrim().isPresent()) {
+                M5LogicalTrimCodecV2.writeState(out, value.logicalTrim().orElseThrow());
+                out.writeInt(value.trimMutationTickets().size());
+                for (var mutation : value.trimMutationTickets()) {
+                    M5LogicalTrimCodecV2.writeMutation(out, mutation);
+                }
+            }
+            if (value.wireVersion() >= 6) {
+                writeBytes(out, value.bootstrap().orElseThrow().encode());
+            }
+            if (value.wireVersion() >= 7) {
+                writeBytes(out, value.kafkaPolicy().orElseThrow().encode());
+                out.writeBoolean(value.sourceScan().isPresent());
+                if (value.sourceScan().isPresent()) {
+                    writeDigest(out, value.sourceScan().orElseThrow().attemptId());
+                    writeDigest(out, value.sourceScan().orElseThrow().openAuthoritySha256());
                 }
             }
             writeDigest(out, value.authorityCanonicalSha256());

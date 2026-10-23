@@ -15,10 +15,13 @@
 package com.nereusstream.metadata.oxia.v2.objectwal;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import io.oxia.client.api.AsyncOxiaClient;
@@ -78,7 +81,7 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
         acceptedRelativeKey = Pattern.compile(Pattern.quote(prefix)
                 + "(?:/authorize/[0-9a-f]{64}(?:/head|/records/[0-9a-f]{64})|/current|"
                 + RUN
-                + "(?:/root|/seal|/checkpoint/head|"
+                + "(?:/root(?:/recovery-retirement-v1)?|/seal|/checkpoint/head|"
                 + PAGE
                 + "|"
                 + KAFKA_HEAD
@@ -95,9 +98,47 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
                 + "))");
     }
 
+    /** One exact Cell admission key; shard controls and other Cell IDs are deliberately outside this route. */
+    public static OxiaCanonicalControlMetadataStore forKafkaCompactionAdmission(
+            AsyncOxiaClient client, String cellAuthorityRoot, Sha256Digest protocolCellSha256) {
+        return forKafkaCompactionAdmission(
+                new AsyncOxiaConditionalClient(client), cellAuthorityRoot, protocolCellSha256);
+    }
+
+    /** Narrow transport constructor for exact mutation conformance checks. */
+    public static OxiaCanonicalControlMetadataStore forKafkaCompactionAdmission(
+            OxiaConditionalClient client, String cellAuthorityRoot, Sha256Digest protocolCellSha256) {
+        Objects.requireNonNull(protocolCellSha256, "protocolCellSha256");
+        if (protocolCellSha256.isZero()) {
+            throw new IllegalArgumentException("compaction admission requires an actual Protocol Cell identity");
+        }
+        String key = "v2/object-wal/cells/" + protocolCellSha256.toHex() + "/read-m5/kafka-compaction-admission";
+        return new OxiaCanonicalControlMetadataStore(client, cellAuthorityRoot, key);
+    }
+
+    private OxiaCanonicalControlMetadataStore(OxiaConditionalClient client, String cellAuthorityRoot, String exactKey) {
+        this.client = Objects.requireNonNull(client, "client");
+        this.failureClassifier = new MutationFailureClassifier();
+        this.cellAuthorityRoot = requireAuthorityRoot(cellAuthorityRoot);
+        if (this.cellAuthorityRoot.length() + 1 + exactKey.length() > MAX_OXIA_KEY_BYTES) {
+            throw new IllegalArgumentException("Cell authority root leaves insufficient room for its admission key");
+        }
+        this.acceptedRelativeKey = Pattern.compile(Pattern.quote(exactKey));
+    }
+
     @Override
     public Optional<CanonicalBytes> get(String key) {
         return readRequired(backendKey(key)).map(AuthorityRecord::storedBytes);
+    }
+
+    /** Exact version/value observation through the same closed key route; UNKNOWN never becomes absence. */
+    public Optional<VersionedValue> getVersioned(String key) {
+        return readRequired(backendKey(key))
+                .map(value -> new VersionedValue(
+                        key,
+                        value.storedBytes(),
+                        Sha256Digest.hash(value.storedBytes()),
+                        MetadataVersionMapper.fromOxia(value.versionId())));
     }
 
     @Override
@@ -112,8 +153,16 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
     public ControlMutationOutcome compareAndSet(
             String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
         String backendKey = backendKey(key);
+        if (key.endsWith("/root/recovery-retirement-v1")) {
+            throw new IllegalArgumentException("Run recovery retirement certificates are create-only");
+        }
         Optional<CanonicalBytes> expected = Objects.requireNonNull(exactExpected, "exactExpected")
                 .map(OxiaCanonicalControlMetadataStore::requireValue);
+        if (key.endsWith("/protocol/kafka/nwkcp1-v1/head")
+                && expected.filter(com.nereusstream.storage.object.control.WalRunKafkaProtocolEmptyClosureV1::hasMagic)
+                        .isPresent()) {
+            throw new IllegalArgumentException("closed Root protocol domains cannot be reopened or replaced");
+        }
         CanonicalBytes candidate = requireValue(exactCandidate);
 
         if (expected.isEmpty()) {

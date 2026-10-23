@@ -3012,6 +3012,7 @@ tasks.register("v2M5BookKeeperTaskTerminationCheck") {
     dependsOn(
         "v2M5BookKeeperNativeCreateCheck",
         ":nereus-storage-object:v2M5TaskSelectionTest",
+        ":nereus-storage-object:v2M5MaterializationWorkerTest",
         ":nereus-storage-object:v2M5RetiredHistoryTest",
         ":nereus-metadata-oxia:v2M5TaskSelectionRouteTest",
         ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminalTest",
@@ -3115,6 +3116,12 @@ tasks.register("v2M5KafkaRunSourceCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5EpochGraceProfileCheck") {
+    group = "verification"
+    description = "Verify the non-deleting native GC epoch profile in its own retained quota domain."
+    commandLine("python3", "scripts/run-v2-m5-epoch-grace-check.py")
+}
+
 
 tasks.register("v2M5ReadFencedOxiaCheck") {
     group = "verification"
@@ -3125,5 +3132,79 @@ tasks.register("v2M5ReadFencedOxiaCheck") {
         ":nereus-metadata-oxia:v2M5ReadFencedRealOxiaTest",
         ":nereus-metadata-oxia:spotlessCheck",
         ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
+    )
+}
+
+tasks.register<Exec>("v2M5CandidateInputsContractTest") {
+    group = "verification"
+    description = "Verify independent M5 pre-commit input closures and exact later commit equivalence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-candidate-inputs-tests.py")
+}
+
+
+tasks.register<Exec>("v2M5EvidenceJUnitContractTest") {
+    group = "verification"
+    description = "Verify raw M5 JUnit attachment integrity and counts without source or promotion authority."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-evidence-junit-tests.py")
+}
+
+tasks.register<Exec>("v2M5EvidenceContractTest") {
+    group = "verification"
+    description = "Verify M5 execution, exclusive child ownership, aggregate, source and Final rejection contracts."
+    dependsOn("v2M5CandidateInputsContractTest", "v2M5EvidenceJUnitContractTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-evidence-tests.py")
+}
+
+tasks.register("v2M5PhysicalGcCheck") {
+    group = "verification"
+    description = "Run the existing physical GC/quota checks against the explicitly supplied real backend."
+    dependsOn("v2M5GcQuotaCheck", "v2M5TargetDeleteAuthorityCoordinatorCheck")
+}
+
+tasks.register<Exec>("v2M5EvidenceExecutionCheck") {
+    group = "verification"
+    description = "Execute the five-stage M5 campaign from one complete isolated input closure."
+    doFirst {
+        val inputs = providers.gradleProperty("v2M5EvidenceInputClosure").orNull
+            ?: error("v2M5EvidenceInputClosure is required")
+        val workspace = file(inputs).resolve("workspace/GITHUB/nereus")
+        workingDir = workspace
+        commandLine(
+            "python3", "scripts/run-v2-m5-evidence.py", "--input-closure", file(inputs).absolutePath,
+            "--output", providers.gradleProperty("v2M5EvidenceOutput").get(),
+            "--kafka-java-home", providers.gradleProperty("v2M5KafkaJavaHome").get(),
+            "--maven-repository", providers.gradleProperty("v2M5EvidenceMavenRepository").get(),
+        )
+    }
+}
+
+tasks.register<Exec>("v2M5FinalSourceCheck") {
+    group = "verification"
+    description = "Independently validate the complete M5 Final, current source, raw archive and scenario group."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        commandLine(
+            "python3", "scripts/check-v2-m5-evidence.py", "final", "--repo-root", rootDir.absolutePath,
+            "--kafka-root", providers.gradleProperty("v2M5KafkaCheckout").get(),
+            "--pulsar-root", providers.gradleProperty("v2M5PulsarCheckout").get(),
+        )
+    }
+}
+
+tasks.register("v2M5CurrentSourceIsolationCheck") {
+    group = "verification"
+    description = "Require the current-source isolation child inside the independently verified complete M5 Final."
+    dependsOn("v2M5FinalSourceCheck")
+}
+
+tasks.register("v2M5Check") {
+    group = "verification"
+    description = "Verify the complete committed M5 delivery without regenerating or relabeling execution evidence."
+    dependsOn(
+        "v2DocumentationCheck", "v2M5HistoricalM4DependencyCheck", "v2M5EvidenceContractTest",
+        "v2M5FinalSourceCheck", "v2M5CurrentSourceIsolationCheck",
     )
 }

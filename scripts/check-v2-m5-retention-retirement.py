@@ -215,9 +215,11 @@ def validate_runtime_contract(root: Path) -> None:
     require_literals(pulsar, ("metadata.compareAndSet", "REFERENCE_SCAN_FENCED_V1"), "Pulsar coordinator")
     require_literals(
         guard,
-        ("authority.acquire", "authority.containsTicket", "clearVisibleTicket"),
+        ("authority.containsTicket", "clearVisibleTicket"),
         "reference mutation guard",
     )
+    if re.search(r"\bauthority\s*\.\s*acquire\s*\(", guard) is None:
+        raise RetentionRetirementError("reference mutation guard lacks its authority acquire call")
     if "conditionalTransaction" in binding or "conditionalTransaction" in pulsar or "conditionalTransaction" in guard:
         raise RetentionRetirementError("accepted M5-C authority path references the rejected multi-key transaction")
     require_literals(

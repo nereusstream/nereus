@@ -117,8 +117,10 @@ public final class KafkaRunTestFixtures {
         public final Map<Long, CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>>> delayedAppends =
                 new LinkedHashMap<>();
         public RunLedgerHandleV1 handle;
+        private long nextLedgerId = 41;
         public int drainCalls;
         public int closeCalls;
+        public int reservedCreateCalls;
 
         public FakeSession() {
             capability = new BookKeeperCapabilitySnapshotV1(
@@ -161,6 +163,25 @@ public final class KafkaRunTestFixtures {
                     configuration.runId(),
                     new BookKeeperLedgerIdentity(
                             41 + configuration.runId().value().lowBits()),
+                    configuration.configurationDigest());
+            return CompletableFuture.completedFuture(
+                    createOverride == null ? ProviderMutationResultV1.appliedExact(handle) : createOverride);
+        }
+
+        @Override
+        public CompletionStage<ProviderMutationResultV1<BookKeeperLedgerIdentity>> reserveLedgerIdentity() {
+            return CompletableFuture.completedFuture(
+                    ProviderMutationResultV1.appliedExact(new BookKeeperLedgerIdentity(nextLedgerId++)));
+        }
+
+        @Override
+        public CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createReservedRunLedger(
+                RunLedgerConfigurationV1 configuration, BookKeeperLedgerIdentity reservedIdentity) {
+            reservedCreateCalls++;
+            handle = new RunLedgerHandleV1(
+                    configuration.providerScopeId(),
+                    configuration.runId(),
+                    reservedIdentity,
                     configuration.configurationDigest());
             return CompletableFuture.completedFuture(
                     createOverride == null ? ProviderMutationResultV1.appliedExact(handle) : createOverride);
@@ -286,9 +307,23 @@ public final class KafkaRunTestFixtures {
 
     public static final class FakeRootAuthority implements KafkaRunRootAuthority {
         public final Map<StorageRunId, KafkaRunRootSnapshotV1> roots = new LinkedHashMap<>();
+        public final Map<StorageRunId, KafkaRunRootSnapshotV1> births = new LinkedHashMap<>();
         public final Set<StorageRunId> retired = new java.util.HashSet<>();
         public CompletableFuture<Void> retirementReadGate;
         public ProviderMutationResultV1<KafkaRunRootSnapshotV1> nextOverride;
+        public ProviderMutationResultV1<KafkaRunRootSnapshotV1> nextBirthOverride;
+
+        @Override
+        public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> reserveRunBirth(
+                KafkaRunRootSnapshotV1 activeCandidate) {
+            if (nextBirthOverride != null) {
+                var result = nextBirthOverride;
+                nextBirthOverride = null;
+                return CompletableFuture.completedFuture(result);
+            }
+            return CompletableFuture.completedFuture(ProviderMutationResultV1.appliedExact(
+                    births.computeIfAbsent(activeCandidate.runId(), ignored -> activeCandidate)));
+        }
 
         @Override
         public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(

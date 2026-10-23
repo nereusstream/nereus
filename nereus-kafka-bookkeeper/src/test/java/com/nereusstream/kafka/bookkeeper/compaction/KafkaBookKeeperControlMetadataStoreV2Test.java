@@ -19,15 +19,142 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.kafka.KafkaOwnerIdentityV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class KafkaBookKeeperControlMetadataStoreV2Test {
+    @Test
+    void nativeReadScopeRetainsRawWireAndRejectsUnboundGenerationMembership() {
+        var state = KafkaBookKeeperCompactionTestSupportV2.recoveryState(false);
+        var fixture = new KafkaSealedBookKeeperDescriptorV2Test.Fixture(
+                KafkaBookKeeperCompactionTestSupportV2.inputWithRecovery(state, 20), state);
+        var digest = KafkaBookKeeperCompactionTestSupportV2.digest("scope-codec-model");
+        var changed = KafkaBookKeeperCompactionTestSupportV2.digest("scope-codec-model-after");
+        var before = new KafkaBookKeeperNativeReadScopeV2.Snapshot(0, digest, digest, digest);
+        var after = new KafkaBookKeeperNativeReadScopeV2.Snapshot(1, changed, changed, changed);
+        var owner = new KafkaOwnerIdentityV1(1, 0, 0, 1, 0);
+        var fact = new AuthorityFactV1(
+                "model/owner-admission-v1", new MetadataVersion(CanonicalBytes.copyOf(new byte[] {1})), digest);
+        var raw = new KafkaBookKeeperNativeReadScopeV2(
+                fixture.descriptor.task().taskIdSha256(),
+                fixture.descriptor.descriptorSha256(),
+                digest,
+                owner,
+                fact,
+                1,
+                digest,
+                digest,
+                digest,
+                digest,
+                before,
+                after,
+                List.of(1L));
+        assertThat(ByteBuffer.wrap(raw.encode().toByteArray()).getInt(4)).isEqualTo(1);
+        assertThat(KafkaBookKeeperNativeReadScopeV2.decode(raw.encode())).isEqualTo(raw);
+        var generation = new KafkaBookKeeperNativeReadScopeV2(
+                raw.taskId(),
+                raw.descriptorId(),
+                raw.nativeScopeSha256(),
+                owner,
+                fact,
+                1,
+                digest,
+                digest,
+                digest,
+                digest,
+                before,
+                after,
+                List.of(1L),
+                Optional.of(raw.descriptorId()));
+        assertThat(ByteBuffer.wrap(generation.encode().toByteArray()).getInt(4)).isEqualTo(2);
+        assertThat(KafkaBookKeeperNativeReadScopeV2.decode(generation.encode())).isEqualTo(generation);
+        assertThatThrownBy(() -> generation.requireDescriptor(fixture.descriptor))
+                .hasMessage("native read scope lacks its exact selected predecessor descriptor");
+        assertThatThrownBy(() -> generation.requireDescriptor(fixture.descriptor, Optional.of(fixture.descriptor)))
+                .hasMessage("native read scope selected predecessor membership differs");
+        var corrupt = generation.encode().toByteArray();
+        corrupt[corrupt.length - 1] ^= 1;
+        assertThatThrownBy(() -> KafkaBookKeeperNativeReadScopeV2.decode(CanonicalBytes.copyOf(corrupt)))
+                .hasMessage("native read scope checksum is corrupt");
+    }
+
+    @Test
+    void selectedCacheBudgetKeepsActualTaskBoundsAndRequiresIndependentOwnerIdentity() {
+        var state = KafkaBookKeeperCompactionTestSupportV2.recoveryState(false);
+        var fixture = new KafkaSealedBookKeeperDescriptorV2Test.Fixture(
+                KafkaBookKeeperCompactionTestSupportV2.inputWithRecovery(state, 20), state);
+        var store = route(fixture);
+        var descriptor = fixture.descriptor;
+        var reservation = new KafkaCompactionAdmissionV1.Reservation(
+                descriptor.task().taskIdSha256(),
+                1_048_576,
+                128,
+                256,
+                256,
+                4_194_304,
+                4_194_304,
+                4_194_304,
+                256,
+                256,
+                0,
+                0,
+                4096,
+                0,
+                4096,
+                64);
+        var budget = new KafkaBookKeeperSelectedCacheBudgetV1(
+                descriptor.descriptorSha256(),
+                new KafkaSealedBookKeeperReaderV2.DecodingBounds(256, 4_194_304),
+                reservation);
+        budget.requireDescriptor(descriptor);
+        assertThat(budget.encode().length()).isEqualTo(KafkaBookKeeperSelectedCacheBudgetV1.ENCODED_BYTES);
+        assertThat(store.putIfAbsent(budget.key(), budget.encode())).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(KafkaBookKeeperSelectedCacheBudgetV1.decode(
+                        store.get(budget.key()).orElseThrow()))
+                .isEqualTo(budget);
+        var coldId = KafkaBookKeeperCompactionTestSupportV2.digest("actual-next-owner-cache-invocation");
+        var next = budget.forOwnerCache(coldId);
+        assertThatThrownBy(() -> budget.forOwnerCache(reservation.compactionTaskIdSha256()))
+                .hasMessageContaining("old Task reservation identity");
+        assertThat(next.compactionTaskIdSha256()).isEqualTo(coldId);
+        assertThat(KafkaCompactionAdmissionV1.totals(List.of(next)))
+                .isEqualTo(KafkaCompactionAdmissionV1.totals(List.of(reservation)));
+        assertThatThrownBy(() -> new KafkaBookKeeperSelectedCacheBudgetV1(
+                        descriptor.descriptorSha256(),
+                        new KafkaSealedBookKeeperReaderV2.DecodingBounds(257, 4_194_304),
+                        reservation))
+                .hasMessageContaining("decoding exceeds");
+        assertThatThrownBy(() -> new KafkaBookKeeperSelectedCacheBudgetV1(
+                        descriptor.descriptorSha256(),
+                        new KafkaSealedBookKeeperReaderV2.DecodingBounds(256, 4_194_305),
+                        reservation))
+                .hasMessageContaining("decoding exceeds");
+        assertThatThrownBy(() -> store.putIfAbsent(
+                        KafkaBookKeeperInventoryV2.taskKey(coldId) + "/cache-budget", budget.encode()))
+                .hasMessageContaining("Task key");
+        for (int length :
+                List.of(0, budget.encode().length() - 1, budget.encode().length() + 1)) {
+            assertThatThrownBy(() -> KafkaBookKeeperSelectedCacheBudgetV1.decode(CanonicalBytes.copyOf(
+                            java.util.Arrays.copyOf(budget.encode().toByteArray(), length))))
+                    .hasMessageContaining("length");
+        }
+        store.putIfAbsent(
+                KafkaBookKeeperCompactionPublicationV2.descriptorKey(descriptor.descriptorSha256()),
+                descriptor.encode());
+        fixture.store.values.remove(
+                KafkaBookKeeperInventoryV2.taskKey(descriptor.task().taskIdSha256()));
+        assertThatThrownBy(() -> store.get(budget.key())).hasMessageContaining("immutable task");
+    }
+
     @Test
     void typedTaskPartsDescriptorCandidateAndM4ViewComposeThroughOneStore() {
         var fixture = new KafkaSealedBookKeeperDescriptorV2Test.Fixture(false);
@@ -48,6 +175,41 @@ class KafkaBookKeeperControlMetadataStoreV2Test {
         assertThat(store.get(candidate))
                 .contains(fixture.descriptor.descriptorSha256().bytes());
         assertThat(store.get(store.selectorKey())).isEqualTo(fixture.store.get(store.selectorKey()));
+    }
+
+    @Test
+    void originalPublicationTargetsRequireExactTaskOutputsAndCanonicalUnchangedBytes() {
+        var fixture = new KafkaSealedBookKeeperDescriptorV2Test.Fixture(false);
+        var store = route(fixture);
+        var descriptor = fixture.descriptor;
+        var input = new com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.BookKeeperLedger(
+                descriptor.task().namespace(), 9009);
+        var resources = KafkaBookKeeperPublicationTicketsV2.targets(
+                descriptor,
+                java.util.Map.of(descriptor.sourceCut().sources().get(0).sourceIdentitySha256(), List.of(input)));
+        var original = KafkaBookKeeperPublicationTargetsV2.of(descriptor, resources);
+        assertThat(store.putIfAbsent(original.key(), original.encode())).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(KafkaBookKeeperPublicationTargetsV2.decode(
+                        store.get(original.key()).orElseThrow()))
+                .isEqualTo(original);
+        byte[] corrupt = original.encode().toByteArray();
+        corrupt[corrupt.length - 1] ^= 1;
+        assertThatThrownBy(() -> store.get(original.key())
+                        .map(value -> KafkaBookKeeperPublicationTargetsV2.decode(CanonicalBytes.copyOf(corrupt))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.putIfAbsent(
+                        original.key(),
+                        KafkaBookKeeperPublicationTargetsV2.of(descriptor, List.of(input))
+                                .encode()))
+                .hasMessageContaining("omit an output part");
+        assertThatThrownBy(() -> store.compareAndSet(original.key(), Optional.of(original.encode()), original.encode()))
+                .hasMessageContaining("immutable create-only");
+        var reversed = new java.util.ArrayList<>(resources);
+        java.util.Collections.reverse(reversed);
+        assertThatThrownBy(() -> KafkaBookKeeperPublicationTargetsV2.of(descriptor, reversed))
+                .hasMessageContaining("sorted and unique");
+        assertThatThrownBy(() -> KafkaBookKeeperPublicationTargetsV2.decode(CanonicalBytes.copyOf(new byte[1_048_577])))
+                .hasMessageContaining("length");
     }
 
     @Test

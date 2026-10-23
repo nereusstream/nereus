@@ -27,6 +27,7 @@ import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
@@ -54,6 +55,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** Strict canonical wire for every M5-C persistent value. */
 public final class M5RetentionCodecV1 {
@@ -61,6 +63,7 @@ public final class M5RetentionCodecV1 {
     private static final int SNAPSHOT_MAGIC = 0x4d355346; // M5SF
     private static final int TRIM_MAGIC = 0x4d355446; // M5TF
     private static final int PROOF_MAGIC = 0x4d355246; // M5RF
+    private static final int TYPED_OBSERVATIONS_MAGIC = 0x4d35524f; // M5RO
     private static final int FULL_BATCH_MAGIC = 0x4d354246; // M5BF
     private static final int RETIRED_BATCH_MAGIC = 0x4d354252; // M5BR
     private static final int RETIRED_PULSAR_MAGIC = 0x4d355052; // M5PR
@@ -76,26 +79,28 @@ public final class M5RetentionCodecV1 {
                 draft.identity(),
                 draft.domain(),
                 draft.generation(),
-                draft.priorTrimFrontier(),
+                draft.pulsarContext().isPresent() ? -1 : draft.priorTrimFrontier(),
                 draft.retentionPolicyRootSha256(),
                 draft.ownerFence(),
                 draft.storageFence(),
                 draft.pageCount(),
                 draft.scannedBytes(),
                 draft.rows(),
-                PLACEHOLDER);
+                PLACEHOLDER,
+                draft.pulsarContext());
         return new RetentionFloorSnapshotV1(
                 draft.identity(),
                 draft.domain(),
                 draft.generation(),
-                draft.priorTrimFrontier(),
+                draft.pulsarContext().isPresent() ? -1 : draft.priorTrimFrontier(),
                 draft.retentionPolicyRootSha256(),
                 draft.ownerFence(),
                 draft.storageFence(),
                 draft.pageCount(),
                 draft.scannedBytes(),
                 draft.rows(),
-                calculateSnapshotRoot(placeholder));
+                calculateSnapshotRoot(placeholder),
+                draft.pulsarContext());
     }
 
     public static CanonicalBytes encodeSnapshot(RetentionFloorSnapshotV1 value) {
@@ -103,7 +108,7 @@ public final class M5RetentionCodecV1 {
             throw new IllegalArgumentException("retention snapshot identity differs from its canonical body");
         }
         return encode(out -> {
-            preamble(out, SNAPSHOT_MAGIC);
+            preamble(out, SNAPSHOT_MAGIC, value.pulsarContext().isPresent() ? 2 : VERSION);
             writeSnapshotBody(out, value);
             writeDigest(out, value.snapshotRootSha256());
         });
@@ -111,11 +116,15 @@ public final class M5RetentionCodecV1 {
 
     public static RetentionFloorSnapshotV1 decodeSnapshot(CanonicalBytes encoded) {
         RetentionFloorSnapshotV1 value = decode(encoded, input -> {
-            requirePreamble(input, SNAPSHOT_MAGIC);
+            int version = readTypedPreamble(input, SNAPSHOT_MAGIC);
             IdentityEnvelope identity = readEnvelope(input);
             PositionDomain domain = enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain");
             long generation = input.readLong();
-            long prior = input.readLong();
+            Optional<M5RetentionRecordsV1.PulsarFloorContextV2> context = version == 2
+                    ? Optional.of(new M5RetentionRecordsV1.PulsarFloorContextV2(
+                            readCoverage(input, 2).pulsarCoverage().orElseThrow(), readPosition(input)))
+                    : Optional.empty();
+            long prior = version == 2 ? -1 : input.readLong();
             Sha256Digest policy = readDigest(input);
             AuthorityFactV1 owner = readAuthorityFact(input);
             AuthorityFactV1 storage = readAuthorityFact(input);
@@ -124,10 +133,21 @@ public final class M5RetentionCodecV1 {
             int count = boundedCount(input.readInt(), M5RetentionRecordsV1.MAX_FLOOR_ROWS, "floor rows");
             List<RetentionFloorObservationV1> rows = new ArrayList<>(count);
             for (int index = 0; index < count; index++) {
-                rows.add(readFloor(input));
+                rows.add(readFloor(input, version));
             }
             return new RetentionFloorSnapshotV1(
-                    identity, domain, generation, prior, policy, owner, storage, pages, bytes, rows, readDigest(input));
+                    identity,
+                    domain,
+                    generation,
+                    prior,
+                    policy,
+                    owner,
+                    storage,
+                    pages,
+                    bytes,
+                    rows,
+                    readDigest(input),
+                    context);
         });
         requireCanonical(encoded, encodeSnapshot(value));
         return value;
@@ -139,11 +159,18 @@ public final class M5RetentionCodecV1 {
 
     public static CanonicalBytes encodeTrimFrontier(BindingTrimFrontierV1 value) {
         return encode(out -> {
-            preamble(out, TRIM_MAGIC);
+            preamble(out, TRIM_MAGIC, value.pulsarContext().isPresent() ? 2 : VERSION);
             writeEnvelope(out, value.identity());
             out.writeByte(value.domain().ordinal() + 1);
-            out.writeLong(value.priorFrontier());
-            out.writeLong(value.newFrontier());
+            if (value.pulsarContext().isPresent()) {
+                var context = value.pulsarContext().orElseThrow();
+                writeCoverage(out, ProtocolCoverage.pulsar(context.coverage()));
+                writePosition(out, context.priorFrontier());
+                writePosition(out, context.newFrontier());
+            } else {
+                out.writeLong(value.priorFrontier());
+                out.writeLong(value.newFrontier());
+            }
             writeDigest(out, value.retentionPolicyRootSha256());
             writeDigest(out, value.floorSnapshotRootSha256());
             writeAuthorityFact(out, value.ownerFence());
@@ -155,18 +182,29 @@ public final class M5RetentionCodecV1 {
 
     public static BindingTrimFrontierV1 decodeTrimFrontier(CanonicalBytes encoded) {
         BindingTrimFrontierV1 value = decode(encoded, input -> {
-            requirePreamble(input, TRIM_MAGIC);
+            int version = readTypedPreamble(input, TRIM_MAGIC);
+            var identity = readEnvelope(input);
+            var domain = enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain");
+            Optional<M5RetentionRecordsV1.PulsarTrimContextV2> context = version == 2
+                    ? Optional.of(new M5RetentionRecordsV1.PulsarTrimContextV2(
+                            readCoverage(input, 2).pulsarCoverage().orElseThrow(),
+                            readPosition(input),
+                            readPosition(input)))
+                    : Optional.empty();
+            long prior = version == 2 ? -1 : input.readLong();
+            long next = version == 2 ? -1 : input.readLong();
             return new BindingTrimFrontierV1(
-                    readEnvelope(input),
-                    enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain"),
-                    input.readLong(),
-                    input.readLong(),
+                    identity,
+                    domain,
+                    prior,
+                    next,
                     readDigest(input),
                     readDigest(input),
                     readAuthorityFact(input),
                     readAuthorityFact(input),
                     input.readLong(),
-                    readCapability(input));
+                    readCapability(input),
+                    context);
         });
         requireCanonical(encoded, encodeTrimFrontier(value));
         return value;
@@ -185,7 +223,13 @@ public final class M5RetentionCodecV1 {
             throw new IllegalArgumentException("reference-free proof identity differs from its canonical body");
         }
         return encode(out -> {
-            preamble(out, PROOF_MAGIC);
+            preamble(
+                    out,
+                    PROOF_MAGIC,
+                    value.epochGrace().isPresent() ? 3 : value.coverage().typedPulsar() ? 2 : VERSION);
+            if (value.epochGrace().isPresent()) {
+                out.writeBoolean(value.coverage().typedPulsar());
+            }
             writeProofBody(out, value);
             writeDigest(out, value.proofSha256());
         });
@@ -193,12 +237,19 @@ public final class M5RetentionCodecV1 {
 
     public static ReferenceFreeProofV1 decodeReferenceFreeProof(CanonicalBytes encoded) {
         ReferenceFreeProofV1 value = decode(encoded, input -> {
-            requirePreamble(input, PROOF_MAGIC);
+            if (input.readInt() != PROOF_MAGIC) {
+                throw new IllegalArgumentException("M5 reference proof magic differs");
+            }
+            int version = input.readInt();
+            if (version != 1 && version != 2 && version != 3) {
+                throw new IllegalArgumentException("M5 reference proof version differs");
+            }
+            int coverageVersion = version == 3 ? (input.readBoolean() ? 2 : 1) : version;
             IdentityEnvelope identity = readEnvelope(input);
             ReferenceTargetKindV1 targetKind =
                     enumValue(ReferenceTargetKindV1.values(), input.readUnsignedByte(), "target kind");
             Sha256Digest target = readDigest(input);
-            ProtocolCoverage coverage = readCoverage(input);
+            ProtocolCoverage coverage = readCoverage(input, coverageVersion);
             AuthorityFactV1 selector = readAuthorityFact(input);
             AuthorityFactV1 manifest = readAuthorityFact(input);
             AuthorityFactV1 trim = readAuthorityFact(input);
@@ -225,7 +276,7 @@ public final class M5RetentionCodecV1 {
                     boundedCount(input.readInt(), M5RetentionRecordsV1.MAX_REFERENCE_ROWS, "reference observations");
             List<ReferenceObservationV1> observations = new ArrayList<>(observationCount);
             for (int index = 0; index < observationCount; index++) {
-                observations.add(readObservation(input));
+                observations.add(readObservation(input, coverage));
             }
             return new ReferenceFreeProofV1(
                     identity,
@@ -246,10 +297,58 @@ public final class M5RetentionCodecV1 {
                     observed,
                     summaries,
                     observations,
+                    version == 3
+                            ? Optional.of(com.nereusstream.storage.object.gc.DeleteEpochGraceMarkV1.decode(readBytes(
+                                    input, com.nereusstream.storage.object.gc.DeleteEpochGraceMarkV1.MAX_BYTES)))
+                            : Optional.empty(),
                     readDigest(input));
         });
         requireCanonical(encoded, encodeReferenceFreeProof(value));
         return value;
+    }
+
+    static Sha256Digest referenceCaptureRoot(
+            M5RetentionEvidenceAssemblerV1.ReferenceProofRequestV1 request,
+            List<ReferenceScanSummaryV1> summaries,
+            List<ReferenceObservationV1> observations) {
+        return Sha256Digest.hash(encode(out -> {
+            preamble(out, 0x4d354352, 1); // M5CR: observation capture, not a reference-free proof
+            writeEnvelope(out, request.identity());
+            out.writeByte(request.targetKind().ordinal());
+            writeDigest(out, request.targetIdentitySha256());
+            out.writeBoolean(request.coverage().typedPulsar());
+            writeCoverage(out, request.coverage());
+            for (var fact : List.of(
+                    request.selectorRoot(),
+                    request.manifestRoot(),
+                    request.trimRoot(),
+                    request.ownerFence(),
+                    request.workerFence(),
+                    request.storageFence(),
+                    request.providerFence())) {
+                writeAuthorityFact(out, fact);
+            }
+            writeDigest(out, request.retentionSnapshotRootSha256());
+            out.writeBoolean(request.epochAuthority().isPresent());
+            if (request.epochAuthority().isPresent()) {
+                var epoch = request.epochAuthority().orElseThrow();
+                out.writeLong(epoch.observationEpoch());
+                var authorityFacts = epoch.authorityFacts();
+                out.writeInt(authorityFacts.size());
+                for (var fact : authorityFacts) {
+                    writeAuthorityFact(out, fact);
+                }
+            }
+            out.writeInt(request.m4Releases().size());
+            for (var release : request.m4Releases()) {
+                writeRelease(out, release);
+            }
+            out.writeInt(summaries.size());
+            for (var summary : summaries) {
+                writeSummary(out, summary);
+            }
+            writeDigest(out, calculateObservationsRoot(observations));
+        }));
     }
 
     public static Sha256Digest calculateProofSha256(ReferenceFreeProofV1 value) {
@@ -257,10 +356,19 @@ public final class M5RetentionCodecV1 {
     }
 
     public static Sha256Digest calculateObservationsRoot(List<ReferenceObservationV1> rows) {
+        boolean typed = rows.stream().anyMatch(row -> row.coverage().typedPulsar());
+        ProtocolCoverage context = typed ? rows.get(0).coverage() : null;
+        if (typed && rows.stream().anyMatch(row -> !row.coverage().equals(context))) {
+            throw new IllegalArgumentException("typed Pulsar reference observations require one exact coverage");
+        }
         return Sha256Digest.hash(encode(out -> {
+            if (typed) {
+                preamble(out, TYPED_OBSERVATIONS_MAGIC, 2);
+                writeCoverage(out, context);
+            }
             out.writeInt(rows.size());
             for (ReferenceObservationV1 row : rows) {
-                writeObservation(out, row);
+                writeObservation(out, row, context);
             }
         }));
     }
@@ -382,7 +490,13 @@ public final class M5RetentionCodecV1 {
         writeEnvelope(out, value.identity());
         out.writeByte(value.domain().ordinal() + 1);
         out.writeLong(value.generation());
-        out.writeLong(value.priorTrimFrontier());
+        if (value.pulsarContext().isPresent()) {
+            var context = value.pulsarContext().orElseThrow();
+            writeCoverage(out, ProtocolCoverage.pulsar(context.coverage()));
+            writePosition(out, context.priorTrimFrontier());
+        } else {
+            out.writeLong(value.priorTrimFrontier());
+        }
         writeDigest(out, value.retentionPolicyRootSha256());
         writeAuthorityFact(out, value.ownerFence());
         writeAuthorityFact(out, value.storageFence());
@@ -390,7 +504,7 @@ public final class M5RetentionCodecV1 {
         out.writeLong(value.scannedBytes());
         out.writeInt(value.rows().size());
         for (RetentionFloorObservationV1 row : value.rows()) {
-            writeFloor(out, row);
+            writeFloor(out, row, value.pulsarContext().isPresent());
         }
     }
 
@@ -420,7 +534,13 @@ public final class M5RetentionCodecV1 {
         }
         out.writeInt(value.observations().size());
         for (ReferenceObservationV1 observation : value.observations()) {
-            writeObservation(out, observation);
+            writeObservation(out, observation, value.coverage());
+        }
+        if (value.epochGrace().isPresent()) {
+            writeBytes(
+                    out,
+                    value.epochGrace().orElseThrow().encode(),
+                    com.nereusstream.storage.object.gc.DeleteEpochGraceMarkV1.MAX_BYTES);
         }
     }
 
@@ -444,6 +564,7 @@ public final class M5RetentionCodecV1 {
                 value.observedAuthorityTimeMillis(),
                 value.scanSummaries(),
                 value.observations(),
+                value.epochGrace(),
                 proofSha);
     }
 
@@ -503,23 +624,45 @@ public final class M5RetentionCodecV1 {
                 canonicalSha);
     }
 
-    private static void writeFloor(DataOutputStream out, RetentionFloorObservationV1 row) throws IOException {
+    private static void writeFloor(DataOutputStream out, RetentionFloorObservationV1 row, boolean typed)
+            throws IOException {
         out.writeByte(row.floorClass().ordinal() + 1);
         writeAuthorityFact(out, row.authority());
         out.writeByte(row.domain().ordinal() + 1);
-        out.writeLong(row.safeFloor());
-        out.writeBoolean(row.constraining());
+        if (typed) {
+            out.writeBoolean(row.constraining());
+            if (row.constraining()) {
+                writePosition(out, row.pulsarSafeFloor().orElseThrow());
+            }
+        } else {
+            out.writeLong(row.safeFloor());
+            out.writeBoolean(row.constraining());
+        }
         out.writeBoolean(row.enumerationComplete());
     }
 
-    private static RetentionFloorObservationV1 readFloor(DataInputStream input) throws IOException {
+    private static RetentionFloorObservationV1 readFloor(DataInputStream input, int version) throws IOException {
+        var kind = enumValue(FloorClassV1.values(), input.readUnsignedByte(), "floor class");
+        var authority = readAuthorityFact(input);
+        var domain = enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain");
+        if (version == 2) {
+            boolean constraining = input.readBoolean();
+            var position =
+                    constraining ? Optional.of(readPosition(input)) : Optional.<M5PulsarCoverageV2.Position>empty();
+            return new RetentionFloorObservationV1(
+                    kind, authority, domain, -1, constraining, input.readBoolean(), position);
+        }
         return new RetentionFloorObservationV1(
-                enumValue(FloorClassV1.values(), input.readUnsignedByte(), "floor class"),
-                readAuthorityFact(input),
-                enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain"),
-                input.readLong(),
-                input.readBoolean(),
-                input.readBoolean());
+                kind, authority, domain, input.readLong(), input.readBoolean(), input.readBoolean());
+    }
+
+    private static void writePosition(DataOutputStream out, M5PulsarCoverageV2.Position position) throws IOException {
+        out.writeLong(position.ledgerId());
+        out.writeLong(position.entryId());
+    }
+
+    private static M5PulsarCoverageV2.Position readPosition(DataInputStream input) throws IOException {
+        return new M5PulsarCoverageV2.Position(input.readLong(), input.readLong());
     }
 
     private static void writeRelease(DataOutputStream out, M4ReleaseBindingV1 release) throws IOException {
@@ -558,21 +701,29 @@ public final class M5RetentionCodecV1 {
                 input.readBoolean());
     }
 
-    private static void writeObservation(DataOutputStream out, ReferenceObservationV1 row) throws IOException {
+    private static void writeObservation(DataOutputStream out, ReferenceObservationV1 row, ProtocolCoverage context)
+            throws IOException {
         out.writeByte(row.kind().ordinal() + 1);
         writeAuthorityFact(out, row.authority());
         writeDigest(out, row.targetIdentitySha256());
-        writeCoverage(out, row.coverage());
+        if (context != null && context.typedPulsar()) {
+            if (!row.coverage().equals(context)) {
+                throw new IllegalArgumentException("Pulsar reference row differs from its parent coverage");
+            }
+        } else {
+            writeCoverage(out, row.coverage());
+        }
         out.writeByte(row.disposition().ordinal() + 1);
         out.writeBoolean(row.enumerationComplete());
     }
 
-    private static ReferenceObservationV1 readObservation(DataInputStream input) throws IOException {
+    private static ReferenceObservationV1 readObservation(DataInputStream input, ProtocolCoverage context)
+            throws IOException {
         return new ReferenceObservationV1(
                 enumValue(ReferenceKindV1.values(), input.readUnsignedByte(), "reference kind"),
                 readAuthorityFact(input),
                 readDigest(input),
-                readCoverage(input),
+                context.typedPulsar() ? context : readCoverage(input, 1),
                 enumValue(ReferenceDispositionV1.values(), input.readUnsignedByte(), "reference disposition"),
                 input.readBoolean());
     }
@@ -637,15 +788,23 @@ public final class M5RetentionCodecV1 {
 
     private static void writeCoverage(DataOutputStream out, ProtocolCoverage value) throws IOException {
         out.writeByte(value.domain().ordinal() + 1);
-        out.writeLong(value.inclusiveStart());
-        out.writeLong(value.exclusiveEnd());
+        if (value.typedPulsar()) {
+            writeBytes(out, value.pulsarCoverage().orElseThrow().encode(), M5PulsarCoverageV2.MAX_BYTES);
+        } else {
+            out.writeLong(value.inclusiveStart());
+            out.writeLong(value.exclusiveEnd());
+        }
     }
 
-    private static ProtocolCoverage readCoverage(DataInputStream input) throws IOException {
-        return new ProtocolCoverage(
-                enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain"),
-                input.readLong(),
-                input.readLong());
+    private static ProtocolCoverage readCoverage(DataInputStream input, int version) throws IOException {
+        var domain = enumValue(PositionDomain.values(), input.readUnsignedByte(), "Position Domain");
+        if (version == 2) {
+            if (domain != PositionDomain.PULSAR_ENTRY) {
+                throw new IllegalArgumentException("M5 reference proof v2 requires ledger-keyed Pulsar coverage");
+            }
+            return ProtocolCoverage.pulsar(M5PulsarCoverageV2.decode(readBytes(input, M5PulsarCoverageV2.MAX_BYTES)));
+        }
+        return new ProtocolCoverage(domain, input.readLong(), input.readLong());
     }
 
     private static void writePulsarIncarnation(DataOutputStream out, PulsarTopicIncarnationIdentity value)
@@ -663,14 +822,29 @@ public final class M5RetentionCodecV1 {
     }
 
     private static void preamble(DataOutputStream out, int magic) throws IOException {
+        preamble(out, magic, VERSION);
+    }
+
+    private static void preamble(DataOutputStream out, int magic, int version) throws IOException {
         out.writeInt(magic);
-        out.writeInt(VERSION);
+        out.writeInt(version);
     }
 
     private static void requirePreamble(DataInputStream input, int magic) throws IOException {
         if (input.readInt() != magic || input.readInt() != VERSION) {
             throw new IllegalArgumentException("M5 retention value magic/version differs");
         }
+    }
+
+    private static int readTypedPreamble(DataInputStream input, int magic) throws IOException {
+        if (input.readInt() != magic) {
+            throw new IllegalArgumentException("M5 retention value magic differs");
+        }
+        int version = input.readInt();
+        if (version != 1 && version != 2) {
+            throw new IllegalArgumentException("M5 retention value version differs");
+        }
+        return version;
     }
 
     private static void writeDigest(DataOutputStream out, Sha256Digest value) throws IOException {

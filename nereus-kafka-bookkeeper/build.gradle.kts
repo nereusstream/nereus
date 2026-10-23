@@ -89,7 +89,11 @@ tasks.register<Test>("realBookKeeperTest") {
     classpath = realBookKeeperTest.runtimeClasspath
     useJUnitPlatform()
     maxParallelForks = 1
-    filter { excludeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.KafkaObjectAuthorizationRealTest") }
+    filter {
+        excludeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.KafkaObjectAuthorizationRealTest")
+        excludeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectCellIsolationRealTest")
+        excludeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest")
+    }
     outputs.upToDateWhen { false }
     jvmArgumentProviders.add(
         objects.newInstance<KafkaBookKeeperMetadataServiceUriArgumentProvider>().apply {
@@ -558,6 +562,7 @@ tasks.register<Test>("v2M5KafkaReadOwnerTest") {
 
 // Bound native GC admission and separate-JVM recovery on the existing permanent namespace route.
 mapOf(
+    "v2M5EpochGraceRealTest" to "epochGraceWaitStartsAtExactMarkAndRestartsForReconstructedClockOrNativeOwner",
     "v2M5BoundDeleteRealTest" to "boundNativeClientRequiresActiveQuotaAuthorityAndRejectsRawRoutesBeforeEpochOrIntentMutation",
     "v2M5BoundDeleteRestartWriteTest" to "writeBeforeServerRestart",
     "v2M5BoundDeleteRestartReadTest" to "readAfterServerRestart",
@@ -592,8 +597,42 @@ tasks.register<Test>("nsip1ObjectAuthorizationRealTest") {
     testClassesDirs = realBookKeeperTest.output.classesDirs
     classpath = realBookKeeperTest.runtimeClasspath
     useJUnitPlatform()
+    systemProperty("junit.jupiter.params.displayname.default", "{displayName} [{index}] {arguments}")
     maxParallelForks = 1
     filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.KafkaObjectAuthorizationRealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.nsip1.object.endpoint", providers.gradleProperty("nsip1ObjectEndpoint").get())
+        systemProperty("nereus.nsip1.object.oxia", providers.gradleProperty("nsip1ObjectOxia").get())
+    }
+}
+
+tasks.register<Test>("v2M5ObjectCellIsolationRealTest") {
+    group = "verification"
+    description = "Measure real same-lane unknown PUT isolation across Bindings, Cells and fixed shard counts."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty("junit.jupiter.params.displayname.default", "{displayName} [{index}] {arguments}")
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectCellIsolationRealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.nsip1.object.endpoint", providers.gradleProperty("nsip1ObjectEndpoint").get())
+        systemProperty("nereus.nsip1.object.oxia", providers.gradleProperty("nsip1ObjectOxia").get())
+    }
+}
+
+
+tasks.register<Test>("v2M5ObjectRunRecoveryRetirementRealTest") {
+    group = "verification"
+    description = "Verify actual multi-Binding whole-Run retirement and bounded continuous-prefix recovery."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty("junit.jupiter.params.displayname.default", "{displayName} [{index}] {arguments}")
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest") }
     outputs.upToDateWhen { false }
     doFirst {
         systemProperty("nereus.nsip1.object.endpoint", providers.gradleProperty("nsip1ObjectEndpoint").get())

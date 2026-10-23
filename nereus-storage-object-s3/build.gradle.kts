@@ -16,6 +16,7 @@ import java.nio.file.Files
 
 dependencies {
     api(project(":nereus-storage-object"))
+    api(project(":nereus-metadata-spi"))
     api(platform(libs.aws.sdk.v2.bom))
     api(libs.aws.sdk.v2.s3)
 
@@ -67,6 +68,9 @@ configurations[realProviderTest.runtimeOnlyConfigurationName]
 dependencies {
     add(realProviderTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
     add(realProviderTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(realProviderTest.implementationConfigurationName, project(":nereus-metadata-oxia"))
+    add(realProviderTest.implementationConfigurationName,
+        project(path = ":nereus-storage-object", configuration = "m5DeleteTestFixtures"))
 }
 
 tasks.register<Test>("realProviderTest") {
@@ -152,6 +156,23 @@ tasks.register<Test>("v2M5VersionMatchDeleteRealProviderTest") {
     maxParallelForks = 1
     maxHeapSize = "512m"
     outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5ObjectOxiaNamespaceRealTest") {
+    group = "verification"
+    description = "Run the non-promotable native S3/Oxia namespace route against real MinIO and Oxia."
+    testClassesDirs = realProviderTest.output.classesDirs
+    classpath = realProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5MinioOxiaObjectNamespaceTest.class")
+    maxParallelForks = 1
+    maxHeapSize = "512m"
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.m5.objectOxiaAddress",
+            providers.gradleProperty("v2M5ObjectOxiaAddress").orNull
+                ?: error("v2M5ObjectOxiaAddress is required for the native S3/Oxia test"))
+    }
 }
 
 tasks.register<Test>("v2M5MultipartCleanupRealProviderTest") {

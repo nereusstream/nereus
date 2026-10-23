@@ -52,6 +52,63 @@ public final class BindingReadSelectorRuntimeV1 {
         return current;
     }
 
+    /** Stops local capture before the owner rereads durable state for a source-map transition. */
+    public BindingReadAuthorityV1 stopLocalAdmission() {
+        BindingReadAuthorityV1 admitted = current.get();
+        if (!admitted.admitting() || !current.compareAndSet(admitted, closed(admitted))) {
+            throw new IllegalStateException("M4 local read admission already changed");
+        }
+        return admitted;
+    }
+
+    /** Fences the old local owner before the durable takeover CAS can authorize a new native owner. */
+    public Outcome grantTakeover(
+            BindingReadSelector expectedSelector,
+            BindingReadAuthorityV1 expectedAuthority,
+            BindingReadAuthorityV1 successorAuthority,
+            Sha256Digest successorViewSha256,
+            long successorOwnerEpoch,
+            long successorSourceGeneration) {
+        return transition(
+                expectedSelector,
+                expectedAuthority,
+                successorAuthority,
+                () -> coordinator.grantTakeover(
+                        expectedSelector, successorViewSha256, successorOwnerEpoch, successorSourceGeneration));
+    }
+
+    /** Installs a selected source and its protected fallback only after the durable selector changes. */
+    public Outcome introduceFallback(
+            BindingReadSelector expectedSelector,
+            BindingReadAuthorityV1 expectedAuthority,
+            BindingReadAuthorityV1 successorAuthority,
+            Sha256Digest fallbackViewSha256,
+            long successorSourceGeneration,
+            List<SourceProtectionIdentity> sources) {
+        return transition(
+                expectedSelector,
+                expectedAuthority,
+                successorAuthority,
+                () -> coordinator.introduceFallback(
+                        expectedSelector, fallbackViewSha256, successorSourceGeneration, sources));
+    }
+
+    /** Keeps the same admission epoch while replacing one authenticated native source map. */
+    public Outcome updateMembershipNeutralView(
+            BindingReadSelector expectedSelector,
+            BindingReadAuthorityV1 expectedAuthority,
+            BindingReadAuthorityV1 successorAuthority,
+            Sha256Digest successorViewSha256,
+            long successorSourceGeneration,
+            List<SourceProtectionIdentity> exactFallbackSources) {
+        return transition(
+                expectedSelector,
+                expectedAuthority,
+                successorAuthority,
+                () -> coordinator.updateMembershipNeutralView(
+                        expectedSelector, successorViewSha256, successorSourceGeneration, exactFallbackSources));
+    }
+
     /** Executes the fused PWF E to PO E+1 transition with local close-before-dispatch. */
     public Outcome closeFallback(
             BindingReadSelector expectedSelector,
@@ -60,8 +117,22 @@ public final class BindingReadSelectorRuntimeV1 {
             Sha256Digest preferredOnlyViewSha256,
             long successorSourceGeneration,
             List<SourceProtectionIdentity> sources) {
+        return transition(
+                expectedSelector,
+                expectedAuthority,
+                successorAuthority,
+                () -> coordinator.closeFallback(
+                        expectedSelector, preferredOnlyViewSha256, successorSourceGeneration, sources));
+    }
+
+    private Outcome transition(
+            BindingReadSelector expectedSelector,
+            BindingReadAuthorityV1 expectedAuthority,
+            BindingReadAuthorityV1 successorAuthority,
+            java.util.function.Supplier<Outcome> durableTransition) {
         requireAligned(expectedSelector, expectedAuthority);
         Objects.requireNonNull(successorAuthority, "successorAuthority");
+        Objects.requireNonNull(durableTransition, "durableTransition");
         BindingReadAuthorityV1 closed = closed(expectedAuthority);
         BindingReadAuthorityV1 installedFence = closed;
         if (!current.compareAndSet(expectedAuthority, closed)) {
@@ -75,8 +146,7 @@ public final class BindingReadSelectorRuntimeV1 {
             installedFence = observed;
         }
 
-        Outcome outcome = coordinator.closeFallback(
-                expectedSelector, preferredOnlyViewSha256, successorSourceGeneration, sources);
+        Outcome outcome = durableTransition.get();
         if (outcome != Outcome.APPLIED && outcome != Outcome.EXISTING_EXACT) {
             return outcome;
         }

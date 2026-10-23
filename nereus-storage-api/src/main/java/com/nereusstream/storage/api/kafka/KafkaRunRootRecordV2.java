@@ -192,8 +192,20 @@ public record KafkaRunRootRecordV2(
     }
 
     public KafkaRunRootRecordV2 select(KafkaRunRootRecordV2 child) {
+        return select(child, false);
+    }
+
+    /** Representation only; native selected recovery must qualify this retired lineage before its CAS. */
+    public KafkaRunRootRecordV2 selectRecoveredSuccessor(KafkaRunRootRecordV2 child) {
+        if (!retired) {
+            throw new IllegalStateException("recovered successor requires a permanently retired anchor");
+        }
+        return select(child, true);
+    }
+
+    private KafkaRunRootRecordV2 select(KafkaRunRootRecordV2 child, boolean retiredAnchor) {
         if (!admitted
-                || retired
+                || retired && !retiredAnchor
                 || root.state() != KafkaRunRootStateV1.SEALED
                 || !resource.namespace().equals(child.resource().namespace())
                 || !Scope.of(root).equals(Scope.of(child.root()))
@@ -207,7 +219,7 @@ public record KafkaRunRootRecordV2(
                 || successor.filter(value -> !value.equals(child.initialLink())).isPresent()) {
             throw new IllegalArgumentException("successor changes the run chain or its permanent choice");
         }
-        return new KafkaRunRootRecordV2(resource, root, true, Optional.of(child.initialLink()), false, recoveryCut);
+        return new KafkaRunRootRecordV2(resource, root, true, Optional.of(child.initialLink()), retired, recoveryCut);
     }
 
     /** Representation only; a caller must prove reference-free retirement before persisting this successor. */

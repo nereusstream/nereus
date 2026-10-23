@@ -180,6 +180,74 @@ class M5TaskSelectionCoordinatorV2Test {
         assertThatThrownBy(() -> tasks.readDecision(task)).hasMessageContaining("another Binding or task");
     }
 
+    @Test
+    void bootstrapHasNoProjectedViewAndSurvivesActivationTrimAndTaskSelection() {
+        var store = new Store();
+        var bootstrap = new M5BindingBootstrapV1(BINDING, INITIAL.capability(), digest("original-sdk-scope"));
+        store.values.put(SELECTOR, bootstrap.encode());
+        var control = new M5BindingAuthorityControlMetadataStoreV1(store, SELECTOR);
+        assertThat(control.get(SELECTOR)).isEmpty();
+        assertThat(M5BindingBootstrapV1.decode(bootstrap.encode())).isEqualTo(bootstrap);
+        store.loseCas = true;
+        assertThat(control.putIfAbsent(SELECTOR, M4ReadControlCodecV1.encodeSelector(INITIAL)))
+                .isEqualTo(ControlMutationOutcome.RESPONSE_UNKNOWN);
+        assertThat(control.get(SELECTOR)).contains(M4ReadControlCodecV1.encodeSelector(INITIAL));
+        var activated =
+                M5BindingAuthorityCodecV1.decodeAuthority(store.get(SELECTOR).orElseThrow());
+        assertThat(activated.bootstrap()).contains(bootstrap);
+        assertThat(activated.writerEnrollment()).isEmpty();
+        assertThat(activated.logicalTrim()).isEmpty();
+        assertThat(activated.predecessorValueSha256()).contains(Sha256Digest.hash(bootstrap.encode()));
+        var trimmed = M5BindingAuthorityCodecV1.logicalTrimSuccessor(
+                activated,
+                new M5LogicalTrimRecordsV2.LogicalTrimStateV2(Optional.empty(), Optional.empty()),
+                List.of());
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(M5BindingAuthorityCodecV1.encodeAuthority(trimmed)))
+                .isEqualTo(trimmed);
+        assertThat(trimmed.bootstrap()).contains(bootstrap);
+        store.values.put(SELECTOR, M5BindingAuthorityCodecV1.encodeAuthority(trimmed));
+        store.loseCas = false;
+        var tasks = new M5TaskSelectionCoordinatorV2(store, 7, BINDING);
+        tasks.prepare(digest("task")).orElseThrow().cancelSelection(INITIAL).orElseThrow();
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(store.get(SELECTOR).orElseThrow())
+                        .bootstrap())
+                .contains(bootstrap);
+    }
+
+    @Test
+    void bootstrapRejectsCorruptionForeignActivationAndCompetingFirstView() {
+        var bootstrap = new M5BindingBootstrapV1(BINDING, INITIAL.capability(), digest("original-sdk-scope"));
+        var bytes = bootstrap.encode().toByteArray();
+        bytes[bytes.length - 1] ^= 1;
+        assertThatThrownBy(() -> M5BindingBootstrapV1.decode(CanonicalBytes.copyOf(bytes)))
+                .hasMessageContaining("checksum");
+        assertThatThrownBy(() -> M5BindingBootstrapV1.decode(CanonicalBytes.copyOf(new byte[0])))
+                .hasMessageContaining("length");
+        assertThatThrownBy(() -> M5BindingAuthorityCodecV1.activateBootstrap(bootstrap, selector(2, digest("next"))))
+                .hasMessageContaining("first exact");
+        var foreign = new M5BindingBootstrapV1(BINDING, new CapabilityBinding(2, digest("other")), digest("scope"));
+        assertThatThrownBy(() -> M5BindingAuthorityCodecV1.activateBootstrap(foreign, INITIAL))
+                .hasMessageContaining("first exact");
+        var activated = M5BindingAuthorityCodecV1.activateBootstrap(bootstrap, INITIAL);
+        assertThatThrownBy(() -> M5BindingAuthorityCodecV1.requireBootstrapTransition(
+                        M5BindingAuthorityCodecV1.initial(INITIAL), activated))
+                .hasMessageContaining("imported");
+        var store = new Store();
+        store.values.put(SELECTOR, bootstrap.encode());
+        var left = new M5BindingAuthorityControlMetadataStoreV1(store, SELECTOR);
+        var right = new M5BindingAuthorityControlMetadataStoreV1(store, SELECTOR);
+        assertThat(left.compareAndSet(SELECTOR, Optional.empty(), M4ReadControlCodecV1.encodeSelector(INITIAL)))
+                .isEqualTo(ControlMutationOutcome.APPLIED);
+        var competing = selector(1, digest("competing-view"));
+        assertThat(right.compareAndSet(SELECTOR, Optional.empty(), M4ReadControlCodecV1.encodeSelector(competing)))
+                .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThat(right.get(SELECTOR)).contains(M4ReadControlCodecV1.encodeSelector(INITIAL));
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(
+                                M5BindingAuthorityCodecV1.encodeAuthority(M5BindingAuthorityCodecV1.initial(INITIAL)))
+                        .bootstrap())
+                .isEmpty();
+    }
+
     private static ControlMutationOutcome select(
             M5TaskSelectionCoordinatorV2.Attempt attempt, BindingReadSelector successor) {
         var facade = new M5BindingAuthorityControlMetadataStoreV1(

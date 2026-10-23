@@ -14,6 +14,17 @@
 
 package com.nereusstream.pulsar.offload;
 
+import com.nereusstream.domain.protocol.ProtocolCellIdentity;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaCellProviderScopeRegistryV2;
+import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace;
+import com.nereusstream.storage.object.materialization.M5CellProviderProfileV2;
+import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
+import com.nereusstream.storage.object.s3.S3C1ObjectProviderTransport;
+import com.nereusstream.storage.object.s3.S3M5PhysicalNamespaceAuthorityV2;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -25,14 +36,18 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity;
+import software.amazon.awssdk.identity.spi.IdentityProvider;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketEncryptionRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -56,21 +71,394 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
     private final String bucket;
     private final ExecutorService executor;
     private final boolean closeClient;
+    private final MaterializationConfiguration materializationConfiguration;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object lifetimeLock = new Object();
+    private final CompletableFuture<Void> closeCompletion = new CompletableFuture<>();
+    private int activeOperations;
+    private boolean shutdownComplete;
+    private boolean closeStarted;
+    private Throwable shutdownFailure;
 
     public S3PulsarOffloadObjectStoreV1(S3Client client, String bucket, ExecutorService executor, boolean closeClient) {
+        this(client, bucket, executor, closeClient, null);
+    }
+
+    /** Explicit stable references attached to the actual configured credential provider; no secret is persisted. */
+    public record MaterializationConfiguration(
+            M5CellProviderProfileV2.References references,
+            IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider,
+            java.util.Optional<M5CellProviderProfileV2.GcGracePolicyV1> gcGracePolicy) {
+        public MaterializationConfiguration(
+                M5CellProviderProfileV2.References references,
+                IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider) {
+            this(references, credentialsProvider, java.util.Optional.empty());
+        }
+
+        public MaterializationConfiguration {
+            Objects.requireNonNull(references, "references");
+            Objects.requireNonNull(credentialsProvider, "credentialsProvider");
+            gcGracePolicy = Objects.requireNonNull(gcGracePolicy, "gcGracePolicy");
+        }
+    }
+
+    public S3PulsarOffloadObjectStoreV1(
+            S3Client client,
+            String bucket,
+            ExecutorService executor,
+            boolean closeClient,
+            MaterializationConfiguration materializationConfiguration) {
         this.client = Objects.requireNonNull(client, "client");
         this.bucket = Objects.requireNonNull(bucket, "bucket");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.closeClient = closeClient;
+        this.materializationConfiguration = materializationConfiguration;
         if (bucket.isBlank()) {
             throw new IllegalArgumentException("S3 bucket is blank");
+        }
+        if (materializationConfiguration != null
+                && client.serviceClientConfiguration().credentialsProvider()
+                        != materializationConfiguration.credentialsProvider()) {
+            throw new IllegalArgumentException("Native materialization credential reference belongs to another SDK");
         }
     }
 
     @Override
     public Capabilities capabilities() {
         return CAPABILITIES;
+    }
+
+    /** Actual SDK provider configuration for low-frequency Native read qualification. */
+    Map<String, String> readAdmissionConfiguration() {
+        var configuration = client.serviceClientConfiguration();
+        return Map.of(
+                "endpoint",
+                        configuration.endpointOverride().map(Object::toString).orElse("AWS_DEFAULT"),
+                "region", configuration.region().id(),
+                "responseChecksum", configuration.responseChecksumValidation().name(),
+                "requestChecksum", configuration.requestChecksumCalculation().name());
+    }
+
+    /** Checks the permanent marker through this store's actual client and bucket on its owned SDK executor. */
+    public CompletionStage<PhysicalNamespaceAuthorityBindingV2> observePhysicalNamespace(
+            Namespace expected, MetadataNamespaceIdentityV2 metadataNamespace) {
+        return submit(() -> {
+            var backend = S3M5PhysicalNamespaceAuthorityV2.connect(client, bucket, expected);
+            return backend.bind(metadataNamespace).toCompletableFuture().join();
+        });
+    }
+
+    /** One original SDK connection hold; all Task/Cell/writer admission is still the native caller's prerequisite. */
+    final class MaterializationConnection implements AutoCloseable {
+        private final S3M5PhysicalNamespaceAuthorityV2 physical;
+        private final PhysicalNamespaceAuthorityBindingV2 binding;
+        private final S3C1ObjectProviderTransport transport;
+        private final C1ObjectProviderSession provider;
+        private final Runnable ownerFinished;
+        private final M5CellProviderProfileV2 profile;
+        private OxiaCellProviderScopeRegistryV2.Attempt scopeAttempt;
+        private OxiaCellProviderScopeRegistryV2.Admission scopeAdmission;
+        private CompletableFuture<Void> scopeWork;
+        private PulsarNativeBindingV1 originalBinding;
+        private boolean released;
+
+        private MaterializationConnection(
+                S3M5PhysicalNamespaceAuthorityV2 physical,
+                PhysicalNamespaceAuthorityBindingV2 binding,
+                S3C1ObjectProviderTransport transport,
+                C1ObjectProviderSession provider,
+                Runnable ownerFinished,
+                M5CellProviderProfileV2 profile) {
+            this.physical = physical;
+            this.binding = binding;
+            this.transport = transport;
+            this.provider = provider;
+            this.ownerFinished = ownerFinished;
+            this.profile = profile;
+        }
+
+        synchronized C1ObjectProviderSession provider() {
+            if (released) {
+                throw new IllegalStateException("Original native materialization connection was released");
+            }
+            return provider;
+        }
+
+        PhysicalNamespaceAuthorityBindingV2 binding() {
+            return binding;
+        }
+
+        S3M5PhysicalNamespaceAuthorityV2 physical() {
+            return physical;
+        }
+
+        void requireObjectDeletePolicyAllows(PhysicalResourceIdV2.ObjectVersion resource) throws java.io.IOException {
+            var admitted = profile();
+            qualifiedProvider();
+            if (!resource.namespace().equals(binding.physicalNamespace())
+                    || resource.identityKind() != PhysicalResourceIdV2.ObjectIdentityKind.IMMUTABLE_VERSION
+                    || !resource.objectKey().value().startsWith(admitted.exclusiveNamespacePrefix() + "/")) {
+                throw new IllegalArgumentException("Provider deletion policy belongs to another admitted scope");
+            }
+            transport.requireObjectDeletePolicyAllows(
+                    resource.objectKey().value(), resource.immutableIdentity().bytes());
+        }
+
+        synchronized M5CellProviderProfileV2 profile() {
+            if (released || profile == null) {
+                throw new IllegalStateException("Original connection has no complete configured Provider profile");
+            }
+            return profile;
+        }
+
+        synchronized CompletableFuture<Void> admitProfile(PulsarNativeBindingV1 actualBinding) {
+            var expected = profile();
+            if (!actualBinding.metadataNamespace().equals(binding.metadataNamespace())
+                    || !actualBinding
+                            .authority()
+                            .aggregate()
+                            .binding()
+                            .cellIdentity()
+                            .equals(expected.protocolCell())
+                    || originalBinding != null && originalBinding != actualBinding) {
+                throw new IllegalArgumentException("Native Provider profile belongs to another actual Cell/Binding");
+            }
+            if (scopeWork == null) {
+                originalBinding = actualBinding;
+                scopeWork = actualBinding
+                        .providerScopes(physical)
+                        .thenCompose(registry -> {
+                            synchronized (this) {
+                                scopeAttempt = registry.prepare(expected);
+                                return scopeAttempt.admit();
+                            }
+                        })
+                        .thenCompose(admitted -> admitted.requireCurrent().thenRun(() -> {
+                            synchronized (this) {
+                                scopeAdmission = admitted;
+                            }
+                        }))
+                        .thenCompose(ignored -> actualBinding.revalidate())
+                        .toCompletableFuture();
+            }
+            return scopeWork.copy();
+        }
+
+        synchronized CompletableFuture<Void> reopenProfile(PulsarNativeBindingV1 actualBinding) {
+            var expected = profile();
+            if (!actualBinding.metadataNamespace().equals(binding.metadataNamespace())
+                    || !actualBinding
+                            .authority()
+                            .aggregate()
+                            .binding()
+                            .cellIdentity()
+                            .equals(expected.protocolCell())
+                    || originalBinding != null && originalBinding != actualBinding) {
+                throw new IllegalArgumentException("Native Provider reopen belongs to another Cell/Binding");
+            }
+            if (scopeWork == null) {
+                originalBinding = actualBinding;
+                scopeWork = actualBinding
+                        .providerScopes(physical)
+                        .thenCompose(registry -> registry.reopen(expected))
+                        .thenAccept(admitted -> scopeAdmission = admitted);
+            }
+            return scopeWork.copy();
+        }
+
+        synchronized CompletableFuture<com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1>
+                captureProfileAuthority() {
+            qualifiedProvider();
+            return scopeAdmission.captureAuthority();
+        }
+
+        synchronized C1ObjectProviderSession qualifiedProvider() {
+            profile();
+            if (scopeAdmission == null
+                    || scopeWork == null
+                    || !scopeWork.isDone()
+                    || scopeWork.isCompletedExceptionally()) {
+                throw new IllegalStateException("Original Provider profile is not actually admitted");
+            }
+            return provider();
+        }
+
+        synchronized CompletableFuture<Void> requireProfileCurrent() {
+            qualifiedProvider();
+            scopeWork = scopeAdmission.requireCurrent().thenRun(() -> {
+                requireConfiguredEncryption();
+            });
+            return scopeWork.copy();
+        }
+
+        /** Historical profile confirmation settles this original loan only; no Task is admitted here. */
+        synchronized CompletableFuture<Void> reconcileScopeForClose() {
+            if (scopeWork != null && !scopeWork.isDone()) {
+                return scopeWork.handle((ignored, failure) -> null).thenCompose(ignored -> reconcileScopeForClose());
+            }
+            if (scopeAttempt == null || scopeAttempt.isSettledForClose()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return scopeAttempt.reconcile().handle((admitted, failure) -> {
+                if (!scopeAttempt.isSettledForClose()) {
+                    throw new java.util.concurrent.CompletionException(
+                            "Original Provider scope metadata remains unresolved", failure);
+                }
+                return null;
+            });
+        }
+
+        @Override
+        public synchronized void close() {
+            if (!released) {
+                if (scopeWork != null && !scopeWork.isDone()
+                        || scopeAttempt != null && !scopeAttempt.isSettledForClose()) {
+                    throw new IllegalStateException("Original Provider scope metadata remains unresolved");
+                }
+                provider.close(); // Pending GET/PUT/UNKNOWN/response cleanup retains this original SDK hold.
+                transport.close(); // This transport borrows the original client.
+                released = true;
+                operationFinished();
+                ownerFinished.run();
+            }
+        }
+    }
+
+    MaterializationConnection borrowMaterializationConnection(
+            Namespace expected,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            CellProviderScopeId scope,
+            String prefix,
+            long maximumObjectBytes,
+            Runnable ownerFinished) {
+        return borrowMaterializationConnection(
+                expected, metadataNamespace, scope, null, prefix, maximumObjectBytes, ownerFinished);
+    }
+
+    MaterializationConnection borrowConfiguredMaterializationConnection(
+            Namespace expected,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            ProtocolCellIdentity cell,
+            String prefix,
+            long maximumObjectBytes,
+            Runnable ownerFinished) {
+        if (materializationConfiguration == null) {
+            throw new IllegalStateException("Native materialization requires its complete configured Provider profile");
+        }
+        return borrowMaterializationConnection(
+                expected, metadataNamespace, null, cell, prefix, maximumObjectBytes, ownerFinished);
+    }
+
+    private MaterializationConnection borrowMaterializationConnection(
+            Namespace expected,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            CellProviderScopeId suppliedScope,
+            ProtocolCellIdentity cell,
+            String prefix,
+            long maximumObjectBytes,
+            Runnable ownerFinished) {
+        synchronized (lifetimeLock) {
+            if (closed.get()) {
+                throw new IllegalStateException("Original S3 native connection is closed");
+            }
+            activeOperations++;
+        }
+        boolean delivered = false;
+        try {
+            var physical = S3M5PhysicalNamespaceAuthorityV2.connect(client, bucket, expected);
+            var binding = physical.bind(metadataNamespace).toCompletableFuture().join();
+            var transport = S3C1ObjectProviderTransport.admitVersionMatchDeleteV1(
+                    client,
+                    bucket,
+                    "native-pulsar/" + expected.serviceIdentity().value() + "/" + bucket,
+                    false,
+                    1000,
+                    cell == null
+                            ? null
+                            : materializationConfiguration.references().allowedEncryptionScope());
+            M5CellProviderProfileV2 profile = null;
+            var scope = suppliedScope;
+            if (cell != null) {
+                requireConfiguredEncryption();
+                var caps = transport.capabilities();
+                var delete = transport.deleteCapabilities();
+                delete.requireVersionMatchDeleteV1();
+                var configuration = new java.util.TreeMap<>(readAdmissionConfiguration());
+                configuration.remove("endpoint"); // Actual physical namespace identity replaces endpoint aliases.
+                configuration.put("adapter", S3C1ObjectProviderTransport.ADAPTER_VERSION);
+                configuration.put("deleteMechanism", delete.mechanism());
+                profile = new M5CellProviderProfileV2(
+                        binding,
+                        cell,
+                        prefix,
+                        materializationConfiguration.references(),
+                        S3C1ObjectProviderTransport.ADAPTER_VERSION,
+                        PulsarNativeM4DrainAdmissionV1.digest(configuration),
+                        caps.maximumObjectBytes(),
+                        caps.maximumRangeBytes(),
+                        caps.maximumListPageKeys(),
+                        delete.maximumVersionTokenBytes(),
+                        materializationConfiguration.gcGracePolicy());
+                scope = profile.scopeId();
+            }
+            var provider = new C1ObjectProviderSession(transport, scope, prefix, maximumObjectBytes, 65_536);
+            var connection =
+                    new MaterializationConnection(physical, binding, transport, provider, ownerFinished, profile);
+            synchronized (lifetimeLock) {
+                if (closed.get()) {
+                    throw new IllegalStateException("Original S3 connection closed during native admission");
+                }
+                delivered = true;
+            }
+            return connection;
+        } catch (IOException failure) {
+            throw new IllegalStateException("Original S3 native materialization admission failed", failure);
+        } finally {
+            if (!delivered) {
+                operationFinished();
+            }
+        }
+    }
+
+    private void requireConfiguredEncryption() {
+        if (materializationConfiguration == null
+                || client.serviceClientConfiguration().credentialsProvider()
+                        != materializationConfiguration.credentialsProvider()) {
+            throw new IllegalStateException("Original configured Provider credential context differs");
+        }
+        String actual;
+        try {
+            var configuration = client.getBucketEncryption(
+                            GetBucketEncryptionRequest.builder().bucket(bucket).build())
+                    .serverSideEncryptionConfiguration();
+            if (configuration == null
+                    || configuration.rules().size() != 1
+                    || configuration.rules().get(0).applyServerSideEncryptionByDefault() == null) {
+                throw new IllegalStateException("Actual bucket encryption scope is unavailable");
+            }
+            var encryption = configuration.rules().get(0).applyServerSideEncryptionByDefault();
+            actual = switch (encryption.sseAlgorithmAsString()) {
+                case "AES256" -> "S3_MANAGED_AES256";
+                case "aws:kms" -> "AWS_KMS:" + encryption.kmsMasterKeyID();
+                default -> throw new IllegalStateException("Actual bucket encryption algorithm is not admitted");
+            };
+            if (actual.startsWith("AWS_KMS:")
+                    && (encryption.kmsMasterKeyID() == null
+                            || !encryption.kmsMasterKeyID().startsWith("arn:"))) {
+                throw new IllegalStateException("Actual bucket KMS identity is not a stable full ARN");
+            }
+        } catch (S3Exception failure) {
+            if (failure.statusCode() != 404
+                    || failure.awsErrorDetails() == null
+                    || !"ServerSideEncryptionConfigurationNotFoundError"
+                            .equals(failure.awsErrorDetails().errorCode())) {
+                throw failure;
+            }
+            actual = "NONE";
+        }
+        if (!materializationConfiguration.references().allowedEncryptionScope().equals(actual)) {
+            throw new IllegalStateException("Actual bucket encryption differs from the allowed KMS scope");
+        }
     }
 
     @Override
@@ -99,24 +487,55 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
 
     @Override
     public CompletionStage<byte[]> readRange(String key, long offset, int length) {
-        return submit(() -> {
-            validateKey(key);
-            if (offset < 0 || length <= 0) {
-                throw new IllegalArgumentException("S3 range is empty or negative");
+        return submit(() -> readRangeSync(key, null, offset, length));
+    }
+
+    @Override
+    public CompletionStage<byte[]> readRange(String key, ImmutableObject expected, long offset, int length) {
+        return submit(() -> readRangeSync(key, Objects.requireNonNull(expected, "expected"), offset, length));
+    }
+
+    private byte[] readRangeSync(String key, ImmutableObject expected, long offset, int length) throws IOException {
+        validateKey(key);
+        if (offset < 0 || length <= 0) {
+            throw new IllegalArgumentException("S3 range is empty or negative");
+        }
+        long last = Math.addExact(offset, length - 1L);
+        var request = GetObjectRequest.builder().bucket(bucket).key(key).range("bytes=" + offset + "-" + last);
+        if (expected != null) {
+            if (last >= expected.bytes()) {
+                throw new IllegalArgumentException("S3 range exceeds the captured Object extent");
             }
-            long last = Math.addExact(offset, length - 1L);
-            try (InputStream input = client.getObject(GetObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(key)
-                    .range("bytes=" + offset + "-" + last)
-                    .build())) {
-                byte[] result = input.readNBytes(length);
-                if (result.length != length || input.read() != -1) {
-                    throw failure(FailureKind.SHORT_READ, "S3 range response differs from the exact requested length");
+            String identity = expected.immutableVersion();
+            if (identity.startsWith("version:")
+                    && identity.length() > "version:".length()
+                    && !identity.substring("version:".length()).isBlank()
+                    && !identity.substring("version:".length()).equals("null")) {
+                request.versionId(identity.substring("version:".length()));
+            } else if (identity.startsWith("etag:")
+                    && identity.length() > "etag:".length()
+                    && !identity.substring("etag:".length()).isBlank()) {
+                request.ifMatch(identity.substring("etag:".length()));
+            } else {
+                throw failure(FailureKind.INTEGRITY, "captured S3 Object version identity is unsupported");
+            }
+        }
+        try (var input = client.getObject(request.build())) {
+            if (expected != null) {
+                var response = input.response();
+                if (!expected.immutableVersion().equals(version(response.versionId(), response.eTag()))
+                        || !expected.sha256().equals(response.metadata().get(SHA256_METADATA))
+                        || !Long.valueOf(length).equals(response.contentLength())
+                        || !("bytes " + offset + "-" + last + "/" + expected.bytes()).equals(response.contentRange())) {
+                    throw failure(FailureKind.INTEGRITY, "S3 GET response differs from the captured Object proof");
                 }
-                return result;
             }
-        });
+            byte[] result = input.readNBytes(length);
+            if (result.length != length || input.read() != -1) {
+                throw failure(FailureKind.SHORT_READ, "S3 range response differs from the exact requested length");
+            }
+            return result;
+        }
     }
 
     @Override
@@ -157,20 +576,70 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
 
     @Override
     public CompletionStage<Void> close() {
-        if (!closed.compareAndSet(false, true)) {
-            return CompletableFuture.completedFuture(null);
+        synchronized (lifetimeLock) {
+            if (closed.get()) {
+                return closeCompletion.copy();
+            }
+            closed.set(true);
         }
-        CompletableFuture<Void> result = new CompletableFuture<>();
+        Throwable failure = null;
+        try {
+            executor.shutdown();
+        } catch (Throwable caught) {
+            failure = caught;
+        }
+        boolean finish;
+        synchronized (lifetimeLock) {
+            shutdownFailure = failure;
+            shutdownComplete = true;
+            finish = readyToClose();
+        }
+        if (finish) {
+            finishClose();
+        }
+        return closeCompletion.copy();
+    }
+
+    private boolean readyToClose() {
+        if (closed.get() && shutdownComplete && activeOperations == 0 && !closeStarted) {
+            closeStarted = true;
+            return true;
+        }
+        return false;
+    }
+
+    private void operationFinished() {
+        boolean finish;
+        synchronized (lifetimeLock) {
+            activeOperations--;
+            finish = readyToClose();
+        }
+        if (finish) {
+            finishClose();
+        }
+    }
+
+    private void finishClose() {
+        Throwable failure;
+        synchronized (lifetimeLock) {
+            failure = shutdownFailure;
+        }
         try {
             if (closeClient) {
                 client.close();
             }
-            executor.shutdown();
-            result.complete(null);
-        } catch (Throwable failure) {
-            result.completeExceptionally(failure);
+        } catch (Throwable caught) {
+            if (failure == null) {
+                failure = caught;
+            } else if (failure != caught) {
+                failure.addSuppressed(caught);
+            }
         }
-        return result;
+        if (failure == null) {
+            closeCompletion.complete(null);
+        } else {
+            closeCompletion.completeExceptionally(failure);
+        }
     }
 
     private ImmutableObject headSync(String key) throws ObjectStoreException {
@@ -218,21 +687,40 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
     }
 
     private <T> CompletionStage<T> submit(ThrowingSupplier<T> operation) {
-        if (closed.get()) {
-            return CompletableFuture.failedFuture(new IllegalStateException("S3 Pulsar Object store is closed"));
+        var result = new CompletableFuture<T>();
+        synchronized (lifetimeLock) {
+            if (closed.get()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("S3 Pulsar Object store is closed"));
+            }
+            activeOperations++;
         }
-        return CompletableFuture.supplyAsync(
-                () -> {
-                    if (closed.get()) {
-                        throw new IllegalStateException("S3 Pulsar Object store is closed");
-                    }
-                    try {
-                        return operation.get();
-                    } catch (Throwable failure) {
-                        throw new java.util.concurrent.CompletionException(map(failure));
-                    }
-                },
-                executor);
+        try {
+            executor.execute(() -> execute(operation, result));
+        } catch (RejectedExecutionException failure) {
+            operationFinished();
+            result.completeExceptionally(failure);
+        }
+        return result.copy();
+    }
+
+    private <T> void execute(ThrowingSupplier<T> operation, CompletableFuture<T> result) {
+        T value = null;
+        Throwable failure = null;
+        try {
+            if (closed.get()) {
+                throw new IllegalStateException("S3 Pulsar Object store is closed");
+            }
+            value = operation.get();
+        } catch (Throwable caught) {
+            failure = map(caught);
+        } finally {
+            operationFinished();
+        }
+        if (failure == null) {
+            result.complete(value);
+        } else {
+            result.completeExceptionally(failure);
+        }
     }
 
     private static Throwable map(Throwable failure) {

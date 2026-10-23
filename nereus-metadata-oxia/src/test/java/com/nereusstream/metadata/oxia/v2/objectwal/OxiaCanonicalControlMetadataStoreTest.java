@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2.objectwal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient;
@@ -104,6 +105,60 @@ class OxiaCanonicalControlMetadataStoreTest {
         assertThat(client.stored(exactBoundaryRoot + "/" + M4_PROTECTION)).isPresent();
         assertThatThrownBy(() -> new OxiaCanonicalControlMetadataStore(client, exactBoundaryRoot + "a", 7))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void runRetirementCertificateUsesOneExactCreateOnlyRootRoute() {
+        String key = ROOT + "/recovery-retirement-v1";
+        assertThat(store.putIfAbsent(key, FIRST)).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(store.get(key)).contains(FIRST);
+        assertThat(store.putIfAbsent(key, DIFFERENT)).isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThatThrownBy(() -> store.compareAndSet(key, Optional.of(FIRST), SECOND))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("create-only");
+        assertThatThrownBy(() -> store.get(key + "/child")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.get(key.replace("0000000007", "0000000008")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(store.get(key)).contains(FIRST);
+    }
+
+    @Test
+    void emptyProtocolDomainTagCannotBeReopenedEvenByARawCasCaller() {
+        // Transport refusal only: this deliberately incomplete value is not a qualified closure certificate.
+        CanonicalBytes tag = CanonicalBytes.copyOf(
+                java.nio.ByteBuffer.allocate(8).putInt(0x4e4b4330).putInt(1).array());
+        assertThat(store.putIfAbsent(KAFKA_HEAD, tag)).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThatThrownBy(() -> store.compareAndSet(KAFKA_HEAD, Optional.of(tag), FIRST))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be reopened");
+        assertThat(store.compareAndSet(KAFKA_HEAD, Optional.empty(), FIRST))
+                .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThat(store.get(KAFKA_HEAD)).contains(tag);
+    }
+
+    @Test
+    void compactionRouteAcceptsOnlyItsExactCellKeyAndReconcilesLostCasReply() {
+        var cell = Sha256Digest.hash(bytes("actual-cell-route-fixture"));
+        var admission = OxiaCanonicalControlMetadataStore.forKafkaCompactionAdmission(client, CELL_ROOT, cell);
+        String key = "v2/object-wal/cells/" + cell.toHex() + "/read-m5/kafka-compaction-admission";
+        assertThat(admission.putIfAbsent(key, FIRST)).isEqualTo(ControlMutationOutcome.APPLIED);
+        var first = admission.getVersioned(key).orElseThrow();
+        assertThat(first.key()).isEqualTo(key);
+        assertThat(first.canonicalStoredBytes()).isEqualTo(FIRST);
+        client.nextMutation(MutationMode.APPLY_THEN_RESPONSE_LOSS);
+        assertThat(admission.compareAndSet(key, Optional.of(FIRST), SECOND)).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(admission.get(key)).contains(SECOND);
+        var second = admission.getVersioned(key).orElseThrow();
+        assertThat(second.metadataVersion()).isNotEqualTo(first.metadataVersion());
+        assertThat(second.canonicalStoredBytes()).isEqualTo(SECOND);
+        assertThat(second.canonicalStoredSha256()).isEqualTo(Sha256Digest.hash(SECOND));
+        assertThat(client.stored(CELL_ROOT + "/" + key)).isPresent();
+        assertThatThrownBy(() -> admission.get(POINTER)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> admission.get(key + "/extra")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> admission.getVersioned(key + "/extra")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> admission.get(key.replace(cell.toHex(), "f".repeat(64))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.get(key)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

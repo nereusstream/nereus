@@ -23,6 +23,7 @@ import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespaceV2;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaQuotaTargetDeleteStoreV2;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerAppendRequestV1;
@@ -40,7 +41,9 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
+import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PublicationOutcome;
+import com.nereusstream.storage.object.retention.M5MaterializationWorkerCoordinatorV1;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
 import java.nio.file.Files;
@@ -164,7 +167,11 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
             int prewrites = fixture.context.faults.recordCreates.get();
             assertThat(fixture.publish(descriptor).get(30, TimeUnit.SECONDS)).isEqualTo(PublicationOutcome.CONFLICT);
             assertThat(fixture.context.faults.selectorCas.get()).isZero();
-            assertThat(fixture.context.faults.recordCreates.get()).isEqualTo(prewrites);
+            // The original membership is durable before ticket acquisition, but no descriptor/candidate was published.
+            assertThat(fixture.context.faults.recordCreates.get()).isEqualTo(prewrites + 1);
+            assertThat(fixture.context.onOwner(() -> fixture.context.store.get(
+                            KafkaBookKeeperCompactionPublicationV2.descriptorKey(descriptor.descriptorSha256()))))
+                    .isEmpty();
             for (var resource : resources) {
                 assertThat(fixture.tickets(resource)).isZero();
             }
@@ -290,6 +297,146 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
     }
 
     @Test
+    void staleSelectedWorkerRetriesOriginalTerminalTicketsWithoutReopeningExpiredInputs() throws Exception {
+        try (var fixture = new Fixture(1409, null, true)) {
+            var descriptor = fixture.write();
+            var resources = fixture.targets(descriptor);
+            fixture.admit(resources);
+            var worker = fixture.worker(descriptor);
+            var faults = new CleanupFaults(fixture.route);
+            var guard = new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(faults));
+            faults.rejectRemoval = true;
+            assertThat(fixture.publishWorker(descriptor, worker, guard, fixture::membership, false))
+                    .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
+            var comparisonKey = KafkaBookKeeperReplacementSemanticsV2.key(descriptor.descriptorSha256());
+            var comparisonFact = fixture.controlFact(comparisonKey);
+            var comparison = KafkaBookKeeperReplacementSemanticsV2.decode(comparisonFact.canonicalStoredBytes());
+            comparison.requireDescriptor(descriptor);
+            var originalMembership =
+                    fixture.controlFact(KafkaBookKeeperPublicationTargetsV2.key(descriptor.descriptorSha256()));
+            assertThat(comparison.publicationTargetsSha256()).isEqualTo(originalMembership.canonicalStoredSha256());
+            assertThat(comparison.transfers(
+                            descriptor,
+                            new com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1(
+                                    comparisonFact.key(),
+                                    comparisonFact.metadataVersion(),
+                                    comparisonFact.canonicalStoredSha256())))
+                    .hasSize(com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2.SemanticAspect.values()
+                            .length);
+            assertThat(fixture.context.onOwner(worker::isCurrent)).isFalse();
+            for (var resource : resources) {
+                assertThat(fixture.tickets(resource)).isEqualTo(1);
+            }
+            var selectorKey = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                            7, fixture.context.binding)
+                    .selector();
+            var selectedAuthority = await(fixture.context.route.read(selectorKey));
+            var original = KafkaBookKeeperPublicationTicketsV2.context(descriptor, resources);
+            var siblingContext = new M5TargetDeleteMultiWriterGuardV2.Context(
+                    original.writerClass(),
+                    original.capabilitySha256(),
+                    original.ownerFenceSha256(),
+                    KafkaBookKeeperCompactionTestSupportV2.digest("independent descriptor obligations"));
+            var held = new CompletableFuture<M5TargetDeleteMultiWriterGuardV2.Completion<String>>();
+            var started = new CompletableFuture<Void>();
+            var sibling = fixture.guard.execute(resources, siblingContext, () -> {
+                started.complete(null);
+                return held;
+            });
+            await(started);
+            var resolutions = new java.util.concurrent.atomic.AtomicInteger();
+            KafkaBookKeeperPublicationTicketsV2.InputMembership expired = plan -> {
+                resolutions.incrementAndGet();
+                return CompletableFuture.failedFuture(new IllegalStateException("native input admission expired"));
+            };
+            try {
+                assertThat(fixture.publishWorker(descriptor, worker, guard, expired, false))
+                        .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
+                for (var resource : resources) {
+                    assertThat(fixture.tickets(resource)).isEqualTo(2);
+                }
+                faults.rejectRemoval = false;
+                assertThat(fixture.publishWorker(descriptor, worker, guard, expired, false))
+                        .isEqualTo(PublicationOutcome.EXISTING_EXACT);
+                for (var resource : resources) {
+                    assertThat(fixture.tickets(resource)).isEqualTo(1);
+                }
+                assertThat(resolutions.get()).isZero();
+                assertThat(fixture.controlFact(comparisonKey)).isEqualTo(comparisonFact);
+                assertThat(sibling.toCompletableFuture()).isNotDone();
+                assertThat(await(fixture.context.route.read(selectorKey))).isEqualTo(selectedAuthority);
+            } finally {
+                faults.rejectRemoval = false;
+                held.complete(new M5TargetDeleteMultiWriterGuardV2.Completion<>(
+                        "finished",
+                        Optional.of(KafkaBookKeeperCompactionTestSupportV2.digest("independent terminal"))));
+                await(sibling);
+            }
+            for (var resource : resources) {
+                assertThat(fixture.tickets(resource)).isZero();
+            }
+        }
+    }
+
+    @Test
+    void replacementWorkerWithoutTerminalRetainsTicketsUntilNativeTaskCancellation() throws Exception {
+        try (var fixture = new Fixture(1410, null, true)) {
+            var descriptor = fixture.write();
+            var resources = fixture.targets(descriptor);
+            fixture.admit(resources);
+            var worker = fixture.worker(descriptor);
+            assertThat(fixture.publishWorker(descriptor, worker, fixture.guard, fixture::membership, true))
+                    .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
+            fixture.context.onOwner(() -> {
+                var cut = fixture.input.plan().sourceCut();
+                var workers =
+                        new M5MaterializationWorkerCoordinatorV1(fixture.context.store, 7, fixture.context.binding);
+                var replacement = workers.propose(
+                        cut.predecessorSelector(),
+                        cut.identity().protocolCellSha256(),
+                        cut.identity().providerScopeSha256(),
+                        cut.identity().storageFence(),
+                        KafkaBookKeeperCompactionTestSupportV2.digest("synthetic replacement native owner"),
+                        KafkaBookKeeperCompactionTestSupportV2.digest("synthetic worker namespace"));
+                assertThat(replacement
+                                .orElseThrow()
+                                .admit(
+                                        M5MaterializationCodecV1.sourceCutSha256(cut),
+                                        KafkaBookKeeperCompactionTestSupportV2.digest("synthetic replacement plan"),
+                                        KafkaBookKeeperCompactionTestSupportV2.digest("synthetic replacement task")))
+                        .isPresent();
+                return null;
+            });
+            var selectorKey = new com.nereusstream.storage.object.read.control.M4ReadControlKeysV1(
+                            7, fixture.context.binding)
+                    .selector();
+            var replacementAuthority = await(fixture.context.route.read(selectorKey));
+            var resolutions = new java.util.concurrent.atomic.AtomicInteger();
+            KafkaBookKeeperPublicationTicketsV2.InputMembership expired = plan -> {
+                resolutions.incrementAndGet();
+                return CompletableFuture.failedFuture(new IllegalStateException("native input admission expired"));
+            };
+            assertThat(fixture.publishWorker(descriptor, worker, fixture.guard, expired, false))
+                    .isEqualTo(PublicationOutcome.OUTCOME_UNKNOWN);
+            for (var resource : resources) {
+                assertThat(fixture.tickets(resource)).isEqualTo(1);
+            }
+            assertThat(await(fixture.context.route.read(selectorKey))).isEqualTo(replacementAuthority);
+            var terminal = fixture.context.onOwner(() -> new KafkaBookKeeperTaskTerminationV2(
+                            fixture.context.store, 7, fixture.context.task, fixture.output, fixture.context.owner)
+                    .terminate());
+            assertThat(await(terminal).outcome())
+                    .isEqualTo(KafkaBookKeeperTaskTerminationV2.Outcome.TERMINATED_UNPUBLISHED);
+            assertThat(fixture.publishWorker(descriptor, worker, fixture.guard, expired, false))
+                    .isEqualTo(PublicationOutcome.CANCELLED_STALE);
+            assertThat(resolutions.get()).isZero();
+            for (var resource : resources) {
+                assertThat(fixture.tickets(resource)).isZero();
+            }
+        }
+    }
+
+    @Test
     void writeBeforeServerRestart() throws Exception {
         try (var fixture = new Fixture(1407, null)) {
             var descriptor = fixture.write();
@@ -353,8 +500,46 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
         return stage.toCompletableFuture().get(30, TimeUnit.SECONDS);
     }
 
+    private static final class CleanupFaults implements ExactMetadataTransactionStoreV1 {
+        final ExactMetadataTransactionStoreV1 delegate;
+        volatile boolean rejectRemoval;
+
+        CleanupFaults(ExactMetadataTransactionStoreV1 delegate) {
+            this.delegate = delegate;
+        }
+
+        public CompletionStage<Optional<VersionedValue>> read(String key) {
+            return delegate.read(key);
+        }
+
+        public CompletionStage<MutationOutcome> compareAndSet(
+                Optional<VersionedValue> predecessor, String key, CanonicalBytes candidate) {
+            if (rejectRemoval
+                    && predecessor.isPresent()
+                    && M5TargetDeleteAuthorityCodecV1.decodeAuthority(candidate)
+                                    .activeWriterTickets()
+                                    .size()
+                            < M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                            predecessor.orElseThrow().canonicalStoredBytes())
+                                    .activeWriterTickets()
+                                    .size()) {
+                return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
+            }
+            return delegate.compareAndSet(predecessor, key, candidate);
+        }
+
+        public CompletionStage<TransactionOutcome> conditionalTransaction(ExactTransaction transaction) {
+            return delegate.conditionalTransaction(transaction);
+        }
+
+        public boolean supportsAtomicMultiKeyTransactions() {
+            return delegate.supportsAtomicMultiKeyTransactions();
+        }
+    }
+
     private static final class Fixture implements AutoCloseable {
         final KafkaBookKeeperCompactionTestSupportV2.Input input;
+        final Optional<KafkaCompactionRecoveryStateV1> recoveryState;
         final AsyncOxiaClient oxia;
         final M5BookKeeperNamespaceAuthorityV2 backend;
         final PhysicalNamespaceAuthorityBindingV2 binding;
@@ -368,7 +553,33 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
         final M5TargetDeleteMultiWriterGuardV2 guard;
 
         Fixture(long attempt, List<String> restore) throws Exception {
-            input = KafkaBookKeeperNativeCreateV2RealTest.nativeInput(false, attempt);
+            this(attempt, restore, false);
+        }
+
+        Fixture(long attempt, List<String> restore, boolean worker) throws Exception {
+            recoveryState = worker
+                    ? Optional.of(KafkaBookKeeperCompactionTestSupportV2.recoveryState(false))
+                    : Optional.empty();
+            if (worker) {
+                var synthetic =
+                        KafkaBookKeeperCompactionTestSupportV2.inputWithRecovery(recoveryState.orElseThrow(), attempt);
+                var capability = synthetic.layout().task().capability();
+                var instance = M5BookKeeperNativeCreateClientV2.discoverInstanceId(
+                        System.getProperty("nereus.bookkeeper.metadataServiceUri"), capability);
+                var layout = KafkaBookKeeperCompactionLayoutV2.plan(
+                        synthetic.plan(),
+                        synthetic.semantic(),
+                        recoveryState.orElseThrow(),
+                        M5BookKeeperNativeCreateSpecV2.namespace(instance),
+                        capability,
+                        attempt,
+                        64 * 1024,
+                        256 * 1024);
+                input = new KafkaBookKeeperCompactionTestSupportV2.Input(
+                        synthetic.plan(), synthetic.semantic(), layout, synthetic.capabilityEvidence());
+            } else {
+                input = KafkaBookKeeperNativeCreateV2RealTest.nativeInput(false, attempt);
+            }
             var task = input.layout().task();
             String uri = System.getProperty("nereus.bookkeeper.metadataServiceUri");
             oxia = OxiaClientBuilder.create(System.getProperty("nereus.m5.oxia.serviceAddress"))
@@ -471,7 +682,61 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
         }
 
         KafkaSealedBookKeeperDescriptorV2 write() throws Exception {
-            return context.write(input);
+            return context.write(input, recoveryState);
+        }
+
+        M5MaterializationWorkerCoordinatorV1.Admission worker(KafkaSealedBookKeeperDescriptorV2 descriptor)
+                throws Exception {
+            return context.onOwner(() -> {
+                var cut = input.plan().sourceCut();
+                var workers = new M5MaterializationWorkerCoordinatorV1(context.store, 7, context.binding);
+                assertThat(workers.migrateLegacyAuthority()).isTrue();
+                return workers.propose(
+                                cut.predecessorSelector(),
+                                cut.identity().protocolCellSha256(),
+                                cut.identity().providerScopeSha256(),
+                                cut.identity().storageFence(),
+                                KafkaBookKeeperCompactionTestSupportV2.digest("synthetic worker owner"),
+                                KafkaBookKeeperCompactionTestSupportV2.digest("synthetic worker namespace"))
+                        .orElseThrow()
+                        .admit(
+                                M5MaterializationCodecV1.sourceCutSha256(cut),
+                                KafkaCompactionCanonicalV1.planRoot(input.plan()),
+                                descriptor.task().taskIdSha256())
+                        .orElseThrow();
+            });
+        }
+
+        PublicationOutcome publishWorker(
+                KafkaSealedBookKeeperDescriptorV2 descriptor,
+                M5MaterializationWorkerCoordinatorV1.Admission worker,
+                M5TargetDeleteMultiWriterGuardV2 writerGuard,
+                KafkaBookKeeperPublicationTicketsV2.InputMembership membership,
+                boolean stalePolicy)
+                throws Exception {
+            var expected = new KafkaCompactionPublicationFenceV1().expected(input.plan());
+            var current = stalePolicy
+                    ? new KafkaCompactionPublicationFenceV1.Snapshot(
+                            expected.compactionPlanRootSha256(),
+                            expected.protocolStateRootSha256(),
+                            expected.policyGeneration() + 1,
+                            expected.frontiers())
+                    : expected;
+            return await(context.onOwner(() -> new KafkaBookKeeperCompactionPublicationV2(
+                            context.store,
+                            7,
+                            context.binding,
+                            context.reader(),
+                            context.owner,
+                            new KafkaBookKeeperPublicationTicketsV2(writerGuard, membership, context.owner))
+                    .publish(
+                            input.plan(),
+                            input.semantic(),
+                            descriptor,
+                            context.protections,
+                            () -> current,
+                            recoveryState.orElseThrow(),
+                            worker)));
         }
 
         CompletionStage<Map<Sha256Digest, List<PhysicalResourceIdV2>>> membership(
@@ -498,6 +763,19 @@ class KafkaBookKeeperPublicationTicketsV2RealTest {
                                 sourceHandle.ledgerIdentity().ledgerId());
                         return Map.of(cut.sources().get(0).sourceIdentitySha256(), List.of(resource));
                     });
+        }
+
+        VersionedValue controlFact(String key) throws Exception {
+            var stored = context.oxia.get(context.records.nativeKey(key)).get(30, TimeUnit.SECONDS);
+            var bytes = CanonicalBytes.copyOf(stored.value());
+            return new VersionedValue(
+                    key,
+                    bytes,
+                    Sha256Digest.hash(bytes),
+                    new com.nereusstream.metadata.spi.model.MetadataVersion(
+                            CanonicalBytes.copyOf(java.nio.ByteBuffer.allocate(Long.BYTES)
+                                    .putLong(stored.version().versionId())
+                                    .array())));
         }
 
         List<PhysicalResourceIdV2> targets(KafkaSealedBookKeeperDescriptorV2 descriptor) throws Exception {

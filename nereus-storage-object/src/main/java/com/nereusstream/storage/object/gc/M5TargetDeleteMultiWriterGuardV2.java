@@ -23,6 +23,7 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Targe
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeSet;
@@ -71,11 +72,37 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
             Sha256Digest operationId,
             boolean mutationInvoked,
             Optional<T> value,
-            List<PhysicalResourceIdV2> unresolvedTargets) {
+            List<PhysicalResourceIdV2> unresolvedTargets,
+            Optional<TerminalCleanup> terminalCleanup) {
+        public Result(
+                Sha256Digest operationId,
+                boolean mutationInvoked,
+                Optional<T> value,
+                List<PhysicalResourceIdV2> unresolvedTargets) {
+            this(operationId, mutationInvoked, value, unresolvedTargets, Optional.empty());
+        }
+
         public Result {
             Objects.requireNonNull(operationId, "operationId");
             value = Objects.requireNonNull(value, "value");
             unresolvedTargets = List.copyOf(unresolvedTargets);
+            terminalCleanup = Objects.requireNonNull(terminalCleanup, "terminalCleanup");
+        }
+    }
+
+    /** Owns exact attempted tickets and predecessor revisions after native termination or confirmed no dispatch. */
+    public final class TerminalCleanup {
+        private final List<Attempt> attempted;
+        private final Sha256Digest proof;
+
+        private TerminalCleanup(List<Attempt> attempted, Sha256Digest proof) {
+            this.attempted = List.copyOf(attempted);
+            this.proof = proof;
+        }
+
+        /** A bounded original-invocation pass; unchanged OPEN without a ticket still retains a possible late CAS. */
+        public CompletionStage<List<PhysicalResourceIdV2>> reconcile() {
+            return release(attempted, proof).thenApply(left -> left);
         }
     }
 
@@ -112,20 +139,38 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
             Supplier<? extends CompletionStage<Completion<T>>> mutation) {
         var targets = canonicalTargets(resources);
         Objects.requireNonNull(context, "context");
+        return executeWithContexts(
+                targets.stream().collect(java.util.stream.Collectors.toMap(resource -> resource, resource -> context)),
+                mutation);
+    }
+
+    /** Actual mixed namespaces may have different capabilities; freeze every target Context before acquisition. */
+    public <T> CompletionStage<Result<T>> executeWithContexts(
+            Map<? extends PhysicalResourceIdV2, Context> targetContexts,
+            Supplier<? extends CompletionStage<Completion<T>>> mutation) {
+        var contexts = Map.copyOf(targetContexts);
+        var targets = canonicalTargets(new ArrayList<>(contexts.keySet()));
         Objects.requireNonNull(mutation, "mutation");
         // Every invocation has distinct tickets, even if two callers retry the same logical publication concurrently.
         // No public method resumes external dispatch with this nonce; recovery can only reconcile a native terminal.
         var nonce = UUID.randomUUID();
-        var operation = Sha256Digest.hash(CanonicalBytes.copyOf(ByteBuffer.allocate(48)
-                .put(context.externalFactsRootSha256().bytes().toByteArray())
+        var envelope = ByteBuffer.allocate(16 + targets.size() * 132)
                 .putLong(nonce.getMostSignificantBits())
-                .putLong(nonce.getLeastSignificantBits())
-                .array()));
+                .putLong(nonce.getLeastSignificantBits());
+        for (var resource : targets) {
+            var context = contexts.get(resource);
+            envelope.put(resource.sha256().bytes().toByteArray())
+                    .putInt(context.writerClass().ordinal())
+                    .put(context.capabilitySha256().bytes().toByteArray())
+                    .put(context.ownerFenceSha256().bytes().toByteArray())
+                    .put(context.externalFactsRootSha256().bytes().toByteArray());
+        }
+        var operation = Sha256Digest.hash(CanonicalBytes.copyOf(envelope.array()));
         var attempted = new ArrayList<Attempt>();
         CompletionStage<Boolean> acquired = CompletableFuture.completedFuture(true);
         for (var resource : targets) {
             acquired = acquired.thenCompose(previous -> previous
-                    ? acquire(resource, context, operation, attempted)
+                    ? acquire(resource, contexts.get(resource), operation, attempted)
                     : CompletableFuture.completedFuture(false));
         }
         var work = acquired.thenCompose(complete -> {
@@ -136,7 +181,12 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
                         .put(operation.bytes().toByteArray())
                         .array()));
                 return release(attempted, noDispatch)
-                        .thenApply(left -> new Result<T>(operation, false, Optional.empty(), left));
+                        .thenApply(left -> new Result<T>(
+                                operation,
+                                false,
+                                Optional.empty(),
+                                left,
+                                Optional.of(new TerminalCleanup(attempted, noDispatch))));
             }
             CompletionStage<Completion<T>> external;
             try {
@@ -151,7 +201,14 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
                                     operation, true, Optional.ofNullable(result).map(Completion::value), targets));
                         }
                         return release(attempted, result.terminalProof().orElseThrow())
-                                .thenApply(left -> new Result<>(operation, true, Optional.of(result.value()), left));
+                                .thenApply(left -> new Result<>(
+                                        operation,
+                                        true,
+                                        Optional.of(result.value()),
+                                        left,
+                                        Optional.of(new TerminalCleanup(
+                                                attempted,
+                                                result.terminalProof().orElseThrow()))));
                     });
         });
         // Cancelling an observer must not stop ticket acquisition, native termination, or reconciliation.
@@ -177,6 +234,15 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
         return reconcile(resources, context, Optional.of(operationId), exactNativeTerminalProof);
     }
 
+    /** Metadata-only cleanup of one original mixed-capability invocation. */
+    public CompletionStage<List<PhysicalResourceIdV2>> reconcileOperationWithContexts(
+            Map<? extends PhysicalResourceIdV2, Context> targetContexts,
+            Sha256Digest operationId,
+            Sha256Digest exactNativeTerminalProof) {
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(operationId, "operationId");
+        return reconcileWithContexts(Map.copyOf(targetContexts), Optional.of(operationId), exactNativeTerminalProof);
+    }
+
     private CompletionStage<List<PhysicalResourceIdV2>> reconcile(
             List<? extends PhysicalResourceIdV2> resources,
             Context context,
@@ -184,6 +250,17 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
             Sha256Digest exactNativeTerminalProof) {
         var targets = canonicalTargets(resources);
         Objects.requireNonNull(context, "context");
+        return reconcileWithContexts(
+                targets.stream().collect(java.util.stream.Collectors.toMap(resource -> resource, resource -> context)),
+                operationId,
+                exactNativeTerminalProof);
+    }
+
+    private CompletionStage<List<PhysicalResourceIdV2>> reconcileWithContexts(
+            Map<? extends PhysicalResourceIdV2, Context> contexts,
+            Optional<Sha256Digest> operationId,
+            Sha256Digest exactNativeTerminalProof) {
+        var targets = canonicalTargets(new ArrayList<>(contexts.keySet()));
         M5TargetDeleteAuthorityRecordsV1.requireDigest(exactNativeTerminalProof, "exactNativeTerminalProof");
         var pending = new ArrayList<Attempt>();
         var unscanned = new TreeSet<PhysicalResourceIdV2>();
@@ -208,7 +285,7 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
                                     && !operationId.orElseThrow().equals(ticket.operationIdSha256())) {
                                 continue;
                             }
-                            if (context.matches(ticket)) {
+                            if (contexts.get(resource).matches(ticket)) {
                                 if (pending.size() < MAX_RECOVERY_TICKETS) {
                                     pending.add(new Attempt(resource, ticket));
                                 } else {

@@ -27,6 +27,9 @@ import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.SealedLedgerSection;
+import com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +44,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import javax.crypto.SecretKey;
 import org.apache.bookkeeper.client.api.LedgerEntries;
 import org.apache.bookkeeper.client.api.LedgerEntry;
@@ -119,6 +124,17 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         }
     }
 
+    Map<String, String> readAdmissionConfiguration() {
+        if (!(objectStore instanceof S3PulsarOffloadObjectStoreV1 store)) {
+            throw new IllegalStateException("Native M4 admission requires its actual qualified S3 adapter");
+        }
+        var values = new java.util.TreeMap<String, String>(store.readAdmissionConfiguration());
+        values.putAll(policy.driverMetadata());
+        values.put("limits", policy.limits().toString());
+        values.put("capabilities", objectStore.capabilities().toString());
+        return Map.copyOf(values);
+    }
+
     private final PulsarOffloadObjectStoreV1 objectStore;
     private final RuntimePolicy policy;
     private final AttemptKeyManager keyManager;
@@ -128,6 +144,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     private final Path stagingDirectory;
     private final PulsarSealedLedgerPublisherV1 publisher;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object lifetimeLock = new Object();
+    private final CompletableFuture<Void> drained = new CompletableFuture<>();
+    private int activeOperations;
 
     public NereusPulsarLedgerOffloaderV1(
             PulsarOffloadObjectStoreV1 objectStore,
@@ -166,8 +185,81 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         return policy.driverMetadata();
     }
 
+    S3PulsarOffloadObjectStoreV1.MaterializationConnection borrowMaterializationConnection(
+            Namespace expected,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            com.nereusstream.storage.api.bookkeeper.CellProviderScopeId scope,
+            long maximumObjectBytes) {
+        synchronized (lifetimeLock) {
+            requireOpen();
+            activeOperations++;
+        }
+        boolean delivered = false;
+        try {
+            if (!(objectStore instanceof S3PulsarOffloadObjectStoreV1 store)) {
+                throw new IllegalStateException("Native materialization requires the original qualified S3 connection");
+            }
+            var connection = store.borrowMaterializationConnection(
+                    expected,
+                    metadataNamespace,
+                    scope,
+                    policy.providerScopePrefix(),
+                    maximumObjectBytes,
+                    this::operationFinished);
+            if (closed.get()) {
+                connection.close();
+                delivered = true; // The connection already returned this original offloader hold.
+                throw new IllegalStateException("Native offloader closed during materialization admission");
+            }
+            delivered = true;
+            return connection;
+        } finally {
+            if (!delivered) {
+                operationFinished();
+            }
+        }
+    }
+
+    S3PulsarOffloadObjectStoreV1.MaterializationConnection borrowConfiguredMaterializationConnection(
+            PulsarNativeBindingV1 binding, Namespace expected, long maximumObjectBytes) {
+        synchronized (lifetimeLock) {
+            requireOpen();
+            activeOperations++;
+        }
+        boolean delivered = false;
+        try {
+            if (!(objectStore instanceof S3PulsarOffloadObjectStoreV1 store)) {
+                throw new IllegalStateException(
+                        "Native materialization requires its original configured S3 connection");
+            }
+            var connection = store.borrowConfiguredMaterializationConnection(
+                    expected,
+                    binding.metadataNamespace(),
+                    binding.authority().aggregate().binding().cellIdentity(),
+                    policy.providerScopePrefix(),
+                    maximumObjectBytes,
+                    this::operationFinished);
+            if (closed.get()) {
+                connection.close();
+                delivered = true;
+                throw new IllegalStateException("Native offloader closed during configured materialization admission");
+            }
+            delivered = true;
+            return connection;
+        } finally {
+            if (!delivered) {
+                operationFinished();
+            }
+        }
+    }
+
     @Override
     public CompletableFuture<Void> offload(ReadHandle ledger, UUID attemptUuid, Map<String, String> extraMetadata) {
+        return admittedOperation(() -> offloadLedger(ledger, attemptUuid, extraMetadata));
+    }
+
+    private CompletableFuture<Void> offloadLedger(
+            ReadHandle ledger, UUID attemptUuid, Map<String, String> extraMetadata) {
         PreparedAttemptKey attemptKey;
         PulsarSealedLedgerAttemptV1 attempt;
         SealedLedgerSection sealedLedger;
@@ -175,7 +267,6 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             Objects.requireNonNull(ledger, "ledger");
             Objects.requireNonNull(attemptUuid, "attemptUuid");
             Objects.requireNonNull(extraMetadata, "extraMetadata");
-            requireOpen();
             if (!ledger.isClosed()
                     || ledger.getLastAddConfirmed() < 0
                     || ledger.getLedgerMetadata().getLastEntryId() != ledger.getLastAddConfirmed()
@@ -215,10 +306,57 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     @Override
     public CompletableFuture<ReadHandle> readOffloaded(
             long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata) {
+        return readOffloaded(ledgerId, attemptUuid, persistedDriverMetadata, null);
+    }
+
+    @Override
+    public CompletableFuture<ReadHandle> readOffloadedCaptured(
+            long ledgerId,
+            UUID attemptUuid,
+            Map<String, String> persistedDriverMetadata,
+            OffloadedReadSourceIdentity expected) {
+        if (expected == null
+                || expected.ledgerId() != ledgerId
+                || !expected.attemptUuid().equals(attemptUuid)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("published Object attempt differs"));
+        }
+        return readOffloaded(ledgerId, attemptUuid, persistedDriverMetadata, expected);
+    }
+
+    private CompletableFuture<ReadHandle> readOffloaded(
+            long ledgerId,
+            UUID attemptUuid,
+            Map<String, String> persistedDriverMetadata,
+            OffloadedReadSourceIdentity expected) {
+        CompletableFuture<ReadHandle> opening =
+                admittedOperation(() -> openReadHandle(ledgerId, attemptUuid, persistedDriverMetadata, expected));
+        CompletableFuture<ReadHandle> observer = new CompletableFuture<>();
+        opening.whenComplete((handle, failure) -> {
+            if (failure != null) {
+                observer.completeExceptionally(failure);
+            } else if (!observer.complete(handle)) {
+                // No caller received this handle; it has no admitted reads and owns no borrowed source.
+                handle.closeAsync();
+            }
+        });
+        return observer;
+    }
+
+    private CompletableFuture<ReadHandle> openReadHandle(
+            long ledgerId,
+            UUID attemptUuid,
+            Map<String, String> persistedDriverMetadata,
+            OffloadedReadSourceIdentity expected) {
         NativePolicy nativePolicy;
         try {
-            requireOpen();
             nativePolicy = nativePolicy(persistedDriverMetadata);
+            if (expected != null) {
+                var keys = PulsarOffloadKeysV1.derive(nativePolicy.providerScopePrefix(), ledgerId, attemptUuid);
+                if (!keys.rootKey().equals(expected.root().key())
+                        || !keys.dataKey().equals(expected.data().key())) {
+                    throw new IllegalArgumentException("published Object keys differ from the actual provider attempt");
+                }
+            }
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -232,28 +370,89 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         nativePolicy.blockClass().targetBytes(),
                         nativePolicy.compressionPolicy(),
                         persistedAttempt -> keyManager.unwrap(
-                                ledgerId, attemptUuid, persistedAttempt.keyEnvelope(), persistedDriverMetadata))
-                .thenApply(handle -> (ReadHandle) new NereusPulsarReadHandleV1(handle))
+                                ledgerId, attemptUuid, persistedAttempt.keyEnvelope(), persistedDriverMetadata),
+                        expected == null
+                                ? null
+                                : new PulsarOffloadObjectStoreV1.ImmutableObject(
+                                        expected.root().version(),
+                                        expected.root().length(),
+                                        expected.root().sha256()),
+                        expected == null
+                                ? null
+                                : new PulsarOffloadObjectStoreV1.ImmutableObject(
+                                        expected.data().version(),
+                                        expected.data().length(),
+                                        expected.data().sha256()))
+                .thenCompose(handle -> {
+                    if (closed.get()) {
+                        return handle.close()
+                                .thenCompose(ignored -> CompletableFuture.<ReadHandle>failedFuture(
+                                        new IllegalStateException("Nereus Pulsar offloader is closed")));
+                    }
+                    return CompletableFuture.<ReadHandle>completedFuture(new NereusPulsarReadHandleV1(handle));
+                })
                 .toCompletableFuture();
+    }
+
+    @Override
+    public OffloadedReadSourceIdentity describeOffloadedReadSource(ReadHandle handle) {
+        if (!(handle instanceof NereusPulsarReadHandleV1 nativeHandle)) {
+            throw new IllegalArgumentException("opened source is not this provider's NPO1/NPD1 handle");
+        }
+        return nativeHandle.describeSource(objectStore);
+    }
+
+    @Override
+    public SourceSafeLedgerOffloader.OffloadedReadMemoryBounds describeOffloadedReadMemoryBounds(ReadHandle handle) {
+        if (!(handle instanceof NereusPulsarReadHandleV1 nativeHandle)) {
+            throw new IllegalArgumentException("opened source is not this provider's NPO1/NPD1 handle");
+        }
+        return nativeHandle.memoryBounds(objectStore);
+    }
+
+    @Override
+    public CompletableFuture<Void> verifyOpenedOffloadedSource(
+            ReadHandle handle,
+            long lastAddConfirmed,
+            long entryCount,
+            long logicalLength,
+            BooleanSupplier sourceUseOpen) {
+        try {
+            if (!(handle instanceof NereusPulsarReadHandleV1 nativeHandle)) {
+                throw new IllegalArgumentException("opened verification source belongs to another provider");
+            }
+            nativeHandle.describeSource(objectStore);
+            return admittedOperation(
+                    () -> nativeHandle.verifyOpenedSource(lastAddConfirmed, entryCount, logicalLength, sourceUseOpen));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    /** Uses this exact Native provider connection; endpoint aliases and another store cannot supply its marker. */
+    public CompletableFuture<PhysicalNamespaceAuthorityBindingV2> observePhysicalNamespace(
+            Namespace expected, MetadataNamespaceIdentityV2 metadataNamespace) {
+        return admittedOperation(() -> {
+            if (!(objectStore instanceof S3PulsarOffloadObjectStoreV1 store)) {
+                return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException("native physical Object namespace is unsupported"));
+            }
+            return store.observePhysicalNamespace(expected, metadataNamespace).toCompletableFuture();
+        });
     }
 
     @Override
     public CompletableFuture<Void> deleteOffloaded(
             long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata) {
-        NativePolicy nativePolicy;
         try {
             requireOpen();
-            nativePolicy = nativePolicy(persistedDriverMetadata);
+            NativePolicy nativePolicy = nativePolicy(persistedDriverMetadata);
+            PulsarOffloadKeysV1.derive(nativePolicy.providerScopePrefix(), ledgerId, attemptUuid);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        PulsarOffloadKeysV1 keys =
-                PulsarOffloadKeysV1.derive(nativePolicy.providerScopePrefix(), ledgerId, attemptUuid);
-        return objectStore
-                .deleteAndProveAbsent(keys.rootKey())
-                .thenCompose(ignored -> objectStore.deleteAndProveAbsent(keys.dataKey()))
-                .thenCompose(ignored -> objectStore.cleanupAttemptMultipartResidue(keys.attemptPrefix()))
-                .toCompletableFuture();
+        return CompletableFuture.failedFuture(new IllegalStateException(
+                "Pulsar offload deletion requires M5 intent, release and native reference-free authority"));
     }
 
     @Override
@@ -299,9 +498,19 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             long lastAddConfirmed,
             long entryCount,
             long logicalLength) {
+        return admittedOperation(() -> revalidateSource(
+                ledgerId, attemptUuid, persistedDriverMetadata, lastAddConfirmed, entryCount, logicalLength));
+    }
+
+    private CompletableFuture<Void> revalidateSource(
+            long ledgerId,
+            UUID attemptUuid,
+            Map<String, String> persistedDriverMetadata,
+            long lastAddConfirmed,
+            long entryCount,
+            long logicalLength) {
         NativePolicy nativePolicy;
         try {
-            requireOpen();
             nativePolicy = nativePolicy(persistedDriverMetadata);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
@@ -343,7 +552,47 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
 
     @Override
     public void close() {
-        closed.set(true);
+        closeAsync().join();
+    }
+
+    /** Waits for admitted offloads, handle opens and source verification; returned read handles remain borrowed. */
+    public CompletableFuture<Void> closeAsync() {
+        boolean complete;
+        synchronized (lifetimeLock) {
+            closed.set(true);
+            complete = activeOperations == 0;
+        }
+        if (complete) {
+            drained.complete(null);
+        }
+        return drained.copy();
+    }
+
+    private <T> CompletableFuture<T> admittedOperation(Supplier<CompletableFuture<T>> operation) {
+        synchronized (lifetimeLock) {
+            if (closed.get()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Nereus Pulsar offloader is closed"));
+            }
+            activeOperations++;
+        }
+        CompletableFuture<T> actual;
+        try {
+            actual = operation.get();
+        } catch (Throwable failure) {
+            actual = CompletableFuture.failedFuture(failure);
+        }
+        return actual.whenComplete((ignored, failure) -> operationFinished()).copy();
+    }
+
+    private void operationFinished() {
+        boolean complete;
+        synchronized (lifetimeLock) {
+            activeOperations--;
+            complete = closed.get() && activeOperations == 0;
+        }
+        if (complete) {
+            drained.complete(null);
+        }
     }
 
     private CompletableFuture<Path> createStagingFile(long ledgerId, UUID attemptUuid) {
@@ -372,8 +621,16 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                                     attemptKey,
                                     attemptUuid,
                                     policy.limits());
-                            readNextBatch(ledger, 0, encoder, result);
-                            result.whenComplete((ignored, failure) -> encoder.close());
+                            CompletableFuture<DataObject> encoded = new CompletableFuture<>();
+                            encoded.whenComplete((ignored, failure) -> encoder.close())
+                                    .whenComplete((data, failure) -> {
+                                        if (failure == null) {
+                                            result.complete(data);
+                                        } else {
+                                            result.completeExceptionally(unwrap(failure));
+                                        }
+                                    });
+                            readNextBatch(ledger, 0, encoder, encoded);
                         },
                         fileExecutor)
                 .exceptionally(failure -> {
@@ -387,74 +644,95 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             ReadHandle ledger, long firstEntryId, StreamingEncoder encoder, CompletableFuture<DataObject> result) {
         CompletableFuture<LedgerEntries> read;
         try {
-            read = Objects.requireNonNull(ledger.batchReadAsync(
-                    firstEntryId,
+            // BookKeeper's range-read fallback ignores maxSize; bound count by the admitted maximum entry size.
+            int maximumEntries = (int) Math.min(
                     policy.limits().maxEntriesPerBlock(),
-                    policy.limits().maxDecodedBlockBytes()));
+                    policy.limits().maxDecodedBlockBytes() / policy.limits().maxEntryBytes());
+            read = Objects.requireNonNull(ledger.batchReadAsync(
+                    firstEntryId, maximumEntries, policy.limits().maxDecodedBlockBytes()));
         } catch (Throwable failure) {
             result.completeExceptionally(failure);
             return;
         }
-        read.whenCompleteAsync(
-                (entries, readFailure) -> {
-                    if (readFailure != null) {
-                        result.completeExceptionally(unwrap(readFailure));
-                        return;
-                    }
-                    Throwable failure = null;
-                    long nextEntryId = firstEntryId;
-                    int batchEntries = 0;
-                    long batchBytes = 0;
-                    try {
-                        if (entries == null) {
-                            throw new IllegalStateException("native batch read returned null entries");
-                        }
-                        for (LedgerEntry entry : entries) {
-                            if (entry.getLedgerId() != ledger.getId() || entry.getEntryId() != nextEntryId) {
-                                throw new IllegalStateException("native batch read is mixed, reordered, or gapped");
-                            }
-                            byte[] payload = entry.getEntryBytes();
-                            batchEntries = Math.addExact(batchEntries, 1);
-                            batchBytes = Math.addExact(batchBytes, payload.length);
-                            if (batchEntries > policy.limits().maxEntriesPerBlock()
-                                    || batchBytes > policy.limits().maxDecodedBlockBytes()) {
-                                throw new IllegalStateException(
-                                        "native batch read exceeded the admitted count or byte cap");
-                            }
-                            encoder.append(new EntryPayload(entry.getEntryId(), payload));
-                            nextEntryId = Math.addExact(nextEntryId, 1);
-                        }
-                        long terminalEntryId = Math.addExact(ledger.getLastAddConfirmed(), 1);
-                        if (nextEntryId == firstEntryId || nextEntryId > terminalEntryId) {
-                            throw new IllegalStateException("native batch read made no progress or crossed LAC");
-                        }
-                    } catch (Throwable batchFailure) {
-                        failure = batchFailure;
-                    }
-                    try {
-                        if (entries != null) {
-                            entries.close();
-                        }
-                    } catch (Throwable closeFailure) {
-                        if (failure == null) {
-                            failure = closeFailure;
-                        } else {
-                            failure.addSuppressed(closeFailure);
-                        }
-                    }
-                    if (failure != null) {
-                        result.completeExceptionally(failure);
-                    } else if (nextEntryId == Math.addExact(ledger.getLastAddConfirmed(), 1)) {
-                        try {
-                            result.complete(encoder.finish());
-                        } catch (Throwable finishFailure) {
-                            result.completeExceptionally(finishFailure);
-                        }
-                    } else {
-                        readNextBatch(ledger, nextEntryId, encoder, result);
-                    }
-                },
-                fileExecutor);
+        read.whenComplete((entries, readFailure) -> {
+            try {
+                fileExecutor.execute(() -> consumeBatch(ledger, firstEntryId, encoder, result, entries, readFailure));
+            } catch (Throwable dispatchFailure) {
+                Throwable primary = readFailure == null ? dispatchFailure : unwrap(readFailure);
+                if (primary != dispatchFailure) {
+                    primary.addSuppressed(dispatchFailure);
+                }
+                result.completeExceptionally(closeEntries(entries, primary));
+            }
+        });
+    }
+
+    private void consumeBatch(
+            ReadHandle ledger,
+            long firstEntryId,
+            StreamingEncoder encoder,
+            CompletableFuture<DataObject> result,
+            LedgerEntries entries,
+            Throwable readFailure) {
+        if (readFailure != null) {
+            result.completeExceptionally(closeEntries(entries, unwrap(readFailure)));
+            return;
+        }
+        Throwable failure = null;
+        long nextEntryId = firstEntryId;
+        int batchEntries = 0;
+        long batchBytes = 0;
+        try {
+            if (entries == null) {
+                throw new IllegalStateException("native batch read returned null entries");
+            }
+            for (LedgerEntry entry : entries) {
+                if (entry.getLedgerId() != ledger.getId() || entry.getEntryId() != nextEntryId) {
+                    throw new IllegalStateException("native batch read is mixed, reordered, or gapped");
+                }
+                byte[] payload = entry.getEntryBytes();
+                batchEntries = Math.addExact(batchEntries, 1);
+                batchBytes = Math.addExact(batchBytes, payload.length);
+                if (batchEntries > policy.limits().maxEntriesPerBlock()
+                        || batchBytes > policy.limits().maxDecodedBlockBytes()) {
+                    throw new IllegalStateException("native batch read exceeded the admitted count or byte cap");
+                }
+                encoder.append(new EntryPayload(entry.getEntryId(), payload));
+                nextEntryId = Math.addExact(nextEntryId, 1);
+            }
+            long terminalEntryId = Math.addExact(ledger.getLastAddConfirmed(), 1);
+            if (nextEntryId == firstEntryId || nextEntryId > terminalEntryId) {
+                throw new IllegalStateException("native batch read made no progress or crossed LAC");
+            }
+        } catch (Throwable batchFailure) {
+            failure = batchFailure;
+        }
+        failure = closeEntries(entries, failure);
+        if (failure != null) {
+            result.completeExceptionally(failure);
+        } else if (nextEntryId == Math.addExact(ledger.getLastAddConfirmed(), 1)) {
+            try {
+                result.complete(encoder.finish());
+            } catch (Throwable finishFailure) {
+                result.completeExceptionally(finishFailure);
+            }
+        } else {
+            readNextBatch(ledger, nextEntryId, encoder, result);
+        }
+    }
+
+    private static Throwable closeEntries(LedgerEntries entries, Throwable failure) {
+        try {
+            if (entries != null) {
+                entries.close();
+            }
+        } catch (Throwable closeFailure) {
+            if (failure == null) {
+                return closeFailure;
+            }
+            failure.addSuppressed(closeFailure);
+        }
+        return failure;
     }
 
     private NativePolicy nativePolicy(Map<String, String> persisted) {

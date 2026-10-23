@@ -17,12 +17,18 @@ package com.nereusstream.metadata.oxia.v2.compaction;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.spi.model.MetadataVersion;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import io.oxia.client.api.AsyncOxiaClient;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.regex.Pattern;
 
 /**
@@ -36,8 +42,10 @@ public final class OxiaKafkaBookKeeperRecordStoreV2 implements CanonicalControlM
     private static final String PREFIX = "v2/kafka-bk-compaction-v2/";
     private static final Pattern ROOT = Pattern.compile("/(?:[A-Za-z0-9_-]+)(?:/[A-Za-z0-9_-]+)*");
     private static final Pattern KEY = Pattern.compile(PREFIX
-            + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/part/(?:0|[1-9][0-9]{0,2}))?"
-            + "|views/[0-9a-f]{64}/descriptor)");
+            + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/cache-budget|/part/(?:0|[1-9][0-9]{0,2}))?"
+            + "|views/[0-9a-f]{64}/(?:descriptor|publication-targets|replacement-semantics"
+            + "|native-read-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}"
+            + "|native-recovery-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}))");
     private final OxiaConditionalClient client;
     private final String cellRoot;
 
@@ -62,19 +70,56 @@ public final class OxiaKafkaBookKeeperRecordStoreV2 implements CanonicalControlM
                 || (key.contains("/part/") && Integer.parseInt(key.substring(key.lastIndexOf('/') + 1)) >= 256)) {
             throw new IllegalArgumentException("key is outside the closed BK compaction record route");
         }
-        return cellRoot + "/" + key;
+        String qualified = cellRoot + "/" + key;
+        if (qualified.length() > MAX_KEY_BYTES) {
+            throw new IllegalArgumentException("native BK record key exceeds its bounded route");
+        }
+        return qualified;
     }
 
     @Override
     public Optional<CanonicalBytes> get(String key) {
+        return getVersioned(key).toCompletableFuture().join().map(VersionedValue::canonicalStoredBytes);
+    }
+
+    /** Exact native read with a key-scoped opaque version for low-frequency eligibility fact capture. */
+    public CompletionStage<Optional<VersionedValue>> getVersioned(String key) {
         String qualified = nativeKey(key);
-        return client.read(qualified).toCompletableFuture().join().map(record -> {
-            if (!qualified.equals(record.key())) {
-                throw new IllegalStateException("native BK compaction read returned another key");
+        return client.read(qualified)
+                .thenApply(observed -> observed.map(record -> {
+                    if (!qualified.equals(record.key())) {
+                        throw new IllegalStateException("native BK compaction read returned another key");
+                    }
+                    verifyValue(key, record.storedBytes());
+                    return VersionedValue.of(key, record.storedBytes(), scopedVersion(qualified, record.versionId()));
+                }));
+    }
+
+    /** Exact physical key/version for GC freshness; never relabels a logical route token as a backend version. */
+    public CompletionStage<VersionedValue> nativeFact(VersionedValue expected) {
+        String qualified =
+                nativeKey(Objects.requireNonNull(expected, "expected").key());
+        verifyValue(expected.key(), expected.canonicalStoredBytes());
+        return client.read(qualified).thenApply(value -> {
+            var actual = value.orElseThrow(() -> new IllegalStateException("native BK record is missing"));
+            if (!actual.key().equals(qualified)
+                    || !actual.storedBytes().equals(expected.canonicalStoredBytes())
+                    || !scopedVersion(qualified, actual.versionId()).equals(expected.metadataVersion())) {
+                throw new IllegalStateException("native BK record differs from its exact logical observation");
             }
-            verifyValue(key, record.storedBytes());
-            return record.storedBytes();
+            return VersionedValue.of(
+                    qualified, actual.storedBytes(), MetadataVersionMapper.fromOxia(actual.versionId()));
         });
+    }
+
+    private static MetadataVersion scopedVersion(String qualified, long versionId) {
+        byte[] name = qualified.getBytes(StandardCharsets.UTF_8);
+        var version = CanonicalBytes.copyOf(ByteBuffer.allocate(Integer.BYTES + name.length + Long.BYTES)
+                .putInt(name.length)
+                .put(name)
+                .putLong(versionId)
+                .array());
+        return new MetadataVersion(Sha256Digest.hash(version).bytes());
     }
 
     @Override

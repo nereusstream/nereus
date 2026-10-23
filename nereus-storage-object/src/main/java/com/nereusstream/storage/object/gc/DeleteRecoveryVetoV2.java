@@ -26,7 +26,8 @@ public record DeleteRecoveryVetoV2(
     public enum Reason {
         PREDECESSOR_OWNER_AUTHORITY_REJECTED,
         CURRENT_OBSERVATION_AUTHORITY_REJECTED,
-        ELIGIBILITY_FACTS_REJECTED
+        ELIGIBILITY_FACTS_REJECTED,
+        EPOCH_GRACE_RENEWAL_PENDING
     }
 
     public DeleteRecoveryVetoV2 {

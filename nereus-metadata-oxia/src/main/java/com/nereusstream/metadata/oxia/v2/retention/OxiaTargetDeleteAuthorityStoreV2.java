@@ -22,8 +22,10 @@ import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.object.gc.DeleteRecoveryVetoV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCodecV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityStateV1;
+import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityStateMachineV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteDoneV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteStoredValueV2;
 import java.nio.ByteBuffer;
@@ -188,11 +190,31 @@ public final class OxiaTargetDeleteAuthorityStoreV2 implements ExactMetadataTran
             throw new IllegalArgumentException("active authority cannot skip full done before compaction");
         }
         var next = M5TargetDeleteAuthorityCodecV1.decodeAuthority(candidate);
+        if (full.epochGrace().isPresent() && next.epochGrace().isEmpty()) {
+            throw new IllegalArgumentException("epoch grace authority cannot downgrade to legacy time qualification");
+        }
         if (!next.target().equals(full.target())
                 || next.authorityRevision() != Math.addExact(full.authorityRevision(), 1)
                 || !next.predecessorAuthoritySha256()
                         .equals(Optional.of(current.exactStoredValue().canonicalStoredSha256()))) {
             throw new IllegalArgumentException("physical authority must preserve resource and exact revision chain");
+        }
+        if (next.recoveryVeto()
+                .filter(veto -> veto.reason() == DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING)
+                .isPresent()) {
+            var mark = next.epochGrace()
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("native grace renewal cannot discard its epoch mark"));
+            var expected = full.epochGrace().equals(next.epochGrace())
+                            && full.state() == TargetDeleteAuthorityStateV1.READ_FENCED_V1
+                    ? M5TargetDeleteAuthorityStateMachineV1.recordRecoveryVeto(
+                            full, DeleteRecoveryVetoV2.Reason.EPOCH_GRACE_RENEWAL_PENDING, mark.authority())
+                    : full.state() == TargetDeleteAuthorityStateV1.DELETE_INTENT_V1
+                            ? M5TargetDeleteAuthorityStateMachineV1.renewIntentEpochGrace(full, mark)
+                            : M5TargetDeleteAuthorityStateMachineV1.renewReadEpochGrace(full, mark);
+            if (!M5TargetDeleteAuthorityCodecV1.encodeAuthority(expected).equals(candidate)) {
+                throw new IllegalArgumentException("pending grace must retain the exact closed predecessor history");
+            }
         }
         boolean allowed =
                 switch (full.state()) {

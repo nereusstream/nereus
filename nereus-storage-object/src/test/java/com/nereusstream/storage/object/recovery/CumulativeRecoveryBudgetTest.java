@@ -21,6 +21,33 @@ import org.junit.jupiter.api.Test;
 
 class CumulativeRecoveryBudgetTest {
     @Test
+    void controlReadReservesBeforeIoAndSettlesOnlyUnusedBytesOnce() {
+        var budget = new CumulativeRecoveryBudget(limits(3, 1000), () -> 0);
+        budget.chargeControlMetadata(64);
+        var original = budget.reserveControlMetadata(4032);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(4096);
+        assertThatThrownBy(() -> budget.chargeControlMetadata(1)).isInstanceOf(RecoveryEnvelopeExceededException.class);
+        original.settle(16);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(80);
+        budget.chargeControlMetadata(8);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(88);
+        assertThatThrownBy(() -> original.settle(0)).isInstanceOf(IllegalStateException.class);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(88);
+    }
+
+    @Test
+    void failedOrOversizedControlReadKeepsItsEntireOriginalReservation() {
+        var budget = new CumulativeRecoveryBudget(limits(3, 1000), () -> 0);
+        var original = budget.reserveControlMetadata(4096);
+        assertThatThrownBy(() -> original.settle(4097)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.settle(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(4096);
+        assertThatThrownBy(() -> budget.reserveControlMetadata(1))
+                .isInstanceOf(RecoveryEnvelopeExceededException.class);
+        assertThat(budget.snapshot().canonicalBodyBytes()).isEqualTo(4096);
+    }
+
+    @Test
     void fallbackAndRetryUseTheSameMonotonicCounters() {
         AtomicLong clock = new AtomicLong(100);
         CumulativeRecoveryBudget budget = new CumulativeRecoveryBudget(limits(2, 1000), clock::get);

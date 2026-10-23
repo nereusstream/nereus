@@ -26,6 +26,9 @@ import org.apache.kafka.common.record.CompressionType;
 
 /** Closed, bounded records for deterministic M5-B Kafka semantic compaction. */
 public final class KafkaCompactionRecordsV1 {
+    /** Native Kafka offset headers and first-clean delete horizons, including fixed output codecs. */
+    public static final String NATIVE_REWRITE_POLICY_VERSION = "NEREUS_NATIVE_KAFKA_BATCH_V1";
+
     public static final int MAX_BATCHES = 65_536;
     public static final int MAX_RECORDS = 1_048_576;
     public static final int MAX_KEYS = 1_048_576;
@@ -39,6 +42,31 @@ public final class KafkaCompactionRecordsV1 {
     public enum CleanupPolicy {
         COMPACT,
         COMPACT_DELETE
+    }
+
+    /** PRODUCER keeps each input batch's codec, including a mixed-codec source cut. */
+    public enum OutputCompressionPolicy {
+        NONE,
+        GZIP,
+        SNAPPY,
+        LZ4,
+        ZSTD,
+        PRODUCER;
+
+        public CompressionType forInput(CompressionType input) {
+            return this == PRODUCER ? Objects.requireNonNull(input, "input compression") : fixedType();
+        }
+
+        public CompressionType fixedType() {
+            if (this == PRODUCER) {
+                throw new IllegalStateException("PRODUCER compression is determined by each input batch");
+            }
+            return CompressionType.valueOf(name());
+        }
+
+        public int canonicalId() {
+            return this == PRODUCER ? -1 : fixedType().id;
+        }
     }
 
     public enum TransactionOutcome {
@@ -101,13 +129,41 @@ public final class KafkaCompactionRecordsV1 {
             long policyGeneration,
             String rewritePolicyVersion,
             String nativeKafkaOracleVersion,
-            CompressionType outputCompression,
+            OutputCompressionPolicy compressionPolicy,
             Caps caps) {
+        /** Retains the existing fixed-codec constructor and its canonical plan identities. */
+        public Policy(
+                int kafkaFeatureLevel,
+                byte messageMagic,
+                CleanupPolicy cleanupPolicy,
+                int minimumCleanableRatioPartsPerMillion,
+                long deleteRetentionMs,
+                long capturedNowMs,
+                long policyGeneration,
+                String rewritePolicyVersion,
+                String nativeKafkaOracleVersion,
+                CompressionType outputCompression,
+                Caps caps) {
+            this(
+                    kafkaFeatureLevel,
+                    messageMagic,
+                    cleanupPolicy,
+                    minimumCleanableRatioPartsPerMillion,
+                    deleteRetentionMs,
+                    capturedNowMs,
+                    policyGeneration,
+                    rewritePolicyVersion,
+                    nativeKafkaOracleVersion,
+                    OutputCompressionPolicy.valueOf(Objects.requireNonNull(outputCompression, "outputCompression")
+                            .name()),
+                    caps);
+        }
+
         public Policy {
             Objects.requireNonNull(cleanupPolicy, "cleanupPolicy");
             requireText(rewritePolicyVersion, "rewritePolicyVersion");
             requireText(nativeKafkaOracleVersion, "nativeKafkaOracleVersion");
-            Objects.requireNonNull(outputCompression, "outputCompression");
+            Objects.requireNonNull(compressionPolicy, "compressionPolicy");
             Objects.requireNonNull(caps, "caps");
             if (kafkaFeatureLevel < 0
                     || messageMagic != 2
@@ -118,6 +174,15 @@ public final class KafkaCompactionRecordsV1 {
                     || policyGeneration <= 0) {
                 throw new IllegalArgumentException("M5-B policy is outside the accepted Kafka domain");
             }
+        }
+
+        /** The existing fixed-codec accessor; PRODUCER has no single output codec. */
+        public CompressionType outputCompression() {
+            return compressionPolicy.fixedType();
+        }
+
+        public CompressionType outputCompressionFor(ParsedBatch input) {
+            return compressionPolicy.forInput(input.compressionType());
         }
     }
 
@@ -176,7 +241,8 @@ public final class KafkaCompactionRecordsV1 {
             long tombstoneDeadlineMs) {
         public LatestKeyProof {
             key = copyBounded(key, MAX_KEY_BYTES, "key");
-            if (key.isEmpty() || latestEligibleOffset < 0 || tombstoneDeadlineMs < 0) {
+            // A zero-length non-null Kafka key is a real key; Optional.empty on RecordValue represents null.
+            if (latestEligibleOffset < 0 || tombstoneDeadlineMs < 0) {
                 throw new IllegalArgumentException("M5-B key proof is outside its domain");
             }
         }

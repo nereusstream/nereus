@@ -32,7 +32,9 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RangeIndexBlockV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStore;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMemberInventoryV2;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespaceV2;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
@@ -84,11 +86,27 @@ class KafkaBookKeeperRunSourceV2RealTest {
         for (int i = 0; i < TOPICS.size(); i++) {
             try (var f = new Fixture(2300 + i, TOPICS.get(i), null)) {
                 var run = await(KafkaBookKeeperRunLifecycleV1.createActive(f.admitting, f.roots, f.runBinding(0), 0));
+                var handle = run.snapshot().handle();
+                assertThatThrownBy(() -> await(f.source.readSealedScopeFacts(f.source.spec(), handle)))
+                        .hasRootCauseMessage("native ledger is not the exact closed run");
                 f.writeData(run);
                 await(run.drain());
                 var root = await(run.seal(
                                 f.footer(f.runBinding(0), 2, run.snapshot().nextEntryId())))
                         .root();
+                var sealed = await(f.source.readSealedScopeFacts(f.source.spec(), handle));
+                assertThat(sealed.namespaceBinding()).isEqualTo(f.binding);
+                assertThat(sealed.closedMetadata().handle()).isEqualTo(handle);
+                assertThat(sealed.closedMetadata().sealedLastEntryId()).isGreaterThanOrEqualTo(2);
+                assertThat(sealed.closedMetadata().sealedLength()).isPositive();
+                assertThat(sealed.taskFence().nativeVersion()).isZero();
+                assertThat(await(f.source.readSealedScopeFacts(f.source.spec(), handle)))
+                        .isEqualTo(sealed);
+                assertThat(await(f.roots.readSelectedRootFact(f.roots.nativeRootKey(root.runId())))
+                                .orElseThrow()
+                                .record()
+                                .root())
+                        .isEqualTo(root);
                 var source = reader(f, f.roots, BOUNDS);
                 var snapshot = await(source.capture(f.roots.nativeRootKey(root.runId()), rawBinding(f)));
                 assertThat(snapshot.batches())
@@ -196,6 +214,14 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 assertThat(captured.selector().mode()).isEqualTo(M4ReadControlRecordsV1.SelectorMode.PREFERRED_ONLY);
                 var plan = mixedPlan(input.plan(), captured, secondSnapshot);
                 var mixed = new KafkaBookKeeperMixedSourceV2(shared, selected, raw);
+                var initial = await(
+                        mixed.capture(List.of(f.roots.nativeRootKey(secondRoot.runId())), firstSnapshot.binding()));
+                assertThat(initial.selected().extent()).isEqualTo(captured.extent());
+                assertThat(initial.selected().batches()).isEqualTo(captured.batches());
+                assertThat(initial.selected().resources()).isEqualTo(captured.resources());
+                assertThat(initial.selected().selector()).isEqualTo(captured.selector());
+                assertThat(initial.raw()).containsExactly(secondSnapshot);
+                assertThat(shared.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
                 var members = await(mixed.resolve(plan));
                 assertThat(members)
                         .containsEntry(captured.extent().sourceIdentitySha256(), captured.resources())
@@ -416,6 +442,69 @@ class KafkaBookKeeperRunSourceV2RealTest {
             assertThat(await(rawReader(f, f.roots, BOUNDS, budget).capture(key, rawBinding(f)))
                             .batches())
                     .hasSize(2);
+
+            var late = new AtomicReference<
+                    java.util.function.Supplier<CompletionStage<ExactMetadataTransactionStoreV1.MutationOutcome>>>();
+            var withheld = (ExactMetadataTransactionStoreV1) Proxy.newProxyInstance(
+                    ExactMetadataTransactionStoreV1.class.getClassLoader(),
+                    new Class<?>[] {ExactMetadataTransactionStoreV1.class},
+                    (proxy, method, args) -> {
+                        if (method.getName().equals("compareAndSet")
+                                && args[0] instanceof Optional<?> before
+                                && before.isPresent()) {
+                            var next = M5TargetDeleteAuthorityCodecV1.decodeAuthority((CanonicalBytes) args[2]);
+                            var previous = M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                                    ((ExactMetadataTransactionStoreV1.VersionedValue) before.orElseThrow())
+                                            .canonicalStoredBytes());
+                            if (next.activeWriterTickets().size()
+                                            > previous.activeWriterTickets().size()
+                                    && late.compareAndSet(
+                                            null,
+                                            () -> f.route.compareAndSet(
+                                                    before.map(value ->
+                                                            (ExactMetadataTransactionStoreV1.VersionedValue) value),
+                                                    (String) args[1],
+                                                    (CanonicalBytes) args[2]))) {
+                                return CompletableFuture.completedFuture(
+                                        ExactMetadataTransactionStoreV1.MutationOutcome.RESPONSE_UNKNOWN);
+                            }
+                        }
+                        try {
+                            return method.invoke(f.route, args);
+                        } catch (InvocationTargetException failure) {
+                            throw failure.getCause();
+                        }
+                    });
+            var sessions = new AtomicInteger();
+            var notDispatched = new KafkaBookKeeperRunSourceV2(
+                    budget,
+                    f.roots,
+                    f.source,
+                    new M5TargetDeleteMultiWriterGuardV2(new M5TargetDeleteAuthorityCoordinatorV1(withheld)),
+                    BOUNDS,
+                    java.util.concurrent.ForkJoinPool.commonPool(),
+                    () -> {
+                        sessions.incrementAndGet();
+                        throw new AssertionError("uncertain physical admission dispatched a native session");
+                    });
+            var admissionFailure =
+                    await(notDispatched.capture(key, rawBinding(f)).handle((value, error) -> error));
+            while (admissionFailure instanceof java.util.concurrent.CompletionException) {
+                admissionFailure = admissionFailure.getCause();
+            }
+            assertThat(admissionFailure).isInstanceOf(KafkaBookKeeperRunSourceV2.TicketCleanupException.class);
+            var cleanup = (KafkaBookKeeperRunSourceV2.TicketCleanupException) admissionFailure;
+            assertThat(await(cleanup.reconcileTickets()))
+                    .containsExactly(f.record(root).resource());
+            assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            assertThat(sessions.get()).isZero();
+            assertThat(await(late.get().get()))
+                    .isEqualTo(ExactMetadataTransactionStoreV1.MutationOutcome.APPLIED_EXACT);
+            assertThat(f.tickets(root.ledgerIdentity())).isEqualTo(1);
+            assertThat(await(cleanup.reconcileTickets())).isEmpty();
+            assertThat(f.tickets(root.ledgerIdentity())).isZero();
+            assertThat(sessions.get()).isZero();
+            assertThat(budget.usage()).isEqualTo(new KafkaBookKeeperReadCellBudgetV2.Usage(0, 0, 0, 0));
         }
     }
 
@@ -694,6 +783,25 @@ class KafkaBookKeeperRunSourceV2RealTest {
                 var partial = rawReader(f, f.roots, new Bounds(128, 2, 1000, 1000000, 500000, 500000), shared);
                 assertThatThrownBy(() -> await(partial.resolve(cut)))
                         .hasRootCauseMessage("native source DATA coverage or payload budget differs");
+                assertThat(shared.usage()).isEqualTo(zero);
+                assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
+                assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
+
+                KafkaRunRootCatalogV2 rejected = key -> key.equals(f.roots.nativeRootKey(secondRoot.runId()))
+                        ? CompletableFuture.failedFuture(new IllegalStateException("later catalog read failed"))
+                        : f.roots.readSelectedRoot(key);
+                var laterFailure = await(rawReader(f, rejected, BOUNDS, shared)
+                        .captureSelectedRuns(
+                                List.of(
+                                        f.roots.nativeRootKey(firstRoot.runId()),
+                                        f.roots.nativeRootKey(secondRoot.runId())),
+                                rawBinding(f))
+                        .handle((value, error) -> error));
+                while (laterFailure instanceof java.util.concurrent.CompletionException) {
+                    laterFailure = laterFailure.getCause();
+                }
+                assertThat(laterFailure).isInstanceOf(KafkaBookKeeperRunSourceV2.TerminatedReadException.class);
+                assertThat(laterFailure).hasRootCauseMessage("later catalog read failed");
                 assertThat(shared.usage()).isEqualTo(zero);
                 assertThat(f.tickets(firstRoot.ledgerIdentity())).isZero();
                 assertThat(f.tickets(secondRoot.ledgerIdentity())).isZero();
@@ -1339,6 +1447,102 @@ class KafkaBookKeeperRunSourceV2RealTest {
     }
 
     @Test
+    void nativePhysicalMembersRetainOriginalUnknownTicketAndEveryBinding() throws Exception {
+        try (var f = new Fixture(28000, "native-members", null)) {
+            var root = admit(f, f.prepareSealedSource());
+            var resource = f.record(root).resource();
+            var member = new OxiaPhysicalMemberInventoryV2.Member(
+                    M5MaterializationRecordsV1.PositionDomain.KAFKA_OFFSET,
+                    f.scope.providerScope().digest(),
+                    rawBinding(f));
+            var cell = KafkaBookKeeperNativeCreateV2RealTest.nativeInput(false, f.attempt)
+                    .plan()
+                    .sourceCut()
+                    .identity()
+                    .protocolCellSha256();
+            assertThatThrownBy(() -> await(f.route.members().readFact(resource)))
+                    .hasRootCauseMessage("native physical member inventory is missing");
+            String key = f.route.members().nativeKey(resource);
+            var lose = new java.util.concurrent.atomic.AtomicBoolean(true);
+            var failedRead = new java.util.concurrent.atomic.AtomicBoolean();
+            var proxy = (io.oxia.client.api.AsyncOxiaClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(),
+                    new Class<?>[] {io.oxia.client.api.AsyncOxiaClient.class},
+                    (ignored, method, args) -> {
+                        final Object response;
+                        try {
+                            response = method.invoke(f.oxia, args);
+                        } catch (InvocationTargetException failure) {
+                            throw failure.getCause();
+                        }
+                        String requested =
+                                args != null && args.length > 0 && args[0] instanceof String value ? value : "";
+                        if (!requested.equals(key)) {
+                            return response;
+                        }
+                        if (method.getName().equals("put") && lose.compareAndSet(true, false)) {
+                            return ((CompletionStage<?>) response).thenApply(value -> {
+                                failedRead.set(true);
+                                throw new IllegalStateException("lost native member write response");
+                            });
+                        }
+                        if (method.getName().equals("get") && failedRead.compareAndSet(true, false)) {
+                            return ((CompletionStage<?>) response).thenApply(value -> {
+                                throw new IllegalStateException("member reconciliation unavailable");
+                            });
+                        }
+                        return response;
+                    });
+            var namespace = await(OxiaPhysicalMetadataNamespaceV2.connect(proxy, f.binding.metadataNamespace()));
+            var faulted =
+                    await(namespace.openAuthorityRoute(f.backend, new Oxia09ExactMetadataTransactionStoreV1(f.oxia)));
+            var capability = f.session.capabilitySnapshot().configurationDigest();
+            var fence = f.source.spec().sha256();
+            assertThatThrownBy(() -> await(faulted.members().register(resource, cell, member, capability, fence)))
+                    .hasRootCauseMessage("member reconciliation unavailable");
+            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(resource.authorityKey()))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .activeWriterTickets())
+                    .hasSize(1);
+            var stored = await(f.nativeClient.read(key)).orElseThrow();
+            assertThat(OxiaPhysicalMemberInventoryV2.Inventory.decode(stored.storedBytes())
+                            .members())
+                    .containsExactly(member);
+            var first = await(f.route.members().register(resource, cell, member, capability, fence));
+            assertThat(first.authority().metadataVersion())
+                    .isEqualTo(com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper.fromOxia(
+                            stored.versionId()));
+            var other = new OxiaPhysicalMemberInventoryV2.Member(
+                    member.domain(),
+                    member.providerScope(),
+                    new M4ReadControlRecordsV1.BindingIdentity(
+                            new com.nereusstream.domain.identity.TopicBindingId(
+                                    Sha256Digest.hash(CanonicalBytes.copyOf(new byte[] {27}))),
+                            member.binding().incarnationSha256(),
+                            member.binding().storageEpochSha256()));
+            var both = await(f.route.members().register(resource, cell, other, capability, fence));
+            assertThat(both.inventory().members()).containsExactlyInAnyOrder(member, other);
+            assertThat(await(f.route.members().register(resource, cell, member, capability, fence)))
+                    .isEqualTo(both);
+            assertThatThrownBy(() -> await(f.route
+                            .members()
+                            .register(resource, Sha256Digest.hash(cell.bytes()), member, capability, fence)))
+                    .hasRootCauseMessage("native physical member belongs to another Protocol Cell");
+            var current = await(f.nativeClient.read(key)).orElseThrow();
+            await(f.nativeClient.compareAndSet(key, current.storedBytes(), current.versionId()));
+            var changed = await(f.route.members().readFact(resource));
+            assertThat(changed.canonicalStoredBytes()).isEqualTo(both.canonicalStoredBytes());
+            assertThat(changed.authority()).isNotEqualTo(both.authority());
+            assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(await(f.route.read(resource.authorityKey()))
+                                    .orElseThrow()
+                                    .canonicalStoredBytes())
+                            .activeWriterTickets())
+                    .isEmpty();
+        }
+    }
+
+    @Test
     void writeBeforeServerRestart() throws Exception {
         Files.createDirectories(checkpoint());
         for (int i = 0; i < TOPICS.size(); i++) {
@@ -1353,6 +1557,15 @@ class KafkaBookKeeperRunSourceV2RealTest {
                             await(selectedReader(f, published, 1000, 500000).capture());
                     var nativeRoot = await(f.nativeClient.read(snapshot.extent().physicalKey()))
                             .orElseThrow();
+                    var cell = input.plan().sourceCut().identity().protocolCellSha256();
+                    var admission = cellAdmission(published.context, cell);
+                    var caps = new KafkaCompactionAdmissionV1.CellCaps(
+                            1, 1000000, 1000, 1000, 1000, 1000000, 1000000, 1000000, 1000, 1000, 60000, 1000000, 1000,
+                            1000, 1000, 1000);
+                    assertThat(admission.install(caps)).isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+                    assertThat(admission.reserve(input.plan(), 500000, 500000, 0, 0, 100, 0, 100, 10))
+                            .isEqualTo(KafkaCompactionAdmissionV1.Outcome.APPLIED_EXACT);
+                    var reservationState = admission.read().orElseThrow();
                     Files.write(
                             checkpoint().resolve(TOPICS.get(i)),
                             List.of(
@@ -1367,6 +1580,9 @@ class KafkaBookKeeperRunSourceV2RealTest {
                                     descriptor.descriptorSha256().toHex(),
                                     selected.extent().sourceIdentitySha256().toHex(),
                                     M5MaterializationCodecV1.calculateSourceSetSha256(List.of(selected.extent()))
+                                            .toHex(),
+                                    cell.toHex(),
+                                    Sha256Digest.hash(KafkaCompactionAdmissionV1.encode(reservationState))
                                             .toHex()));
                 }
             }
@@ -1393,6 +1609,20 @@ class KafkaBookKeeperRunSourceV2RealTest {
                         .isEqualTo(lines.get(4));
                 var input = input(f, snapshot, 3400 + i);
                 try (var published = new Published(f, input, lines.get(6))) {
+                    var cell = Sha256Digest.copyOf(java.util.HexFormat.of().parseHex(lines.get(10)));
+                    assertThat(cell)
+                            .isEqualTo(input.plan().sourceCut().identity().protocolCellSha256());
+                    var admission = cellAdmission(published.context, cell);
+                    var reservationState = admission.read().orElseThrow();
+                    assertThat(Sha256Digest.hash(KafkaCompactionAdmissionV1.encode(reservationState))
+                                    .toHex())
+                            .isEqualTo(lines.get(11));
+                    assertThat(reservationState.reservations()).hasSize(1);
+                    assertThat(admission.install(reservationState.caps()))
+                            .isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
+                    assertThat(admission.read()).contains(reservationState);
+                    assertThat(admission.reserve(input.plan(), 500000, 500000, 0, 0, 100, 0, 100, 10))
+                            .isEqualTo(KafkaCompactionAdmissionV1.Outcome.EXISTING_EXACT);
                     verify(
                             published.context.recover(),
                             input,
@@ -1412,6 +1642,12 @@ class KafkaBookKeeperRunSourceV2RealTest {
             }
         }
         readSecondGenerationsAfterRestart();
+    }
+
+    /** Real retained-server capacity state; this component fixture does not qualify a native Broker task. */
+    private static KafkaCompactionAdmissionV1 cellAdmission(NativeContext context, Sha256Digest cell) {
+        return new KafkaCompactionAdmissionV1(
+                OxiaCanonicalControlMetadataStore.forKafkaCompactionAdmission(context.oxia, context.root, cell), cell);
     }
 
     private static void writeSecondGenerationsBeforeRestart() throws Exception {

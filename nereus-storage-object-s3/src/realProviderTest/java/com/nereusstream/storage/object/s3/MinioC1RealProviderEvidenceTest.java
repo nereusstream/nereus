@@ -90,6 +90,21 @@ class MinioC1RealProviderEvidenceTest {
                     assertThat(provider.readDirectoryPrefix(capBody.identity(), 4 * 1024 * 1024, Optional.empty())
                                     .length())
                             .isEqualTo(4 * 1024 * 1024);
+                    var consumed = provider.consumeVerifiedObject(capBody.identity(), Optional.empty(), input -> {
+                        byte[] buffer = new byte[65_536];
+                        long bytes = 0;
+                        for (int read = input.read(buffer); read != -1; read = input.read(buffer)) {
+                            for (int index = 0; index < read; index++) {
+                                if (buffer[index] != (byte) ((bytes + index) * 31 + 0x5a)) {
+                                    throw new IOException("actual streaming Object payload differs");
+                                }
+                            }
+                            bytes = Math.addExact(bytes, read);
+                        }
+                        return bytes;
+                    });
+                    assertThat(consumed.value()).isEqualTo(CAP);
+                    assertThat(provider.acceptedOperations()).isZero();
 
                     StreamingBody conflicting = StreamingBody.pattern("walrun/lane-1/42/object", CAP, 0x6b);
                     assertThat(provider.conditionalCreate(conflicting).outcome())

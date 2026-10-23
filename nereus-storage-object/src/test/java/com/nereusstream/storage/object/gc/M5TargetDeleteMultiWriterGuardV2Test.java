@@ -43,6 +43,58 @@ class M5TargetDeleteMultiWriterGuardV2Test {
             SyntheticDeleteAuthorityFixturesV2.digest("native terminal fixture");
 
     @Test
+    void freezesDifferentTargetContextsAndReconcilesOnlyTheOriginalMixedInvocation() {
+        var fixture = new Fixture();
+        var resources = fixture.resources(2);
+        var second = new Context(
+                CONTEXT.writerClass(),
+                SyntheticDeleteAuthorityFixturesV2.digest("second actual capability fixture"),
+                CONTEXT.ownerFenceSha256(),
+                CONTEXT.externalFactsRootSha256());
+        var contexts = new HashMap<PhysicalResourceIdV2, Context>();
+        contexts.put(resources.get(1), second);
+        contexts.put(resources.get(0), CONTEXT);
+        var hold = new CompletableFuture<Completion<String>>();
+        var work = fixture.guard.executeWithContexts(contexts, () -> hold).toCompletableFuture();
+        contexts.clear();
+        assertThat(fixture.store.casKeys)
+                .containsExactlyElementsOf(resources.stream()
+                        .map(PhysicalResourceIdV2::authorityKey)
+                        .toList());
+        assertThat(fixture.tickets(resources.get(0)).get(0).capabilitySha256()).isEqualTo(CONTEXT.capabilitySha256());
+        assertThat(fixture.tickets(resources.get(1)).get(0).capabilitySha256()).isEqualTo(second.capabilitySha256());
+        hold.complete(new Completion<>("unknown original SDK fixture", Optional.empty()));
+        var original = work.join();
+        assertThat(original.unresolvedTargets()).containsExactlyElementsOf(resources);
+        var sibling = fixture.guard
+                .executeWithContexts(
+                        Map.of(resources.get(0), CONTEXT, resources.get(1), second),
+                        () -> CompletableFuture.completedFuture(new Completion<>("unknown sibling", Optional.empty())))
+                .toCompletableFuture()
+                .join();
+        assertThat(fixture.guard
+                        .reconcileOperationWithContexts(
+                                Map.of(resources.get(0), CONTEXT, resources.get(1), second),
+                                original.operationId(),
+                                TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+        resources.forEach(resource -> assertThat(fixture.tickets(resource))
+                .singleElement()
+                .extracting(value -> value.operationIdSha256())
+                .isEqualTo(sibling.operationId()));
+        assertThat(fixture.guard
+                        .reconcileOperationWithContexts(
+                                Map.of(resources.get(0), CONTEXT, resources.get(1), second),
+                                sibling.operationId(),
+                                TERMINAL)
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+    }
+
+    @Test
     void deduplicatesAndOrdersEveryTargetBeforeDispatchAndClearsOnlyAfterTerminal() {
         var fixture = new Fixture();
         var resources = fixture.resources(3);
@@ -235,13 +287,13 @@ class M5TargetDeleteMultiWriterGuardV2Test {
         assertThat(result.mutationInvoked()).isFalse();
         assertThat(result.unresolvedTargets()).containsExactly(resources.get(1));
         assertThat(fixture.tickets(resources.get(0))).isEmpty();
+        var cleanup = result.terminalCleanup().orElseThrow();
+        assertThat(cleanup.reconcile().toCompletableFuture().join()).containsExactly(resources.get(1));
+        assertThat(fixture.tickets(resources.get(1))).isEmpty();
         fixture.store.late.run();
         assertThat(fixture.tickets(resources.get(1))).hasSize(1);
-        assertThat(fixture.guard
-                        .reconcileTerminal(resources, CONTEXT, TERMINAL)
-                        .toCompletableFuture()
-                        .join())
-                .isEmpty();
+        assertThat(cleanup.reconcile().toCompletableFuture().join()).isEmpty();
+        assertThat(fixture.tickets(resources.get(1))).isEmpty();
     }
 
     @Test

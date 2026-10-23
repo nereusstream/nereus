@@ -65,15 +65,41 @@ public final class M5RetentionEvidenceAssemblerV1 {
             long priorTrimFrontier,
             Sha256Digest retentionPolicyRootSha256,
             AuthorityFactV1 ownerFence,
-            AuthorityFactV1 storageFence) {
+            AuthorityFactV1 storageFence,
+            java.util.Optional<M5RetentionRecordsV1.PulsarFloorContextV2> pulsarContext) {
+        public FloorSnapshotRequestV1(
+                IdentityEnvelope identity,
+                PositionDomain domain,
+                long generation,
+                long priorTrimFrontier,
+                Sha256Digest retentionPolicyRootSha256,
+                AuthorityFactV1 ownerFence,
+                AuthorityFactV1 storageFence) {
+            this(
+                    identity,
+                    domain,
+                    generation,
+                    priorTrimFrontier,
+                    retentionPolicyRootSha256,
+                    ownerFence,
+                    storageFence,
+                    java.util.Optional.empty());
+        }
+
         public FloorSnapshotRequestV1 {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(domain, "domain");
             M5RetentionRecordsV1.requireDigest(retentionPolicyRootSha256, "retentionPolicyRootSha256");
             Objects.requireNonNull(ownerFence, "ownerFence");
             Objects.requireNonNull(storageFence, "storageFence");
-            if (generation <= 0 || priorTrimFrontier < 0) {
+            pulsarContext = Objects.requireNonNull(pulsarContext, "pulsarContext");
+            if (generation <= 0 || (pulsarContext.isPresent() ? priorTrimFrontier != -1 : priorTrimFrontier < 0)) {
                 throw new IllegalArgumentException("floor snapshot request generation/frontier is invalid");
+            }
+            if (pulsarContext.isPresent()
+                    && (domain != PositionDomain.PULSAR_ENTRY
+                            || !pulsarContext.orElseThrow().coverage().binding().equals(identity.binding()))) {
+                throw new IllegalArgumentException("typed floor request differs from its Binding/domain");
             }
         }
     }
@@ -113,12 +139,52 @@ public final class M5RetentionEvidenceAssemblerV1 {
             AuthorityFactV1 storageFence,
             AuthorityFactV1 providerFence,
             long auditGraceDeadlineMillis,
-            long observedAuthorityTimeMillis) {
+            long observedAuthorityTimeMillis,
+            java.util.Optional<com.nereusstream.storage.object.gc.DeleteObservationContextV2> epochAuthority) {
+        public ReferenceProofRequestV1(
+                IdentityEnvelope identity,
+                ReferenceTargetKindV1 targetKind,
+                Sha256Digest targetIdentitySha256,
+                ProtocolCoverage coverage,
+                AuthorityFactV1 selectorRoot,
+                AuthorityFactV1 manifestRoot,
+                AuthorityFactV1 trimRoot,
+                Sha256Digest retentionSnapshotRootSha256,
+                List<M4ReleaseBindingV1> m4Releases,
+                AuthorityFactV1 ownerFence,
+                AuthorityFactV1 workerFence,
+                AuthorityFactV1 storageFence,
+                AuthorityFactV1 providerFence,
+                long auditGraceDeadlineMillis,
+                long observedAuthorityTimeMillis) {
+            this(
+                    identity,
+                    targetKind,
+                    targetIdentitySha256,
+                    coverage,
+                    selectorRoot,
+                    manifestRoot,
+                    trimRoot,
+                    retentionSnapshotRootSha256,
+                    m4Releases,
+                    ownerFence,
+                    workerFence,
+                    storageFence,
+                    providerFence,
+                    auditGraceDeadlineMillis,
+                    observedAuthorityTimeMillis,
+                    java.util.Optional.empty());
+        }
+
         public ReferenceProofRequestV1 {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(targetKind, "targetKind");
             M5RetentionRecordsV1.requireDigest(targetIdentitySha256, "targetIdentitySha256");
             Objects.requireNonNull(coverage, "coverage");
+            if (coverage.typedPulsar()
+                    && !coverage.pulsarCoverage().orElseThrow().binding().equals(identity.binding())) {
+                throw new IllegalArgumentException("Pulsar reference coverage belongs to another Binding");
+            }
             Objects.requireNonNull(selectorRoot, "selectorRoot");
             Objects.requireNonNull(manifestRoot, "manifestRoot");
             Objects.requireNonNull(trimRoot, "trimRoot");
@@ -128,7 +194,12 @@ public final class M5RetentionEvidenceAssemblerV1 {
             Objects.requireNonNull(workerFence, "workerFence");
             Objects.requireNonNull(storageFence, "storageFence");
             Objects.requireNonNull(providerFence, "providerFence");
-            if (auditGraceDeadlineMillis <= 0 || observedAuthorityTimeMillis < auditGraceDeadlineMillis) {
+            epochAuthority = Objects.requireNonNull(epochAuthority, "epochAuthority");
+            if (epochAuthority.isPresent()) {
+                if (auditGraceDeadlineMillis != 0 || observedAuthorityTimeMillis != 0) {
+                    throw new IllegalArgumentException("epoch scan request cannot reinterpret legacy time fields");
+                }
+            } else if (auditGraceDeadlineMillis <= 0 || observedAuthorityTimeMillis < auditGraceDeadlineMillis) {
                 throw new IllegalArgumentException("reference proof request has not satisfied audit grace");
             }
         }
@@ -202,12 +273,13 @@ public final class M5RetentionEvidenceAssemblerV1 {
                     pageCount,
                     scannedBytes,
                     rows,
-                    PLACEHOLDER));
+                    PLACEHOLDER,
+                    request.pulsarContext()));
             return freshness.requireFresh(snapshot).thenApply(ignored -> snapshot);
         });
     }
 
-    public CompletionStage<ReferenceFreeProofV1> buildReferenceFreeProof(ReferenceProofRequestV1 request) {
+    private CompletionStage<List<ReferenceAdapterResultV1>> scanReferenceInventory(ReferenceProofRequestV1 request) {
         Objects.requireNonNull(request, "request");
         CompletionStage<List<ReferenceAdapterResultV1>> stage = CompletableFuture.completedFuture(new ArrayList<>());
         for (ReferenceKindV1 referenceKind : ReferenceKindV1.values()) {
@@ -223,38 +295,135 @@ public final class M5RetentionEvidenceAssemblerV1 {
                         return results;
                     }));
         }
-        return stage.thenCompose(results -> {
-            List<ReferenceScanSummaryV1> summaries =
-                    results.stream().map(ReferenceAdapterResultV1::summary).toList();
-            List<ReferenceObservationV1> observations = results.stream()
+        return stage;
+    }
+
+    /** Complete initial capture is immutable observation data, never an elapsed-grace or deletion proof. */
+    public final class ReferenceCapture {
+        private final ReferenceProofRequestV1 request;
+        private final List<ReferenceScanSummaryV1> summaries;
+        private final List<ReferenceObservationV1> observations;
+        private final Sha256Digest root;
+
+        private ReferenceCapture(ReferenceProofRequestV1 request, List<ReferenceAdapterResultV1> results) {
+            this.request = request;
+            summaries = results.stream().map(ReferenceAdapterResultV1::summary).toList();
+            observations = results.stream()
                     .flatMap(result -> result.observations().stream())
                     .sorted(Comparator.comparing(ReferenceObservationV1::kind)
                             .thenComparing(row -> row.authority().key())
-                            .thenComparingLong(row -> row.coverage().inclusiveStart())
-                            .thenComparingLong(row -> row.coverage().exclusiveEnd()))
+                            .thenComparing(
+                                    ReferenceObservationV1::coverage, M5RetentionRecordsV1::compareReferenceCoverage))
                     .toList();
-            ReferenceFreeProofV1 proof = M5RetentionCodecV1.finalizeProof(new ReferenceFreeProofV1(
-                    request.identity(),
+            M5RetentionRecordsV1.requireReferenceInventory(
                     request.targetKind(),
                     request.targetIdentitySha256(),
                     request.coverage(),
-                    request.selectorRoot(),
-                    request.manifestRoot(),
-                    request.trimRoot(),
-                    request.retentionSnapshotRootSha256(),
-                    M5RetentionCodecV1.calculateObservationsRoot(observations),
                     request.m4Releases(),
-                    request.ownerFence(),
-                    request.workerFence(),
-                    request.storageFence(),
-                    request.providerFence(),
-                    request.auditGraceDeadlineMillis(),
-                    request.observedAuthorityTimeMillis(),
                     summaries,
-                    observations,
-                    PLACEHOLDER));
-            return freshness.requireFresh(proof).thenApply(ignored -> proof);
-        });
+                    observations);
+            request.epochAuthority().ifPresent(context -> {
+                var auditFacts = observations.stream()
+                        .filter(row -> row.kind() == ReferenceKindV1.AUDIT_GRACE)
+                        .map(ReferenceObservationV1::authority)
+                        .toList();
+                if (!auditFacts.containsAll(context.authorityFacts())) {
+                    throw new IllegalArgumentException("epoch capture lacks its actual owner/capability observations");
+                }
+            });
+            root = M5RetentionCodecV1.referenceCaptureRoot(request, summaries, observations);
+        }
+
+        public Sha256Digest rootSha256() {
+            return root;
+        }
+
+        public com.nereusstream.storage.object.gc.DeleteObservationContextV2 epochAuthority() {
+            return request.epochAuthority()
+                    .orElseThrow(() -> new IllegalStateException("legacy capture has no epoch-clock authority"));
+        }
+
+        private List<AuthorityFactV1> facts() {
+            var facts = new ArrayList<AuthorityFactV1>();
+            facts.add(request.selectorRoot());
+            facts.add(request.manifestRoot());
+            facts.add(request.trimRoot());
+            request.m4Releases().forEach(release -> facts.add(release.protectionAuthority()));
+            observations.forEach(row -> facts.add(row.authority()));
+            request.epochAuthority().ifPresent(context -> facts.addAll(context.authorityFacts()));
+            facts.addAll(List.of(
+                    request.ownerFence(), request.workerFence(), request.storageFence(), request.providerFence()));
+            return facts;
+        }
+    }
+
+    public CompletionStage<ReferenceCapture> captureEpochReferences(ReferenceProofRequestV1 request) {
+        if (request.epochAuthority().isEmpty()) {
+            throw new IllegalArgumentException("initial epoch capture requires its actual native authority");
+        }
+        return captureReferences(request)
+                .thenCompose(captured ->
+                        freshness.requireFreshFacts(captured.facts()).thenApply(ignored -> captured));
+    }
+
+    private CompletionStage<ReferenceCapture> captureReferences(ReferenceProofRequestV1 request) {
+        return scanReferenceInventory(request).thenApply(results -> new ReferenceCapture(request, results));
+    }
+
+    public CompletionStage<ReferenceFreeProofV1> buildEpochReferenceFreeProof(
+            ReferenceProofRequestV1 request,
+            com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady ready) {
+        Objects.requireNonNull(ready, "ready");
+        if (!request.epochAuthority().equals(java.util.Optional.of(ready.mark().authority()))) {
+            throw new IllegalArgumentException("epoch rescan has another native owner/capability");
+        }
+        return ready.requireCurrent()
+                .thenCompose(ignored -> captureReferences(request))
+                .thenCompose(capture -> {
+                    // Rescan facts must be current, not byte-identical to the initial observation: bounded
+                    // observation accounting itself can advance versions. Any reference writer invalidates
+                    // the durable D mark; completeReferenceProof and the final readiness reread check both.
+                    return completeReferenceProof(request, capture, java.util.Optional.of(ready.mark()))
+                            .thenCompose(proof -> ready.requireCurrent().thenApply(ignored -> proof));
+                });
+    }
+
+    public CompletionStage<ReferenceFreeProofV1> buildReferenceFreeProof(ReferenceProofRequestV1 request) {
+        if (request.epochAuthority().isPresent()) {
+            throw new IllegalArgumentException("epoch reference proof requires original elapsed readiness");
+        }
+        return captureReferences(request)
+                .thenCompose(capture -> completeReferenceProof(request, capture, java.util.Optional.empty()));
+    }
+
+    private CompletionStage<ReferenceFreeProofV1> completeReferenceProof(
+            ReferenceProofRequestV1 request,
+            ReferenceCapture capture,
+            java.util.Optional<com.nereusstream.storage.object.gc.DeleteEpochGraceMarkV1> epochGrace) {
+        List<ReferenceScanSummaryV1> summaries = capture.summaries;
+        List<ReferenceObservationV1> observations = capture.observations;
+        ReferenceFreeProofV1 proof = M5RetentionCodecV1.finalizeProof(new ReferenceFreeProofV1(
+                request.identity(),
+                request.targetKind(),
+                request.targetIdentitySha256(),
+                request.coverage(),
+                request.selectorRoot(),
+                request.manifestRoot(),
+                request.trimRoot(),
+                request.retentionSnapshotRootSha256(),
+                M5RetentionCodecV1.calculateObservationsRoot(observations),
+                request.m4Releases(),
+                request.ownerFence(),
+                request.workerFence(),
+                request.storageFence(),
+                request.providerFence(),
+                request.auditGraceDeadlineMillis(),
+                request.observedAuthorityTimeMillis(),
+                summaries,
+                observations,
+                epochGrace,
+                PLACEHOLDER));
+        return freshness.requireFresh(proof).thenApply(ignored -> proof);
     }
 
     private static void validateReferenceTarget(ReferenceProofRequestV1 request, ReferenceAdapterResultV1 result) {
@@ -302,8 +471,7 @@ public final class M5RetentionEvidenceAssemblerV1 {
     private static void requireSortedUniqueReferenceRows(List<ReferenceObservationV1> rows) {
         Comparator<ReferenceObservationV1> order = Comparator.comparing(
                         (ReferenceObservationV1 row) -> row.authority().key())
-                .thenComparingLong(row -> row.coverage().inclusiveStart())
-                .thenComparingLong(row -> row.coverage().exclusiveEnd());
+                .thenComparing(ReferenceObservationV1::coverage, M5RetentionRecordsV1::compareReferenceCoverage);
         if (!rows.equals(rows.stream().sorted(order).toList())
                 || rows.stream().distinct().count() != rows.size()) {
             throw new IllegalArgumentException("reference adapter rows are not sorted unique");

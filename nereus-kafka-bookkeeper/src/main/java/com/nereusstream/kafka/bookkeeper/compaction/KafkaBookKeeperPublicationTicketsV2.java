@@ -18,6 +18,7 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CompactionPlan;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2.Completion;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /** Concrete BK publication tickets; input membership must be supplied by the admitted source owner. */
@@ -64,63 +66,120 @@ public final class KafkaBookKeeperPublicationTicketsV2 {
             CompactionPlan plan,
             KafkaSealedBookKeeperDescriptorV2 descriptor,
             Supplier<CompletionStage<PublicationOutcome>> publication,
-            Supplier<Optional<M5TaskSelectionDecisionV2>> currentDecision) {
+            Supplier<Optional<M5TaskSelectionDecisionV2>> currentDecision,
+            CanonicalControlMetadataStore metadata,
+            BooleanSupplier currentWorker) {
         if (!plan.sourceCut().equals(descriptor.sourceCut())) {
             throw new IllegalArgumentException("publication input plan differs from the descriptor source cut");
         }
-        return inputMembership.resolve(plan).thenCompose(membership -> {
-            var resources = targets(descriptor, membership);
-            var context = context(descriptor, resources);
-            return CompletableFuture.supplyAsync(() -> terminal(descriptor, currentDecision.get()), owner)
-                    .thenCompose(known -> {
-                        if (known.isPresent()) {
-                            // This native irreversible decision also makes unfinished invocations from an old JVM
-                            // harmless.
-                            return guard.reconcileTerminal(
-                                            resources,
-                                            context,
-                                            known.orElseThrow().proof())
-                                    .thenApply(left -> left.isEmpty()
-                                            ? known.orElseThrow().outcome()
-                                            : PublicationOutcome.OUTCOME_UNKNOWN);
-                        }
-                        return guard.execute(resources, context, () -> CompletableFuture.supplyAsync(publication, owner)
-                                        .thenCompose(stage -> stage)
-                                        .handle((outcome, failure) ->
-                                                failure == null ? outcome : PublicationOutcome.OUTCOME_UNKNOWN)
-                                        .thenApplyAsync(
-                                                outcome -> new Completion<>(
-                                                        outcome,
-                                                        terminal(descriptor, currentDecision.get())
-                                                                .map(Terminal::proof)),
-                                                owner))
-                                .thenCompose(result -> {
-                                    if (!result.mutationInvoked()) {
-                                        return CompletableFuture.completedFuture(PublicationOutcome.CONFLICT);
+        return CompletableFuture.supplyAsync(() -> terminal(descriptor, currentDecision.get()), owner)
+                .thenCompose(known -> {
+                    if (known.isPresent()) {
+                        // A selected/cancelled task no longer has source-work admission. Recover its original
+                        // durable membership without opening native data sessions or acquiring another nonce.
+                        return CompletableFuture.supplyAsync(
+                                        () -> metadata.get(KafkaBookKeeperPublicationTargetsV2.key(
+                                                        descriptor.descriptorSha256()))
+                                                .map(KafkaBookKeeperPublicationTargetsV2::decode),
+                                        owner)
+                                .thenCompose(original -> {
+                                    if (original.isEmpty()) {
+                                        return CompletableFuture.completedFuture(PublicationOutcome.OUTCOME_UNKNOWN);
                                     }
-                                    // A winning native selection also makes older concurrent invocations harmless.
-                                    // Reconcile their nonces only after reading that irreversible decision again.
-                                    return CompletableFuture.supplyAsync(
-                                                    () -> terminal(descriptor, currentDecision.get()), owner)
-                                            .thenCompose(selected -> selected.isEmpty()
-                                                    ? CompletableFuture.completedFuture(
-                                                            PublicationOutcome.OUTCOME_UNKNOWN)
-                                                    : guard.reconcileTerminal(
-                                                                    resources,
-                                                                    context,
-                                                                    selected.orElseThrow()
-                                                                            .proof())
-                                                            .thenApply(left -> left.isEmpty()
-                                                                    ? result.value()
-                                                                            .filter(value -> value
-                                                                                    == PublicationOutcome.APPLIED_EXACT)
-                                                                            .orElse(selected.orElseThrow()
-                                                                                    .outcome())
-                                                                    : PublicationOutcome.OUTCOME_UNKNOWN))
-                                            .exceptionally(failure -> PublicationOutcome.OUTCOME_UNKNOWN);
+                                    original.orElseThrow().requireDescriptor(descriptor);
+                                    return reconcile(
+                                            original.orElseThrow().resources(), descriptor, known.orElseThrow());
                                 });
-                    });
-        });
+                    }
+                    return CompletableFuture.supplyAsync(currentWorker::getAsBoolean, owner)
+                            .thenCompose(current -> {
+                                if (!current) {
+                                    // Staleness alone is not an irreversible cancellation or cleanup proof.
+                                    return CompletableFuture.completedFuture(PublicationOutcome.OUTCOME_UNKNOWN);
+                                }
+                                return inputMembership.resolve(plan).thenCompose(membership -> {
+                                    var resources = targets(descriptor, membership);
+                                    var original = KafkaBookKeeperPublicationTargetsV2.of(descriptor, resources);
+                                    return CompletableFuture.supplyAsync(
+                                                    () -> {
+                                                        var bytes = original.encode();
+                                                        metadata.putIfAbsent(original.key(), bytes);
+                                                        return metadata.get(original.key())
+                                                                .equals(Optional.of(bytes));
+                                                    },
+                                                    owner)
+                                            .thenCompose(recorded -> recorded
+                                                    ? execute(
+                                                            resources,
+                                                            descriptor,
+                                                            publication,
+                                                            currentDecision,
+                                                            currentWorker)
+                                                    : CompletableFuture.completedFuture(
+                                                            PublicationOutcome.OUTCOME_UNKNOWN));
+                                });
+                            });
+                });
+    }
+
+    private CompletionStage<PublicationOutcome> reconcile(
+            List<PhysicalResourceIdV2> resources, KafkaSealedBookKeeperDescriptorV2 descriptor, Terminal terminal) {
+        return guard.reconcileTerminal(resources, context(descriptor, resources), terminal.proof())
+                .thenApply(left -> left.isEmpty() ? terminal.outcome() : PublicationOutcome.OUTCOME_UNKNOWN)
+                .exceptionally(failure -> PublicationOutcome.OUTCOME_UNKNOWN);
+    }
+
+    private CompletionStage<PublicationOutcome> execute(
+            List<PhysicalResourceIdV2> resources,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            Supplier<CompletionStage<PublicationOutcome>> publication,
+            Supplier<Optional<M5TaskSelectionDecisionV2>> currentDecision,
+            BooleanSupplier currentWorker) {
+        return CompletableFuture.supplyAsync(() -> terminal(descriptor, currentDecision.get()), owner)
+                .thenCompose(known -> {
+                    if (known.isPresent()) {
+                        return reconcile(resources, descriptor, known.orElseThrow());
+                    }
+                    return CompletableFuture.supplyAsync(currentWorker::getAsBoolean, owner)
+                            .thenCompose(current -> {
+                                if (!current) {
+                                    return CompletableFuture.completedFuture(PublicationOutcome.OUTCOME_UNKNOWN);
+                                }
+                                return guard.execute(
+                                                resources,
+                                                context(descriptor, resources),
+                                                () -> CompletableFuture.supplyAsync(publication, owner)
+                                                        .thenCompose(stage -> stage)
+                                                        .handle((outcome, failure) -> failure == null
+                                                                ? outcome
+                                                                : PublicationOutcome.OUTCOME_UNKNOWN)
+                                                        .thenApplyAsync(
+                                                                outcome -> new Completion<>(
+                                                                        outcome,
+                                                                        terminal(descriptor, currentDecision.get())
+                                                                                .map(Terminal::proof)),
+                                                                owner))
+                                        .thenCompose(result -> {
+                                            if (!result.mutationInvoked()) {
+                                                return CompletableFuture.completedFuture(PublicationOutcome.CONFLICT);
+                                            }
+                                            boolean applied = result.value().orElse(PublicationOutcome.OUTCOME_UNKNOWN)
+                                                    == PublicationOutcome.APPLIED_EXACT;
+                                            return CompletableFuture.supplyAsync(
+                                                            () -> terminal(descriptor, currentDecision.get()), owner)
+                                                    .thenCompose(selected -> selected.isEmpty()
+                                                            ? CompletableFuture.completedFuture(
+                                                                    PublicationOutcome.OUTCOME_UNKNOWN)
+                                                            : reconcile(resources, descriptor, selected.orElseThrow())
+                                                                    .thenApply(outcome ->
+                                                                            outcome == PublicationOutcome.EXISTING_EXACT
+                                                                                            && applied
+                                                                                    ? PublicationOutcome.APPLIED_EXACT
+                                                                                    : outcome))
+                                                    .exceptionally(failure -> PublicationOutcome.OUTCOME_UNKNOWN);
+                                        });
+                            });
+                });
     }
 
     static List<PhysicalResourceIdV2> targets(

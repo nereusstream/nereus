@@ -57,6 +57,31 @@ public final class KafkaPartitionPublicationCellV1 {
                 KafkaPartitionPublicationKindV1.BOOKKEEPER_RUN_SWITCH);
     }
 
+    /** Retiring covered physical sources changes only source/checkpoint references under the same protocol cut. */
+    public KafkaPartitionPublicationResultV1 retireBookKeeperSources(
+            KafkaPartitionProtocolStateV1 expected, KafkaPartitionStateReferencesV1 references) {
+        var current = state.get();
+        var mismatch = exactPredecessor(current, expected.fence(), expected.stateVersion());
+        if (mismatch != null) {
+            return mismatch;
+        }
+        var before = current.references();
+        if (current.frontiers().allocatedEndOffset() != current.frontiers().durableEndOffset()
+                || !references.doesNotRegress(before)
+                || !references.activeTail().equals(before.activeTail())
+                || !references.committedProducerState().equals(before.committedProducerState())
+                || !references.speculativeProducerQueue().equals(before.speculativeProducerQueue())
+                || !references.transactionIndex().equals(before.transactionIndex())
+                || !references.leaderEpochIndex().equals(before.leaderEpochIndex())) {
+            return result(KafkaPartitionPublicationOutcomeV1.INVALID_COMMIT_REPLACEMENT, current);
+        }
+        return replace(
+                current,
+                new KafkaPartitionProtocolStateV1(
+                        current.fence(), Math.incrementExact(current.stateVersion()), current.frontiers(), references),
+                KafkaPartitionPublicationKindV1.BOOKKEEPER_SOURCE_RETIREMENT);
+    }
+
     public KafkaPartitionReadSnapshotV1 captureReadSnapshot() {
         return state.get();
     }

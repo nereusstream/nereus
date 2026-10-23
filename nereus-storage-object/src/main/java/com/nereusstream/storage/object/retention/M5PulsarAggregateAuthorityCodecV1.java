@@ -63,6 +63,22 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
     /** Wrap one exact legacy NTA1 aggregate without changing its reader projection bytes. */
     public static PulsarAggregateRetirementAuthorityV1 migrateLegacy(
             CanonicalBytes exactLegacyAggregate, CapabilityBinding capability) {
+        return migrateLegacy(exactLegacyAggregate, capability, Optional.empty());
+    }
+
+    /** Preserve the actual immutable NTA1 predecessor token while its C envelope advances independently. */
+    public static PulsarAggregateRetirementAuthorityV1 migrateLegacy(
+            ExactMetadataTransactionStoreV1.VersionedValue exactLegacyAggregate, CapabilityBinding capability) {
+        return migrateLegacy(
+                exactLegacyAggregate.canonicalStoredBytes(),
+                capability,
+                Optional.of(exactLegacyAggregate.metadataVersion()));
+    }
+
+    private static PulsarAggregateRetirementAuthorityV1 migrateLegacy(
+            CanonicalBytes exactLegacyAggregate,
+            CapabilityBinding capability,
+            Optional<MetadataVersion> originalVersion) {
         TopicBindingAggregateV1 aggregate = Nta1CodecV1.decode(exactLegacyAggregate);
         if (!(aggregate.binding().incarnationIdentity() instanceof PulsarTopicIncarnationIdentity incarnation)) {
             throw new IllegalArgumentException(
@@ -80,7 +96,133 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
                 List.of(),
                 Optional.empty(),
                 capability,
-                PLACEHOLDER));
+                PLACEHOLDER,
+                originalVersion));
+    }
+
+    /** A new P1 key starts closed; no existing aggregate can acquire this policy by migration. */
+    public static PulsarAggregateRetirementAuthorityV1 initialNativeOnly(
+            CanonicalBytes aggregateBytes, ReferenceWriterEnrollmentV1 enrollment) {
+        return initialNativeOnly(
+                aggregateBytes,
+                enrollment,
+                M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1.NATIVE_PULSAR_ONLY_V1);
+    }
+
+    public static PulsarAggregateRetirementAuthorityV1 initialNativeOnly(
+            CanonicalBytes aggregateBytes,
+            ReferenceWriterEnrollmentV1 enrollment,
+            M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1 policy) {
+        return initialNativeOnly(aggregateBytes, enrollment, policy, Optional.empty());
+    }
+
+    public static PulsarAggregateRetirementAuthorityV1 initialNativeOnly(
+            CanonicalBytes aggregateBytes,
+            ReferenceWriterEnrollmentV1 enrollment,
+            M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1 policy,
+            Optional<M5PulsarAuditDomainV1> initialAudits) {
+        java.util.Objects.requireNonNull(policy, "policy");
+        if (initialAudits.filter(domain -> !domain.holds().isEmpty()).isPresent()) {
+            throw new IllegalArgumentException("audit domain must be initialized before its first physical reference");
+        }
+        var aggregate = Nta1CodecV1.decode(aggregateBytes);
+        if (!(aggregate.binding().incarnationIdentity() instanceof PulsarTopicIncarnationIdentity incarnation)) {
+            throw new IllegalArgumentException("Native-only policy requires a Pulsar aggregate");
+        }
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                incarnation,
+                aggregate.binding().bindingId(),
+                1,
+                Optional.empty(),
+                PulsarAggregateAuthorityStateV1.NATIVE_PULSAR_ONLY_INITIALIZING_V5,
+                aggregateBytes,
+                Sha256Digest.hash(aggregateBytes),
+                Optional.empty(),
+                List.of(),
+                Optional.of(enrollment),
+                enrollment.capability(),
+                PLACEHOLDER,
+                Optional.empty(),
+                Optional.of(new M5LogicalTrimRecordsV2.LogicalTrimStateV2(Optional.empty(), Optional.empty())),
+                Optional.empty(),
+                Optional.of(policy),
+                Optional.empty(),
+                initialAudits));
+    }
+
+    /** Bind the actual first-create version before opening any P1/native admission. */
+    public static PulsarAggregateRetirementAuthorityV1 activateNativeOnly(
+            ExactMetadataTransactionStoreV1.VersionedValue initialized) {
+        var current = decodeAuthority(initialized.canonicalStoredBytes());
+        if (current.state() != PulsarAggregateAuthorityStateV1.NATIVE_PULSAR_ONLY_INITIALIZING_V5) {
+            throw new IllegalArgumentException("Native-only activation requires its exact initializing predecessor");
+        }
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                current.incarnation(),
+                current.bindingId(),
+                2,
+                Optional.of(Sha256Digest.hash(initialized.canonicalStoredBytes())),
+                PulsarAggregateAuthorityStateV1.OPEN_V1,
+                current.canonicalAggregateBytes(),
+                current.originalAggregateSha256(),
+                Optional.empty(),
+                List.of(),
+                current.writerEnrollment(),
+                current.capability(),
+                PLACEHOLDER,
+                Optional.of(initialized.metadataVersion()),
+                current.logicalTrim(),
+                Optional.empty(),
+                current.retentionPolicy(),
+                current.firstNativeFactoryScope(),
+                current.auditDomain(),
+                current.nativeRetention()));
+    }
+
+    static PulsarAggregateRetirementAuthorityV1 firstNativeFactorySuccessor(
+            PulsarAggregateRetirementAuthorityV1 current, Sha256Digest scope) {
+        if (current.state() != PulsarAggregateAuthorityStateV1.OPEN_V1
+                || current.retentionPolicy().isEmpty()
+                || current.firstNativeFactoryScope().isPresent()
+                || !current.referenceMutationTickets().isEmpty()) {
+            throw new IllegalArgumentException("first Native factory claim requires its idle new policy");
+        }
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                current.incarnation(),
+                current.bindingId(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                current.state(),
+                current.canonicalAggregateBytes(),
+                current.originalAggregateSha256(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                PLACEHOLDER,
+                current.originalAggregateVersion(),
+                current.logicalTrim(),
+                current.logicalTrimSourceScan(),
+                current.retentionPolicy(),
+                Optional.of(scope),
+                current.auditDomain(),
+                current.nativeRetention()));
+    }
+
+    public static Sha256Digest nativeOnlyPolicyRoot(PulsarAggregateRetirementAuthorityV1 value) {
+        if (value.retentionPolicy().isEmpty()) {
+            throw new IllegalArgumentException("Pulsar aggregate has no explicit Native-only policy");
+        }
+        return Sha256Digest.hash(encode(output -> {
+            output.writeUTF(
+                    value.retentionPolicy().orElseThrow()
+                                    == M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1.NATIVE_PULSAR_ONLY_V1
+                            ? "NEREUS_NATIVE_PULSAR_ONLY_V1"
+                            : "NEREUS_NATIVE_PULSAR_ONLY_WITHOUT_ACCESS_PROJECTION_V2");
+            writeDigest(output, value.originalAggregateSha256());
+            writeCapability(output, value.capability());
+            writeDigest(output, value.writerEnrollment().orElseThrow().implementationRootSha256());
+        }));
     }
 
     public static PulsarAggregateRetirementAuthorityV1 successor(
@@ -110,7 +252,78 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
                 tickets,
                 enrollment,
                 current.capability(),
-                PLACEHOLDER));
+                PLACEHOLDER,
+                current.originalAggregateVersion(),
+                current.logicalTrim(),
+                current.logicalTrimSourceScan(),
+                current.retentionPolicy(),
+                current.firstNativeFactoryScope(),
+                current.auditDomain(),
+                current.nativeRetention()));
+    }
+
+    static PulsarAggregateRetirementAuthorityV1 logicalTrimSuccessor(
+            PulsarAggregateRetirementAuthorityV1 current, M5LogicalTrimRecordsV2.LogicalTrimStateV2 trim) {
+        if (current.state() != PulsarAggregateAuthorityStateV1.OPEN_V1
+                && current.state() != PulsarAggregateAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2) {
+            throw new IllegalArgumentException("retirement scan fence cannot become a logical trim fence");
+        }
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                current.incarnation(),
+                current.bindingId(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                trim.fence().isPresent()
+                        ? PulsarAggregateAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2
+                        : PulsarAggregateAuthorityStateV1.OPEN_V1,
+                current.canonicalAggregateBytes(),
+                current.originalAggregateSha256(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                PLACEHOLDER,
+                current.originalAggregateVersion(),
+                Optional.of(trim),
+                Optional.empty(),
+                current.retentionPolicy(),
+                current.firstNativeFactoryScope(),
+                current.auditDomain(),
+                current.nativeRetention()));
+    }
+
+    static PulsarAggregateRetirementAuthorityV1 sourceScanSuccessor(
+            PulsarAggregateRetirementAuthorityV1 current,
+            Optional<M5PulsarAggregateAuthorityRecordsV1.PulsarLogicalTrimSourceScanV3> scan,
+            M5LogicalTrimRecordsV2.LogicalTrimStateV2 trim) {
+        if (current.state() != PulsarAggregateAuthorityStateV1.OPEN_V1
+                && current.state() != PulsarAggregateAuthorityStateV1.LOGICAL_TRIM_SOURCE_SCAN_FENCED_V3) {
+            throw new IllegalArgumentException("another scan owns the Pulsar authority");
+        }
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                current.incarnation(),
+                current.bindingId(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                scan.isPresent()
+                        ? PulsarAggregateAuthorityStateV1.LOGICAL_TRIM_SOURCE_SCAN_FENCED_V3
+                        : trim.fence().isPresent()
+                                ? PulsarAggregateAuthorityStateV1.LOGICAL_TRIM_SCAN_FENCED_V2
+                                : PulsarAggregateAuthorityStateV1.OPEN_V1,
+                current.canonicalAggregateBytes(),
+                current.originalAggregateSha256(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                PLACEHOLDER,
+                current.originalAggregateVersion(),
+                Optional.of(trim),
+                scan,
+                current.retentionPolicy(),
+                current.firstNativeFactoryScope(),
+                current.auditDomain(),
+                current.nativeRetention()));
     }
 
     public static CanonicalBytes encodeAuthority(PulsarAggregateRetirementAuthorityV1 value) {
@@ -131,9 +344,22 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
             throw new IllegalArgumentException("Pulsar aggregate authority exceeds the metadata value hard cap");
         }
         PulsarAggregateRetirementAuthorityV1 value = decode(encoded, input -> {
-            if (input.readInt() != MAGIC || input.readInt() != VERSION) {
+            if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Pulsar aggregate authority preamble differs");
             }
+            int version = input.readInt();
+            if (version != VERSION
+                    && version != 2
+                    && version != 3
+                    && version != 4
+                    && version != 5
+                    && version != 6
+                    && version != 7) {
+                throw new IllegalArgumentException("Pulsar aggregate authority version differs");
+            }
+            Optional<MetadataVersion> originalVersion = version == 2 || version >= 3 && input.readBoolean()
+                    ? Optional.of(new MetadataVersion(readBytes(input, 4096)))
+                    : Optional.empty();
             long generation = input.readLong();
             Optional<Sha256Digest> predecessor =
                     input.readBoolean() ? Optional.of(readDigest(input)) : Optional.empty();
@@ -178,6 +404,38 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
             }
             PulsarAggregateAuthorityStateV1 state = enumValue(
                     PulsarAggregateAuthorityStateV1.values(), input.readUnsignedByte(), "Pulsar authority state");
+            Optional<M5LogicalTrimRecordsV2.LogicalTrimStateV2> trim = Optional.empty();
+            if (version >= 3) {
+                Optional<M5RetentionRecordsV1.BindingTrimFrontierV1> frontier = input.readBoolean()
+                        ? Optional.of(M5RetentionCodecV1.decodeTrimFrontier(
+                                readBytes(input, M5PulsarAggregateAuthorityRecordsV1.MAX_AUTHORITY_BYTES)))
+                        : Optional.empty();
+                Optional<M5LogicalTrimRecordsV2.LogicalTrimFenceV2> trimFence = input.readBoolean()
+                        ? Optional.of(new M5LogicalTrimRecordsV2.LogicalTrimFenceV2(
+                                readDigest(input), readDigest(input), readAuthorityFact(input)))
+                        : Optional.empty();
+                trim = Optional.of(new M5LogicalTrimRecordsV2.LogicalTrimStateV2(frontier, trimFence));
+            }
+            Optional<M5PulsarAggregateAuthorityRecordsV1.PulsarLogicalTrimSourceScanV3> sourceScan =
+                    version == 4 || version >= 5 && input.readBoolean()
+                            ? Optional.of(new M5PulsarAggregateAuthorityRecordsV1.PulsarLogicalTrimSourceScanV3(
+                                    readDigest(input), readAuthorityFact(input)))
+                            : Optional.empty();
+            Optional<Sha256Digest> firstFactory =
+                    version >= 5 && input.readBoolean() ? Optional.of(readDigest(input)) : Optional.empty();
+            Optional<M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1> policy = version >= 5
+                    ? Optional.of(enumValue(
+                            M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1.values(),
+                            input.readUnsignedByte(),
+                            "Pulsar retention policy"))
+                    : Optional.empty();
+            Optional<M5PulsarAuditDomainV1> audits = version == 6 || version == 7 && input.readBoolean()
+                    ? Optional.of(M5PulsarAuditDomainV1.decode(readBytes(input, M5PulsarAuditDomainV1.MAX_BYTES)))
+                    : Optional.empty();
+            Optional<M5PulsarRetentionConfigurationV1> nativeRetention = version == 7
+                    ? Optional.of(M5PulsarRetentionConfigurationV1.decode(
+                            readBytes(input, M5PulsarRetentionConfigurationV1.MAX_BYTES)))
+                    : Optional.empty();
             Sha256Digest canonicalSha = readDigest(input);
             TopicBindingAggregateV1 aggregate = Nta1CodecV1.decode(aggregateBytes);
             if (!(aggregate.binding().incarnationIdentity() instanceof PulsarTopicIncarnationIdentity incarnation)) {
@@ -195,7 +453,14 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
                     tickets,
                     enrollment,
                     capability,
-                    canonicalSha);
+                    canonicalSha,
+                    originalVersion,
+                    trim,
+                    sourceScan,
+                    policy,
+                    firstFactory,
+                    audits,
+                    nativeRetention);
         });
         if (!encoded.equals(encodeAuthority(value))) {
             throw new IllegalArgumentException("Pulsar aggregate authority is not canonical");
@@ -206,10 +471,68 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
     /** Project an authority envelope back to the exact canonical NTA1 bytes expected by M1 readers. */
     public static CanonicalBytes projectAggregate(CanonicalBytes stored) {
         if (isAuthorityValue(stored)) {
-            return decodeAuthority(stored).canonicalAggregateBytes();
+            var authority = decodeAuthority(stored);
+            if (authority.state() == PulsarAggregateAuthorityStateV1.NATIVE_PULSAR_ONLY_INITIALIZING_V5) {
+                throw new IllegalArgumentException("Native-only P1 admission is not activated");
+            }
+            return authority.canonicalAggregateBytes();
         }
         Nta1CodecV1.decode(stored);
         return stored;
+    }
+
+    static PulsarAggregateRetirementAuthorityV1 retentionConfigurationSuccessor(
+            PulsarAggregateRetirementAuthorityV1 current, M5PulsarRetentionConfigurationV1 configured) {
+        var next = successor(current, current.state(), current.scanFence(), current.referenceMutationTickets());
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                next.incarnation(),
+                next.bindingId(),
+                next.authorityGeneration(),
+                next.predecessorValueSha256(),
+                next.state(),
+                next.canonicalAggregateBytes(),
+                next.originalAggregateSha256(),
+                next.scanFence(),
+                next.referenceMutationTickets(),
+                next.writerEnrollment(),
+                next.capability(),
+                next.authorityCanonicalSha256(),
+                next.originalAggregateVersion(),
+                next.logicalTrim(),
+                next.logicalTrimSourceScan(),
+                next.retentionPolicy(),
+                next.firstNativeFactoryScope(),
+                next.auditDomain(),
+                Optional.of(configured)));
+    }
+
+    static PulsarAggregateRetirementAuthorityV1 auditSuccessor(
+            PulsarAggregateRetirementAuthorityV1 current, M5PulsarAuditDomainV1 audits) {
+        if (current.state() != PulsarAggregateAuthorityStateV1.OPEN_V1
+                || current.auditDomain().isEmpty()) {
+            throw new IllegalArgumentException("audit mutation requires its existing OPEN domain");
+        }
+        var next = successor(current, current.state(), current.scanFence(), current.referenceMutationTickets());
+        return finalizeAuthority(new PulsarAggregateRetirementAuthorityV1(
+                next.incarnation(),
+                next.bindingId(),
+                next.authorityGeneration(),
+                next.predecessorValueSha256(),
+                next.state(),
+                next.canonicalAggregateBytes(),
+                next.originalAggregateSha256(),
+                next.scanFence(),
+                next.referenceMutationTickets(),
+                next.writerEnrollment(),
+                next.capability(),
+                PLACEHOLDER,
+                next.originalAggregateVersion(),
+                next.logicalTrim(),
+                next.logicalTrimSourceScan(),
+                next.retentionPolicy(),
+                next.firstNativeFactoryScope(),
+                Optional.of(audits),
+                next.nativeRetention()));
     }
 
     private static PulsarAggregateRetirementAuthorityV1 finalizeAuthority(PulsarAggregateRetirementAuthorityV1 draft) {
@@ -231,13 +554,41 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
                 value.referenceMutationTickets(),
                 value.writerEnrollment(),
                 value.capability(),
-                canonicalSha);
+                canonicalSha,
+                value.originalAggregateVersion(),
+                value.logicalTrim(),
+                value.logicalTrimSourceScan(),
+                value.retentionPolicy(),
+                value.firstNativeFactoryScope(),
+                value.auditDomain(),
+                value.nativeRetention());
     }
 
     private static CanonicalBytes encodeUnchecked(PulsarAggregateRetirementAuthorityV1 value) {
         return encode(output -> {
             output.writeInt(MAGIC);
-            output.writeInt(VERSION);
+            output.writeInt(
+                    value.nativeRetention().isPresent()
+                            ? 7
+                            : value.auditDomain().isPresent()
+                                    ? 6
+                                    : value.retentionPolicy().isPresent()
+                                            ? 5
+                                            : value.logicalTrimSourceScan().isPresent()
+                                                    ? 4
+                                                    : value.logicalTrim().isPresent()
+                                                            ? 3
+                                                            : value.originalAggregateVersion()
+                                                                            .isPresent()
+                                                                    ? 2
+                                                                    : VERSION);
+            if (value.logicalTrim().isPresent()) {
+                output.writeBoolean(value.originalAggregateVersion().isPresent());
+            }
+            if (value.originalAggregateVersion().isPresent()) {
+                writeBytes(
+                        output, value.originalAggregateVersion().orElseThrow().value(), 4096);
+            }
             output.writeLong(value.authorityGeneration());
             output.writeBoolean(value.predecessorValueSha256().isPresent());
             if (value.predecessorValueSha256().isPresent()) {
@@ -280,6 +631,51 @@ public final class M5PulsarAggregateAuthorityCodecV1 {
                 writeDigest(output, enrollment.implementationRootSha256());
             }
             output.writeByte(value.state().ordinal());
+            if (value.logicalTrim().isPresent()) {
+                var trim = value.logicalTrim().orElseThrow();
+                output.writeBoolean(trim.frontier().isPresent());
+                if (trim.frontier().isPresent()) {
+                    writeBytes(
+                            output,
+                            M5RetentionCodecV1.encodeTrimFrontier(
+                                    trim.frontier().orElseThrow()),
+                            M5PulsarAggregateAuthorityRecordsV1.MAX_AUTHORITY_BYTES);
+                }
+                output.writeBoolean(trim.fence().isPresent());
+                if (trim.fence().isPresent()) {
+                    var trimFence = trim.fence().orElseThrow();
+                    writeDigest(output, trimFence.attemptIdSha256());
+                    writeDigest(output, trimFence.floorSnapshotRootSha256());
+                    writeAuthorityFact(output, trimFence.openAuthority());
+                }
+            }
+            if (value.retentionPolicy().isPresent()) {
+                output.writeBoolean(value.logicalTrimSourceScan().isPresent());
+            }
+            if (value.logicalTrimSourceScan().isPresent()) {
+                var scan = value.logicalTrimSourceScan().orElseThrow();
+                writeDigest(output, scan.attemptIdSha256());
+                writeAuthorityFact(output, scan.openAuthority());
+            }
+            if (value.retentionPolicy().isPresent()) {
+                output.writeBoolean(value.firstNativeFactoryScope().isPresent());
+                if (value.firstNativeFactoryScope().isPresent()) {
+                    writeDigest(output, value.firstNativeFactoryScope().orElseThrow());
+                }
+                output.writeByte(value.retentionPolicy().orElseThrow().ordinal());
+            }
+            if (value.nativeRetention().isPresent()) {
+                output.writeBoolean(value.auditDomain().isPresent());
+            }
+            if (value.auditDomain().isPresent()) {
+                writeBytes(output, value.auditDomain().orElseThrow().encode(), M5PulsarAuditDomainV1.MAX_BYTES);
+            }
+            if (value.nativeRetention().isPresent()) {
+                writeBytes(
+                        output,
+                        value.nativeRetention().orElseThrow().encode(),
+                        M5PulsarRetentionConfigurationV1.MAX_BYTES);
+            }
             writeDigest(output, value.authorityCanonicalSha256());
         });
     }

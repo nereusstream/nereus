@@ -27,8 +27,9 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.SemanticValidationProof;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-/** Immutable SEALED_BK_COMPACTED_RUN_V2 value. Only an exact M4 selector may grant read-selection authority. */
+/** Immutable KBSD2/KBSD3 value. Only an exact M4 selector may grant read-selection authority. */
 public record KafkaSealedBookKeeperDescriptorV2(
         Task task,
         long sourceGeneration,
@@ -37,9 +38,33 @@ public record KafkaSealedBookKeeperDescriptorV2(
         Sha256Digest gapRootSha256,
         SemanticValidationProof semanticProof,
         List<BookKeeperDeleteTargetV1> sealedParts,
-        List<IndexLocator> indexes) {
+        List<IndexLocator> indexes,
+        Optional<IndexLocator> recoveryStateLocator) {
     public static final int MAX_ENCODED_BYTES = 1_048_576;
     public static final String KIND = "SEALED_BK_COMPACTED_RUN_V2";
+    public static final String RECOVERY_KIND = "SEALED_BK_COMPACTED_RUN_V3";
+
+    /** The original KBSD2 constructor retains the original wire and contains no independent protocol state. */
+    public KafkaSealedBookKeeperDescriptorV2(
+            Task task,
+            long sourceGeneration,
+            int batchCount,
+            Sha256Digest dispositionRootSha256,
+            Sha256Digest gapRootSha256,
+            SemanticValidationProof semanticProof,
+            List<BookKeeperDeleteTargetV1> sealedParts,
+            List<IndexLocator> indexes) {
+        this(
+                task,
+                sourceGeneration,
+                batchCount,
+                dispositionRootSha256,
+                gapRootSha256,
+                semanticProof,
+                sealedParts,
+                indexes,
+                Optional.empty());
+    }
 
     /** Chunks are contiguous in ordered part/entry traversal, even when an index crosses multiple ledgers. */
     public record IndexLocator(
@@ -66,6 +91,7 @@ public record KafkaSealedBookKeeperDescriptorV2(
         Objects.requireNonNull(semanticProof, "semanticProof");
         sealedParts = List.copyOf(Objects.requireNonNull(sealedParts, "sealedParts"));
         indexes = List.copyOf(Objects.requireNonNull(indexes, "indexes"));
+        Objects.requireNonNull(recoveryStateLocator, "recoveryStateLocator");
         var cut = M5MaterializationCodecV1.decodeSourceCut(task.sourceCut());
         if (sourceGeneration != Math.addExact(cut.predecessorSelector().sourceGeneration(), 1)
                 || batchCount < 0
@@ -117,18 +143,44 @@ public record KafkaSealedBookKeeperDescriptorV2(
         if (data != (batchCount > 0) || !indexPhase) {
             throw new IllegalArgumentException("sealed BK descriptor has an inconsistent empty output");
         }
-        for (IndexLocator index : indexes) {
+        List<IndexLocator> allLocators = new java.util.ArrayList<>(indexes);
+        recoveryStateLocator.ifPresent(allLocators::add);
+        for (IndexLocator index : allLocators) {
             if (index.firstPart() >= task.parts().size()
                     || task.parts().get(index.firstPart()).kind() != PartKind.INDEX
                     || index.firstEntry() >= task.parts().get(index.firstPart()).entryCount()) {
                 throw new IllegalArgumentException("sealed BK index starts outside an exact index part");
             }
         }
+        recoveryStateLocator.ifPresent(locator -> {
+            if (locator.artifactLength() > KafkaCompactionRecoveryStateCodecV1.MAX_ENCODED_BYTES) {
+                throw new IllegalArgumentException("sealed BK recovery locator exceeds its protocol state bound");
+            }
+        });
     }
 
     /** Builds from independently validated semantics and exact physical writer results; it does not publish. */
     public static KafkaSealedBookKeeperDescriptorV2 create(
             CompactionPlan plan, KafkaCompactionSemanticOutputV2 semantic, Layout layout, List<VerifiedPart> verified) {
+        return create(plan, semantic, layout, verified, Optional.empty());
+    }
+
+    public static KafkaSealedBookKeeperDescriptorV2 create(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            Layout layout,
+            List<VerifiedPart> verified,
+            KafkaCompactionRecoveryStateV1 recoveryState) {
+        Objects.requireNonNull(recoveryState, "recoveryState").requirePlan(plan);
+        return create(plan, semantic, layout, verified, Optional.of(recoveryState));
+    }
+
+    private static KafkaSealedBookKeeperDescriptorV2 create(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            Layout layout,
+            List<VerifiedPart> verified,
+            Optional<KafkaCompactionRecoveryStateV1> recoveryState) {
         var proof = new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, semantic);
         Task task = layout.task();
         if (!task.sourceCut().equals(M5MaterializationCodecV1.encodeSourceCut(plan.sourceCut()))
@@ -149,6 +201,7 @@ public record KafkaSealedBookKeeperDescriptorV2(
         }
         var artifacts = KafkaBookKeeperArtifactAssemblerV2.assemble(task, layout.parts());
         requireBodies(semantic, artifacts);
+        requireRecoveryState(recoveryState, artifacts);
         return new KafkaSealedBookKeeperDescriptorV2(
                 task,
                 Math.addExact(plan.sourceCut().predecessorSelector().sourceGeneration(), 1),
@@ -157,7 +210,8 @@ public record KafkaSealedBookKeeperDescriptorV2(
                 KafkaBookKeeperArtifactAssemblerV2.gapRoot(semantic.gaps()),
                 proof,
                 verified.stream().map(VerifiedPart::sealedMetadata).toList(),
-                artifacts.indexLocators());
+                artifacts.indexLocators(),
+                artifacts.recoveryStateLocator());
     }
 
     static void requireBodies(
@@ -174,6 +228,21 @@ public record KafkaSealedBookKeeperDescriptorV2(
 
     public MaterializationSourceCut sourceCut() {
         return M5MaterializationCodecV1.decodeSourceCut(task.sourceCut());
+    }
+
+    static void requireRecoveryState(
+            Optional<KafkaCompactionRecoveryStateV1> expected, KafkaBookKeeperArtifactAssemblerV2.Artifacts actual) {
+        if (!actual.recoveryState().equals(expected.map(KafkaCompactionRecoveryStateV1::encode))) {
+            throw new IllegalStateException("sealed BK protocol recovery state differs from its captured input");
+        }
+    }
+
+    public int wireVersion() {
+        return recoveryStateLocator.isPresent() ? 3 : 2;
+    }
+
+    public String kind() {
+        return recoveryStateLocator.isPresent() ? RECOVERY_KIND : KIND;
     }
 
     public CanonicalBytes encode() {

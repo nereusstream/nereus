@@ -92,6 +92,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
     private final M5BookKeeperNativeCreateGuardV2 guard;
     private final List<ACL> acls;
     private final RunLedgerHandleV1 handle;
+    private final Optional<M5PulsarNativeCreateSpecV1> pulsarSpec;
     private final PhysicalResourceIdV2.BookKeeperLedger resource;
     private final BookKeeperCapabilitySnapshotV1 capability;
     private final Sha256Digest capabilitySha;
@@ -108,22 +109,163 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
             PhysicalResourceIdV2.Namespace namespace,
             BookKeeperCapabilitySnapshotV1 capability,
             Supplier<CompletionStage<Void>> beforeDelete) {
+        this(
+                zk,
+                manager,
+                guard,
+                acls,
+                handle,
+                new PhysicalResourceIdV2.BookKeeperLedger(
+                        namespace, handle.ledgerIdentity().ledgerId()),
+                Optional.empty(),
+                capability,
+                beforeDelete);
+    }
+
+    M5BookKeeperNativeDeleteAuthorityV2(
+            ZooKeeper zk,
+            M5BookKeeperNativeLedgerManagerV2 manager,
+            M5BookKeeperNativeCreateGuardV2 guard,
+            List<ACL> acls,
+            M5PulsarNativeCreateSpecV1 spec,
+            PhysicalResourceIdV2.BookKeeperLedger resource,
+            BookKeeperCapabilitySnapshotV1 capability) {
+        this(
+                zk,
+                manager,
+                guard,
+                acls,
+                null,
+                resource,
+                Optional.of(spec),
+                capability,
+                () -> CompletableFuture.completedFuture(null));
+        if (spec.bookKeeperGcGrace().isEmpty()
+                || !spec.namespaceBinding().physicalNamespace().equals(resource.namespace())
+                || !spec.providerScope().equals(capability.providerScopeId().digest())
+                || !spec.configuration().equals(capability.configurationDigest())) {
+            throw new IllegalArgumentException("Native Pulsar delete scope/capability differs");
+        }
+    }
+
+    private M5BookKeeperNativeDeleteAuthorityV2(
+            ZooKeeper zk,
+            M5BookKeeperNativeLedgerManagerV2 manager,
+            M5BookKeeperNativeCreateGuardV2 guard,
+            List<ACL> acls,
+            RunLedgerHandleV1 handle,
+            PhysicalResourceIdV2.BookKeeperLedger resource,
+            Optional<M5PulsarNativeCreateSpecV1> pulsarSpec,
+            BookKeeperCapabilitySnapshotV1 capability,
+            Supplier<CompletionStage<Void>> beforeDelete) {
         this.zk = Objects.requireNonNull(zk, "zk");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.acls = List.copyOf(acls);
-        this.handle = Objects.requireNonNull(handle, "handle");
-        this.resource = new PhysicalResourceIdV2.BookKeeperLedger(
-                namespace, handle.ledgerIdentity().ledgerId());
+        this.handle = handle;
+        this.pulsarSpec = pulsarSpec;
+        this.resource = Objects.requireNonNull(resource, "resource");
         this.capability = Objects.requireNonNull(capability, "capability");
         this.capabilitySha = capabilitySha256(capability);
         this.beforeDelete = Objects.requireNonNull(beforeDelete, "beforeDelete");
         this.quota = guard.deleteQuota();
-        this.path = quota.epochPath(handle.ledgerIdentity().ledgerId());
+        this.path = quota.epochPath(resource.ledgerId());
+    }
+
+    /** Transient SDK observation, never a replacement for the native epoch or the durable M5 intent. */
+    public record PulsarTarget(
+            PhysicalResourceIdV2.BookKeeperLedger resource,
+            Sha256Digest createScope,
+            long metadataVersion,
+            long lastEntryId,
+            long length,
+            Sha256Digest metadataSha256) {
+        public PulsarTarget {
+            Objects.requireNonNull(resource, "resource");
+            Objects.requireNonNull(createScope, "createScope");
+            Objects.requireNonNull(metadataSha256, "metadataSha256");
+            if (createScope.isZero()
+                    || metadataSha256.isZero()
+                    || metadataVersion < 0
+                    || metadataVersion > Integer.MAX_VALUE
+                    || lastEntryId < 0
+                    || length <= 0) {
+                throw new IllegalArgumentException("Native Pulsar sealed delete target is invalid");
+            }
+        }
+    }
+
+    static PulsarTarget pulsarTarget(
+            PhysicalResourceIdV2.BookKeeperLedger resource,
+            M5PulsarNativeCreateSpecV1 spec,
+            org.apache.bookkeeper.versioning.Versioned<org.apache.bookkeeper.client.api.LedgerMetadata> observed) {
+        var metadata = observed.getValue();
+        M5PulsarNativeCreateSpecV1.requireBoundedMetadata(metadata);
+        if (spec.bookKeeperGcGrace().isEmpty()
+                || !resource.namespace().equals(spec.namespaceBinding().physicalNamespace())
+                || !(observed.getVersion() instanceof LongVersion version)
+                || !metadata.isClosed()
+                || metadata.getCustomMetadata().containsKey("pulsar/cursor")
+                || spec.bindingFor(metadata, true).isEmpty()) {
+            throw new IllegalArgumentException("Native Pulsar target is not its exact tagged CLOSED data ledger");
+        }
+        try {
+            // The SDK serializer preserves custom-row iteration order. Sort it so a reconnect's map order
+            // cannot change the fingerprint of the same sealed native metadata.
+            var canonical = org.apache.bookkeeper.client.LedgerMetadataBuilder.from(metadata)
+                    .withCToken(metadata.getCToken())
+                    .withCustomMetadata(new java.util.TreeMap<>(metadata.getCustomMetadata()))
+                    .build();
+            var bytes = new org.apache.bookkeeper.meta.LedgerMetadataSerDe().serialize(canonical);
+            // BK's serializer can omit ctoken and ctime. They still distinguish the original physical ledger.
+            var identity = new ByteArrayOutputStream();
+            try (var out = new DataOutputStream(identity)) {
+                out.writeInt(0x4d355054); // M5PT
+                out.write(spec.sha256().bytes().toByteArray());
+                out.writeLong(resource.ledgerId());
+                out.writeLong(metadata.getCToken());
+                out.writeLong(metadata.getCtime());
+                out.writeBoolean(org.apache.bookkeeper.client.LedgerMetadataUtils.shouldStoreCtime(metadata));
+                out.writeInt(bytes.length);
+                out.write(bytes);
+            }
+            return new PulsarTarget(
+                    resource,
+                    spec.sha256(),
+                    version.getLongVersion(),
+                    metadata.getLastEntryId(),
+                    metadata.getLength(),
+                    Sha256Digest.hash(CanonicalBytes.copyOf(identity.toByteArray())));
+        } catch (java.io.IOException failure) {
+            throw new java.util.concurrent.CompletionException(failure);
+        }
+    }
+
+    /** Actual reads through the original tagged scope. Only native NoSuchLedger establishes absence. */
+    public CompletionStage<Optional<PulsarTarget>> capturePulsarTarget() {
+        if (pulsarSpec.isEmpty()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("not a Native Pulsar delete scope"));
+        }
+        return guard.requireOwned(resource.ledgerId())
+                .thenCompose(ignored -> manager.readLedgerMetadata(resource.ledgerId())
+                        .handle((observed, failure) -> {
+                            if (failure == null) {
+                                return Optional.of(pulsarTarget(resource, pulsarSpec.orElseThrow(), observed));
+                            }
+                            if (absent(failure)) {
+                                return Optional.<PulsarTarget>empty();
+                            }
+                            throw new java.util.concurrent.CompletionException(failure);
+                        }));
     }
 
     public PhysicalResourceIdV2.BookKeeperLedger resource() {
         return resource;
+    }
+
+    /** Identity of the original Native create scope; this observation grants no deletion eligibility. */
+    public Optional<Sha256Digest> pulsarCreateScopeSha256() {
+        return pulsarSpec.map(M5PulsarNativeCreateSpecV1::sha256);
     }
 
     public Sha256Digest admittedCapabilitySha256() {
@@ -384,12 +526,82 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                 .thenApply(value -> value);
     }
 
+    /** Same native epoch, intent and Cell dispatch transaction for an actual Pulsar tagged data ledger. */
+    public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> deletePulsarExact(
+            M5BookKeeperDeleteCellBudgetV2 budget, M5BookKeeperNativeDeleteIntentV2 intent, PulsarTarget target) {
+        if (pulsarSpec.isEmpty()
+                || target == null
+                || intent == null
+                || !resource.equals(target.resource())
+                || !pulsarSpec.orElseThrow().sha256().equals(target.createScope())
+                || !intent.ledgerMetadataSha256().equals(target.metadataSha256())) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Native Pulsar intent/target differs"));
+        }
+        var issued = new java.util.concurrent.atomic.AtomicBoolean();
+        return guard.requireNamespaceBinding()
+                .thenCompose(binding -> requireIntent(intent).thenCompose(ignored -> {
+                    var admissionChecks = new ArrayList<>(checks(intent.epoch()));
+                    admissionChecks.add(Op.check(intentPath(), intent.nativeVersion()));
+                    return budget.execute(
+                            binding,
+                            capability.providerScopeId(),
+                            intent,
+                            admissionChecks,
+                            issued,
+                            () -> capturePulsarTarget()
+                                    .thenCompose(observed -> {
+                                        if (observed.isEmpty()) {
+                                            return CompletableFuture.completedFuture(
+                                                    DeleteResult.authoritativelyAbsent());
+                                        }
+                                        if (!observed.equals(Optional.of(target))) {
+                                            return CompletableFuture.completedFuture(
+                                                    DeleteResult.differentLedgerOrMetadata());
+                                        }
+                                        var deletionChecks = new ArrayList<>(admissionChecks);
+                                        deletionChecks.add(Op.delete(
+                                                manager.nativeLedgerPath(resource.ledgerId()),
+                                                Math.toIntExact(target.metadataVersion())));
+                                        return beforeDelete
+                                                .get()
+                                                .thenCompose(unused -> {
+                                                    issued.set(true);
+                                                    return multi(deletionChecks);
+                                                })
+                                                .thenCompose(rc -> {
+                                                    if (rc == KeeperException.Code.BADVERSION.intValue()
+                                                            || rc == KeeperException.Code.NOAUTH.intValue()) {
+                                                        return CompletableFuture.failedFuture(
+                                                                M5BookKeeperNativeCreateGuardV2.failure(rc, path));
+                                                    }
+                                                    return capturePulsarTarget().handle((remaining, failure) -> {
+                                                        if (failure != null) {
+                                                            return DeleteResult.outcomeUnknown();
+                                                        }
+                                                        if (remaining.isEmpty()) {
+                                                            return DeleteResult.authoritativelyAbsent();
+                                                        }
+                                                        if (!remaining.equals(Optional.of(target))) {
+                                                            return DeleteResult.differentLedgerOrMetadata();
+                                                        }
+                                                        return rc == KeeperException.Code.OK.intValue()
+                                                                ? DeleteResult.exactLedgerRemains()
+                                                                : DeleteResult.outcomeUnknown();
+                                                    });
+                                                });
+                                    })
+                                    .thenCompose(result -> requireIntent(intent).thenApply(unused -> result)));
+                }))
+                .thenApply(value -> value);
+    }
+
     /** Read-only recovery of callback-terminal UNKNOWN; in-flight reservations are never cleared by timeout/restart. */
     public CompletionStage<M5BookKeeperDeleteCellBudgetV2.Result> reconcileCellDelete(
             M5BookKeeperDeleteCellBudgetV2 budget,
             M5BookKeeperNativeDeleteIntentV2 intent,
             BookKeeperDeleteTargetV1 target) {
-        if (!intent.ledgerMetadataSha256().equals(target.metadataSha256()) || !handle.equals(target.handle())) {
+        if (!intent.ledgerMetadataSha256().equals(target.metadataSha256())
+                || !Objects.equals(handle, target.handle())) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("native intent ledger identity differs"));
         }
@@ -426,6 +638,12 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
                                                 return absent(failure)
                                                         ? DeleteResult.authoritativelyAbsent()
                                                         : DeleteResult.outcomeUnknown();
+                                            }
+                                            if (pulsarSpec.isPresent()) {
+                                                var actual = pulsarTarget(resource, pulsarSpec.orElseThrow(), observed);
+                                                return actual.metadataSha256().equals(intent.ledgerMetadataSha256())
+                                                        ? DeleteResult.exactLedgerRemains()
+                                                        : DeleteResult.differentLedgerOrMetadata();
                                             }
                                             var actual = M5BookKeeperDeleteAdapterV1.exactTarget(
                                                     observed.getValue(), handle, capability, new byte[0]);
@@ -479,7 +697,7 @@ public final class M5BookKeeperNativeDeleteAuthorityV2 {
             BookKeeperDeleteTargetV1 target,
             java.util.concurrent.atomic.AtomicBoolean issued) {
         Objects.requireNonNull(target, "target");
-        if (!handle.equals(target.handle())) {
+        if (!Objects.equals(handle, target.handle())) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("native delete target handle differs"));
         }
         CompletionStage<DeleteResult> operation = requireCurrent(expected)

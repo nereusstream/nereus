@@ -17,8 +17,10 @@ package com.nereusstream.kafka.bookkeeper.compaction;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.NativeSelectedInputSources;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CompactionPlan;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.InputBatch;
+import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
@@ -37,6 +39,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
 /**
  * Captures the current native selected BK generation, including all data/index ledgers and gap-only output.
@@ -84,6 +87,8 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
     private final M5TargetDeleteMultiWriterGuardV2 guard;
     private final Bounds bounds;
     private final Executor owner;
+    private final Optional<NativeSelectedInputSources> nativeInput;
+    private final Supplier<KafkaBookKeeperRunSourceV2.OwnedReadSession> sessions;
 
     public KafkaBookKeeperSelectedSourceV2(
             KafkaBookKeeperReadCellBudgetV2 budget,
@@ -93,6 +98,51 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
             M5TargetDeleteMultiWriterGuardV2 guard,
             Bounds bounds,
             Executor owner) {
+        this(
+                budget,
+                store,
+                m4,
+                client,
+                guard,
+                bounds,
+                owner,
+                Optional.empty(),
+                () -> new KafkaBookKeeperRunSourceV2.OwnedReadSession(client.newSession(), ignored -> {}));
+    }
+
+    /** Uses the actual native actor's descriptor admission and tracked read-only sessions. */
+    public static KafkaBookKeeperSelectedSourceV2 forNativeOwner(
+            KafkaBookKeeperReadCellBudgetV2 budget,
+            CanonicalControlMetadataStore store,
+            M4ReadControlCoordinatorV1 m4,
+            M5BookKeeperNativeCreateClientV2 client,
+            M5TargetDeleteMultiWriterGuardV2 guard,
+            Bounds bounds,
+            Executor owner,
+            NativeSelectedInputSources nativeInput,
+            Supplier<KafkaBookKeeperRunSourceV2.OwnedReadSession> sessions) {
+        return new KafkaBookKeeperSelectedSourceV2(
+                budget,
+                store,
+                m4,
+                client,
+                guard,
+                bounds,
+                owner,
+                Optional.of(Objects.requireNonNull(nativeInput, "nativeInput")),
+                sessions);
+    }
+
+    private KafkaBookKeeperSelectedSourceV2(
+            KafkaBookKeeperReadCellBudgetV2 budget,
+            CanonicalControlMetadataStore store,
+            M4ReadControlCoordinatorV1 m4,
+            M5BookKeeperNativeCreateClientV2 client,
+            M5TargetDeleteMultiWriterGuardV2 guard,
+            Bounds bounds,
+            Executor owner,
+            Optional<NativeSelectedInputSources> nativeInput,
+            Supplier<KafkaBookKeeperRunSourceV2.OwnedReadSession> sessions) {
         this.budget = Objects.requireNonNull(budget, "budget");
         this.store = Objects.requireNonNull(store, "store");
         this.m4 = Objects.requireNonNull(m4, "m4");
@@ -100,6 +150,8 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
         this.guard = Objects.requireNonNull(guard, "guard");
         this.bounds = Objects.requireNonNull(bounds, "bounds");
         this.owner = Objects.requireNonNull(owner, "owner");
+        this.nativeInput = nativeInput;
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
     public CompletionStage<Snapshot> capture() {
@@ -110,12 +162,12 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
                             descriptor.task().namespace(),
                             part.handle().ledgerIdentity().ledgerId()))
                     .toList();
-            return KafkaBookKeeperReadOwnerV2.run(
+            return KafkaBookKeeperReadOwnerV2.runOwned(
                     budget,
                     descriptor,
                     m4,
                     guard,
-                    client::newSession,
+                    sessions,
                     client::captureExactTarget,
                     owner,
                     bounds,
@@ -133,6 +185,10 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
         });
         // Observer cancellation cannot abandon accepted reads, owned session close or this invocation's tickets.
         return work.thenApply(value -> value);
+    }
+
+    CellProviderScopeId providerScope() {
+        return client.capabilitySnapshot().providerScopeId();
     }
 
     boolean usesBudget(KafkaBookKeeperReadCellBudgetV2 expected) {
@@ -179,6 +235,7 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
     }
 
     private Selected selected() {
+        nativeInput.ifPresent(NativeSelectedInputSources::requireCurrent);
         var selector = m4.readSelector().orElseThrow(() -> new IllegalStateException("selected source lacks selector"));
         if (selector.admissionState() != AdmissionState.ADMITTING) {
             throw new IllegalStateException("selected source read admission is stopped");
@@ -193,10 +250,19 @@ public final class KafkaBookKeeperSelectedSourceV2 implements KafkaBookKeeperPub
                 || !descriptor.task().capability().equals(client.capabilitySnapshot())) {
             throw new IllegalStateException("selected source descriptor differs from its native route");
         }
+        if (nativeInput
+                .filter(input -> !input.descriptor().equals(descriptor)
+                        || !input.selector().equals(selector))
+                .isPresent()) {
+            throw new IllegalStateException("selected source differs from its installed native input actor");
+        }
         long entries = 0;
         long bytes = 0;
         for (int part = 0; part < descriptor.task().parts().size(); part++) {
-            if (!client.spec().configurations().contains(descriptor.task().configuration(part))) {
+            if (nativeInput.isEmpty()
+                    && !client.spec()
+                            .configurations()
+                            .contains(descriptor.task().configuration(part))) {
                 throw new IllegalStateException("selected source configuration is not admitted by its client");
             }
             entries += descriptor.task().parts().get(part).entryCount();

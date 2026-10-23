@@ -25,6 +25,47 @@ public final class M5RetentionPlannerV1 {
         Objects.requireNonNull(snapshot, "snapshot");
         Optional<BindingTrimFrontierV1> predecessor = Objects.requireNonNull(current, "current");
         M5RetentionCodecV1.encodeSnapshot(snapshot);
+        if (snapshot.pulsarContext().isPresent()) {
+            var context = snapshot.pulsarContext().orElseThrow();
+            predecessor.ifPresent(value -> {
+                var prior = value.pulsarContext()
+                        .orElseThrow(() -> new IllegalArgumentException("typed trim predecessor has scalar coverage"));
+                if (!value.identity().binding().equals(snapshot.identity().binding())
+                        || !value.retentionPolicyRootSha256().equals(snapshot.retentionPolicyRootSha256())
+                        || !value.capability().equals(snapshot.identity().capability())
+                        || !prior.coverage().equals(context.coverage())
+                        || !prior.newFrontier().equals(context.priorTrimFrontier())) {
+                    throw new IllegalArgumentException("typed trim predecessor changes Binding/policy/chain/frontier");
+                }
+            });
+            if (predecessor.isEmpty()) {
+                var first = context.coverage().chain().get(0);
+                if (!context.priorTrimFrontier()
+                        .equals(new com.nereusstream.storage.object.materialization.M5PulsarCoverageV2.Position(
+                                first.ledgerId(), 0))) {
+                    throw new IllegalArgumentException(
+                            "initial typed trim predecessor is not the captured chain start");
+                }
+            }
+            return new BindingTrimFrontierV1(
+                    snapshot.identity(),
+                    snapshot.domain(),
+                    -1,
+                    -1,
+                    snapshot.retentionPolicyRootSha256(),
+                    snapshot.snapshotRootSha256(),
+                    snapshot.ownerFence(),
+                    snapshot.storageFence(),
+                    predecessor
+                            .map(value -> Math.addExact(value.generation(), 1))
+                            .orElse(1L),
+                    snapshot.identity().capability(),
+                    Optional.of(new M5RetentionRecordsV1.PulsarTrimContextV2(
+                            context.coverage(), context.priorTrimFrontier(), snapshot.minimumPulsarFloor())));
+        }
+        if (predecessor.stream().anyMatch(value -> value.pulsarContext().isPresent())) {
+            throw new IllegalArgumentException("scalar floor snapshot cannot replace a typed trim frontier");
+        }
         long prior = predecessor.map(BindingTrimFrontierV1::newFrontier).orElse(0L);
         long generation =
                 predecessor.map(value -> Math.addExact(value.generation(), 1)).orElse(1L);

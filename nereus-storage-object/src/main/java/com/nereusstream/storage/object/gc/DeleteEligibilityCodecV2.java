@@ -29,6 +29,7 @@ import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2.SemanticTr
 import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2.UnpublishedEvidence;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5PulsarCoverageV2;
 import com.nereusstream.storage.object.retention.M5RetentionCodecV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BindingTrimFrontierV1;
@@ -42,10 +43,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Bounded canonical M5ES v2 evidence wire, including exact M4 and M5-C proof bytes. */
+/** Bounded M5ES v2 evidence and v3 typed semantic transfers, including exact M4 and M5-C proof bytes. */
 public final class DeleteEligibilityCodecV2 {
     private static final int MAGIC = 0x4d354553;
     private static final int VERSION = 2;
+    private static final int TYPED_VERSION = 3;
     private static final int MAX_FACT_COMPONENT_BYTES = 8192;
 
     private DeleteEligibilityCodecV2() {}
@@ -53,11 +55,17 @@ public final class DeleteEligibilityCodecV2 {
     public static CanonicalBytes encode(DeleteEligibilitySnapshotV2 snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
         snapshot.authorityFacts();
+        int version = snapshot.members().stream()
+                        .flatMap(member -> member.replacement().stream())
+                        .flatMap(replacement -> replacement.transfers().stream())
+                        .anyMatch(transfer -> transfer.coverage().typedPulsar())
+                ? TYPED_VERSION
+                : VERSION;
         try {
             BoundedBytes bytes = new BoundedBytes();
             try (DataOutputStream out = new DataOutputStream(bytes)) {
                 out.writeInt(MAGIC);
-                out.writeInt(VERSION);
+                out.writeInt(version);
                 writeBytes(out, snapshot.resource().canonicalBytes());
                 out.writeByte(snapshot.reason().ordinal());
                 out.writeLong(snapshot.generation());
@@ -80,9 +88,7 @@ public final class DeleteEligibilityCodecV2 {
                         out.writeInt(replacement.transfers().size());
                         for (SemanticTransfer transfer : replacement.transfers()) {
                             out.writeByte(transfer.aspect().ordinal());
-                            out.writeByte(transfer.coverage().domain().ordinal());
-                            out.writeLong(transfer.coverage().inclusiveStart());
-                            out.writeLong(transfer.coverage().exclusiveEnd());
+                            writeCoverage(out, transfer.coverage(), version);
                             writeDigest(out, transfer.priorSemanticRoot());
                             writeDigest(out, transfer.replacementSemanticRoot());
                             writeFact(out, transfer.verifierAuthority());
@@ -121,8 +127,12 @@ public final class DeleteEligibilityCodecV2 {
             throw new IllegalArgumentException("deletion eligibility exceeds its hard cap");
         }
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
-            if (in.readInt() != MAGIC || in.readInt() != VERSION) {
+            if (in.readInt() != MAGIC) {
                 throw new IllegalArgumentException("deletion eligibility preamble differs");
+            }
+            int version = in.readInt();
+            if (version != VERSION && version != TYPED_VERSION) {
+                throw new IllegalArgumentException("deletion eligibility version differs");
             }
             PhysicalResourceIdV2 resource =
                     PhysicalResourceIdCodecV2.decode(readBytes(in, PhysicalResourceIdV2.MAX_ENCODED_BYTES));
@@ -153,8 +163,7 @@ public final class DeleteEligibilityCodecV2 {
                     for (int j = 0; j < transfersCount; j++) {
                         transfers.add(new SemanticTransfer(
                                 readEnum(in, SemanticAspect.values()),
-                                new ProtocolCoverage(
-                                        readEnum(in, PositionDomain.values()), in.readLong(), in.readLong()),
+                                readCoverage(in, version),
                                 readDigest(in),
                                 readDigest(in),
                                 readFact(in)));
@@ -194,6 +203,31 @@ public final class DeleteEligibilityCodecV2 {
             throw new IllegalArgumentException("unknown deletion eligibility enum code");
         }
         return values[code];
+    }
+
+    private static void writeCoverage(DataOutputStream out, ProtocolCoverage coverage, int version) throws IOException {
+        if (version == TYPED_VERSION) {
+            out.writeBoolean(coverage.typedPulsar());
+        }
+        out.writeByte(coverage.domain().ordinal());
+        if (coverage.typedPulsar()) {
+            writeBytes(out, coverage.pulsarCoverage().orElseThrow().encode());
+        } else {
+            out.writeLong(coverage.inclusiveStart());
+            out.writeLong(coverage.exclusiveEnd());
+        }
+    }
+
+    private static ProtocolCoverage readCoverage(DataInputStream in, int version) throws IOException {
+        boolean typed = version == TYPED_VERSION && in.readBoolean();
+        var domain = readEnum(in, PositionDomain.values());
+        if (typed) {
+            if (domain != PositionDomain.PULSAR_ENTRY) {
+                throw new IllegalArgumentException("typed semantic coverage requires Pulsar positions");
+            }
+            return ProtocolCoverage.pulsar(M5PulsarCoverageV2.decode(readBytes(in, M5PulsarCoverageV2.MAX_BYTES)));
+        }
+        return new ProtocolCoverage(domain, in.readLong(), in.readLong());
     }
 
     private static int count(DataInputStream in, int cap) throws IOException {

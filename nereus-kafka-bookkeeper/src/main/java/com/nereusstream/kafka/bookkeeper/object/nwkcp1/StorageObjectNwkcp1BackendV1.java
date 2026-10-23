@@ -40,6 +40,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
     private final CanonicalControlMetadataStore metadata;
     private final String objectPrefix;
     private final String controlHeadKey;
+    private PendingHeadCas pendingHeadCas;
 
     public StorageObjectNwkcp1BackendV1(
             WalRunObjectSession objectSession, CanonicalControlMetadataStore metadata, String objectPrefix) {
@@ -51,8 +52,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
         if (!objectPrefix.startsWith(root.providerConfiguration().exclusiveNamespacePrefix() + "/")) {
             throw new IllegalArgumentException("NWKCP1 Object prefix escapes its Root namespace");
         }
-        String rootKey = WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch());
-        controlHeadKey = rootKey.substring(0, rootKey.length() - "/root".length()) + "/protocol/kafka/nwkcp1-v1/head";
+        controlHeadKey = WalRunControlKeys.kafkaProtocolCheckpointHeadKey(root.shardId(), root.shardRunEpoch());
     }
 
     @Override
@@ -61,6 +61,16 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
             throw new IllegalArgumentException("NWKCP1 prefix differs from configured Root context");
         }
         return controlHeadKey;
+    }
+
+    @Override
+    public synchronized void requirePublicationAdmission() {
+        if (pendingHeadCas != null) {
+            throw new KafkaObjectCheckpointException("retain and reconcile the original unresolved Head CAS");
+        }
+        try (var ignored = objectSession.acquireProtocolMutationIo(false)) {
+            // Admission and each actual I/O independently share the original owner lifecycle.
+        }
     }
 
     @Override
@@ -161,9 +171,18 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
 
     @Override
     public CompletionStage<Optional<CanonicalBytes>> readHead(String key) {
-        try {
+        try (var ignored = objectSession.acquireControlReadIo()) {
             requireControlHead(key);
+            objectSession.chargeRecoveryControlMetadata(MAX_CONTROL_METADATA_BYTES);
             Optional<CanonicalBytes> value = metadata.get(key);
+            value.ifPresent(this::requireBoundedHead);
+            synchronized (this) {
+                if (pendingHeadCas != null
+                        && !pendingHeadCas.inFlight
+                        && value.equals(Optional.of(pendingHeadCas.replacement))) {
+                    settleHeadCas();
+                }
+            }
             return CompletableFuture.completedFuture(value);
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
@@ -190,15 +209,110 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
             String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes replacement) {
         try {
             requireControlHead(key);
-            ControlMutationOutcome outcome = metadata.compareAndSet(key, exactExpected, replacement);
-            return CompletableFuture.completedFuture(
-                    switch (outcome) {
-                        case APPLIED -> CasDisposition.APPLIED;
-                        case DEFINITIVE_CONFLICT -> CasDisposition.NOT_APPLIED;
-                        case RESPONSE_UNKNOWN -> CasDisposition.UNKNOWN;
-                    });
+            requireBoundedHead(replacement);
+            Objects.requireNonNull(exactExpected, "exactExpected").ifPresent(this::requireBoundedHead);
+            PendingHeadCas attempt;
+            boolean created = false;
+            synchronized (this) {
+                if (pendingHeadCas == null) {
+                    var head = KafkaProtocolCheckpointHeadCodecV1.decode(
+                            objectPrefix, objectSession.rootSha256(), replacement);
+                    var io = objectSession.acquireProtocolMutationIo(
+                            head.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL);
+                    try {
+                        objectSession.chargeRecoveryControlMetadata(replacement.length());
+                        long bytes = Math.addExact(
+                                replacement.length(),
+                                exactExpected.map(CanonicalBytes::length).orElse(0));
+                        var memory = objectSession.acquireRecoveryWorkingSet(Math.multiplyExact(3L, bytes));
+                        pendingHeadCas = new PendingHeadCas(exactExpected, replacement, io, memory);
+                        created = true;
+                    } catch (RuntimeException | Error failure) {
+                        io.close();
+                        throw failure;
+                    }
+                } else if (!pendingHeadCas.expected.equals(exactExpected)
+                        || !pendingHeadCas.replacement.equals(replacement)) {
+                    throw new KafkaObjectCheckpointException("retain the exact original unresolved Head CAS candidate");
+                }
+                attempt = claimPendingHeadCas(!created);
+            }
+            return CompletableFuture.completedFuture(dispatchPendingHeadCas(attempt));
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    /** Retries only the original accepted candidate, including after ordinary admission has stopped. */
+    public CompletionStage<CasDisposition> reconcilePendingHeadCas() {
+        try {
+            return CompletableFuture.completedFuture(dispatchPendingHeadCas(claimPendingHeadCas(true)));
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private synchronized PendingHeadCas claimPendingHeadCas(boolean charge) {
+        PendingHeadCas attempt = pendingHeadCas;
+        if (attempt == null || attempt.inFlight) {
+            throw new KafkaObjectCheckpointException("no idle original Head CAS candidate to reconcile");
+        }
+        if (charge) {
+            objectSession.chargeRecoveryControlMetadata(attempt.replacement.length());
+        }
+        attempt.inFlight = true;
+        return attempt;
+    }
+
+    private CasDisposition dispatchPendingHeadCas(PendingHeadCas attempt) {
+        // The synchronous canonical adapter joins the original native stage. Never expose/cancel that stage.
+        ControlMutationOutcome outcome = null;
+        try {
+            outcome = metadata.compareAndSet(controlHeadKey, attempt.expected, attempt.replacement);
+        } finally {
+            synchronized (this) {
+                attempt.inFlight = false;
+                if (outcome != null && outcome != ControlMutationOutcome.RESPONSE_UNKNOWN) {
+                    settleHeadCas();
+                }
+            }
+        }
+        return switch (outcome) {
+            case APPLIED -> CasDisposition.APPLIED;
+            case DEFINITIVE_CONFLICT -> CasDisposition.NOT_APPLIED;
+            case RESPONSE_UNKNOWN -> CasDisposition.UNKNOWN;
+        };
+    }
+
+    private synchronized void settleHeadCas() {
+        pendingHeadCas.memory.close();
+        pendingHeadCas.io.close();
+        pendingHeadCas = null;
+    }
+
+    private void requireBoundedHead(CanonicalBytes value) {
+        Objects.requireNonNull(value, "Head value");
+        if (value.length() <= 0 || value.length() > MAX_CONTROL_METADATA_BYTES) {
+            throw new KafkaObjectCheckpointException("Root protocol Head exceeds its control-value bound");
+        }
+    }
+
+    private static final class PendingHeadCas {
+        private final Optional<CanonicalBytes> expected;
+        private final CanonicalBytes replacement;
+        private final WalRunObjectSession.IoLease io;
+        private final WalRunObjectSession.RecoveryWorkingSetLease memory;
+        private boolean inFlight;
+
+        private PendingHeadCas(
+                Optional<CanonicalBytes> expected,
+                CanonicalBytes replacement,
+                WalRunObjectSession.IoLease io,
+                WalRunObjectSession.RecoveryWorkingSetLease memory) {
+            this.expected = expected;
+            this.replacement = replacement;
+            this.io = io;
+            this.memory = memory;
         }
     }
 
@@ -207,53 +321,55 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
             WalRunTerminalClosureProofV1 proof,
             Nbke2RunBindingV1 expectedRunBinding,
             KafkaProtocolCheckpointStateV1 finalProtocolState) {
-        Objects.requireNonNull(proof, "proof");
-        Objects.requireNonNull(expectedRunBinding, "expectedRunBinding");
-        Objects.requireNonNull(finalProtocolState, "finalProtocolState");
-        WalRunRootRecord root = objectSession.rootRecord();
-        if (!WalRunControlCodec.rootSha256(root).equals(proof.root().rootSha256())
-                || root.shardId() != proof.root().shardId()
-                || root.shardRunEpoch() != proof.root().shardRunEpoch()
-                || !proof.root().rootKey().equals(WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch()))
-                || !proof.sealKey().equals(WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch()))
-                || !proof.finalPhysicalCheckpointHeadKey()
-                        .equals(WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch()))) {
-            throw new KafkaObjectCheckpointException("physical closure Root differs from the exact owner session");
-        }
-        objectSession.chargeRecoveryControlMetadata(MAX_CONTROL_METADATA_BYTES);
-        CanonicalBytes sealBytes = metadata.get(proof.sealKey())
-                .orElseThrow(() -> new KafkaObjectCheckpointException("physical closure Seal is absent"));
-        if (!Sha256Digest.hash(sealBytes).equals(proof.sealSha256())) {
-            throw new KafkaObjectCheckpointException("physical closure Seal differs from its exact SHA");
-        }
-        var seal = WalRunControlCodec.decodeSeal(sealBytes);
-        objectSession.chargeRecoveryControlMetadata(MAX_CONTROL_METADATA_BYTES);
-        CanonicalBytes headBytes = metadata.get(proof.finalPhysicalCheckpointHeadKey())
-                .orElseThrow(() -> new KafkaObjectCheckpointException("final physical checkpoint Head is absent"));
-        if (!Sha256Digest.hash(headBytes).equals(proof.finalPhysicalCheckpointHeadSha256())) {
-            throw new KafkaObjectCheckpointException("final physical checkpoint Head differs from its exact SHA");
-        }
-        var physicalHead = WalRunControlCodec.decodeCheckpointHead(headBytes);
-        var chain = objectSession.verifyCheckpointChainStreaming(metadata, physicalHead, ignored -> {});
-        if (!seal.root().equals(proof.root())
-                || !seal.terminalSequence().equals(proof.terminalSequence())
-                || !seal.finalCheckpointHeadKey().equals(proof.finalPhysicalCheckpointHeadKey())
-                || !seal.finalCheckpointHeadSha256().equals(proof.finalPhysicalCheckpointHeadSha256())
-                || seal.aggregateExtentCount() != proof.aggregateExtentCount()
-                || seal.aggregateCanonicalBodyBytes() != proof.aggregateCanonicalBodyBytes()
-                || !chain.coveredThrough().equals(proof.terminalSequence())
-                || chain.aggregateExtentCount() != proof.aggregateExtentCount()
-                || chain.aggregateCanonicalBodyBytes() != proof.aggregateCanonicalBodyBytes()) {
-            throw new KafkaObjectCheckpointException("physical Root/Seal/Head/page-chain closure facts diverge");
-        }
-        if (!finalProtocolState.vector().isAlignedCompoundCheckpoint()
-                || !finalProtocolState.vector().runBinding().equals(expectedRunBinding)
-                || !expectedRunBinding.providerScopeId().equals(root.providerScopeId())
-                || !expectedRunBinding.runId().value().equals(root.walRunSessionId())
-                || root.protocolCellIdentity().protocolKind()
-                        != com.nereusstream.domain.protocol.ProtocolKindV1.KAFKA) {
-            throw new KafkaObjectCheckpointException(
-                    "final Kafka vector is incompatible with the exact physical closure context");
+        try (var metadataIo = objectSession.acquireControlReadIo()) {
+            Objects.requireNonNull(proof, "proof");
+            Objects.requireNonNull(expectedRunBinding, "expectedRunBinding");
+            Objects.requireNonNull(finalProtocolState, "finalProtocolState");
+            WalRunRootRecord root = objectSession.rootRecord();
+            if (!WalRunControlCodec.rootSha256(root).equals(proof.root().rootSha256())
+                    || root.shardId() != proof.root().shardId()
+                    || root.shardRunEpoch() != proof.root().shardRunEpoch()
+                    || !proof.root().rootKey().equals(WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch()))
+                    || !proof.sealKey().equals(WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch()))
+                    || !proof.finalPhysicalCheckpointHeadKey()
+                            .equals(WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch()))) {
+                throw new KafkaObjectCheckpointException("physical closure Root differs from the exact owner session");
+            }
+            objectSession.chargeRecoveryControlMetadata(MAX_CONTROL_METADATA_BYTES);
+            CanonicalBytes sealBytes = metadata.get(proof.sealKey())
+                    .orElseThrow(() -> new KafkaObjectCheckpointException("physical closure Seal is absent"));
+            if (!Sha256Digest.hash(sealBytes).equals(proof.sealSha256())) {
+                throw new KafkaObjectCheckpointException("physical closure Seal differs from its exact SHA");
+            }
+            var seal = WalRunControlCodec.decodeSeal(sealBytes);
+            objectSession.chargeRecoveryControlMetadata(MAX_CONTROL_METADATA_BYTES);
+            CanonicalBytes headBytes = metadata.get(proof.finalPhysicalCheckpointHeadKey())
+                    .orElseThrow(() -> new KafkaObjectCheckpointException("final physical checkpoint Head is absent"));
+            if (!Sha256Digest.hash(headBytes).equals(proof.finalPhysicalCheckpointHeadSha256())) {
+                throw new KafkaObjectCheckpointException("final physical checkpoint Head differs from its exact SHA");
+            }
+            var physicalHead = WalRunControlCodec.decodeCheckpointHead(headBytes);
+            var chain = objectSession.verifyCheckpointChainStreaming(metadata, physicalHead, ignored -> {});
+            if (!seal.root().equals(proof.root())
+                    || !seal.terminalSequence().equals(proof.terminalSequence())
+                    || !seal.finalCheckpointHeadKey().equals(proof.finalPhysicalCheckpointHeadKey())
+                    || !seal.finalCheckpointHeadSha256().equals(proof.finalPhysicalCheckpointHeadSha256())
+                    || seal.aggregateExtentCount() != proof.aggregateExtentCount()
+                    || seal.aggregateCanonicalBodyBytes() != proof.aggregateCanonicalBodyBytes()
+                    || !chain.coveredThrough().equals(proof.terminalSequence())
+                    || chain.aggregateExtentCount() != proof.aggregateExtentCount()
+                    || chain.aggregateCanonicalBodyBytes() != proof.aggregateCanonicalBodyBytes()) {
+                throw new KafkaObjectCheckpointException("physical Root/Seal/Head/page-chain closure facts diverge");
+            }
+            if (!finalProtocolState.vector().isAlignedCompoundCheckpoint()
+                    || !finalProtocolState.vector().runBinding().equals(expectedRunBinding)
+                    || !expectedRunBinding.providerScopeId().equals(root.providerScopeId())
+                    || !expectedRunBinding.runId().value().equals(root.walRunSessionId())
+                    || root.protocolCellIdentity().protocolKind()
+                            != com.nereusstream.domain.protocol.ProtocolKindV1.KAFKA) {
+                throw new KafkaObjectCheckpointException(
+                        "final Kafka vector is incompatible with the exact physical closure context");
+            }
         }
     }
 

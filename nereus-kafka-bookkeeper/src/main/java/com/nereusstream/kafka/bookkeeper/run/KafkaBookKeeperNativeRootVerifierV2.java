@@ -24,31 +24,73 @@ import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.kafka.KafkaOwnerAdmissionV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
+import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootVerifierV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateClientV2;
 import com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /** Reads actual NBKE2 header/footer and sealed metadata through the exact guarded BK client. Never fences a writer. */
 public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVerifierV2, AutoCloseable {
     private final M5BookKeeperNativeCreateClientV2 client;
-    private final RealBookKeeperCellSessionV1 reads;
+    /** The caller owns capacity, independent operation pins, and the accepted session's terminal close. */
+    @FunctionalInterface
+    public interface ReadOwner {
+        CompletionStage<Void> read(
+                KafkaRunRootRecordV2 record,
+                int maximumHandles,
+                Function<RealBookKeeperCellSessionV1, CompletionStage<Void>> verification);
+
+        default CompletionStage<Boolean> permitsRetiredSuccessor(
+                KafkaRunRootRecordV2 parent, KafkaRunRootSnapshotV1 successor) {
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
+    private final ReadOwner readOwner;
+    private final Set<RealBookKeeperCellSessionV1> standaloneReads = ConcurrentHashMap.newKeySet();
+    private volatile boolean draining;
 
     public KafkaBookKeeperNativeRootVerifierV2(M5BookKeeperNativeCreateClientV2 client) {
+        this(client, null);
+    }
+
+    public KafkaBookKeeperNativeRootVerifierV2(M5BookKeeperNativeCreateClientV2 client, ReadOwner readOwner) {
         this.client = Objects.requireNonNull(client, "client");
-        reads = client.newSession();
+        this.readOwner = readOwner == null ? this::readStandalone : readOwner;
     }
 
     @Override
     public Sha256Digest capabilitySha256() {
-        return reads.capabilitySnapshot().configurationDigest();
+        return client.capabilitySnapshot().configurationDigest();
     }
 
     @Override
     public CompletionStage<Void> requireNative(KafkaRunRootRecordV2 record) {
+        return verify(record, 1, reads -> requireNative(record, reads));
+    }
+
+    @Override
+    public CompletionStage<Boolean> permitsRetiredSuccessor(
+            KafkaRunRootRecordV2 parent, KafkaRunRootSnapshotV1 successor) {
+        if (draining
+                || !parent.retired()
+                || !parent.resource().namespace().equals(client.spec().namespace())
+                || !successor
+                        .providerScopeId()
+                        .equals(client.capabilitySnapshot().providerScopeId())) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return readOwner.permitsRetiredSuccessor(parent, successor);
+    }
+
+    private CompletionStage<Void> requireNative(KafkaRunRootRecordV2 record, RealBookKeeperCellSessionV1 reads) {
         if (record.recoveryCut().isPresent()) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("crash run requires its exact closed-owner prefix verification"));
@@ -70,7 +112,7 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
                 root.kafkaLeaderEpoch(),
                 root.providerScopeId(),
                 root.runId());
-        return client.readNativeRunHeader(handle)
+        return reads.readNativeRunHeader(handle)
                 .thenApply(entry -> Nbke2CodecV1.decode(
                         entry.payload().toByteArray(), handle.ledgerIdentity().ledgerId(), 0))
                 .thenCompose(frame -> {
@@ -93,7 +135,7 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
                                     if (!open.exactHandle().equals(java.util.Optional.of(handle))) {
                                         throw new IllegalStateException("closed native root handle is unavailable");
                                     }
-                                    return frame(handle, seal.sealedLastEntryId());
+                                    return frame(reads, handle, seal.sealedLastEntryId());
                                 })
                                 .thenAccept(last -> {
                                     if (!(last instanceof Nbke2RunFooterV1 footer)
@@ -114,6 +156,11 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
 
     @Override
     public CompletionStage<Void> requireRecovered(KafkaRunRootRecordV2 record, KafkaOwnerAdmissionV1 closed) {
+        return verify(record, 2, reads -> requireRecovered(record, closed, reads));
+    }
+
+    private CompletionStage<Void> requireRecovered(
+            KafkaRunRootRecordV2 record, KafkaOwnerAdmissionV1 closed, RealBookKeeperCellSessionV1 reads) {
         var root = record.root();
         var cut = record.recoveryCut().orElseThrow(() -> new IllegalArgumentException("crash recovery cut is absent"));
         if (!closed.closed()
@@ -177,7 +224,7 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
                             batch.endOffsetExclusive() - batch.baseOffset());
                 },
                 System::nanoTime);
-        return requireNative(KafkaRunRootRecordV2.pending(record.resource().namespace(), active))
+        return requireNative(KafkaRunRootRecordV2.pending(record.resource().namespace(), active), reads)
                 .thenCompose(ignored -> client.captureExactTarget(handle))
                 .thenCompose(captured -> {
                     var seal = captured.exactTarget()
@@ -198,7 +245,8 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
                 });
     }
 
-    private CompletionStage<Nbke2FrameV1> frame(RunLedgerHandleV1 handle, long entryId) {
+    private CompletionStage<Nbke2FrameV1> frame(
+            RealBookKeeperCellSessionV1 reads, RunLedgerHandleV1 handle, long entryId) {
         return reads.readExactEntry(handle, entryId).thenApply(read -> {
             var entry = read.exactEntry().orElseThrow(() -> new IllegalStateException("native root frame is absent"));
             if (!entry.handle().equals(handle) || entry.entryId() != entryId) {
@@ -209,8 +257,73 @@ public final class KafkaBookKeeperNativeRootVerifierV2 implements KafkaRunRootVe
         });
     }
 
+    private CompletionStage<Void> verify(
+            KafkaRunRootRecordV2 record,
+            int maximumHandles,
+            Function<RealBookKeeperCellSessionV1, CompletionStage<Void>> verification) {
+        if (draining) {
+            return CompletableFuture.failedFuture(new IllegalStateException("native root verifier is draining"));
+        }
+        try {
+            return Objects.requireNonNull(readOwner.read(record, maximumHandles, verification), "verification stage")
+                    .thenApply(ignored -> null);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private CompletionStage<Void> readStandalone(
+            KafkaRunRootRecordV2 record,
+            int maximumHandles,
+            Function<RealBookKeeperCellSessionV1, CompletionStage<Void>> verification) {
+        final RealBookKeeperCellSessionV1 reads;
+        synchronized (this) {
+            if (draining) {
+                return CompletableFuture.failedFuture(new IllegalStateException("native root verifier is draining"));
+            }
+            reads = client.newSession();
+            standaloneReads.add(reads);
+        }
+        CompletionStage<Void> work;
+        try {
+            work = Objects.requireNonNull(verification.apply(reads), "native verification stage");
+        } catch (Throwable failure) {
+            work = CompletableFuture.failedFuture(failure);
+        }
+        var terminal = new CompletableFuture<Void>();
+        work.whenComplete((ignored, failure) -> closeStandalone(reads).whenComplete((closed, closeFailure) -> {
+            if (closeFailure != null) {
+                if (failure != null && failure != closeFailure) {
+                    closeFailure.addSuppressed(failure);
+                }
+                terminal.completeExceptionally(closeFailure);
+            } else if (failure != null) {
+                terminal.completeExceptionally(failure);
+            } else {
+                terminal.complete(null);
+            }
+        }));
+        return terminal;
+    }
+
+    private CompletionStage<Void> closeStandalone(RealBookKeeperCellSessionV1 reads) {
+        try {
+            return reads.closeAsync().thenRun(() -> standaloneReads.remove(reads));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
     @Override
     public void close() {
-        reads.closeAsync().toCompletableFuture().join();
+        final java.util.List<RealBookKeeperCellSessionV1> reads;
+        synchronized (this) {
+            draining = true;
+            reads = java.util.List.copyOf(standaloneReads);
+        }
+        CompletableFuture.allOf(reads.stream()
+                        .map(session -> closeStandalone(session).toCompletableFuture())
+                        .toArray(CompletableFuture[]::new))
+                .join();
     }
 }

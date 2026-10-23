@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Common checkpoint plus only the finite metadata-authorized NWG1 tail; LIST is never an authorization source. */
 public final class KafkaObjectAuthorizedRecoveryV1 {
@@ -56,6 +57,64 @@ public final class KafkaObjectAuthorizedRecoveryV1 {
             Sha256Digest emptyRoot,
             Resolver resolver)
             throws IOException {
+        var state = recoverFrom(
+                closed,
+                recoveryBinding,
+                resolver,
+                authority.checkpoint(closed),
+                closed.head().checkpointEnd(),
+                null);
+        return new Result(
+                state,
+                KafkaObjectRecoveredTailV1.authorized(
+                        closed, emptyRoot, authority.headKey(closed.head().fence()), state));
+    }
+
+    /** Compares complete replayed protocol state; the caller checks selected checkpoint provenance. */
+    public static void verifyCheckpointTransfer(
+            KafkaObjectAuthorizationV1 authority,
+            KafkaObjectAuthorizationV1.ClosedHistory closed,
+            KafkaProtocolCheckpointStateV1 original,
+            Resolver resolver,
+            WalRunObjectSession budgetOwner)
+            throws IOException {
+        var selected = authority
+                .checkpoint(closed)
+                .orElseThrow(() -> new IllegalStateException("protocol transfer lacks a selected common checkpoint"));
+        var initial = original.vector();
+        var target = selected.vector();
+        var before = initial.runBinding();
+        var after = target.runBinding();
+        if (!initial.isAlignedCompoundCheckpoint()
+                || !target.isAlignedCompoundCheckpoint()
+                || !before.bindingId().equals(after.bindingId())
+                || !before.topicIncarnation().equals(after.topicIncarnation())
+                || before.partitionId() != after.partitionId()
+                || !before.storageEpochId().equals(after.storageEpochId())
+                || !before.providerScopeId().equals(after.providerScopeId())
+                || initial.recoveryCoveredThrough() > target.recoveryCoveredThrough()) {
+            throw new IllegalStateException("protocol transfer substituted or regressed the checkpoint Binding");
+        }
+        var restored = recoverFrom(
+                closed,
+                after,
+                resolver,
+                Optional.of(original),
+                initial.recoveryCoveredThrough(),
+                Objects.requireNonNull(budgetOwner, "budgetOwner"));
+        if (!restored.equals(selected)) {
+            throw new IllegalStateException("full protocol state did not transfer to the selected common checkpoint");
+        }
+    }
+
+    private static KafkaProtocolCheckpointStateV1 recoverFrom(
+            KafkaObjectAuthorizationV1.ClosedHistory closed,
+            Nbke2RunBindingV1 recoveryBinding,
+            Resolver resolver,
+            Optional<KafkaProtocolCheckpointStateV1> checkpoint,
+            long checkpointEnd,
+            WalRunObjectSession budgetOwner)
+            throws IOException {
         Objects.requireNonNull(resolver, "resolver");
         var head = closed.head();
         var fence = head.fence();
@@ -68,7 +127,6 @@ public final class KafkaObjectAuthorizedRecoveryV1 {
                 || recoveryBinding.kafkaLeaderEpoch() != fence.kafkaLeaderEpoch()) {
             throw new IllegalArgumentException("Object recovery context differs from selected closed Owner");
         }
-        var checkpoint = authority.checkpoint(closed);
         var producers = checkpoint
                 .map(KafkaProtocolCheckpointStateV1::producerState)
                 .orElseGet(KafkaCommittedProducerStateV1::empty);
@@ -78,7 +136,7 @@ public final class KafkaObjectAuthorizedRecoveryV1 {
         var leaders = checkpoint
                 .map(KafkaProtocolCheckpointStateV1::leaderEpochIndex)
                 .orElseGet(KafkaLeaderEpochIndexV1::empty);
-        long next = head.checkpointEnd();
+        long next = checkpointEnd;
         var adapter = new KafkaNativeProtocolBatchAdapterV1();
         for (var grant : head.grants()) {
             var locator = grant.locator();
@@ -93,29 +151,39 @@ public final class KafkaObjectAuthorizedRecoveryV1 {
                 throw new IllegalArgumentException("Object source resolver substituted the physical Root");
             }
             var batches = new ArrayList<KafkaAssignedProtocolBatchV1>();
-            var verified = source.session()
-                    .readRoutineNwg1AppendUnit(
-                            grant.object(), source.verification(), locator.firstDirectoryRow(), (frame, payload) -> {
-                                byte[] raw = new byte[payload.remaining()];
-                                payload.get(raw);
-                                try {
-                                    var batch = KafkaNativeAssignedRecordBatchV1.validate(
-                                            KafkaRawAssignedRecordBatchFactsV1.parse(CanonicalBytes.copyOf(raw)));
-                                    if (batch.baseOffset() != frame.coverage0()
-                                            || batch.endOffsetExclusive() != frame.coverage1()
-                                            || batch.partitionLeaderEpoch()
-                                                    != grant.fence().kafkaLeaderEpoch()) {
-                                        throw new IllegalStateException(
-                                                "Object authorized native frame coverage differs");
-                                    }
-                                    batches.add(new KafkaAssignedProtocolBatchV1(
-                                            batch.baseOffset(),
-                                            batch.endOffsetExclusive(),
-                                            adapter.protocolDelta(batch)));
-                                } finally {
-                                    Arrays.fill(raw, (byte) 0);
-                                }
-                            })
+            com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer =
+                    (frame, payload) -> {
+                        byte[] raw = new byte[payload.remaining()];
+                        payload.get(raw);
+                        try {
+                            var batch = KafkaNativeAssignedRecordBatchV1.validate(
+                                    KafkaRawAssignedRecordBatchFactsV1.parse(CanonicalBytes.copyOf(raw)));
+                            if (batch.baseOffset() != frame.coverage0()
+                                    || batch.endOffsetExclusive() != frame.coverage1()
+                                    || batch.partitionLeaderEpoch()
+                                            != grant.fence().kafkaLeaderEpoch()) {
+                                throw new IllegalStateException("Object authorized native frame coverage differs");
+                            }
+                            batches.add(new KafkaAssignedProtocolBatchV1(
+                                    batch.baseOffset(), batch.endOffsetExclusive(), adapter.protocolDelta(batch)));
+                        } finally {
+                            Arrays.fill(raw, (byte) 0);
+                        }
+                    };
+            var verified = (budgetOwner == null
+                            ? source.session()
+                                    .readRoutineNwg1AppendUnit(
+                                            grant.object(),
+                                            source.verification(),
+                                            locator.firstDirectoryRow(),
+                                            consumer)
+                            : source.session()
+                                    .readNwg1AppendUnitForTransfer(
+                                            grant.object(),
+                                            source.verification(),
+                                            locator.firstDirectoryRow(),
+                                            consumer,
+                                            budgetOwner))
                     .appendUnit();
             var commit = new KafkaSpeculativeCommitV1(
                     locator.startOffset(), locator.endOffsetExclusive(), grant.fence(), batches);
@@ -144,7 +212,6 @@ public final class KafkaObjectAuthorizedRecoveryV1 {
                 producers,
                 transactions,
                 leaders);
-        return new Result(
-                state, KafkaObjectRecoveredTailV1.authorized(closed, emptyRoot, authority.headKey(fence), state));
+        return state;
     }
 }

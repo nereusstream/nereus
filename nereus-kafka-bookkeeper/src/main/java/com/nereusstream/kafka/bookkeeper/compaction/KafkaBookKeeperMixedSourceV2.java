@@ -22,6 +22,7 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -51,6 +52,54 @@ public final class KafkaBookKeeperMixedSourceV2 implements KafkaBookKeeperPublic
         if (!selected.usesBudget(budget) || !raw.usesBudget(budget)) {
             throw new IllegalArgumentException("mixed BK source readers require one Cell budget owner");
         }
+    }
+
+    public record Snapshot(
+            KafkaBookKeeperSelectedSourceV2.Snapshot selected, List<KafkaBookKeeperRunSourceV2.Snapshot> raw) {
+        public Snapshot {
+            Objects.requireNonNull(selected, "selected");
+            raw = List.copyOf(raw);
+        }
+    }
+
+    /** Initial capture shares resolve's retained-result charge through the actual raw SDK scan. */
+    public CompletionStage<Snapshot> capture(List<String> rawKeys, BindingIdentity binding) {
+        final KafkaBookKeeperReadCellBudgetV2.Reservation retained;
+        try {
+            retained = budget.reserveRetained(selected.providerScope(), binding, selected.retainedResultAllowance());
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletionStage<Snapshot> work;
+        try {
+            work = selected.capture().thenCompose(snapshot -> {
+                if (!snapshot.selector().binding().equals(binding)) {
+                    throw new IllegalStateException("mixed capture selected input differs from its Binding");
+                }
+                var scanned = rawKeys.isEmpty()
+                        ? CompletableFuture.<List<KafkaBookKeeperRunSourceV2.Snapshot>>completedFuture(List.of())
+                        : raw.captureSelectedRuns(rawKeys, binding);
+                return scanned.thenCompose(
+                        runs -> selected.verifyCurrent(snapshot).thenApply(ignored -> {
+                            long end = snapshot.extent().coverage().exclusiveEnd();
+                            var namespace = snapshot.resources().get(0).namespace();
+                            for (var run : runs) {
+                                if (run.extent().coverage().inclusiveStart() != end
+                                        || !run.root().resource().namespace().equals(namespace)) {
+                                    throw new IllegalStateException(
+                                            "mixed capture raw tail differs from selected coverage/namespace");
+                                }
+                                end = run.extent().coverage().exclusiveEnd();
+                            }
+                            return new Snapshot(snapshot, runs);
+                        }));
+            });
+        } catch (Throwable failure) {
+            retained.releaseBeforeSession();
+            return CompletableFuture.failedFuture(failure);
+        }
+        return work.whenComplete((value, failure) -> retained.releaseBeforeSession())
+                .thenApply(value -> value);
     }
 
     @Override

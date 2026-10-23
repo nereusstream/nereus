@@ -1,0 +1,220 @@
+// The actual Native Test dependencies build first; this task never invokes the Test itself.
+gradle.projectsEvaluated {
+    def complete = System.getProperty('nereus.m5.nativeBuildTarget') == 'COMPLETE'
+    def pulsar = complete || System.getProperty('nereus.m5.nativeBuildTarget') == 'PULSAR'
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.allTasks.any { it instanceof org.gradle.api.tasks.testing.Test }) {
+            throw new GradleException('Native preparation must not execute any Test task')
+        }
+    }
+    if (!pulsar && gradle.rootProject.name != 'kafka') throw new GradleException('Native Kafka preparation only')
+    if (pulsar && gradle.rootProject.name == 'build-logic') {
+        println('M5_PULSAR_AUXILIARY_BUILD ' + gradle.rootProject.name)
+        return
+    }
+    if (pulsar && !(gradle.rootProject.name in ['nereus', 'pulsar'])) {
+        throw new GradleException('Unexpected Pulsar preparation build: ' + gradle.rootProject.name)
+    }
+    def prefix = System.getProperty('nereus.m5.nativeBuildCapture')
+    if (prefix == null) throw new GradleException('Missing create-only preparation capture path')
+    def objects = new File(System.getProperty('nereus.m5.nativeBuildObjects'))
+    objects.mkdirs()
+    def capture = { File file ->
+        if (!file.isFile()) throw new GradleException('Missing preparation input: ' + file)
+        if (java.nio.file.Files.isSymbolicLink(file.toPath())) throw new GradleException('Symlink preparation input')
+        if (file.length() > 128L * 1024 * 1024) throw new GradleException('Preparation file exceeds input bound')
+        def raw = file.bytes
+        def hash = java.security.MessageDigest.getInstance('SHA-256').digest(raw).encodeHex().toString()
+        def target = new File(objects, hash)
+        synchronized (objects) {
+            if (!target.exists()) {
+                java.nio.file.Files.write(target.toPath(), raw, java.nio.file.StandardOpenOption.CREATE_NEW)
+            }
+        }
+        [path: file.absolutePath, bytes: raw.length, sha256: hash]
+    }
+    def sourceRoot = pulsar ? new File(System.getProperty('nereus.m5.evidenceMavenRepository')).parentFile.parentFile : null
+    def generatedRoots = pulsar ? [sourceRoot.canonicalFile.toPath(),
+        new File(sourceRoot, '../../nereusstream/pulsar').canonicalFile.toPath()] : []
+    def generated = { File file ->
+        generatedRoots.any { base ->
+            def path = file.toPath()
+            if (!path.startsWith(base)) return false
+            def parts = base.relativize(path).collect { it.toString() }
+            def buildIndex = parts.indexOf('build')
+            buildIndex >= 0 && (parts.indexOf('src') < 0 || buildIndex < parts.indexOf('src'))
+        }
+    }
+    def snapshot = { project, collection, boolean before = false ->
+        def result = new TreeMap<String, Map>()
+        collection.files.each { input ->
+            def paths = input.isDirectory() ? project.fileTree(input).files : [input]
+            paths.findAll { it.isFile() && !(pulsar && before && generated(it)) }
+                .each { file -> result[file.absolutePath] = capture(file) }
+        }
+        result.values().toList()
+    }
+    def compact = { value ->
+        def table = []
+        def indices = [:]
+        def intern = { node ->
+            if (!indices.containsKey(node.path)) {
+                indices[node.path] = table.size()
+                table.add(node)
+            } else if (table[indices[node.path]] != node) {
+                throw new GradleException('Producer capture saw changing file bytes: ' + node.path)
+            }
+            indices[node.path]
+        }
+        value.producers.each { producer ->
+            ['inputs', 'outputs', 'sources', 'classpath', 'compilerClasspath'].each { key ->
+                if (producer.containsKey(key)) producer[key] = producer[key].collect { intern(it) }
+            }
+            if (producer.containsKey('compiler')) producer.compiler.executable = intern(producer.compiler.executable)
+        }
+        if (value.containsKey('runtime')) value.runtime = value.runtime.collect { intern(it) }
+        value.files = table
+        value.schema = value.schema.replace('_V1', '_V2')
+        value
+    }
+    def nativeProject = gradle.rootProject.project(pulsar
+        ? (gradle.rootProject.name == 'pulsar' ? ':managed-ledger' : ':nereus-pulsar-offload') : ':core')
+    def tests = complete && gradle.rootProject.name == 'nereus'
+        ? gradle.rootProject.allprojects.collectMany { owner ->
+            owner.tasks.withType(org.gradle.api.tasks.testing.Test).findAll { test ->
+                test.name == 'test' || test.name.startsWith('v2M5') || test.name.startsWith('v2M4') ||
+                    test.name == 'nsip1ObjectAuthorizationRealTest'
+            }.toList()
+        }
+        : pulsar
+        ? (gradle.rootProject.name == 'pulsar' ? [':managed-ledger:test']
+            : System.getProperty('nereus.m5.nativeBuildTests').split(',').toList())
+            .collect { gradle.rootProject.tasks.getByPath(it) }
+        : [nativeProject.tasks.named('nereusBookKeeperM4AdmissionRealTest').get()]
+    if (!tests || tests.any { !(it instanceof org.gradle.api.tasks.testing.Test) }) {
+        throw new GradleException('Preparation targets must be actual Test tasks')
+    }
+    def identity = pulsar ? gradle.rootProject.name + '-' : ''
+    def build = nativeProject.tasks.register('m5PrepareNativeArtifacts') {
+        // Mapping a TaskProvider retains its producer dependency and would also execute the Test.
+        dependsOn({ tests.collectMany { test -> complete
+            ? test.taskDependencies.getDependencies(test).toList() : test.dependsOn.toList() } })
+        if (pulsar && gradle.rootProject.name == 'nereus') {
+            dependsOn(gradle.includedBuild('pulsar').task(':managed-ledger:m5CapturePreparedNativeArtifacts'))
+            dependsOn(':nereus-storage-bookkeeper:checkstyleMain', ':nereus-storage-bookkeeper:checkstyleTest',
+                ':nereus-storage-bookkeeper:spotlessCheck', ':nereus-pulsar-offload:checkstyleMain',
+                ':nereus-pulsar-offload:checkstyleTest', ':nereus-pulsar-offload:checkstyleP6ProviderTest',
+                ':nereus-pulsar-offload:spotlessCheck')
+        } else if (pulsar) {
+            dependsOn(':managed-ledger:checkstyleMain', ':managed-ledger:checkstyleTest', ':managed-ledger:spotlessCheck')
+        }
+    }
+    def beforeCaptures = []
+    def captures = []
+    gradle.rootProject.allprojects.each { project ->
+        def before = project.tasks.register('m5CaptureNativeInputsBeforeBuild') {
+            doLast {
+                def selected = gradle.taskGraph.allTasks.findAll { item ->
+                    item.project == project && !item.name.startsWith('m5Capture') && item.name != 'm5PrepareNativeArtifacts'
+                }.sort { it.path }
+                def value = [schema: 'NEREUS_V2_M5_NATIVE_PROJECT_BUILD_INPUTS_V1', project: project.path,
+                    producers: selected.collect { item ->
+                        def result = [task: item.path, inputs: snapshot(project, item.inputs.files, true),
+                            missingInputs: item.inputs.files.files.findAll { !it.exists() }.collect { it.absolutePath }.sort()]
+                        if (pulsar) {
+                            result.deferredGeneratedInputs = item.inputs.files.files.collectMany { input ->
+                                (input.isDirectory() ? project.fileTree(input).files : [input])
+                                    .findAll { it.isFile() && generated(it) }.collect { it.absolutePath }
+                            }.unique().sort()
+                        }
+                        result
+                    }]
+                def target = new File(prefix + '-before-' + identity + project.path.replace(':', '_') + '.json')
+                target.parentFile.mkdirs()
+                java.nio.file.Files.writeString(target.toPath(), groovy.json.JsonOutput.toJson(compact(value)) + '\n',
+                    java.nio.file.StandardOpenOption.CREATE_NEW)
+            }
+        }
+        beforeCaptures.add(before)
+        def task = project.tasks.register('m5CaptureNativeProducerInputs') {
+            mustRunAfter(build)
+            doLast {
+                def selected = gradle.taskGraph.allTasks.findAll { item ->
+                    item.project == project && !item.name.startsWith('m5Capture') && item.name != 'm5PrepareNativeArtifacts'
+                }.sort { it.path }
+                def records = selected.collect { item ->
+                    def value = [task: item.path, type: item.class.name,
+                                 inputs: snapshot(project, item.inputs.files),
+                                 outputs: snapshot(project, item.outputs.files)]
+                    if (item instanceof org.gradle.api.tasks.compile.JavaCompile) {
+                        value.projectDirectory = item.project.projectDir.absolutePath
+                        value.temporaryDirectory = item.temporaryDir.absolutePath
+                        def compiler = item.javaCompiler.get()
+                        value.compiler = [executable: capture(compiler.executablePath.asFile),
+                            installation: compiler.metadata.installationPath.asFile.absolutePath,
+                            language: compiler.metadata.languageVersion.asInt(),
+                            runtime: compiler.metadata.javaRuntimeVersion, vendor: compiler.metadata.vendor.toString()]
+                        value.options = [release: item.options.release.orNull, encoding: item.options.encoding,
+                                         arguments: item.options.compilerArgs, debug: item.options.debug]
+                        value.sources = snapshot(project, item.source)
+                        value.classpath = snapshot(project, item.classpath)
+                        value.classDirectory = item.destinationDirectory.get().asFile.absolutePath
+                    } else if (item instanceof org.gradle.api.tasks.scala.ScalaCompile) {
+                        value.options = [arguments: item.scalaCompileOptions.additionalParameters,
+                                         javaArguments: item.options.compilerArgs, release: item.options.release.orNull]
+                        value.sources = snapshot(project, item.source)
+                        value.classpath = snapshot(project, item.classpath)
+                        value.compilerClasspath = snapshot(project, item.scalaClasspath)
+                        value.classDirectory = item.destinationDirectory.get().asFile.absolutePath
+                    } else if (item instanceof org.gradle.api.tasks.bundling.AbstractArchiveTask) {
+                        value.archive = item.archiveFile.get().asFile.absolutePath
+                    }
+                    if (complete && item instanceof org.gradle.api.plugins.quality.Checkstyle) {
+                        value.sources = snapshot(project, item.source)
+                        if (!value.sources) throw new GradleException('Fresh preparation Checkstyle has no sources: ' + item.path)
+                    }
+                    value
+                }
+                def value = [schema: 'NEREUS_V2_M5_NATIVE_PROJECT_BUILD_V1', project: project.path, producers: records]
+                def ownedTests = tests.findAll { it.project == project }
+                if (ownedTests) {
+                    def runtime = new TreeMap<String, Map>()
+                    ownedTests.each { test -> snapshot(project, test.classpath).each { runtime[it.path] = it } }
+                    value.runtime = runtime.values().toList()
+                }
+                if (pulsar) {
+                    value.build = gradle.rootProject.name
+                    value.runtimeTasks = ownedTests.collect { it.path }.sort()
+                }
+                def target = new File(prefix + '-' + identity + project.path.replace(':', '_') + '.json')
+                target.parentFile.mkdirs()
+                java.nio.file.Files.writeString(target.toPath(), groovy.json.JsonOutput.toJson(compact(value)) + '\n',
+                    java.nio.file.StandardOpenOption.CREATE_NEW)
+            }
+        }
+        captures.add(task)
+    }
+    build.configure { dependsOn(beforeCaptures) }
+    gradle.rootProject.allprojects.each { project ->
+        project.tasks.configureEach { producer ->
+            if (!producer.name.startsWith('m5Capture') && producer.name != 'm5PrepareNativeArtifacts') {
+                producer.mustRunAfter(beforeCaptures)
+            }
+        }
+    }
+    if (pulsar) {
+        captures.each { recorder ->
+            recorder.configure {
+                gradle.rootProject.allprojects.each { owner ->
+                    mustRunAfter(owner.tasks.matching { candidate ->
+                        !candidate.name.startsWith('m5Capture') && candidate.name != 'm5PrepareNativeArtifacts'
+                    })
+                }
+            }
+        }
+    }
+    nativeProject.tasks.register('m5CapturePreparedNativeArtifacts') {
+        dependsOn(build)
+        dependsOn(captures)
+    }
+}

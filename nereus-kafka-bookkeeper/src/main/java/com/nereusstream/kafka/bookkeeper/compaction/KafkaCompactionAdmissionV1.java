@@ -205,7 +205,23 @@ public final class KafkaCompactionAdmissionV1 {
     }
 
     public Outcome install(CellCaps caps) {
-        return reconcileCreate(encode(new State(1, caps, List.of())));
+        Objects.requireNonNull(caps, "caps");
+        var existing = read();
+        if (existing.isPresent()) {
+            return existing.orElseThrow().caps().equals(caps) ? Outcome.EXISTING_EXACT : Outcome.CONFLICT;
+        }
+        var mutation = metadata.putIfAbsent(key, encode(new State(1, caps, List.of())));
+        var observed = read();
+        if (observed.isEmpty()) {
+            return Outcome.OUTCOME_UNKNOWN;
+        }
+        if (!observed.orElseThrow().caps().equals(caps)) {
+            return Outcome.CONFLICT;
+        }
+        return mutation == ControlMutationOutcome.APPLIED
+                        && observed.orElseThrow().generation() == 1
+                ? Outcome.APPLIED_EXACT
+                : Outcome.EXISTING_EXACT;
     }
 
     public Outcome reserve(
@@ -228,6 +244,12 @@ public final class KafkaCompactionAdmissionV1 {
                 kmsOperations,
                 metadataOperations,
                 responseUnknowns);
+        return reserve(reservation);
+    }
+
+    /** Reserves a bounded preparation allowance before the input scan can construct a complete plan. */
+    public Outcome reserve(Reservation reservation) {
+        Objects.requireNonNull(reservation, "reservation");
         State current = read().orElseThrow(() -> new IllegalStateException("M5-B Cell caps are not installed"));
         Optional<Reservation> existing = current.reservations().stream()
                 .filter(value -> value.compactionTaskIdSha256().equals(reservation.compactionTaskIdSha256()))
@@ -245,13 +267,57 @@ public final class KafkaCompactionAdmissionV1 {
         return reconcileCas(current, new State(Math.addExact(current.generation(), 1), current.caps(), candidates));
     }
 
+    /** Changes an exact preparation reservation to its complete task in one Cell CAS, without a release gap. */
+    public Outcome replace(Reservation expected, Reservation replacement) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        if (expected.compactionTaskIdSha256().equals(replacement.compactionTaskIdSha256())) {
+            throw new IllegalArgumentException("preparation and complete task identities must differ");
+        }
+        State current = read().orElseThrow(() -> new IllegalStateException("M5-B Cell caps are not installed"));
+        var previous = current.reservations().stream()
+                .filter(value -> value.compactionTaskIdSha256().equals(expected.compactionTaskIdSha256()))
+                .findFirst();
+        var successor = current.reservations().stream()
+                .filter(value -> value.compactionTaskIdSha256().equals(replacement.compactionTaskIdSha256()))
+                .findFirst();
+        if (previous.isEmpty()) {
+            return successor.filter(replacement::equals).isPresent() ? Outcome.EXISTING_EXACT : Outcome.CONFLICT;
+        }
+        if (!previous.orElseThrow().equals(expected) || successor.isPresent()) {
+            return Outcome.CONFLICT;
+        }
+        List<Reservation> candidates = new ArrayList<>(current.reservations());
+        candidates.remove(expected);
+        candidates.add(replacement);
+        candidates.sort(
+                Comparator.comparing(value -> value.compactionTaskIdSha256().toHex()));
+        if (!within(current.caps(), totals(candidates))) {
+            return Outcome.REJECTED_CAP;
+        }
+        return reconcileCas(current, new State(Math.addExact(current.generation(), 1), current.caps(), candidates));
+    }
+
     public Outcome release(Sha256Digest compactionTaskIdSha256) {
+        return release(compactionTaskIdSha256, false);
+    }
+
+    /**
+     * After the actual preparation owner has stopped dispatching, advance the Cell CAS even if its reservation is
+     * absent. This invalidates an earlier reservation CAS whose response was lost and may still reach the server.
+     */
+    public Outcome cancelPreparation(Sha256Digest preparationIdSha256) {
+        return release(preparationIdSha256, true);
+    }
+
+    private Outcome release(Sha256Digest compactionTaskIdSha256, boolean fencePendingReservation) {
         KafkaCompactionRecordsV1.requireDigest(compactionTaskIdSha256, "compactionTaskIdSha256");
         State current = read().orElseThrow(() -> new IllegalStateException("M5-B Cell caps are not installed"));
         List<Reservation> survivors = current.reservations().stream()
                 .filter(value -> !value.compactionTaskIdSha256().equals(compactionTaskIdSha256))
                 .toList();
-        if (survivors.size() == current.reservations().size()) {
+        if (!fencePendingReservation
+                && survivors.size() == current.reservations().size()) {
             return Outcome.EXISTING_EXACT;
         }
         return reconcileCas(current, new State(Math.addExact(current.generation(), 1), current.caps(), survivors));
@@ -343,15 +409,6 @@ public final class KafkaCompactionAdmissionV1 {
         return true;
     }
 
-    private Outcome reconcileCreate(CanonicalBytes candidate) {
-        ControlMutationOutcome mutation = metadata.putIfAbsent(key, candidate);
-        Optional<CanonicalBytes> observed = metadata.get(key);
-        if (observed.isPresent() && observed.orElseThrow().equals(candidate)) {
-            return mutation == ControlMutationOutcome.APPLIED ? Outcome.APPLIED_EXACT : Outcome.EXISTING_EXACT;
-        }
-        return observed.isEmpty() ? Outcome.OUTCOME_UNKNOWN : Outcome.CONFLICT;
-    }
-
     private Outcome reconcileCas(State current, State successor) {
         CanonicalBytes expected = encode(current);
         CanonicalBytes candidate = encode(successor);
@@ -361,9 +418,7 @@ public final class KafkaCompactionAdmissionV1 {
             return mutation == ControlMutationOutcome.APPLIED ? Outcome.APPLIED_EXACT : Outcome.EXISTING_EXACT;
         }
         if (observed.isPresent() && observed.orElseThrow().equals(expected)) {
-            return mutation == ControlMutationOutcome.DEFINITIVE_CONFLICT
-                    ? Outcome.CONFLICT
-                    : Outcome.DEFINITIVELY_NOT_APPLIED;
+            return mutation == ControlMutationOutcome.DEFINITIVE_CONFLICT ? Outcome.CONFLICT : Outcome.OUTCOME_UNKNOWN;
         }
         return observed.isEmpty() ? Outcome.OUTCOME_UNKNOWN : Outcome.CONFLICT;
     }

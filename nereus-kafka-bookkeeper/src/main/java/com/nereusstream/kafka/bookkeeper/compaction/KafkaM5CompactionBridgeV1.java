@@ -43,8 +43,11 @@ public final class KafkaM5CompactionBridgeV1 {
             KafkaSemanticCompactorV1.Result result, M5MaterializationObjectSessionV1 objectSession) throws IOException {
         Objects.requireNonNull(result, "result");
         Objects.requireNonNull(objectSession, "objectSession");
-        var payload = objectSession.createExact(List.of(result.candidate().payloadCandidate()));
-        var indexes = objectSession.createExact(result.candidate().indexCandidates());
+        var materializationPlan = result.candidate().materializationPlan();
+        var payload = objectSession.createExact(
+                materializationPlan, List.of(result.candidate().payloadCandidate()));
+        var indexes = objectSession.createExact(
+                materializationPlan, result.candidate().indexCandidates());
         return new CreatedGeneration(payload.exactObjects(), indexes.exactObjects());
     }
 

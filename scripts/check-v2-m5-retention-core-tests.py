@@ -31,6 +31,16 @@ class M5RetentionCoreContractTest(unittest.TestCase):
     def test_accepts_current_non_promotable_blocked_core(self) -> None:
         M5C.validate(ROOT)
 
+    def test_rejects_trim_without_either_authoritative_commit_path(self) -> None:
+        path = ROOT / "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5LogicalTrimCoordinatorV1.java"
+        current = path.read_text(encoding="utf-8")
+        for required in ("conditionalTransaction", "advanceLogicalTrim"):
+            with self.subTest(required=required):
+                with self.assertRaisesRegex(M5C.RetentionCoreError, "logical trim lacks required"):
+                    M5C.validate_logical_trim(current.replace(required, "missing_commit"))
+        with self.assertRaisesRegex(M5C.RetentionCoreError, "unfenced one-key CAS"):
+            M5C.validate_logical_trim(current + "\nmetadata.compareAndSet(unsafe)")
+
     def test_rejects_missing_core_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(M5C.RetentionCoreError, "missing/empty"):

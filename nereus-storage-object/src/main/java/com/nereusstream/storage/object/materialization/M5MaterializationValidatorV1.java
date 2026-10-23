@@ -26,16 +26,21 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PayloadKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.RepresentationMode;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -57,6 +62,85 @@ public final class M5MaterializationValidatorV1 {
         VerifiedObjectRead readObject(ObjectIdentity identity) throws IOException;
 
         CanonicalBytes readSource(SourceExtent source) throws IOException;
+
+        default void verifyPulsarSource(SourceExtent source) throws IOException {
+            throw new IOException("Pulsar validation requires independent native/provider source qualification");
+        }
+
+        default M5PulsarEntriesV2.Cursor openPulsarEntries(SourceExtent source) throws IOException {
+            throw new IOException("Pulsar validation requires a per-entry native source reader");
+        }
+    }
+
+    /** Actual implementations keep Provider response and original source cursor ownership inside this call. */
+    public interface PulsarStreamedDataReader extends MaterializationDataReader {
+        Nms1CodecV1.VerifiedPulsarPart readPulsarPart(MaterializationPlan plan, GenerationObject descriptor)
+                throws IOException;
+
+        VerifiedObjectRead readPulsarIndex(GenerationObject descriptor) throws IOException;
+    }
+
+    /** Issued only by independent full output/original-entry verification. This grants no M4 publication. */
+    public static final class VerifiedPulsarOutputs {
+        private final MaterializationPlan plan;
+        private final List<GenerationObject> payloads;
+        private final List<GenerationObject> indexes;
+        private final long bytes;
+        private final Sha256Digest lookupBoundaries;
+        private final Sha256Digest entryEquality;
+
+        private VerifiedPulsarOutputs(
+                MaterializationPlan plan,
+                List<GenerationObject> payloads,
+                List<GenerationObject> indexes,
+                long bytes,
+                List<CanonicalBytes> indexBodies,
+                Sha256Digest equality) {
+            this.plan = plan;
+            this.payloads = List.copyOf(payloads);
+            this.indexes = List.copyOf(indexes);
+            this.bytes = bytes;
+            lookupBoundaries = hashLookupBoundaries(indexBodies);
+            entryEquality = equality;
+        }
+
+        public MaterializationPlan plan() {
+            return plan;
+        }
+
+        public List<GenerationObject> payloads() {
+            return payloads;
+        }
+
+        public List<GenerationObject> indexes() {
+            return indexes;
+        }
+
+        public long canonicalBytes() {
+            return bytes;
+        }
+    }
+
+    private record ReusedPhysicalRead(
+            Sha256Digest providerScopeSha256,
+            M5MaterializationRecordsV1.SourceKind kind,
+            String physicalKey,
+            Optional<CanonicalBytes> immutableProviderVersionToken,
+            long canonicalLength,
+            Sha256Digest bodySha256,
+            Sha256Digest formatRootSha256,
+            Sha256Digest encryptionPolicySha256) {
+        private ReusedPhysicalRead(MaterializationPlan plan, SourceExtent source) {
+            this(
+                    plan.sourceCut().identity().providerScopeSha256(),
+                    source.kind(),
+                    source.physicalKey(),
+                    source.immutableProviderVersionToken(),
+                    source.canonicalLength(),
+                    source.bodySha256(),
+                    source.formatRootSha256(),
+                    source.encryptionPolicySha256());
+        }
     }
 
     public record ValidatedGeneration(
@@ -106,16 +190,41 @@ public final class M5MaterializationValidatorV1 {
         Objects.requireNonNull(reader, "reader");
         M5MaterializationCodecV1.encodePlan(plan);
         requireCurrentAuthority(plan, currentSelector);
+        requireExactCutMembership(plan);
         Sha256Digest fallbackSet = requireFallbackSources(plan, exactFallbackSources);
         payloadObjects = sortedGenerationObjects(payloadObjects, true);
         indexObjects = sortedGenerationObjects(indexObjects, false);
         requireOutputShape(plan, payloadObjects, indexObjects);
+        if (plan.sourceCut().coverage().typedPulsar()) {
+            return validatePulsar(plan, currentSelector, fallbackSet, payloadObjects, indexObjects, reader);
+        }
 
-        List<CanonicalBytes> sourceBodies = readAndValidateSources(plan, reader);
-        List<CanonicalBytes> payloadBodies = readAndValidatePayloads(plan, payloadObjects, reader);
+        Map<ReusedPhysicalRead, VerifiedObjectRead> reusedReads = new HashMap<>();
+        List<CanonicalBytes> sourceBodies = readAndValidateSources(plan, reader, reusedReads);
+        List<CanonicalBytes> payloadBodies = readAndValidatePayloads(plan, payloadObjects, reader, reusedReads);
         List<CanonicalBytes> indexBodies = readAndValidateIndexes(plan, indexObjects, reader);
         requireBytePreservingSemantics(plan, sourceBodies, payloadBodies);
 
+        return finishGeneration(
+                plan,
+                currentSelector,
+                fallbackSet,
+                payloadObjects,
+                indexObjects,
+                payloadBodies,
+                indexBodies,
+                hashBodies("M5-A-BYTE-EQUALITY-V1", sourceBodies, payloadBodies));
+    }
+
+    private ValidatedGeneration finishGeneration(
+            MaterializationPlan plan,
+            BindingReadSelector currentSelector,
+            Sha256Digest fallbackSet,
+            List<GenerationObject> payloadObjects,
+            List<GenerationObject> indexObjects,
+            List<CanonicalBytes> payloadBodies,
+            List<CanonicalBytes> indexBodies,
+            Sha256Digest payloadEquality) {
         long totalBytes = 0;
         for (CanonicalBytes body : payloadBodies) {
             totalBytes = Math.addExact(totalBytes, body.length());
@@ -123,14 +232,54 @@ public final class M5MaterializationValidatorV1 {
         for (CanonicalBytes body : indexBodies) {
             totalBytes = Math.addExact(totalBytes, body.length());
         }
+        return finishGeneration(
+                plan,
+                currentSelector,
+                fallbackSet,
+                payloadObjects,
+                indexObjects,
+                totalBytes,
+                indexBodies,
+                payloadEquality);
+    }
+
+    private ValidatedGeneration finishGeneration(
+            MaterializationPlan plan,
+            BindingReadSelector currentSelector,
+            Sha256Digest fallbackSet,
+            List<GenerationObject> payloadObjects,
+            List<GenerationObject> indexObjects,
+            long totalBytes,
+            List<CanonicalBytes> indexBodies,
+            Sha256Digest payloadEquality) {
+        return finishGeneration(
+                plan,
+                currentSelector,
+                fallbackSet,
+                payloadObjects,
+                indexObjects,
+                totalBytes,
+                hashLookupBoundaries(indexBodies),
+                payloadEquality);
+    }
+
+    private ValidatedGeneration finishGeneration(
+            MaterializationPlan plan,
+            BindingReadSelector currentSelector,
+            Sha256Digest fallbackSet,
+            List<GenerationObject> payloadObjects,
+            List<GenerationObject> indexObjects,
+            long totalBytes,
+            Sha256Digest lookupBoundaries,
+            Sha256Digest payloadEquality) {
         GenerationValidationRoot validation = new GenerationValidationRoot(
                 plan.taskIdSha256(),
                 plan.outputIdentitySha256(),
                 plan.sourceCut().sourceSetSha256(),
                 hashObjects("M5-A-VALIDATED-OBJECTS-V1", payloadObjects, indexObjects),
                 hashCoverage("M5-A-COVERAGE-V1", payloadObjects, indexObjects),
-                hashLookupBoundaries(indexBodies),
-                hashBodies("M5-A-BYTE-EQUALITY-V1", sourceBodies, payloadBodies),
+                lookupBoundaries,
+                payloadEquality,
                 hashAuthority(plan, currentSelector),
                 payloadObjects.size(),
                 indexObjects.size(),
@@ -164,6 +313,238 @@ public final class M5MaterializationValidatorV1 {
         return new ValidatedGeneration(validation, generation, manifest);
     }
 
+    private ValidatedGeneration validatePulsar(
+            MaterializationPlan plan,
+            BindingReadSelector current,
+            Sha256Digest fallback,
+            List<GenerationObject> payloads,
+            List<GenerationObject> indexes,
+            MaterializationDataReader reader)
+            throws IOException {
+        if (plan.representationMode() != RepresentationMode.REWRITE_GENERATION) {
+            throw new IOException("Pulsar reuse validation requires its actual native payload locator adapter");
+        }
+        if (reader instanceof PulsarStreamedDataReader streaming) {
+            return validatePulsarStreamed(plan, current, fallback, payloads, indexes, streaming);
+        }
+        List<CanonicalBytes> payloadBodies = new ArrayList<>();
+        List<M5LookupIndexV1.Row> locators = new ArrayList<>();
+        List<String> roots = new ArrayList<>();
+        for (int ordinal = 0; ordinal < payloads.size(); ordinal++) {
+            var source = plan.sourceCut().sources().get(ordinal);
+            reader.verifyPulsarSource(source);
+            var descriptor = payloads.get(ordinal);
+            var read = reader.readObject(descriptor.identity());
+            requireObjectIdentity(descriptor, read);
+            if (!read.immutableProviderVersionToken().equals(descriptor.immutableProviderVersionToken())) {
+                throw new IOException("Pulsar payload Provider version changed");
+            }
+            var decoded = Nms1CodecV1.decode(read.body());
+            requirePulsarPayloadHeader(plan, decoded, ordinal);
+            if (!decoded.sources()
+                    .equals(List.of(new Nms1ObjectV1.SourceContribution(
+                            source.sourceIdentitySha256(),
+                            source.coverage(),
+                            source.pulsarEntryRootSha256().orElseThrow())))) {
+                throw new IOException("Pulsar source contribution differs from its frozen entry root");
+            }
+            var commitment = new M5PulsarEntriesV2.Commitment(
+                    source.coverage().pulsarCoverage().orElseThrow());
+            verifyPulsarEntries(reader, source, decoded, commitment, ordinal, locators);
+            var root = commitment.finish();
+            commitment.requireTimestampSummary(source.minimumTimestamp(), source.maximumTimestamp());
+            if (!root.equals(source.pulsarEntryRootSha256().orElseThrow())) {
+                throw new IOException("Pulsar independent entry root differs from the frozen cut");
+            }
+            reader.verifyPulsarSource(source);
+            roots.add(root.toHex());
+            payloadBodies.add(read.body());
+        }
+        List<CanonicalBytes> indexBodies = new ArrayList<>();
+        for (int ordinal = 0; ordinal < indexes.size(); ordinal++) {
+            var descriptor = indexes.get(ordinal);
+            var read = reader.readObject(descriptor.identity());
+            requireObjectIdentity(descriptor, read);
+            if (!read.immutableProviderVersionToken().equals(descriptor.immutableProviderVersionToken())) {
+                throw new IOException("Pulsar index Provider version changed");
+            }
+            var decoded = M5LookupIndexV1.decode(read.body());
+            if (decoded.kind() != descriptor.indexKind()
+                    || !decoded.coverage().equals(descriptor.coverage())
+                    || !decoded.taskIdSha256().equals(plan.taskIdSha256())
+                    || !decoded.outputIdentitySha256().equals(plan.outputIdentitySha256())
+                    || !decoded.rows().equals(locators)) {
+                throw new IOException("Pulsar index does not bind every exact original entry locator");
+            }
+            requireLookupBoundaries(decoded);
+            indexBodies.add(read.body());
+        }
+        requireCurrentAuthority(plan, current);
+        return finishGeneration(
+                plan,
+                current,
+                fallback,
+                payloads,
+                indexes,
+                payloadBodies,
+                indexBodies,
+                hash("M5-A-PULSAR-ENTRY-EQUALITY-V2", roots));
+    }
+
+    private ValidatedGeneration validatePulsarStreamed(
+            MaterializationPlan plan,
+            BindingReadSelector current,
+            Sha256Digest fallback,
+            List<GenerationObject> payloads,
+            List<GenerationObject> indexes,
+            PulsarStreamedDataReader reader)
+            throws IOException {
+        var verified = verifyPulsarOutputs(plan, payloads, indexes, reader);
+        requireCurrentAuthority(plan, current);
+        return finishGeneration(
+                plan,
+                current,
+                fallback,
+                verified.payloads,
+                verified.indexes,
+                verified.bytes,
+                verified.lookupBoundaries,
+                verified.entryEquality);
+    }
+
+    public VerifiedPulsarOutputs verifyPulsarOutputs(
+            MaterializationPlan plan,
+            List<GenerationObject> payloads,
+            List<GenerationObject> indexes,
+            PulsarStreamedDataReader reader)
+            throws IOException {
+        M5MaterializationCodecV1.encodePlan(plan);
+        requireExactCutMembership(plan);
+        if (!plan.sourceCut().coverage().typedPulsar()
+                || plan.representationMode() != RepresentationMode.REWRITE_GENERATION) {
+            throw new IllegalArgumentException("streamed verification requires the original typed Pulsar rewrite");
+        }
+        payloads = sortedGenerationObjects(payloads, true);
+        indexes = sortedGenerationObjects(indexes, false);
+        requireOutputShape(plan, payloads, indexes);
+        long bytes = 0;
+        List<M5LookupIndexV1.Row> locators = new ArrayList<>();
+        List<String> roots = new ArrayList<>();
+        for (int ordinal = 0; ordinal < payloads.size(); ordinal++) {
+            var source = plan.sourceCut().sources().get(ordinal);
+            reader.verifyPulsarSource(source);
+            var descriptor = payloads.get(ordinal);
+            var verified = reader.readPulsarPart(plan, descriptor);
+            if (verified.body().bytes() != descriptor.identity().bodyLength()
+                    || !verified.body().sha256().equals(descriptor.identity().bodySha256())) {
+                throw new IOException("Pulsar streamed Object identity differs");
+            }
+            bytes = Math.addExact(bytes, verified.body().bytes());
+            locators.addAll(verified.locators());
+            roots.add(source.pulsarEntryRootSha256().orElseThrow().toHex());
+            reader.verifyPulsarSource(source);
+        }
+        List<CanonicalBytes> indexBodies = new ArrayList<>();
+        for (var descriptor : indexes) {
+            var read = reader.readPulsarIndex(descriptor);
+            requireObjectIdentity(descriptor, read);
+            if (!read.immutableProviderVersionToken().equals(descriptor.immutableProviderVersionToken())) {
+                throw new IOException("Pulsar streamed index Provider version changed");
+            }
+            var decoded = M5LookupIndexV1.decode(read.body());
+            if (decoded.kind() != descriptor.indexKind()
+                    || !decoded.coverage().equals(descriptor.coverage())
+                    || !decoded.taskIdSha256().equals(plan.taskIdSha256())
+                    || !decoded.outputIdentitySha256().equals(plan.outputIdentitySha256())
+                    || !decoded.rows().equals(locators)) {
+                throw new IOException("Pulsar streamed index differs from exact entry locators");
+            }
+            requireLookupBoundaries(decoded);
+            bytes = Math.addExact(bytes, read.body().length());
+            indexBodies.add(read.body());
+        }
+        return new VerifiedPulsarOutputs(
+                plan, payloads, indexes, bytes, indexBodies, hash("M5-A-PULSAR-ENTRY-EQUALITY-V2", roots));
+    }
+
+    /** Freezes publication roots from the same private full-read proof and exact current M4 protections. */
+    public ValidatedGeneration finalizePulsarOutputs(
+            VerifiedPulsarOutputs verified,
+            BindingReadSelector current,
+            List<SourceProtectionIdentity> exactFallbackSources) {
+        Objects.requireNonNull(verified, "original independently verified outputs");
+        requireCurrentAuthority(verified.plan, current);
+        Sha256Digest fallback = requireFallbackProtections(verified.plan.sourceCut(), exactFallbackSources);
+        return finishGeneration(
+                verified.plan,
+                current,
+                fallback,
+                verified.payloads,
+                verified.indexes,
+                verified.bytes,
+                verified.lookupBoundaries,
+                verified.entryEquality);
+    }
+
+    private static void requirePulsarPayloadHeader(MaterializationPlan plan, Nms1ObjectV1 value, int ordinal) {
+        if (!value.indexes().isEmpty()) {
+            throw new IllegalStateException("Pulsar rewrite plan does not contain embedded indexes");
+        }
+        if (!value.identity().equals(plan.sourceCut().identity())
+                || value.payloadKind() != plan.payloadKind()
+                || !value.taskIdSha256().equals(plan.taskIdSha256())
+                || !value.outputIdentitySha256().equals(plan.outputIdentitySha256())
+                || !value.coverage().equals(plan.outputParts().get(ordinal).coverage())
+                || value.partOrdinal() != ordinal
+                || value.partCount() != plan.outputParts().size()
+                || !value.encryptionGenerationSha256().equals(plan.encryptionGenerationSha256())
+                || !value.compressionPolicySha256().equals(plan.compressionPolicySha256())
+                || !value.checksumPolicySha256().equals(plan.checksumPolicySha256())) {
+            throw new IllegalStateException("Pulsar payload header differs from the exact plan");
+        }
+    }
+
+    private static void verifyPulsarEntries(
+            MaterializationDataReader reader,
+            SourceExtent source,
+            Nms1ObjectV1 payload,
+            M5PulsarEntriesV2.Commitment commitment,
+            int ordinal,
+            List<M5LookupIndexV1.Row> locators)
+            throws IOException {
+        byte[] body = payload.payload().toByteArray();
+        try (var entries = reader.openPulsarEntries(source)) {
+            for (var extent : payload.extents()) {
+                var original = entries.next().orElseThrow(() -> new IOException("Pulsar original entry is missing"));
+                commitment.accept(original);
+                var bytes = CanonicalBytes.copyOf(Arrays.copyOfRange(
+                        body, extent.payloadOffset(), Math.addExact(extent.payloadOffset(), extent.payloadLength())));
+                if (!original.position()
+                                .equals(extent.coverage()
+                                        .pulsarCoverage()
+                                        .orElseThrow()
+                                        .firstPosition())
+                        || !original.payload().equals(bytes)
+                        || !Sha256Digest.hash(bytes).equals(extent.payloadSha256())
+                        || extent.minimumTimestamp() != original.timestamp()
+                        || extent.maximumTimestamp() != original.timestamp()) {
+                    throw new IOException("Pulsar payload entry bytes/position/timestamp differ from native source");
+                }
+                locators.add(new M5LookupIndexV1.Row(
+                        extent.coverage(),
+                        ordinal,
+                        extent.payloadOffset(),
+                        extent.payloadLength(),
+                        extent.minimumTimestamp(),
+                        extent.maximumTimestamp(),
+                        extent.payloadSha256()));
+            }
+            if (entries.next().isPresent()) {
+                throw new IOException("Pulsar original source has extra entries outside the cut");
+            }
+        }
+    }
+
     /**
      * Applies the unchanged M5-A authority/publication envelope to independently validated M5-B semantic output.
      */
@@ -190,13 +571,14 @@ public final class M5MaterializationValidatorV1 {
             throw new IllegalArgumentException("M5-B semantic proof differs from the materialization plan");
         }
         requireCurrentAuthority(plan, currentSelector);
+        requireExactCutMembership(plan);
         Sha256Digest fallbackSet = requireFallbackSources(plan, exactFallbackSources);
         payloadObjects = sortedGenerationObjects(payloadObjects, true);
         indexObjects = sortedGenerationObjects(indexObjects, false);
         requireOutputShape(plan, payloadObjects, indexObjects);
 
-        readAndValidateSources(plan, reader);
-        List<CanonicalBytes> payloadBodies = readAndValidatePayloads(plan, payloadObjects, reader);
+        readAndValidateSources(plan, reader, Map.of());
+        List<CanonicalBytes> payloadBodies = readAndValidatePayloads(plan, payloadObjects, reader, Map.of());
         List<CanonicalBytes> indexBodies = readAndValidateSemanticIndexes(indexObjects, reader);
         if (!semanticPayloadBodiesRoot(payloadBodies).equals(proof.payloadBodiesRootSha256())
                 || !semanticIndexBodiesRoot(indexBodies).equals(proof.indexBodiesRootSha256())) {
@@ -269,6 +651,19 @@ public final class M5MaterializationValidatorV1 {
         }
     }
 
+    private static void requireExactCutMembership(MaterializationPlan plan) {
+        plan.sourceCut().coverage().requireCurrentPulsar();
+        Sha256Digest binding = plan.sourceCut().identity().binding().bindingId().digest();
+        for (SourceExtent source : plan.sourceCut().sources()) {
+            if (!source.memberBindingIds().contains(binding)
+                    || (source.sharedPhysicalObject()
+                            && source.kind() != SourceKind.OBJECT_WAL_NWG1
+                            && source.kind() != SourceKind.PULSAR_NPD1_DATA)) {
+                throw new IllegalArgumentException("M5 source has foreign or unsupported physical membership");
+            }
+        }
+    }
+
     private static Sha256Digest requireFallbackSources(
             MaterializationPlan plan, List<SourceProtectionIdentity> sources) {
         return requireFallbackProtections(plan.sourceCut(), sources);
@@ -316,11 +711,29 @@ public final class M5MaterializationValidatorV1 {
     }
 
     private static List<CanonicalBytes> readAndValidateSources(
-            MaterializationPlan plan, MaterializationDataReader reader) throws IOException {
+            MaterializationPlan plan,
+            MaterializationDataReader reader,
+            Map<ReusedPhysicalRead, VerifiedObjectRead> reusedReads)
+            throws IOException {
         List<CanonicalBytes> result = new ArrayList<>(plan.sourceCut().sources().size());
         for (SourceExtent source : plan.sourceCut().sources()) {
-            CanonicalBytes body =
-                    CanonicalBytes.copyOf(reader.readSource(source).toByteArray());
+            CanonicalBytes body;
+            if (plan.representationMode() == RepresentationMode.REWRITE_GENERATION) {
+                body = CanonicalBytes.copyOf(reader.readSource(source).toByteArray());
+            } else {
+                ReusedPhysicalRead key = new ReusedPhysicalRead(plan, source);
+                VerifiedObjectRead read = reusedReads.get(key);
+                if (read == null) {
+                    ObjectIdentity identity =
+                            new ObjectIdentity(source.physicalKey(), source.canonicalLength(), source.bodySha256());
+                    read = reader.readObject(identity);
+                    reusedReads.put(key, read);
+                }
+                if (!read.immutableProviderVersionToken().equals(source.immutableProviderVersionToken())) {
+                    throw new IllegalStateException("M5 reused source Provider version differs");
+                }
+                body = read.body();
+            }
             if (body.length() != source.canonicalLength()
                     || !Sha256Digest.hash(body).equals(source.bodySha256())) {
                 throw new IllegalStateException("M5 source body identity differs: " + source.physicalKey());
@@ -331,13 +744,22 @@ public final class M5MaterializationValidatorV1 {
     }
 
     private static List<CanonicalBytes> readAndValidatePayloads(
-            MaterializationPlan plan, List<GenerationObject> objects, MaterializationDataReader reader)
+            MaterializationPlan plan,
+            List<GenerationObject> objects,
+            MaterializationDataReader reader,
+            Map<ReusedPhysicalRead, VerifiedObjectRead> reusedReads)
             throws IOException {
         List<CanonicalBytes> result = new ArrayList<>(objects.size());
         for (int index = 0; index < objects.size(); index++) {
             GenerationObject object = objects.get(index);
             OutputPartPlan part = plan.outputParts().get(index);
-            VerifiedObjectRead read = reader.readObject(object.identity());
+            VerifiedObjectRead read = plan.representationMode() == RepresentationMode.REWRITE_GENERATION
+                    ? reader.readObject(object.identity())
+                    : reusedReads.get(new ReusedPhysicalRead(
+                            plan, plan.sourceCut().sources().get(index)));
+            if (read == null) {
+                throw new IllegalStateException("M5 reused source was not independently read");
+            }
             requireObjectIdentity(object, read);
             if (!read.immutableProviderVersionToken().equals(object.immutableProviderVersionToken())) {
                 throw new IllegalStateException("M5 payload Provider version differs");
@@ -358,7 +780,8 @@ public final class M5MaterializationValidatorV1 {
                 SourceExtent source = plan.sourceCut().sources().get(index);
                 if (!object.identity().key().equals(source.physicalKey())
                         || object.identity().bodyLength() != source.canonicalLength()
-                        || !object.identity().bodySha256().equals(source.bodySha256())) {
+                        || !object.identity().bodySha256().equals(source.bodySha256())
+                        || !object.immutableProviderVersionToken().equals(source.immutableProviderVersionToken())) {
                     throw new IllegalStateException("native payload reference differs from the source cut");
                 }
                 result.add(read.body());
@@ -446,14 +869,37 @@ public final class M5MaterializationValidatorV1 {
         if (plan.payloadKind() == PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1) {
             throw new IllegalArgumentException("M5-A cannot validate semantic compaction output");
         }
-        CanonicalBytes sourceBytes = concatenate(sources);
-        CanonicalBytes payloadBytes = concatenate(payloads);
-        if (!sourceBytes.equals(payloadBytes)) {
+        if (!equalSegments(sources, payloads)) {
             throw new IllegalStateException("M5-A byte-preserving payload differs from the frozen source cut");
         }
     }
 
     private static void requireLookupBoundaries(M5LookupIndexV1 index) {
+        if (index.coverage().typedPulsar()) {
+            var selected = index.coverage().pulsarCoverage().orElseThrow();
+            var first = selected.firstPosition();
+            if ((first.entryId() > 0
+                            && index.lookup(new M5PulsarCoverageV2.Position(first.ledgerId(), first.entryId() - 1))
+                                    .isPresent())
+                    || index.lookup(selected.endPosition()).isPresent()) {
+                throw new IllegalStateException("Pulsar index exposes a position outside its selected cut");
+            }
+            for (int row = 0; row < index.rows().size(); row++) {
+                var current = index.rows().get(row);
+                var coverage = current.coverage().pulsarCoverage().orElseThrow();
+                if (!index.lookup(coverage.firstPosition()).orElseThrow().equals(current)) {
+                    throw new IllegalStateException("Pulsar index cannot locate its exact original entry");
+                }
+                var next = index.lookup(coverage.endPosition());
+                if (row + 1 < index.rows().size()
+                        ? next.isEmpty()
+                                || !next.orElseThrow().equals(index.rows().get(row + 1))
+                        : next.isPresent()) {
+                    throw new IllegalStateException("Pulsar index cannot locate its captured-chain successor");
+                }
+            }
+            return;
+        }
         long first = index.coverage().inclusiveStart();
         long last = index.coverage().exclusiveEnd() - 1;
         if (!index.rows().isEmpty()) {
@@ -517,19 +963,39 @@ public final class M5MaterializationValidatorV1 {
     }
 
     private static Sha256Digest hashLookupBoundaries(List<CanonicalBytes> indexBodies) {
-        List<String> values = indexBodies.stream().map(CanonicalBytes::toHex).toList();
-        if (values.isEmpty()) {
-            values = List.of("NO_NEW_INDEX_OBJECTS");
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            sha.update("M5-A-LOOKUP-BOUNDARIES-V1\0".getBytes(StandardCharsets.UTF_8));
+            if (indexBodies.isEmpty()) {
+                sha.update("NO_NEW_INDEX_OBJECTS".getBytes(StandardCharsets.UTF_8));
+            }
+            byte[] hex = new byte[8192];
+            for (int index = 0; index < indexBodies.size(); index++) {
+                if (index > 0) {
+                    sha.update((byte) 0);
+                }
+                byte[] body = indexBodies.get(index).toByteArray();
+                for (int offset = 0; offset < body.length; ) {
+                    int count = Math.min(body.length - offset, hex.length / 2);
+                    for (int byteIndex = 0; byteIndex < count; byteIndex++) {
+                        int value = Byte.toUnsignedInt(body[offset + byteIndex]);
+                        hex[byteIndex * 2] = (byte) Character.forDigit(value >>> 4, 16);
+                        hex[byteIndex * 2 + 1] = (byte) Character.forDigit(value & 15, 16);
+                    }
+                    sha.update(hex, 0, count * 2);
+                    offset += count;
+                }
+            }
+            return Sha256Digest.copyOf(sha.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JDK has no SHA-256 provider", e);
         }
-        return hash("M5-A-LOOKUP-BOUNDARIES-V1", values);
     }
 
     private static Sha256Digest hashBodies(String domain, List<CanonicalBytes> sources, List<CanonicalBytes> payloads) {
         return hash(
                 domain,
-                List.of(
-                        Sha256Digest.hash(concatenate(sources)).toHex(),
-                        Sha256Digest.hash(concatenate(payloads)).toHex()));
+                List.of(hashSegments(sources).toHex(), hashSegments(payloads).toHex()));
     }
 
     private static Sha256Digest hashAuthority(MaterializationPlan plan, BindingReadSelector selector) {
@@ -546,6 +1012,10 @@ public final class M5MaterializationValidatorV1 {
     }
 
     private static String coverageText(GenerationObject object) {
+        if (object.coverage().typedPulsar()) {
+            return "PULSAR_ENTRY_V2:"
+                    + object.coverage().pulsarCoverage().orElseThrow().sha256().toHex();
+        }
         return object.coverage().domain().name()
                 + ":"
                 + object.coverage().inclusiveStart()
@@ -565,15 +1035,55 @@ public final class M5MaterializationValidatorV1 {
         }
     }
 
-    private static CanonicalBytes concatenate(List<CanonicalBytes> values) {
+    private static Sha256Digest hashSegments(List<CanonicalBytes> values) {
         try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
             for (CanonicalBytes value : values) {
-                output.write(value.toByteArray());
+                sha.update(value.toByteArray());
             }
-            return CanonicalBytes.copyOf(output.toByteArray());
-        } catch (IOException impossible) {
-            throw new IllegalStateException("in-memory M5 byte comparison failed", impossible);
+            return Sha256Digest.copyOf(sha.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JDK has no SHA-256 provider", e);
         }
+    }
+
+    private static boolean equalSegments(List<CanonicalBytes> sources, List<CanonicalBytes> payloads) {
+        long sourceLength = sources.stream().mapToLong(CanonicalBytes::length).sum();
+        long payloadLength = payloads.stream().mapToLong(CanonicalBytes::length).sum();
+        if (sourceLength != payloadLength) {
+            return false;
+        }
+        int sourcePart = 0;
+        int payloadPart = 0;
+        int sourceOffset = 0;
+        int payloadOffset = 0;
+        byte[] source = new byte[0];
+        byte[] payload = new byte[0];
+        long remaining = sourceLength;
+        while (remaining > 0) {
+            if (sourceOffset == source.length) {
+                source = sources.get(sourcePart++).toByteArray();
+                sourceOffset = 0;
+            }
+            if (payloadOffset == payload.length) {
+                payload = payloads.get(payloadPart++).toByteArray();
+                payloadOffset = 0;
+            }
+            int compared = Math.min(source.length - sourceOffset, payload.length - payloadOffset);
+            if (Arrays.mismatch(
+                            source,
+                            sourceOffset,
+                            sourceOffset + compared,
+                            payload,
+                            payloadOffset,
+                            payloadOffset + compared)
+                    >= 0) {
+                return false;
+            }
+            sourceOffset += compared;
+            payloadOffset += compared;
+            remaining -= compared;
+        }
+        return true;
     }
 }

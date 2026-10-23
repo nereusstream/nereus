@@ -31,7 +31,8 @@ public final class M5LogicalTrimCoordinatorV1 {
         EXISTING_EXACT,
         DEFINITIVELY_NOT_APPLIED,
         RESPONSE_UNKNOWN,
-        CONFLICT
+        CONFLICT,
+        UNSUPPORTED
     }
 
     public record Result(Outcome outcome, Optional<BindingTrimFrontierV1> exactFrontier) {
@@ -56,7 +57,14 @@ public final class M5LogicalTrimCoordinatorV1 {
     public CompletionStage<Result> advance(String frontierKey, RetentionFloorSnapshotV1 snapshot) {
         Objects.requireNonNull(frontierKey, "frontierKey");
         Objects.requireNonNull(snapshot, "snapshot");
-        return freshness.requireFresh(snapshot).thenCompose(ignored -> metadata.read(frontierKey)
+        if (metadata instanceof M5SerializedLogicalTrimStoreV2 serialized) {
+            return serialized.advanceLogicalTrim(frontierKey, snapshot);
+        }
+        if (!metadata.supportsAtomicMultiKeyTransactions()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                    new Result(Outcome.UNSUPPORTED, Optional.empty()));
+        }
+        return freshness.requireFresh(snapshot).thenCompose(facts -> metadata.read(frontierKey)
                 .thenCompose(current -> {
                     Optional<BindingTrimFrontierV1> predecessor = current.map(value -> decode(frontierKey, value));
                     if (predecessor.filter(value -> exactRetry(value, snapshot)).isPresent()) {
@@ -65,9 +73,35 @@ public final class M5LogicalTrimCoordinatorV1 {
                     }
                     BindingTrimFrontierV1 candidate = planner.plan(snapshot, predecessor);
                     CanonicalBytes candidateBytes = M5RetentionCodecV1.encodeTrimFrontier(candidate);
-                    return metadata.compareAndSet(current, frontierKey, candidateBytes)
-                            .thenCompose(
-                                    mutation -> reconcile(frontierKey, current, candidate, candidateBytes, mutation));
+                    var conditions = new java.util.TreeMap<String, ExactMetadataTransactionStoreV1.ExactCondition>();
+                    for (var fact : facts) {
+                        conditions.put(fact.key(), ExactMetadataTransactionStoreV1.ExactCondition.present(fact));
+                    }
+                    var frontierCondition = new ExactMetadataTransactionStoreV1.ExactCondition(frontierKey, current);
+                    var old = conditions.putIfAbsent(frontierKey, frontierCondition);
+                    if (old != null && !old.equals(frontierCondition)) {
+                        throw new IllegalArgumentException("floor vector and trim predecessor disagree");
+                    }
+                    var transaction = new ExactMetadataTransactionStoreV1.ExactTransaction(
+                            frontierKey,
+                            java.util.List.copyOf(conditions.values()),
+                            java.util.List.of(
+                                    ExactMetadataTransactionStoreV1.ExactPut.of(frontierKey, candidateBytes)));
+                    return metadata.conditionalTransaction(transaction).thenCompose(outcome -> {
+                        if (outcome == ExactMetadataTransactionStoreV1.TransactionOutcome.UNSUPPORTED) {
+                            return java.util.concurrent.CompletableFuture.completedFuture(
+                                    new Result(Outcome.UNSUPPORTED, Optional.empty()));
+                        }
+                        var mutation =
+                                switch (outcome) {
+                                    case APPLIED_EXACT -> MutationOutcome.APPLIED_EXACT;
+                                    case CONDITIONS_UNCHANGED -> MutationOutcome.PREDECESSOR_UNCHANGED;
+                                    case DEFINITIVE_CONFLICT -> MutationOutcome.DEFINITIVE_CONFLICT;
+                                    case RESPONSE_UNKNOWN -> MutationOutcome.RESPONSE_UNKNOWN;
+                                    case UNSUPPORTED -> throw new AssertionError("handled above");
+                                };
+                        return reconcile(frontierKey, current, candidate, candidateBytes, mutation);
+                    });
                 }));
     }
 
@@ -89,9 +123,11 @@ public final class M5LogicalTrimCoordinatorV1 {
                     }
                     if (observed.equals(predecessor)) {
                         return new Result(
-                                mutation == MutationOutcome.DEFINITIVE_CONFLICT
-                                        ? Outcome.CONFLICT
-                                        : Outcome.DEFINITIVELY_NOT_APPLIED,
+                                switch (mutation) {
+                                    case DEFINITIVE_CONFLICT -> Outcome.CONFLICT;
+                                    case PREDECESSOR_UNCHANGED -> Outcome.DEFINITIVELY_NOT_APPLIED;
+                                    case APPLIED_EXACT, RESPONSE_UNKNOWN -> Outcome.RESPONSE_UNKNOWN;
+                                },
                                 Optional.empty());
                     }
                     return new Result(Outcome.CONFLICT, Optional.empty());
@@ -106,11 +142,24 @@ public final class M5LogicalTrimCoordinatorV1 {
         return M5RetentionCodecV1.decodeTrimFrontier(stored.canonicalStoredBytes());
     }
 
-    private static boolean exactRetry(BindingTrimFrontierV1 stored, RetentionFloorSnapshotV1 snapshot) {
+    public static boolean exactRetry(BindingTrimFrontierV1 stored, RetentionFloorSnapshotV1 snapshot) {
         return stored.identity().equals(snapshot.identity())
                 && stored.domain() == snapshot.domain()
-                && stored.priorFrontier() == snapshot.priorTrimFrontier()
-                && stored.newFrontier() == snapshot.minimumSafeFloor()
+                && (snapshot.pulsarContext().isPresent()
+                        ? stored.pulsarContext()
+                                .filter(context -> context.coverage()
+                                                .equals(snapshot.pulsarContext()
+                                                        .orElseThrow()
+                                                        .coverage())
+                                        && context.priorFrontier()
+                                                .equals(snapshot.pulsarContext()
+                                                        .orElseThrow()
+                                                        .priorTrimFrontier())
+                                        && context.newFrontier().equals(snapshot.minimumPulsarFloor()))
+                                .isPresent()
+                        : stored.pulsarContext().isEmpty()
+                                && stored.priorFrontier() == snapshot.priorTrimFrontier()
+                                && stored.newFrontier() == snapshot.minimumSafeFloor())
                 && stored.retentionPolicyRootSha256().equals(snapshot.retentionPolicyRootSha256())
                 && stored.floorSnapshotRootSha256().equals(snapshot.snapshotRootSha256())
                 && stored.ownerFence().equals(snapshot.ownerFence())

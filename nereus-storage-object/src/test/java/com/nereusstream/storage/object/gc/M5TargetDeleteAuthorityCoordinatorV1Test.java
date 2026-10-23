@@ -26,6 +26,7 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.M
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.TransactionOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2.ReclamationReason;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.Outcome;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
@@ -38,6 +39,8 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Targe
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteWriterGuardV1.ExternalMutationResultV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteWriterGuardV1.GuardOutcomeV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -336,6 +339,46 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         assertThatThrownBy(() -> other.create(template).toCompletableFuture().join())
                 .hasRootCauseMessage("eligibility authority is absent: /physical-namespace");
         assertThat(missing.values).doesNotContainKey(template.authorityKey());
+    }
+
+    @Test
+    void eligibilityCannotCiteItsOwnMutableTargetAuthority() {
+        var store = new InMemoryStore();
+        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        var template = open(1);
+        var unqualified =
+                M5TargetDeleteAuthorityStateMachineV1.open(template.target(), template.writerEnrollment(), digest(126));
+        var created = coordinator
+                .create(unqualified)
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        var self = new AuthorityFactV1(created.key(), created.metadataVersion(), created.canonicalStoredSha256());
+        var snapshot = M5DeleteEligibilityTestFixtures.snapshot(
+                template.target().resourceId(),
+                ReclamationReason.UNPUBLISHED_ARTIFACT,
+                2,
+                0,
+                PositionDomain.KAFKA_OFFSET,
+                (key, value) ->
+                        key.equals("/adoption-closed") ? self : M5DeleteEligibilityTestFixtures.fact(key, value));
+
+        assertThatThrownBy(() -> coordinator.qualifyEligibility(created, snapshot))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("own mutable target authority");
+        var initialSnapshot = new DeleteEligibilitySnapshotV2(
+                snapshot.resource(),
+                snapshot.reason(),
+                1,
+                snapshot.namespaceAdmission(),
+                snapshot.completeMemberInventory(),
+                snapshot.members());
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.open(
+                        template.target(), template.writerEnrollment(), initialSnapshot))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("own mutable target authority");
+        assertThat(store.readNow(created.key())).isEqualTo(created);
     }
 
     @Test
@@ -863,6 +906,31 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 .hasRootCauseMessage("eligibility authority changed: "
                         + harness.context.capability().key());
         assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(harness.intent);
+    }
+
+    @Test
+    void physicalDispatchAdmissionRechecksIntentAndFactsAfterNativeRead() {
+        var harness = new DispatchHarness(false);
+        var read = new CompletableFuture<ExternalIdentityObservationV1>();
+        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(), expected -> read);
+        var pending = coordinator.requireCurrentDispatch(harness.intent);
+        var capability = M5TargetDeleteAuthorityStateMachineV1.dispatchContext(decode(harness.intent))
+                .capability();
+        harness.store.seed(capability.key(), bytes("revoked"));
+        read.complete(ExternalIdentityObservationV1.PRESENT_EXACT_V1);
+        assertThatThrownBy(() -> pending.toCompletableFuture().join())
+                .hasRootCauseMessage("eligibility authority changed: " + capability.key());
+        assertThat(harness.store.readNow(harness.intent.key())).isEqualTo(harness.intent);
+
+        var fresh = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store,
+                M5DeleteEligibilityTestFixtures.syntheticObservationVerifier(),
+                expected -> CompletableFuture.completedFuture(ExternalIdentityObservationV1.PRESENT_EXACT_V1));
+        assertThatThrownBy(() -> fresh.requireCurrentDispatch(harness.intent)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("eligibility authority changed: " + capability.key());
     }
 
     @Test

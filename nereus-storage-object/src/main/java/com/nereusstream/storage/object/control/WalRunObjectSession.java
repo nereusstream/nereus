@@ -87,8 +87,23 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     /** Counts actual I/O lifetime; drain/interrupt cannot release the Provider/KMS leases underneath it. */
-    synchronized IoLease acquireTerminalIo() {
+    public synchronized IoLease acquireTerminalIo() {
         requireTerminalClosable();
+        return acquireIo();
+    }
+
+    /** Pins an original synchronous control read until its native stage has actually terminated. */
+    public synchronized IoLease acquireControlReadIo() {
+        return acquireIo();
+    }
+
+    /** Ordinary protocol mutations stop with physical admission; only sealed terminal CAS may finish later. */
+    public synchronized IoLease acquireProtocolMutationIo(boolean terminal) {
+        if (terminal) {
+            requireTerminalClosable();
+        } else {
+            requireCheckpointAdmission();
+        }
         return acquireIo();
     }
 
@@ -108,7 +123,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         return new IoLease(this, candidate);
     }
 
-    static final class IoLease implements AutoCloseable {
+    public static final class IoLease implements AutoCloseable {
         private final WalRunObjectSession owner;
         private final AdmittedNwg1Candidate candidate;
         private boolean closed;
@@ -382,7 +397,7 @@ public final class WalRunObjectSession implements AutoCloseable {
             throws IOException {
         IoLease lease;
         synchronized (this) {
-            requireOpen();
+            requireCheckpointAdmission();
             Objects.requireNonNull(candidate, "candidate");
             if (candidate.owner != this) {
                 throw new IllegalArgumentException("Kafka protocol Object token belongs to another WalRun session");
@@ -699,6 +714,59 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
     }
 
+    /** Authenticated transfer reads use the retiring Root's existing envelope, including cross-Run suffixes. */
+    public VerifiedRoutineNwg1AppendUnit readNwg1AppendUnitForTransfer(
+            ObjectIdentity identity,
+            Nwg1VerificationContextV1 verificationContext,
+            long selectedFrameOrdinal,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer,
+            WalRunObjectSession budgetOwner)
+            throws IOException {
+        Objects.requireNonNull(budgetOwner, "budgetOwner");
+        try (var sourceIo = acquireIo();
+                var budgetIo = budgetOwner.acquireControlReadIo()) {
+            requireVerificationContext(verificationContext);
+            var leaf = requireNwg1LeafIdentity(identity);
+            var reader = recovery.usingBudgetOf(budgetOwner.recovery);
+            try (var memory =
+                    budgetOwner.acquireRecoveryWorkingSet(Math.multiplyExact(3L, leaf.directoryPrefixEnd()))) {
+                var raw = reader.reconstructDirectoryPrefixes(Map.of(identity, leaf.directoryPrefixEnd()))
+                        .get(identity);
+                var prefix = kms.readAuthenticatedPrefix(raw.toByteArray(), identity.bodyLength(), verificationContext);
+                requirePrefixIdentity(prefix, leaf);
+                requirePrefixWithinRootCaps(prefix);
+                var directory = prefix.directory();
+                reader.chargeDecoded(
+                        directory.bindings().size(),
+                        directory.frames().size(),
+                        directory.appendUnits().size());
+                var unit = directory.appendUnits().stream()
+                        .filter(value -> value.firstFrameOrdinal() == selectedFrameOrdinal)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("transfer selected no exact append unit"));
+                long maximumFrame = directory
+                        .frames()
+                        .subList(
+                                Math.toIntExact(unit.firstFrameOrdinal()),
+                                Math.toIntExact(unit.firstFrameOrdinal() + unit.frameCount()))
+                        .stream()
+                        .mapToLong(frame -> Math.addExact(frame.storedBlockBytes(), frame.decodedPayloadBytes()))
+                        .max()
+                        .orElseThrow();
+                memory.grow(Math.multiplyExact(3L, maximumFrame));
+                var verified = kms.readSelectedAppendUnitStreaming(
+                        prefix,
+                        (range, ignored) -> reader.readExactFrameRange(
+                                        identity, range.inclusiveStart(), range.exclusiveEnd())
+                                .toByteArray(),
+                        selectedFrameOrdinal,
+                        verificationContext,
+                        Objects.requireNonNull(consumer, "consumer"));
+                return new VerifiedRoutineNwg1AppendUnit(prefix, verified);
+            }
+        }
+    }
+
     /** One cumulative range-GET authenticates the complete Directory needed to rebuild exact recovery locators. */
     public Nwg1ObjectReaderV1.AuthenticatedPrefix recoverAndVerifyNwg1Directory(
             ObjectIdentity identity, Nwg1VerificationContextV1 verificationContext) throws IOException {
@@ -847,6 +915,12 @@ public final class WalRunObjectSession implements AutoCloseable {
     public synchronized void chargeRecoveryRoot(boolean predecessor, long canonicalBytes) {
         requireUsable();
         recovery.chargeRoot(predecessor, canonicalBytes);
+    }
+
+    public synchronized CumulativeRecoveryBudget.ControlMetadataReservation reserveRecoveryControlMetadata(
+            long maximumBytes) {
+        requireUsable();
+        return recovery.reserveControlMetadata(maximumBytes);
     }
 
     public synchronized void chargeRecoveryControlMetadata(long canonicalBytes) {

@@ -20,6 +20,9 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Entry;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Head;
 import com.nereusstream.storage.object.gc.M5GcQuotaRecordsV2.Layout;
+import com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2;
+import com.nereusstream.storage.object.provider.ObjectIdentity;
+import com.nereusstream.storage.object.retention.M5MaterializationWorkerV1;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -35,6 +38,15 @@ public final class M5GcQuotaCoordinatorV2 {
     }
 
     public record Snapshot(Head head, long chargedCanonicalBytes, long availableCanonicalBytes) {}
+
+    public enum BirthResult {
+        RESERVED,
+        ASSIGNED,
+        CANCELLED_NO_DISPATCH,
+        WRITE_ARMED,
+        EXHAUSTED,
+        RETRY
+    }
 
     private final Layout layout;
     private final ExactMetadataTransactionStoreV1 accounting;
@@ -55,6 +67,41 @@ public final class M5GcQuotaCoordinatorV2 {
         });
     }
 
+    /** Read-only accounting evidence; active reservations and permanent terminal costs remain separate. */
+    public CompletionStage<String> describeUsage() {
+        return snapshot().thenApply(snapshot -> {
+            var head = snapshot.head();
+            long active = Math.multiplyExact(head.reservedResources(), layout.reservationCharge());
+            long entries = Math.multiplyExact(head.settledResources(), layout.entryCharge());
+            long authorityKeys = Math.multiplyExact(head.settledResources(), layout.authorityKeyCharge());
+            long members = Math.multiplyExact(head.settledResources(), layout.permanentMemberCharge());
+            long birthBytes = snapshot.chargedCanonicalBytes()
+                    - layout.headCharge()
+                    - active
+                    - entries
+                    - authorityKeys
+                    - members
+                    - head.compactDoneValueBytes();
+            return "scope=" + head.scope().toHex()
+                    + ", revision=" + head.revision()
+                    + ", capacityBytes=" + head.capacityBytes()
+                    + ", reservedResources=" + head.reservedResources()
+                    + ", settledResources=" + head.settledResources()
+                    + ", pending=" + head.pending()
+                    + ", births=" + head.births()
+                    + ", headBytes=" + layout.headCharge()
+                    + ", activeReservationBytes=" + active
+                    + ", permanentEntryBytes=" + entries
+                    + ", permanentAuthorityKeyBytes=" + authorityKeys
+                    + ", permanentMemberBytes=" + members
+                    + ", compactDoneBytes=" + head.compactDoneValueBytes()
+                    + ", birthBytes=" + birthBytes
+                    + ", chargedCanonicalBytes=" + snapshot.chargedCanonicalBytes()
+                    + ", availableCanonicalBytes=" + snapshot.availableCanonicalBytes()
+                    + ", nextReservationBytes=" + layout.reservationCharge();
+        });
+    }
+
     /** At most one operation is helped per call. RETRY is bounded contention/uncertainty, never an absence proof. */
     public CompletionStage<Result> reserve(PhysicalResourceIdV2 resource) {
         layout.requireResource(resource);
@@ -64,7 +111,7 @@ public final class M5GcQuotaCoordinatorV2 {
                 return completed(existing.orElseThrow().settled() ? Result.SETTLED : Result.GRANTED);
             }
             var current = decode(captured);
-            if (current.pending().isPresent()) {
+            if (hasPending(current)) {
                 return recover(captured).thenApply(ignored -> Result.RETRY);
             }
             if (current.availableBytes(layout) < layout.reservationCharge()) {
@@ -104,7 +151,7 @@ public final class M5GcQuotaCoordinatorV2 {
                     return completed(Result.SETTLED);
                 }
                 var current = decode(captured);
-                if (current.pending().isPresent()) {
+                if (hasPending(current)) {
                     return recover(captured).thenApply(ignored -> Result.RETRY);
                 }
                 return commit(captured, current.settle(settled)).thenCompose(ignored -> entry(resource)
@@ -128,6 +175,113 @@ public final class M5GcQuotaCoordinatorV2 {
         return head().thenCompose(this::recover);
     }
 
+    public CompletionStage<BirthResult> reserveBirth(
+            M5MaterializationWorkerV1 worker, M5PendingOutputInventoryV2.Slot slot) {
+        if (layout.namespace().providerKind() != PhysicalResourceIdV2.ProviderKind.OBJECT_PROVIDER) {
+            throw new IllegalArgumentException("Object birth credit requires its actual Object namespace");
+        }
+        var claim = new M5ObjectBirthCreditV3(
+                layout.scope(), worker, slot, 2, M5ObjectBirthCreditV3.State.RESERVED, Optional.empty());
+        return head().thenCompose(captured -> birth(claim.key()).thenCompose(existing -> {
+            if (existing.isPresent()) {
+                return completed(birthResult(existing.orElseThrow()));
+            }
+            var current = decode(captured);
+            if (hasPending(current)) {
+                return recover(captured).thenApply(ignored -> BirthResult.RETRY);
+            }
+            long cost = Math.addExact(layout.birthRecordCharge(), layout.reservationCharge());
+            if (current.births().isEmpty()) {
+                cost = Math.addExact(cost, M5GcQuotaRecordsV2.BIRTH_HEAD_BYTES - M5GcQuotaRecordsV2.HEAD_BYTES);
+            }
+            if (current.availableBytes(layout) < cost) {
+                return completed(BirthResult.EXHAUSTED);
+            }
+            return commit(captured, current.reserveBirth(layout, worker, slot))
+                    .thenCompose(ignored -> birth(claim.key()))
+                    .thenApply(observed ->
+                            observed.map(M5GcQuotaCoordinatorV2::birthResult).orElse(BirthResult.RETRY));
+        }));
+    }
+
+    public CompletionStage<Optional<M5ObjectBirthCreditV3>> readBirth(String key) {
+        return head().thenCompose(ignored -> birth(key));
+    }
+
+    public CompletionStage<BirthResult> armBirth(String key, ObjectIdentity output) {
+        return head().thenCompose(captured -> birth(key).thenCompose(existing -> {
+            var original = existing.orElseThrow(() -> new IllegalStateException("birth credit is not reserved"));
+            var candidate = original.reserved().arm(output);
+            if (original.state() != M5ObjectBirthCreditV3.State.RESERVED) {
+                if (!original.output().equals(candidate.output())) {
+                    throw new IllegalStateException("write intent differs from the original body commitment");
+                }
+                return completed(birthResult(original));
+            }
+            var current = decode(captured);
+            if (hasPending(current)) {
+                return recover(captured).thenApply(ignored -> BirthResult.RETRY);
+            }
+            return commit(captured, current.armBirth(candidate))
+                    .thenCompose(ignored -> birth(key))
+                    .thenApply(value ->
+                            value.filter(candidate::equals).isPresent() ? BirthResult.WRITE_ARMED : BirthResult.RETRY);
+        }));
+    }
+
+    /** Native caller supplies original SDK/full-GET version facts; an expected key/hash alone cannot call this path. */
+    public CompletionStage<BirthResult> assignBirth(String key, PhysicalResourceIdV2.ObjectVersion actual) {
+        layout.requireResource(actual);
+        return finishBirth(key, Optional.of(actual));
+    }
+
+    /** Requires original no-dispatch proof. Age, absence observations and process death are insufficient. */
+    public CompletionStage<BirthResult> cancelNoDispatchBirth(String key) {
+        return finishBirth(key, Optional.empty());
+    }
+
+    private CompletionStage<BirthResult> finishBirth(String key, Optional<PhysicalResourceIdV2.ObjectVersion> actual) {
+        return head().thenCompose(captured -> birth(key).thenCompose(existing -> {
+            var original = existing.orElseThrow(() -> new IllegalStateException("birth credit is not reserved"));
+            var candidate = actual.map(original.beforeTerminal()::assign)
+                    .orElseGet(() -> original.beforeTerminal().cancelNoDispatch());
+            if (original.state() != M5ObjectBirthCreditV3.State.RESERVED
+                    && original.state() != M5ObjectBirthCreditV3.State.WRITE_ARMED) {
+                if (!original.equals(candidate)) {
+                    throw new IllegalStateException("birth terminal differs from the original assignment/no-dispatch");
+                }
+                return completed(birthResult(original));
+            }
+            var current = decode(captured);
+            if (hasPending(current)) {
+                return recover(captured).thenApply(ignored -> BirthResult.RETRY);
+            }
+            if (actual.isEmpty()) {
+                return commit(captured, current.finishBirth(candidate, false))
+                        .thenCompose(ignored -> birth(key))
+                        .thenApply(value -> value.filter(candidate::equals).isPresent()
+                                ? BirthResult.CANCELLED_NO_DISPATCH
+                                : BirthResult.RETRY);
+            }
+            var resource = actual.orElseThrow();
+            return entry(resource).thenCompose(reserved -> {
+                if (reserved.filter(Entry::settled).isPresent()) {
+                    throw new IllegalStateException("birth cannot assign a permanently settled resource");
+                }
+                return authorities.read(resource.authorityKey()).thenCompose(authority -> {
+                    if (reserved.isEmpty() && authority.isPresent()) {
+                        throw new IllegalStateException("birth cannot import an unaccounted resource authority");
+                    }
+                    return commit(captured, current.finishBirth(candidate, reserved.isEmpty()))
+                            .thenCompose(ignored -> birth(key))
+                            .thenApply(value -> value.filter(candidate::equals).isPresent()
+                                    ? BirthResult.ASSIGNED
+                                    : BirthResult.RETRY);
+                });
+            });
+        }));
+    }
+
     private CompletionStage<Void> commit(VersionedValue captured, Head candidate) {
         layout.verify(candidate);
         return accounting
@@ -142,7 +296,7 @@ public final class M5GcQuotaCoordinatorV2 {
     private CompletionStage<Boolean> recover(VersionedValue captured) {
         var current = decode(captured);
         if (current.pending().isEmpty()) {
-            return CompletableFuture.completedFuture(true);
+            return recoverBirth(captured);
         }
         var pending = current.pending().orElseThrow();
         return accounting
@@ -191,8 +345,76 @@ public final class M5GcQuotaCoordinatorV2 {
                                     M5GcQuotaRecordsV2.HEAD_KEY,
                                     current.clearPending().encode())
                             .thenCompose(ignored -> head())
-                            .thenApply(observed -> decode(observed).pending().isEmpty());
+                            .thenCompose(observed ->
+                                    decode(observed).pending().isEmpty() ? recoverBirth(observed) : completed(false));
                 });
+    }
+
+    private CompletionStage<Boolean> recoverBirth(VersionedValue captured) {
+        var current = decode(captured);
+        var pending = current.births().flatMap(M5GcQuotaRecordsV2.Births::pending);
+        if (pending.isEmpty()) {
+            return completed(true);
+        }
+        var candidate = pending.orElseThrow();
+        return accounting.read(candidate.key()).thenCompose(previous -> {
+            if (previous.isPresent()) {
+                var stored = verifyBirth(previous.orElseThrow(), candidate.key());
+                if (!stored.equals(candidate) && !candidate.isSuccessorOf(stored)) {
+                    return completed(false); // Captured head cannot overwrite a different permanent terminal.
+                }
+            } else if (candidate.state() != M5ObjectBirthCreditV3.State.RESERVED) {
+                throw new IllegalStateException("birth terminal lost its original permanent grant");
+            }
+            var write = previous.filter(value -> value.canonicalStoredBytes().equals(candidate.encode()))
+                            .isPresent()
+                    ? CompletableFuture.completedFuture(ExactMetadataTransactionStoreV1.MutationOutcome.APPLIED_EXACT)
+                    : accounting.compareAndSet(previous, candidate.key(), candidate.encode());
+            return write.thenCompose(ignored -> birth(candidate.key())).thenCompose(observed -> {
+                if (observed.filter(candidate::equals).isEmpty()) {
+                    return completed(false);
+                }
+                return accounting
+                        .compareAndSet(
+                                Optional.of(captured),
+                                M5GcQuotaRecordsV2.HEAD_KEY,
+                                current.clearPendingBirth().encode())
+                        .thenCompose(ignored -> head())
+                        .thenApply(after -> !hasPending(decode(after)));
+            });
+        });
+    }
+
+    private CompletionStage<Optional<M5ObjectBirthCreditV3>> birth(String key) {
+        if (!key.matches(M5ObjectBirthCreditV3.PREFIX + "[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid permanent Object birth credit key");
+        }
+        return accounting.read(key).thenApply(value -> value.map(stored -> verifyBirth(stored, key)));
+    }
+
+    private M5ObjectBirthCreditV3 verifyBirth(VersionedValue stored, String key) {
+        var credit = M5ObjectBirthCreditV3.decode(stored.canonicalStoredBytes());
+        if (!stored.key().equals(key)
+                || !credit.key().equals(key)
+                || !credit.scope().equals(layout.scope())) {
+            throw new IllegalArgumentException("birth credit scope/key differs from the original namespace");
+        }
+        credit.resource().ifPresent(layout::requireResource);
+        return credit;
+    }
+
+    private static boolean hasPending(Head head) {
+        return head.pending().isPresent()
+                || head.births().flatMap(M5GcQuotaRecordsV2.Births::pending).isPresent();
+    }
+
+    private static BirthResult birthResult(M5ObjectBirthCreditV3 value) {
+        return switch (value.state()) {
+            case RESERVED -> BirthResult.RESERVED;
+            case ASSIGNED -> BirthResult.ASSIGNED;
+            case CANCELLED_NO_DISPATCH -> BirthResult.CANCELLED_NO_DISPATCH;
+            case WRITE_ARMED -> BirthResult.WRITE_ARMED;
+        };
     }
 
     private CompletionStage<Boolean> writeEntry(Optional<VersionedValue> previous, Entry candidate) {
@@ -253,7 +475,7 @@ public final class M5GcQuotaCoordinatorV2 {
         return head;
     }
 
-    private static CompletionStage<Result> completed(Result result) {
+    private static <T> CompletionStage<T> completed(T result) {
         return CompletableFuture.completedFuture(result);
     }
 }

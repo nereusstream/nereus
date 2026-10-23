@@ -38,6 +38,8 @@ public final class RealBookKeeperClientConfigurationV1 {
         ClientConfiguration configuration = new ClientConfiguration();
         configuration.setMetadataServiceUri(metadataServiceUri);
         configuration.setUseV2WireProtocol(false);
+        // BK 4.18 batch read requests are available only on v2; v3 uses the SDK range-read fallback.
+        configuration.setBatchReadEnabled(false);
         configuration.setPreserveMdcForTaskExecution(false);
         configuration.setClientConnectTimeoutMillis(exactInt(timeouts.connectMillis(), "connect timeout"));
         configuration.setAddEntryTimeout(exactSeconds(timeouts.addMillis(), "add timeout"));

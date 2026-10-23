@@ -44,6 +44,10 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             return stored;
         }
         CanonicalBytes exact = stored.orElseThrow();
+        if (M5BindingBootstrapV1.isBootstrap(exact)) {
+            M5BindingBootstrapV1.decode(exact);
+            return Optional.empty();
+        }
         if (!M5BindingAuthorityCodecV1.isAuthorityValue(exact)) {
             M4ReadControlCodecV1.decodeSelector(exact);
             return stored;
@@ -59,9 +63,7 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             return delegate.putIfAbsent(key, exactValue);
         }
         BindingReadSelector selector = M4ReadControlCodecV1.decodeSelector(exactValue);
-        CanonicalBytes authority =
-                M5BindingAuthorityCodecV1.encodeAuthority(M5BindingAuthorityCodecV1.initial(selector));
-        return delegate.putIfAbsent(key, authority);
+        return createSelector(key, selector, true);
     }
 
     @Override
@@ -73,10 +75,7 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
         Optional<CanonicalBytes> expected = Objects.requireNonNull(exactExpected, "exactExpected");
         BindingReadSelector candidate = M4ReadControlCodecV1.decodeSelector(exactCandidate);
         if (expected.isEmpty()) {
-            return delegate.compareAndSet(
-                    key,
-                    Optional.empty(),
-                    M5BindingAuthorityCodecV1.encodeAuthority(M5BindingAuthorityCodecV1.initial(candidate)));
+            return createSelector(key, candidate, false);
         }
         BindingReadSelector expectedSelector = M4ReadControlCodecV1.decodeSelector(expected.orElseThrow());
         Optional<CanonicalBytes> raw = delegate.get(key);
@@ -84,6 +83,9 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             return ControlMutationOutcome.DEFINITIVE_CONFLICT;
         }
         CanonicalBytes rawExpected = raw.orElseThrow();
+        if (M5BindingBootstrapV1.isBootstrap(rawExpected)) {
+            return ControlMutationOutcome.DEFINITIVE_CONFLICT;
+        }
         BindingReadSelector currentProjection = M5BindingAuthorityCodecV1.projectSelector(rawExpected);
         if (!currentProjection.equals(expectedSelector)) {
             return ControlMutationOutcome.DEFINITIVE_CONFLICT;
@@ -109,6 +111,9 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
         BindingRetirementAuthorityV1 projected;
         if (raw.isEmpty()) {
             projected = M5BindingAuthorityCodecV1.initial(candidate);
+        } else if (M5BindingBootstrapV1.isBootstrap(raw.orElseThrow())) {
+            projected = M5BindingAuthorityCodecV1.activateBootstrap(
+                    M5BindingBootstrapV1.decode(raw.orElseThrow()), candidate);
         } else if (M5BindingAuthorityCodecV1.isAuthorityValue(raw.orElseThrow())) {
             BindingRetirementAuthorityV1 current = M5BindingAuthorityCodecV1.decodeAuthority(raw.orElseThrow());
             if (current.state() == M5BindingAuthorityRecordsV1.BindingAuthorityStateV1.REFERENCE_SCAN_FENCED_V1) {
@@ -119,6 +124,20 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             projected = M5BindingAuthorityCodecV1.migrateLegacyWithSuccessor(raw.orElseThrow(), candidate);
         }
         M5BindingAuthorityCodecV1.encodeAuthority(projected);
+    }
+
+    private ControlMutationOutcome createSelector(String key, BindingReadSelector selector, boolean createOnly) {
+        Optional<CanonicalBytes> raw = delegate.get(key);
+        if (raw.filter(M5BindingBootstrapV1::isBootstrap).isPresent()) {
+            var bootstrap = M5BindingBootstrapV1.decode(raw.orElseThrow());
+            var activated = M5BindingAuthorityCodecV1.encodeAuthority(
+                    M5BindingAuthorityCodecV1.activateBootstrap(bootstrap, selector));
+            return delegate.compareAndSet(key, raw, activated);
+        }
+        var authority = M5BindingAuthorityCodecV1.encodeAuthority(M5BindingAuthorityCodecV1.initial(selector));
+        return createOnly
+                ? delegate.putIfAbsent(key, authority)
+                : delegate.compareAndSet(key, Optional.empty(), authority);
     }
 
     private BindingRetirementAuthorityV1 selectorSuccessor(

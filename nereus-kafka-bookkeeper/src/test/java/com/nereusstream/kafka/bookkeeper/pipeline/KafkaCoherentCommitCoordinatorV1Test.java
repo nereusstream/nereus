@@ -15,12 +15,17 @@
 package com.nereusstream.kafka.bookkeeper.pipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaRecoveryCheckpointVectorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentCommitCoordinatorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolAppendPlanV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolBatchDeltaV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionBatchKindV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecoveryStateCodecV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecoveryStateV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
@@ -244,6 +249,103 @@ class KafkaCoherentCommitCoordinatorV1Test {
         assertThat(old.committedProducerState().producers()).isEmpty();
         assertThat(context.coordinator.capture().root().frontiers().highWatermark())
                 .isEqualTo(200);
+    }
+
+    @Test
+    void recoveryCheckpointCaptureRejectsSeedsAndStaleRootsAndKeepsResolvedState() {
+        var context = context();
+        assertThatThrownBy(() -> context.coordinator.captureRecoveryCheckpoint(context.coordinator.capture()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unavailable");
+        var storage = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
+        context.pipeline
+                .submit(
+                        storage.request(),
+                        storage::assignment,
+                        context.coordinator.protocolHooks(
+                                plan(context.fence, batch(7, 0, KafkaTransactionBatchKindV1.NONE, -1))))
+                .toCompletableFuture()
+                .join();
+        var before = context.coordinator.capture();
+        var checkpoint = new KafkaProtocolCheckpointStateV1(
+                new KafkaRecoveryCheckpointVectorV1(context.lifecycle.snapshot().runBinding(), 101, 101, 101, 101),
+                before.committedProducerState(),
+                before.transactionState(),
+                before.leaderEpochIndex());
+        var next = KafkaBookKeeperRunLifecycleV1.createActive(
+                        new KafkaRunTestFixtures.FakeSession(),
+                        new KafkaRunTestFixtures.FakeRootAuthority(),
+                        KafkaRunTestFixtures.binding(7, 11, 5),
+                        101)
+                .toCompletableFuture()
+                .join();
+        context.coordinator.switchBookKeeperRun(
+                context.lifecycle.snapshot().handle(),
+                next.snapshot().handle(),
+                checkpoint,
+                KafkaRunTestFixtures.digest(90));
+        var resolved = context.coordinator.captureRecoveryCheckpoint(context.coordinator.capture());
+        assertThat(resolved).isSameAs(checkpoint);
+        var transferred = KafkaCompactionRecoveryStateV1.capture(context.coordinator.capture(), resolved);
+        var transferredBytes = transferred.encode();
+        assertThat(transferred.sourceCheckpointSha256())
+                .isEqualTo(context.coordinator
+                        .capture()
+                        .root()
+                        .references()
+                        .checkpointVector()
+                        .contentDigest());
+        assertThatThrownBy(() -> KafkaCompactionRecoveryStateV1.capture(before, resolved))
+                .hasMessageContaining("coherent checkpoint cut");
+        assertThat(resolved.producerState().findDuplicate(new KafkaBatchDuplicateIdentityV1(7, (short) 0, 0, 0)))
+                .hasValueSatisfying(result -> assertThat(result.startOffset()).isEqualTo(100));
+        assertThatThrownBy(() -> context.coordinator.captureRecoveryCheckpoint(before))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("superseded");
+        assertThat(KafkaCompactionRecoveryStateCodecV1.decode(transferredBytes)).isEqualTo(transferred);
+
+        var replacement = new KafkaProtocolCheckpointStateV1(
+                new KafkaRecoveryCheckpointVectorV1(next.snapshot().runBinding(), 101, 101, 101, 101),
+                resolved.producerState(),
+                resolved.transactionState(),
+                resolved.leaderEpochIndex());
+        var successor = KafkaBookKeeperRunLifecycleV1.createActive(
+                        new KafkaRunTestFixtures.FakeSession(),
+                        new KafkaRunTestFixtures.FakeRootAuthority(),
+                        KafkaRunTestFixtures.binding(8, 11, 5),
+                        101)
+                .toCompletableFuture()
+                .join();
+        context.coordinator.switchBookKeeperRun(
+                next.snapshot().handle(), successor.snapshot().handle(), replacement, KafkaRunTestFixtures.digest(91));
+        assertThat(context.coordinator.captureRecoveryCheckpoint(context.coordinator.capture()))
+                .isSameAs(replacement);
+        assertThat(resolved).isEqualTo(checkpoint);
+        assertThat(resolved.vector().runBinding().runId())
+                .isEqualTo(context.lifecycle.snapshot().runBinding().runId());
+        var current = context.coordinator.capture();
+        var transfer = new KafkaProtocolCheckpointStateV1(
+                replacement.vector(),
+                replacement.producerState(),
+                replacement.transactionState(),
+                replacement.leaderEpochIndex());
+        var regressed = new KafkaProtocolCheckpointStateV1(
+                new KafkaRecoveryCheckpointVectorV1(replacement.vector().runBinding(), 100, 100, 100, 100),
+                com.nereusstream.kafka.bookkeeper.commit.KafkaCommittedProducerStateV1.empty(),
+                replacement.transactionState(),
+                com.nereusstream.kafka.bookkeeper.commit.KafkaLeaderEpochIndexV1.empty());
+        assertThatThrownBy(
+                        () -> context.coordinator.retireBookKeeperSources(regressed, KafkaRunTestFixtures.digest(92)))
+                .hasMessageContaining("exact protocol checkpoint");
+        assertThat(context.coordinator.capture().root()).isEqualTo(current.root());
+        context.coordinator.retireBookKeeperSources(transfer, KafkaRunTestFixtures.digest(92));
+        var selected = context.coordinator.capture();
+        assertThat(selected.root().frontiers()).isEqualTo(current.root().frontiers());
+        assertThat(selected.activeTail()).isEqualTo(current.activeTail());
+        assertThat(selected.committedProducerState()).isEqualTo(current.committedProducerState());
+        assertThat(selected.transactionState()).isEqualTo(current.transactionState());
+        assertThat(selected.leaderEpochIndex()).isEqualTo(current.leaderEpochIndex());
+        assertThat(context.coordinator.captureRecoveryCheckpoint(selected)).isEqualTo(transfer);
     }
 
     @Test

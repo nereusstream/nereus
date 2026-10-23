@@ -17,12 +17,12 @@ package com.nereusstream.kafka.bookkeeper.read;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import java.util.Objects;
 
-/** One validated complete protocol-native RecordBatch returned without splitting or storage filtering. */
+/** One validated complete RecordBatch; entryId is the actual first carrier entry (including KBSC entry zero). */
 public record KafkaBookKeeperReadBatchV1(
         long startOffset, long endOffsetExclusive, long entryId, CanonicalBytes rawAssignedRecordBatch) {
     public KafkaBookKeeperReadBatchV1 {
         Objects.requireNonNull(rawAssignedRecordBatch, "rawAssignedRecordBatch");
-        if (startOffset < 0 || endOffsetExclusive <= startOffset || entryId <= 0 || rawAssignedRecordBatch.isEmpty()) {
+        if (startOffset < 0 || endOffsetExclusive <= startOffset || entryId < 0 || rawAssignedRecordBatch.isEmpty()) {
             throw new IllegalArgumentException("read batch is outside its domain");
         }
     }

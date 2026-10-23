@@ -110,8 +110,8 @@ for module, task, name, count in (
     ("nereus-storage-object", "v2M5PermanentDoneTest", "com.nereusstream.storage.object.gc.M5PermanentDoneV2Test", 9),
     ("nereus-metadata-oxia", "v2M5TargetDeleteRouteTest", "com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2Test", 4),
     ("nereus-metadata-oxia", "v2M5PermanentDoneRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5PermanentDoneOxiaIntegrationTest", 4),
-    ("nereus-storage-object", "v2M5GcQuotaTest", "com.nereusstream.storage.object.gc.M5GcQuotaV2Test", 9),
-    ("nereus-metadata-oxia", "v2M5GcQuotaRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaIntegrationTest", 8),
+    ("nereus-storage-object", "v2M5GcQuotaTest", "com.nereusstream.storage.object.gc.M5GcQuotaV2Test", 14),
+    ("nereus-metadata-oxia", "v2M5GcQuotaRealOxiaTest", "com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaIntegrationTest", 13),
     ("nereus-metadata-oxia", "v2M5GcQuotaOxiaRestartWriteTest", "com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaRestartTest", 1),
     ("nereus-metadata-oxia", "v2M5GcQuotaOxiaRestartReadTest", "com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaRestartTest", 1),
 ):

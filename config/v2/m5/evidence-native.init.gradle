@@ -1,0 +1,130 @@
+settingsEvaluated { settings ->
+    if (settings.rootProject.name == 'pulsar' && System.getProperty('nereus.m5.evidenceMavenRepository') != null) {
+        // Plugin Portal terminates the TLS transfer for this fixed artifact in the current environment.
+        // Resolve the identical published coordinate from its original Maven Central repository.
+        settings.pluginManagement.repositories.exclusiveContent {
+            forRepository {
+                settings.pluginManagement.repositories.maven {
+                    name = 'm5LightprotoCentral'
+                    url = uri('https://repo.maven.apache.org/maven2')
+                }
+            }
+            filter {
+                includeVersion('io.streamnative.lightproto', 'lightproto-code-generator', '0.7.3')
+            }
+        }
+        settings.dependencyResolutionManagement.repositories.exclusiveContent {
+            forRepository {
+                settings.dependencyResolutionManagement.repositories.maven {
+                    name = 'm5VerifiedAntLocal'
+                    url = uri(System.getProperty('nereus.m5.evidenceMavenRepository'))
+                }
+            }
+            filter {
+                includeVersion('org.apache.ant', 'ant', '1.10.12')
+                includeVersion('org.apache.ant', 'ant-launcher', '1.10.12')
+                includeVersion('org.apache.ant', 'ant-parent', '1.10.12')
+                includeVersion('org.awaitility', 'awaitility', '4.2.0')
+                includeVersion('io.dropwizard.metrics', 'metrics-core', '4.1.12.1')
+                includeVersion('org.hamcrest', 'hamcrest', '2.2')
+                includeVersion('org.awaitility', 'awaitility-parent', '4.2.0')
+                includeVersion('io.dropwizard.metrics', 'metrics-parent', '4.1.12.1')
+                includeVersion('org.sonatype.oss', 'oss-parent', '9')
+            }
+        }
+        settings.dependencyResolutionManagement.repositories.exclusiveContent {
+            forRepository {
+                settings.dependencyResolutionManagement.repositories.maven {
+                    name = 'm5VerifiedSdkTestingLocal'
+                    url = uri(System.getProperty('nereus.m5.evidenceSdkTestingRepository'))
+                }
+            }
+            filter {
+                includeVersion('io.opentelemetry', 'opentelemetry-sdk-testing', '1.62.0')
+                includeVersion('com.google.api.grpc', 'proto-google-common-protos', '2.63.2')
+                includeVersion('com.google.protobuf', 'protobuf-java-util', '4.35.0')
+                includeVersion('com.google.protobuf', 'protobuf-parent', '4.35.0')
+                includeVersion('com.google.protobuf', 'protobuf-bom', '4.35.0')
+                includeVersion('com.squareup.okio', 'okio-jvm', '3.17.0')
+                includeVersion('io.grpc', 'grpc-api', '1.79.0')
+                includeVersion('io.grpc', 'grpc-context', '1.79.0')
+                includeVersion('io.grpc', 'grpc-core', '1.79.0')
+                includeVersion('io.grpc', 'grpc-netty-shaded', '1.79.0')
+                includeVersion('io.grpc', 'grpc-protobuf', '1.79.0')
+                includeVersion('io.grpc', 'grpc-protobuf-lite', '1.79.0')
+                includeVersion('io.grpc', 'grpc-services', '1.79.0')
+                includeVersion('io.grpc', 'grpc-stub', '1.79.0')
+                includeVersion('io.grpc', 'grpc-util', '1.79.0')
+                includeVersion('io.opentelemetry', 'opentelemetry-exporter-common', '1.62.0')
+                includeVersion('io.opentelemetry', 'opentelemetry-exporter-otlp-common', '1.62.0')
+                includeVersion('io.opentelemetry', 'opentelemetry-exporter-sender-okhttp', '1.62.0')
+                includeVersion('org.codehaus.mojo', 'animal-sniffer-annotations', '1.26')
+                includeVersion('org.codehaus.mojo', 'animal-sniffer-parent', '1.26')
+                includeVersion('org.codehaus.mojo', 'mojo-parent', '94')
+            }
+        }
+    }
+}
+
+// Exact method identities and observed class origins for the explicitly invoked M5 evidence run.
+gradle.allprojects { project ->
+    project.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach { test ->
+        if (System.getProperty('nereus.m5.evidenceMethodNames') == 'true' && !test.name.startsWith('v2M4')) {
+            test.systemProperty('junit.jupiter.params.displayname.default', '{displayName} [{index}] {arguments}')
+        }
+        def destination = System.getProperty('nereus.m5.evidenceClassLogDirectory')
+        if (destination != null) {
+            test.doFirst {
+                def directory = new File(destination)
+                directory.mkdirs()
+                def label = project.path.replace(':', '_') + '-' + test.name + '-%p.log'
+                test.jvmArgs('-Xlog:class+load=info:file=' + new File(directory, label).absolutePath)
+            }
+        }
+    }
+}
+
+// Resolve only the existing campaign's test classpaths, in each configuration's owning project.
+// Capturing inputs executes no tests and does not resolve another project's configuration in a task.
+gradle.projectsEvaluated {
+    def target = System.getProperty('nereus.m5.captureRuntimeManifest')
+    if (target != null) {
+        def modules = ['nereus-storage-api', 'nereus-storage-object', 'nereus-storage-object-s3',
+                       'nereus-storage-bookkeeper', 'nereus-kafka-bookkeeper', 'nereus-metadata-oxia',
+                       'nereus-pulsar-offload', 'managed-ledger', 'core']
+        def projects = gradle.rootProject.allprojects.findAll { modules.contains(it.name) }
+        projects.each { project ->
+            project.tasks.register('m5CaptureRuntimeInputs') {
+                doLast {
+                    def paths = new TreeMap<String, String>()
+                    project.tasks.withType(org.gradle.api.tasks.testing.Test).findAll { test ->
+                        if (project.name == 'core') return test.name == 'nereusBookKeeperM4AdmissionRealTest'
+                        if (project.name == 'managed-ledger') return test.name == 'test'
+                        return test.name == 'test' || test.name.startsWith('v2M5') ||
+                            test.name.startsWith('v2M4') || test.name == 'nsip1ObjectAuthorizationRealTest'
+                    }.each { test ->
+                        test.classpath.files.each { input ->
+                            def files = input.isDirectory() ? project.fileTree(input).files : [input]
+                            files.findAll { it.isFile() }.each { file ->
+                                def digest = java.security.MessageDigest.getInstance('SHA-256')
+                                file.withInputStream { stream ->
+                                    byte[] buffer = new byte[65536]
+                                    int size
+                                    while ((size = stream.read(buffer)) != -1) digest.update(buffer, 0, size)
+                                }
+                                paths[file.absolutePath] = digest.digest().encodeHex().toString()
+                            }
+                        }
+                    }
+                    def destination = new File(target + '-' + gradle.rootProject.name + '-' + project.name + '.json')
+                    if (destination.exists()) throw new GradleException('Runtime manifest already exists')
+                    destination.parentFile.mkdirs()
+                    destination.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(paths)) + '\n'
+                }
+            }
+        }
+        gradle.rootProject.tasks.register('m5CaptureRuntimeInputs') {
+            dependsOn(projects.collect { it.path + ':m5CaptureRuntimeInputs' })
+        }
+    }
+}

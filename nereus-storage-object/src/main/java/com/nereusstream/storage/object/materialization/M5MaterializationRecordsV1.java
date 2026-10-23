@@ -47,7 +47,8 @@ public final class M5MaterializationRecordsV1 {
         BOOKKEEPER_LEDGER,
         PULSAR_NPD1_DATA,
         PULSAR_NPO1_ROOT,
-        KAFKA_BK_COMPACTED_GENERATION_V2
+        KAFKA_BK_COMPACTED_GENERATION_V2,
+        PULSAR_NMS1_DATA_V2
     }
 
     public enum RepresentationMode {
@@ -113,22 +114,133 @@ public final class M5MaterializationRecordsV1 {
     }
 
     /** Typed inclusive/exclusive protocol coverage. */
-    public record ProtocolCoverage(PositionDomain domain, long inclusiveStart, long exclusiveEnd) {
+    public record ProtocolCoverage(
+            PositionDomain domain,
+            long inclusiveStart,
+            long exclusiveEnd,
+            Optional<M5PulsarCoverageV2> pulsarCoverage) {
+        public ProtocolCoverage(PositionDomain domain, long inclusiveStart, long exclusiveEnd) {
+            this(domain, inclusiveStart, exclusiveEnd, Optional.empty());
+        }
+
         public ProtocolCoverage {
             Objects.requireNonNull(domain, "domain");
-            if (inclusiveStart < 0 || exclusiveEnd <= inclusiveStart) {
+            Objects.requireNonNull(pulsarCoverage, "pulsarCoverage");
+            if (pulsarCoverage.isPresent()) {
+                if (domain != PositionDomain.PULSAR_ENTRY || inclusiveStart != -1 || exclusiveEnd != -1) {
+                    throw new IllegalArgumentException("typed Pulsar coverage cannot carry numeric offset endpoints");
+                }
+            } else if (inclusiveStart < 0 || exclusiveEnd <= inclusiveStart) {
                 throw new IllegalArgumentException("protocol coverage is empty or reversed");
             }
         }
 
+        public static ProtocolCoverage pulsar(M5PulsarCoverageV2 value) {
+            return new ProtocolCoverage(PositionDomain.PULSAR_ENTRY, -1, -1, Optional.of(value));
+        }
+
+        public boolean typedPulsar() {
+            return pulsarCoverage.isPresent();
+        }
+
+        @Override
+        public long inclusiveStart() {
+            requireScalar();
+            return inclusiveStart;
+        }
+
+        @Override
+        public long exclusiveEnd() {
+            requireScalar();
+            return exclusiveEnd;
+        }
+
+        public void requireCurrentPulsar() {
+            if (domain == PositionDomain.PULSAR_ENTRY && !typedPulsar()) {
+                throw new IllegalArgumentException("legacy single-long Pulsar coverage has no qualified ledger chain");
+            }
+        }
+
+        private void requireScalar() {
+            if (typedPulsar()) {
+                throw new IllegalStateException("Pulsar coverage requires ledger-keyed positions");
+            }
+        }
+
+        public long entryCount() {
+            return typedPulsar()
+                    ? pulsarCoverage.orElseThrow().entryCount()
+                    : Math.subtractExact(exclusiveEnd, inclusiveStart);
+        }
+
         public boolean contains(ProtocolCoverage other) {
+            if (typedPulsar() || other.typedPulsar()) {
+                return typedPulsar()
+                        && other.typedPulsar()
+                        && pulsarCoverage.orElseThrow().contains(other.pulsarCoverage.orElseThrow());
+            }
             return domain == other.domain
                     && inclusiveStart <= other.inclusiveStart
                     && exclusiveEnd >= other.exclusiveEnd;
         }
 
         public boolean adjacentTo(ProtocolCoverage other) {
+            if (typedPulsar() || other.typedPulsar()) {
+                return typedPulsar()
+                        && other.typedPulsar()
+                        && pulsarCoverage.orElseThrow().adjacentTo(other.pulsarCoverage.orElseThrow());
+            }
             return domain == other.domain && exclusiveEnd == other.inclusiveStart;
+        }
+
+        public int compareStart(ProtocolCoverage other) {
+            if (typedPulsar() || other.typedPulsar()) {
+                requireSamePulsarChain(other);
+                return pulsarCoverage
+                        .orElseThrow()
+                        .compare(
+                                pulsarCoverage.orElseThrow().firstPosition(),
+                                other.pulsarCoverage.orElseThrow().firstPosition());
+            }
+            if (domain != other.domain) {
+                throw new IllegalArgumentException("coverage position domains differ");
+            }
+            return Long.compare(inclusiveStart, other.inclusiveStart);
+        }
+
+        public boolean sameStart(ProtocolCoverage other) {
+            return sameContext(other)
+                    && (typedPulsar()
+                            ? pulsarCoverage
+                                    .orElseThrow()
+                                    .firstPosition()
+                                    .equals(other.pulsarCoverage.orElseThrow().firstPosition())
+                            : inclusiveStart == other.inclusiveStart);
+        }
+
+        public boolean sameEnd(ProtocolCoverage other) {
+            return sameContext(other)
+                    && (typedPulsar()
+                            ? pulsarCoverage
+                                    .orElseThrow()
+                                    .endPosition()
+                                    .equals(other.pulsarCoverage.orElseThrow().endPosition())
+                            : exclusiveEnd == other.exclusiveEnd);
+        }
+
+        private boolean sameContext(ProtocolCoverage other) {
+            return domain == other.domain
+                    && (typedPulsar() || other.typedPulsar()
+                            ? typedPulsar()
+                                    && other.typedPulsar()
+                                    && pulsarCoverage.orElseThrow().sameChain(other.pulsarCoverage.orElseThrow())
+                            : true);
+        }
+
+        private void requireSamePulsarChain(ProtocolCoverage other) {
+            if (!sameContext(other)) {
+                throw new IllegalArgumentException("Pulsar coverage chain contexts differ");
+            }
         }
     }
 
@@ -149,7 +261,45 @@ public final class M5MaterializationRecordsV1 {
             Sha256Digest encryptionPolicySha256,
             boolean payloadLongLivedReadable,
             boolean requiredIndexesPresent,
-            List<Sha256Digest> memberBindingIds) {
+            List<Sha256Digest> memberBindingIds,
+            Optional<Sha256Digest> pulsarEntryRootSha256) {
+        public SourceExtent(
+                SourceKind kind,
+                Sha256Digest sourceIdentitySha256,
+                ProtocolCoverage coverage,
+                String physicalKey,
+                long canonicalLength,
+                int recordCount,
+                long minimumTimestamp,
+                long maximumTimestamp,
+                Sha256Digest bodySha256,
+                Optional<CanonicalBytes> immutableProviderVersionToken,
+                Optional<Sha256Digest> ledgerIdentitySha256,
+                Sha256Digest formatRootSha256,
+                Sha256Digest encryptionPolicySha256,
+                boolean payloadLongLivedReadable,
+                boolean requiredIndexesPresent,
+                List<Sha256Digest> memberBindingIds) {
+            this(
+                    kind,
+                    sourceIdentitySha256,
+                    coverage,
+                    physicalKey,
+                    canonicalLength,
+                    recordCount,
+                    minimumTimestamp,
+                    maximumTimestamp,
+                    bodySha256,
+                    immutableProviderVersionToken,
+                    ledgerIdentitySha256,
+                    formatRootSha256,
+                    encryptionPolicySha256,
+                    payloadLongLivedReadable,
+                    requiredIndexesPresent,
+                    memberBindingIds,
+                    Optional.empty());
+        }
+
         public SourceExtent {
             Objects.requireNonNull(kind, "kind");
             requireDigest(sourceIdentitySha256, "sourceIdentitySha256");
@@ -170,11 +320,26 @@ public final class M5MaterializationRecordsV1 {
             requireDigest(formatRootSha256, "formatRootSha256");
             requireDigest(encryptionPolicySha256, "encryptionPolicySha256");
             memberBindingIds = sortedUniqueDigests(memberBindingIds, MAX_MEMBER_BINDINGS, "memberBindingIds");
+            pulsarEntryRootSha256 = optionalDigest(pulsarEntryRootSha256, "pulsarEntryRootSha256");
+            if (coverage.typedPulsar()) {
+                if (pulsarEntryRootSha256.isEmpty() || recordCount != coverage.entryCount()) {
+                    throw new IllegalArgumentException("Pulsar source lacks its exact entry count/root");
+                }
+            } else if (pulsarEntryRootSha256.isPresent()) {
+                throw new IllegalArgumentException("entry root requires ledger-keyed Pulsar coverage");
+            }
             if (kind == SourceKind.BOOKKEEPER_LEDGER && ledgerIdentitySha256.isEmpty()) {
                 throw new IllegalArgumentException("BookKeeper source lacks a ledger identity");
             }
             if (kind != SourceKind.BOOKKEEPER_LEDGER && ledgerIdentitySha256.isPresent()) {
                 throw new IllegalArgumentException("non-BookKeeper source carries a ledger identity");
+            }
+            if (kind == SourceKind.PULSAR_NMS1_DATA_V2
+                    && (!coverage.typedPulsar()
+                            || immutableProviderVersionToken.isEmpty()
+                            || !payloadLongLivedReadable
+                            || memberBindingIds.size() != 1)) {
+                throw new IllegalArgumentException("Pulsar NMS1 source requires exact typed single-Binding output");
             }
             if (kind == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2
                     && (coverage.domain() != PositionDomain.KAFKA_OFFSET
@@ -208,7 +373,45 @@ public final class M5MaterializationRecordsV1 {
             Sha256Digest materializationPolicySha256,
             Sha256Digest outputFormatPolicySha256,
             Sha256Digest sourceSetSha256,
-            List<SourceExtent> sources) {
+            List<SourceExtent> sources,
+            Optional<M5PulsarFrontiersV2> pulsarFrontiers) {
+        public MaterializationSourceCut(
+                IdentityEnvelope identity,
+                BindingReadSelector predecessorSelector,
+                Sha256Digest predecessorSelectorValueSha256,
+                Sha256Digest predecessorViewSha256,
+                ProtocolCoverage coverage,
+                long durableFrontier,
+                long logEndFrontier,
+                long highWatermark,
+                long lastStableFrontier,
+                long trimFrontier,
+                Sha256Digest protocolStateRootSha256,
+                Sha256Digest recoveryCheckpointRootSha256,
+                Sha256Digest materializationPolicySha256,
+                Sha256Digest outputFormatPolicySha256,
+                Sha256Digest sourceSetSha256,
+                List<SourceExtent> sources) {
+            this(
+                    identity,
+                    predecessorSelector,
+                    predecessorSelectorValueSha256,
+                    predecessorViewSha256,
+                    coverage,
+                    durableFrontier,
+                    logEndFrontier,
+                    highWatermark,
+                    lastStableFrontier,
+                    trimFrontier,
+                    protocolStateRootSha256,
+                    recoveryCheckpointRootSha256,
+                    materializationPolicySha256,
+                    outputFormatPolicySha256,
+                    sourceSetSha256,
+                    sources,
+                    Optional.empty());
+        }
+
         public MaterializationSourceCut {
             Objects.requireNonNull(identity, "identity");
             Objects.requireNonNull(predecessorSelector, "predecessorSelector");
@@ -229,8 +432,29 @@ public final class M5MaterializationRecordsV1 {
                     || !predecessorViewSha256.equals(predecessorSelector.selectedViewSha256())) {
                 throw new IllegalArgumentException("source cut predecessor authority differs");
             }
-            requireFrontiers(
-                    coverage, durableFrontier, logEndFrontier, highWatermark, lastStableFrontier, trimFrontier);
+            Objects.requireNonNull(pulsarFrontiers, "pulsarFrontiers");
+            if (coverage.typedPulsar()) {
+                if (!identity.binding()
+                                .equals(coverage.pulsarCoverage().orElseThrow().binding())
+                        || pulsarFrontiers.isEmpty()
+                        || durableFrontier != -1
+                        || logEndFrontier != -1
+                        || highWatermark != -1
+                        || lastStableFrontier != -1
+                        || trimFrontier != -1) {
+                    throw new IllegalArgumentException(
+                            "Pulsar cut requires its own Binding/frontiers, without Kafka scalars");
+                }
+                pulsarFrontiers
+                        .orElseThrow()
+                        .requireCut(coverage.pulsarCoverage().orElseThrow());
+            } else {
+                if (pulsarFrontiers.isPresent()) {
+                    throw new IllegalArgumentException("Pulsar frontiers require typed coverage");
+                }
+                requireFrontiers(
+                        coverage, durableFrontier, logEndFrontier, highWatermark, lastStableFrontier, trimFrontier);
+            }
             requireExactCoverage(coverage, sources);
         }
     }
@@ -263,8 +487,8 @@ public final class M5MaterializationRecordsV1 {
         public IndexPlan {
             Objects.requireNonNull(kind, "kind");
             Objects.requireNonNull(coverage, "coverage");
-            if (parserVersion != 1) {
-                throw new IllegalArgumentException("only the frozen M5 index parser v1 is admitted");
+            if (parserVersion != (coverage.typedPulsar() ? 2 : 1)) {
+                throw new IllegalArgumentException("M5 index parser version differs from its coverage");
             }
             requireDigest(canonicalPlanSha256, "canonicalPlanSha256");
             requireText(objectKey, "objectKey");
@@ -399,6 +623,28 @@ public final class M5MaterializationRecordsV1 {
             if (sourceGeneration <= 0 || payloadObjects.isEmpty()) {
                 throw new IllegalArgumentException("materialized generation is empty");
             }
+            if (coverage.typedPulsar()) {
+                requirePulsarEnvelope(identity, coverage);
+                if (!payloadObjects.get(0).coverage().sameStart(coverage)
+                        || !payloadObjects
+                                .get(payloadObjects.size() - 1)
+                                .coverage()
+                                .sameEnd(coverage)) {
+                    throw new IllegalArgumentException("Pulsar generation does not cover its selected cut");
+                }
+                for (int index = 0; index < payloadObjects.size(); index++) {
+                    var part = payloadObjects.get(index);
+                    if (part.ordinal() != index
+                            || !coverage.contains(part.coverage())
+                            || index > 0
+                                    && !payloadObjects.get(index - 1).coverage().adjacentTo(part.coverage())) {
+                        throw new IllegalArgumentException("Pulsar generation payload mapping is incomplete");
+                    }
+                }
+                if (indexObjects.stream().anyMatch(value -> !coverage.contains(value.coverage()))) {
+                    throw new IllegalArgumentException("Pulsar generation index belongs to another context");
+                }
+            }
             if ((payloadKind == PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1) != semanticProofRootSha256.isPresent()) {
                 throw new IllegalArgumentException("Kafka compacted payload and semantic root disagree");
             }
@@ -419,6 +665,7 @@ public final class M5MaterializationRecordsV1 {
             requireDigest(exactPredecessorViewSha256, "exactPredecessorViewSha256");
             requireDigest(exactPredecessorSelectorValueSha256, "exactPredecessorSelectorValueSha256");
             Objects.requireNonNull(coverage, "coverage");
+            requirePulsarEnvelope(identity, coverage);
             compactionSuppressionRootSha256 =
                     Objects.requireNonNull(compactionSuppressionRootSha256, "compactionSuppressionRootSha256");
             compactionSuppressionRootSha256.ifPresent(value -> requireDigest(value, "compactionSuppressionRootSha256"));
@@ -477,13 +724,21 @@ public final class M5MaterializationRecordsV1 {
         }
     }
 
+    private static void requirePulsarEnvelope(IdentityEnvelope identity, ProtocolCoverage coverage) {
+        if (coverage.typedPulsar()
+                && !identity.binding()
+                        .equals(coverage.pulsarCoverage().orElseThrow().binding())) {
+            throw new IllegalArgumentException("Pulsar coverage belongs to another Binding/incarnation/storage epoch");
+        }
+    }
+
     private static void requireExactCoverage(ProtocolCoverage coverage, List<SourceExtent> sources) {
         List<SourceExtent> sorted = sources.stream()
-                .sorted(Comparator.comparingLong(value -> value.coverage().inclusiveStart()))
+                .sorted((left, right) -> left.coverage().compareStart(right.coverage()))
                 .toList();
         if (!sources.equals(sorted)
-                || sources.get(0).coverage().inclusiveStart() != coverage.inclusiveStart()
-                || sources.get(sources.size() - 1).coverage().exclusiveEnd() != coverage.exclusiveEnd()) {
+                || !sources.get(0).coverage().sameStart(coverage)
+                || !sources.get(sources.size() - 1).coverage().sameEnd(coverage)) {
             throw new IllegalArgumentException("source membership is not canonical exact coverage");
         }
         for (int index = 0; index < sources.size(); index++) {
@@ -497,8 +752,8 @@ public final class M5MaterializationRecordsV1 {
     }
 
     private static void requireExactPartCoverage(ProtocolCoverage coverage, List<OutputPartPlan> parts) {
-        if (parts.get(0).coverage().inclusiveStart() != coverage.inclusiveStart()
-                || parts.get(parts.size() - 1).coverage().exclusiveEnd() != coverage.exclusiveEnd()) {
+        if (!parts.get(0).coverage().sameStart(coverage)
+                || !parts.get(parts.size() - 1).coverage().sameEnd(coverage)) {
             throw new IllegalArgumentException("output parts do not cover the source cut");
         }
         for (int index = 0; index < parts.size(); index++) {

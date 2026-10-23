@@ -26,6 +26,7 @@ import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.domain.protocol.KafkaTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.KafkaTopicName;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperLedgerIdentity;
@@ -47,6 +48,7 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteDoneV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2;
 import com.nereusstream.storage.object.gc.SyntheticDeleteAuthorityFixturesV2;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -58,6 +60,121 @@ import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 
 class OxiaKafkaRunRootAuthorityV2Test {
+    @Test
+    void birthChoiceIsDurableBeforePhysicalAuthorityAndAdoptsTheNativeWinner() {
+        var f = new Fixture();
+        var first = root(1, 0, 0);
+        var competing = new KafkaRunRootSnapshotV1(
+                first.bindingId(),
+                first.topicIncarnation(),
+                first.partitionId(),
+                first.storageEpochId(),
+                first.creatorOwnerEpoch(),
+                first.kafkaLeaderEpoch(),
+                first.providerScopeId(),
+                first.runId(),
+                new BookKeeperLedgerIdentity(91),
+                first.kafkaStartOffset(),
+                first.kafkaEndOffsetExclusive(),
+                first.state(),
+                first.predecessorRunId());
+        f.admit();
+        f.client.loseAndBlock = f.roots.nativeRootKey(first.runId());
+
+        assertThat(join(f.roots.reserveRunBirth(first)).outcome()).isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        f.client.blockReads = false;
+        assertThat(join(f.roots.reserveRunBirth(competing)).exactProof()).contains(first);
+        assertThat(f.stored(first).root()).isEqualTo(first);
+        assertThat(join(f.roots.openRoot(first.runId()))).isEmpty();
+        assertThat(f.client.values).doesNotContainKey(f.record(first).resource().authorityKey());
+        assertThat(f.client.values)
+                .doesNotContainKey(f.record(competing).resource().authorityKey());
+        var closed = join(f.roots.closeOwner(owner())).exactProof().orElseThrow();
+        assertThat(join(f.authority().readRunBirths(closed))).contains(List.of(f.record(first)));
+        assertThat(join(f.authority().readAdmittedRun(f.record(first).initialLink())))
+                .isEmpty();
+    }
+
+    @Test
+    void selectedBirthRemainsInInventoryAfterOwnerClosure() {
+        var f = new Fixture();
+        var active = root(1, 0, 0);
+        f.admit(active);
+        var openFact = join(f.authority().readOwnerAdmissionFact()).orElseThrow();
+        assertThat(openFact.admission().closed()).isFalse();
+        assertThat(openFact.authority().valueSha256())
+                .isEqualTo(Sha256Digest.hash(openFact.admission().encode()));
+
+        assertThat(join(f.roots.reserveRunBirth(active)).exactProof()).contains(active);
+        assertThat(join(f.roots.createRoot(active)).exactProof()).contains(active);
+        var closed = join(f.roots.closeOwner(owner())).exactProof().orElseThrow();
+        var closedFact = join(f.authority().readOwnerAdmissionFact()).orElseThrow();
+        assertThat(closedFact.admission()).isEqualTo(closed);
+        assertThat(closedFact.authority().metadataVersion())
+                .isNotEqualTo(openFact.authority().metadataVersion());
+
+        assertThat(join(f.authority().readRunBirths(closed)))
+                .contains(List.of(f.record(active).admit()));
+        assertThat(join(f.authority().readAdmittedRun(f.record(active).initialLink())))
+                .contains(f.record(active).admit());
+    }
+
+    @Test
+    void closedBirthInventoryRejectsContradictoryParentAndRootAdoption() {
+        var f = new Fixture();
+        var parent = root(1, 0, 0);
+        var child = root(2, 1, 10);
+        f.admit(parent, child);
+        assertThat(join(f.roots.reserveRunBirth(parent)).exactProof()).contains(parent);
+        assertThat(join(f.roots.createRoot(parent)).exactProof()).contains(parent);
+        assertThat(join(f.roots.sealRoot(parent, sealed(parent, 10))).exactProof())
+                .contains(sealed(parent, 10));
+        assertThat(join(f.roots.reserveRunBirth(child)).exactProof()).contains(child);
+        var closed = join(f.roots.closeOwner(owner())).exactProof().orElseThrow();
+        assertThat(closed.runs()).containsExactly(f.record(parent).initialLink());
+        var exactParent = f.stored(parent);
+        var exactChild = f.stored(child);
+
+        f.client.put(
+                f.roots.nativeRootKey(parent.runId()),
+                exactParent.select(exactChild).encode());
+        assertThatThrownBy(() -> join(f.authority().readRunBirths(closed)))
+                .hasRootCauseMessage("unselected birth has a selected parent successor");
+
+        f.client.put(f.roots.nativeRootKey(parent.runId()), exactParent.encode());
+        f.client.put(f.roots.nativeRootKey(child.runId()), exactChild.admit().encode());
+        assertThatThrownBy(() -> join(f.authority().readRunBirths(closed)))
+                .hasRootCauseMessage("closed owner excluded an admitted run birth");
+
+        f.client.put(f.roots.nativeRootKey(child.runId()), exactChild.encode());
+        assertThat(join(f.authority().readRunBirths(closed))).contains(List.of(exactParent, exactChild));
+        var facts = join(f.authority().readRunBirthFacts(closed)).orElseThrow();
+        assertThat(facts.closedArchive())
+                .isEqualTo(fact(f.client.values.get(f.roots.nativeClosedOwnerKey(owner().ownerEpoch()))));
+        assertThat(facts.inventory())
+                .isEqualTo(fact(f.client.values.get(f.roots.nativeBirthInventoryKey(owner().ownerEpoch()))));
+        assertThat(facts.births()).hasSize(2);
+        assertThat(facts.births().get(1).record()).isEqualTo(exactChild);
+        assertThat(facts.births().get(1).root())
+                .isEqualTo(fact(f.client.values.get(f.roots.nativeRootKey(child.runId()))));
+        var parentFact = facts.births().get(1).parent().orElseThrow();
+        assertThat(parentFact).isEqualTo(fact(f.client.values.get(f.roots.nativeRootKey(parent.runId()))));
+        f.client.put(f.roots.nativeRootKey(parent.runId()), exactParent.encode());
+        var refreshedParent = join(f.authority().readRunBirthFacts(closed))
+                .orElseThrow()
+                .births()
+                .get(1)
+                .parent()
+                .orElseThrow();
+        assertThat(refreshedParent.valueSha256()).isEqualTo(parentFact.valueSha256());
+        assertThat(refreshedParent.metadataVersion()).isNotEqualTo(parentFact.metadataVersion());
+    }
+
+    private static AuthorityFactV1 fact(AuthorityRecord value) {
+        return new AuthorityFactV1(
+                value.key(), MetadataVersionMapper.fromOxia(value.versionId()), Sha256Digest.hash(value.storedBytes()));
+    }
+
     @Test
     void canonicalRecordsBindFullRootAndPermanentSuccessorWithoutChangingInitialIdentity() {
         var f = new Fixture();
@@ -75,6 +192,13 @@ class OxiaKafkaRunRootAuthorityV2Test {
         assertThatThrownBy(retired::admit).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(retired::retire).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> retired.select(child)).isInstanceOf(IllegalArgumentException.class);
+        var recovered = sealed.retire().selectRecoveredSuccessor(child);
+        assertThat(recovered).isEqualTo(retired);
+        assertThat(KafkaRunRootRecordV2.decode(recovered.encode())).isEqualTo(recovered);
+        assertThatThrownBy(recovered::admit).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> recovered.selectRecoveredSuccessor(f.record(root(3, 1, 10))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> sealed.selectRecoveredSuccessor(child)).isInstanceOf(IllegalStateException.class);
         assertThat(KafkaRunRootRecordV2.Link.decode(child.initialLink().encode()))
                 .isEqualTo(child.initialLink());
         assertThatThrownBy(() -> chosen.select(f.record(root(3, 1, 10)))).isInstanceOf(IllegalArgumentException.class);
@@ -239,6 +363,61 @@ class OxiaKafkaRunRootAuthorityV2Test {
                 .isEmpty();
         assertThat(f.tickets(a)).isZero();
         assertThat(f.tickets(b)).isZero();
+    }
+
+    @Test
+    void qualifiedRetiredAnchorPreservesDoneAndOriginalChildTicketsThroughLostReply() {
+        // Synthetic native qualification isolates transport behavior; the actual Broker must supply cold recovery.
+        var f = new Fixture();
+        var a = root(1, 0, 0);
+        f.admit(a);
+        join(f.roots.createRoot(a));
+        var sealed = sealed(a, 10);
+        join(f.roots.sealRoot(a, sealed));
+        var closed = join(f.roots.closeOwner(owner())).exactProof().orElseThrow();
+        var resource = f.record(a).resource();
+        var done = SyntheticDeleteAuthorityFixturesV2.phases(resource).get(3);
+        f.client.put(resource.authorityKey(), M5TargetDeleteDoneV2.from(done).encode());
+        assertThat(join(f.roots.retireDeletedRoot(sealed)).exactProof()).contains(sealed);
+        var permanentDone = f.client.values.get(resource.authorityKey());
+        var nextOwner = new KafkaOwnerIdentityV1(4, 3, 2, 9, 31);
+        assertThat(join(f.roots.openOwner(nextOwner, Optional.of(closed))).exactProof())
+                .isPresent();
+        var raw = root(2, 1, 10);
+        var b = new KafkaRunRootSnapshotV1(
+                raw.bindingId(),
+                raw.topicIncarnation(),
+                raw.partitionId(),
+                raw.storageEpochId(),
+                4,
+                3,
+                raw.providerScopeId(),
+                raw.runId(),
+                raw.ledgerIdentity(),
+                raw.kafkaStartOffset(),
+                raw.kafkaEndOffsetExclusive(),
+                raw.state(),
+                raw.predecessorRunId());
+        f.admit(b);
+        assertThat(join(f.roots.reserveRunBirth(b)).outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        f.permitRetired = true;
+        assertThat(join(f.roots.reserveRunBirth(b)).exactProof()).contains(b);
+        f.client.loseAndBlock = f.roots.nativeRootKey(a.runId());
+        assertThat(join(f.roots.createSuccessor(sealed, b)).outcome())
+                .isEqualTo(ProviderMutationOutcomeV1.OUTCOME_UNKNOWN);
+        assertThat(f.tickets(b)).isEqualTo(1);
+        assertThat(f.client.values.get(resource.authorityKey())).isEqualTo(permanentDone);
+        int verifications = f.verifications;
+        f.client.blockReads = false;
+        f.permitRetired = false;
+        assertThat(join(f.roots.createSuccessor(sealed, b)).exactProof()).contains(b);
+        assertThat(f.verifications).isEqualTo(verifications);
+        assertThat(f.tickets(b)).isZero();
+        assertThat(f.stored(a).retired()).isTrue();
+        assertThat(f.stored(a).successor()).contains(f.record(b).initialLink());
+        assertThat(join(f.roots.openRoot(a.runId()))).isEmpty();
+        assertThat(join(f.roots.openRoot(b.runId()))).contains(b);
+        assertThat(f.client.values.get(resource.authorityKey())).isEqualTo(permanentDone);
     }
 
     @Test
@@ -470,6 +649,7 @@ class OxiaKafkaRunRootAuthorityV2Test {
                 new M5TargetDeleteAuthorityCoordinatorV1(new Oxia09ExactMetadataTransactionStoreV1(client)));
         final OxiaKafkaRunRootAuthorityV2 roots = authority();
         int verifications;
+        boolean permitRetired;
 
         OxiaKafkaRunRootAuthorityV2 authority() {
             return new OxiaKafkaRunRootAuthorityV2(
@@ -485,6 +665,11 @@ class OxiaKafkaRunRootAuthorityV2Test {
                             assertThat(tickets(record.root())).isPositive();
                             verifications++;
                             return CompletableFuture.completedFuture(null);
+                        }
+
+                        public CompletionStage<Boolean> permitsRetiredSuccessor(
+                                KafkaRunRootRecordV2 parent, KafkaRunRootSnapshotV1 successor) {
+                            return CompletableFuture.completedFuture(permitRetired);
                         }
                     },
                     guard);
