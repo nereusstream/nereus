@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.nereusstream.storage.bookkeeper.BookKeeperDependencyBoundaryTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:48:38.260Z" hostname="liusinandeMacBook-Pro.local" time="0.035">
-  <properties/>
-  <testcase name="productionClasspathPinsBookKeeperAndExcludesProtocolAndMetadataRuntimes()" classname="com.nereusstream.storage.bookkeeper.BookKeeperDependencyBoundaryTest" time="0.028"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

@@ -1,24 +1,15 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: Verified
-evidenceStatus: CurrentSourceReceipt
+implementationStatus: InProgress
+evidenceStatus: FocusedOnly
 authority: NormativeDesignIndex
 sourceTuple: v2-m1
-receipt: docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json
 ---
 
 # Current M5 contracts and implementation
 
-## Current verified Final (2026-10-23)
-
-The current [commit-bound M5 Final](../../evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json) binds Nereus `a0ba94e01af07711abf00533be523b9216616738`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667` and Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8` to input `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`. All five stages pass566/1332/39/63/736, totaling2736 tests with zero failures/errors/skips. C4 verifies all17 obligations and five source-bound children. Native BK replacement/expiry include actual UNKNOWN reconciliation, real absence, D/Cell settlement, Native DONE and backlog; Object GC retains its separate evidence. Exactly14 scenarios are promoted; the three M6-deferred Kafka rows and V2-OPEN-READ-15 remain unchanged. This bounded result grants no production deployment, M6/M7/M8 or complete NSIP-1 acceptance.
-
-The final source input is `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`. COMPONENTS executes at this root; the four backend records retain their original `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` roots, times, commands and attachments. The reviewed governance-only input-equivalence proof and fresh historical six-contract verification bind those origins without rerunning or relabeling a backend.
-
-## Pre-Final execution history
-
-The following OPEN/current/focused statements describe their named earlier inputs only; they are not the current acceptance status.
+## Current C4 Native BookKeeper lifecycle closeout (2026-10-23)
 
 The reader-only successor input `3aa5c9c1c697f5cedf2951c9fa78927ef0cdd6b45ce85e0c193563ad6d72df1f`
 passes source-bound candidate validation and its fresh COMPONENTS566 execution. C4 initially rejected whole-M5

@@ -1,7 +1,0 @@
-owned_backend_ready nereus-m5-native-pulsar-green-complete-2049
-current_native_sdk_drain_capsule bb476681c6d0b189449e9cf6efb96c07a2426032ad8327738c33d5f38ca780f2
-current_native_bk_delete_sdk_drain_capsule 16b7456a806a698254cdb79ef60c2221be02524b514cf310bab6f1c3d7e822c6
-actual_gradle_exit 0 suites 35
-owned_cleanup_verified nereus-m5-native-pulsar-green-complete-2049
-
-M5_STAGE_EXIT stage=NATIVE_PULSAR code=0

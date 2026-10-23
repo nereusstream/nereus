@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:11.470Z" hostname="liusinandeMacBook-Pro.local" time="0.558">
-  <properties/>
-  <testcase name="typedEmptyGenerationRecompactsAsIndexesAndCannotEnterObjectMaterialization()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test" time="0.455"/>
-  <testcase name="selectedRecoverySharesDecodedCountAndByteLimitsAndAllowsIndexOnlyZeroBudget()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test" time="0.058"/>
-  <testcase name="generationCannotMasqueradeAsOneLedgerOrOmitIndexesAndNonemptyInputs()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test" time="0.035"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

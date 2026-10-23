@@ -9,11 +9,15 @@ sourceTuple: v2-m1
 
 # V2 open questions
 
-## M5 lifecycle execution obligations: verified
+## M5 lifecycle amendment implementation obligations
 
-ADR0148 and the [current contract view](detailed_design/m5/m5-current-contracts.md) are implemented and verified by the [current M5 Final](evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json):17 obligations, five children and2736 passing tests. The frozen writer/acceptance matrices preserve their original design-time OPEN records; they are not outstanding current M5 execution work.
+ADR 0148 resolves design selection for stable physical identity, replacement versus expiry, BK_ONLY compaction and
+protected retirement history. The [current contract view](detailed_design/m5/m5-current-contracts.md),
+[writer matrix](detailed_design/m5/m5-lifecycle-writer-matrix.md) and
+[acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json) track remaining implementation and evidence.
+These are OPEN execution obligations, not permission to defer M5 integration. Native activation remains M6, planned
+operational handoff M7 and scale/parity M8; no historical M3/M4 evidence is reinterpreted.
 
-Native activation remains M6, operational handoff M7 and scale/parity M8. The three M6-deferred Kafka rows, V2-OPEN-READ-15 and production-deployment exclusions remain unchanged; historical M3/M4 evidence is not reinterpreted.
 
 This file records proposals that have not been accepted as runtime contracts and retains resolved gate IDs for
 traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
@@ -127,7 +131,7 @@ irreversible same-key `FULL_V1 -> RETIRED_V1` compaction and permanent 0.2 compa
 accept tombstone deletion or a retired-through/frontier authority.
 
 The pure-document M0 decision frontier for this branch is exhausted. M4 Final closes
-`V2-OPEN-READ-08/09`. The M5 Final now supplies its retirement-history/lifetime/capacity predicates; the remaining concrete-backend activation boundary below stays OPEN:
+`V2-OPEN-READ-08/09`; the remaining descendant below requires later M5 evidence:
 
 | Gate | Evidence required before another design decision |
 | --- | --- | --- |

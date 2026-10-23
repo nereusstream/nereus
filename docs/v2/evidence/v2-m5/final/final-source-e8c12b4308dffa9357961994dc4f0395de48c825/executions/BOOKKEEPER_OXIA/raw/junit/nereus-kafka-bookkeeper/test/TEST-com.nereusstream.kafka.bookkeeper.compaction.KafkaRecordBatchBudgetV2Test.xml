@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:15.025Z" hostname="liusinandeMacBook-Pro.local" time="0.006">
-  <properties/>
-  <testcase name="compressedRecordBytesCannotBypassDecodedByteBudget()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test" time="0.005"/>
-  <testcase name="exactRecordCountBoundRejectsNextRecordBeforeMaterialization()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test" time="0.001"/>
-  <testcase name="genuineEmptyBatchNeedsNoDecodedRecordBudget()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

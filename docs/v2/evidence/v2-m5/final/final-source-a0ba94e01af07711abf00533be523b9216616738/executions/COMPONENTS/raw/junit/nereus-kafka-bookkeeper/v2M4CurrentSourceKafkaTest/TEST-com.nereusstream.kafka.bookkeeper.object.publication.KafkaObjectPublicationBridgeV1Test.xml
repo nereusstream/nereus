@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-23T14:24:13.013Z" hostname="liusinandeMacBook-Pro.local" time="0.156">
-  <properties/>
-  <testcase name="m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.141"/>
-  <testcase name="m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.007"/>
-  <system-out><![CDATA[M4_METRIC KAFKA_CURRENT_SOURCE operations=1000 elapsedNanos=37873125 p50Nanos=28292 p99Nanos=116375 maxNanos=3688000 throughputOpsPerSecond=26403 callerAllocatedBytes=889888 callerAllocatedBytesPerOperation=889 ownerAllocatedBytes=945600 ownerAllocatedBytesPerOperation=945 measuredAllocatedBytes=1835488 measuredAllocatedBytesPerOperation=1835 hazardCapacity=8 peakInFlight=8 rejectedAtCapacity=1 outerHazardCasPerRead=2 perCallbackSlotCas=0 reusablePlanCapacity=256
-]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

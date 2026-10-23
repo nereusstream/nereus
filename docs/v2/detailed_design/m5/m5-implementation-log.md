@@ -1,32 +1,21 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: Verified
-evidenceStatus: CurrentSourceReceipt
+implementationStatus: InProgress
+evidenceStatus: FocusedOnly
 authority: ImplementationLog
 sourceTuple: v2-m1
-receipt: docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json
 ---
 
 # M5 implementation log
 
-## Current verified Final (2026-10-23)
-
-The current [commit-bound M5 Final](../../evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json) binds Nereus `a0ba94e01af07711abf00533be523b9216616738`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667` and Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8` to input `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`. All five stages pass566/1332/39/63/736, totaling2736 tests with zero failures/errors/skips. C4 verifies all17 obligations and five source-bound children. Native BK replacement/expiry include actual UNKNOWN reconciliation, real absence, D/Cell settlement, Native DONE and backlog; Object GC retains its separate evidence. Exactly14 scenarios are promoted; the three M6-deferred Kafka rows and V2-OPEN-READ-15 remain unchanged. This bounded result grants no production deployment, M6/M7/M8 or complete NSIP-1 acceptance.
-
-The final source input is `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`. COMPONENTS executes at this root; the four backend records retain their original `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` roots, times, commands and attachments. The reviewed governance-only input-equivalence proof and fresh historical six-contract verification bind those origins without rerunning or relabeling a backend.
-
-The exact source commits match the full tested Git trees. The original publisher binds all five children and the Final; completion-status changes use an evidence-only successor. Delivery checks are recorded at the end of this log; published Git and CI results are reported with the delivery.
-
-Historical artifact status (2026-10-22): the authorized cleanup removed that older local generated evidence. It did not remove the later fresh c06 execution or the current immutable Final archive. Earlier retention/reuse statements and failures remain time-bound historical records.
+Current artifact status (2026-10-22): the user-authorized cleanup recorded at the end of this log removes local
+generated test evidence and supersedes the older local-retention/reuse statements. Later acceptance requires
+fresh preparation and full applicable validation; historical descriptions do not establish retained evidence.
 
 This log tracks implementation descendants of the immutable M5 hard-freeze. It does not amend the six documents
 bound by `m5-design-freeze.json`, and it is not a child receipt, scenario receipt, canonical Final, staging
 certification, or production authority.
-
-## Execution history (historical)
-
-The following dated sections retain their original progress and failure states. The verified current result is the Final and explicit provenance above.
 
 ## 2026-09-07 lifecycle amendment 3
 
@@ -17198,75 +17187,3 @@ already-authorized C5 without asking again. Pure completion-status changes follo
 evidence-only successors and do not start another product validation cycle. Actual new failures retain their
 primary and require scoped cause/impact handling rather than automatic rerun. No standalone test, C4/C5, actual
 staging, source commit or push has occurred yet.
-
-## 2026-10-23 e8 Final and initial C5 (historical)
-
-The fresh c06 campaign completes all five stages with2736 tests and zero failures/errors/skips. C4 accepts all17
-obligations, five exclusive children and the complete three-repository input cohort. Actual source commits are
-Nereus `e8c12b4308dffa9357961994dc4f0395de48c825`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667` and
-Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`; each complete Git tree equals its executed c06 tree. The
-original bind and publisher complete successfully. The current Final SHA-256 is
-`b52fd3e2eb77826d5718a760687ab82616d0e78ebffa41d21107f0382788e3b6`.
-
-Actual current-source Final/isolation validation passes, including the complete archive,17 obligations, five
-children and exactly14 promoted scenarios. Candidate-input11, JUnit10 and evidence57 contract tests pass.
-The real no-stub CI selector returns the full Pulsar source commit above. `git diff --check` passes.
-
-Delivery is pending. The approved evidence-root `.ignore` excludes only the raw Kafka source attachment from
-documentation discovery;77 discovered paths disappear, all within that exact subtree. Active Markdown and ADRs
-remain discoverable, Git still includes the attachment and Python archive/hash checks remain unchanged. The
-original documentation check then reaches its separate missing M5 closed-receipt-group integration and fails.
-The older historical-M4 task also incorrectly requires the newly promoted M5 scenarios to remain PLANNED.
-A temporary two-script correction reads the fixed CLOSURE's real Git registry and reuses the original M4
-scenario validator; all six existing contract tests and the real current-root validation pass in that temporary
-copy. A third temporary patch delegates the documentation M5 group to the existing formal reader; its full
-documentation check against the real live Root/Final passes, and the new partial-group branch rejects13/14.
-The single review patch is `c5-historical-m4-scope/delivery-checks.patch` in the external task workspace, SHA-256
-`61e2d9cadd02252007b23b3ed700547fe232b1950e8e7798c32525eaaebe5f5a`. All three live bound scripts remain
-unchanged. These are temporary correction results, not a passing default `v2M5Check`. Coordination has requested
-the human's source-binding decision; no product test is replayed, no immutable archive is changed and no push
-has occurred at this point. Frozen design matrices, the three M6-deferred Kafka rows, V2-OPEN-READ-15 and the
-existing production/NSIP-1 boundaries remain unchanged.
-
-
-## 2026-10-23 final governance-only successor and delivery
-
-The reviewed exact eight-file successor is committed as Nereus
-`a0ba94e01af07711abf00533be523b9216616738`, parent `e8c12b4308dffa9357961994dc4f0395de48c825`, full tree
-`bf35bd345e26f77ce0842f1a24023adbe1af304a`. Kafka remains
-`6221e3955f4eeeda0ba05a995df3918e6eca7667`; Pulsar remains
-`d52ab36ba099ba114f27d5842b9064f428dac5e8`. The original full-tree binding and publisher pass against
-input `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`. The new canonical Final SHA-256 is
-`50a22b835f49d4a7fae1c19288e205c95a62b9f48899d47d336490a0a9ca91fa`.
-
-The complete candidate has2736 tests with zero failures/errors/skips,17 obligations and five exclusive children.
-Only COMPONENTS runs at700d:566 tests plus60 evidence contracts,11 input contracts and10 JUnit contracts.
-The existing historical six-contract task runs independently and its actual command, timestamps, exit0 and log
-are preserved in the input-only proof. BK/Oxia's five original logs retain the actual old governance calls;
-the other three backends have no such calls. All four backend records,711 attachments and the original complete
-candidate's784 files retain their c06 bytes and origins. The proof grants no execution or promotion authority.
-The original same-campaign Source/Legacy and native consumption remain linked. All14773 extra inputs/manifests,
-actual product class/JAR/runtime inputs, tools, dependencies, drivers, recipes and Java/Scala sources remain
-unchanged. The original INPUTS.bind also independently verifies c06's complete trees and real ancestry to e8/622/d52.
-
-The bda component run passes566 but its collector rejects a mistaken requirement that the original component
-entry include historical six-contract output. The corrected collector captures that independent task truthfully;
-the357 successor passes before the necessary CI history checkout correction. Both retain their original identities.
-The final700d successor includes only the accepted governance correction and the documentation checkout's two
-full-history lines. Missing differences, foreign roots/records, altered runtime/product/build/driver inputs,
-unreviewed source and changes outside the exact CI hunk reject. Old v5/eb constraints and the ordinary full-tree,
-Final, ancestry and evidence-only guards remain intact. No backend is rerun or relabeled.
-
-The old e8 Final is restored at its original canonical path, still SHA-256
-`b52fd3e2eb77826d5718a760687ab82616d0e78ebffa41d21107f0382788e3b6`; all15082 archive files match the preserved
-copy. The evidence-root .ignore retains the raw Kafka source rule and adds only this new canonical Final's two
-before/after source-object directories. These16 source objects remain in the Python inventory, hashes and Git
-archive. Current documentation and exactly14 scenario rows select the new Final. Frozen design matrices, the
-three M6-deferred rows, READ15, native Object Broker and production/complete-NSIP-1 boundaries remain unchanged.
-
-The default `v2M5Check` completes after this publication with exit0 (1m, six tasks): documentation, complete
-Final/current-source/isolation, fixed historical M4 dependency,60 evidence contracts,11 input contracts and10
-JUnit contracts pass. The real no-stub `ci-pulsar-commit` returns the full Pulsar source SHA above. Normal SDK
-and Kafka pushes succeed. The exact CI checkout sequence then really fetches that SDK commit from the fixed
-fork and checks it out detached; HEAD equals `d52ab36ba099ba114f27d5842b9064f428dac5e8`. Root's evidence-only
-publication, final-HEAD verification and actual CI result are reported with the delivery; no old run is substituted.

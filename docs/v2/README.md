@@ -16,14 +16,6 @@ performance-first BookKeeper WAL.
 
 ## Current status
 
-- M5 implementation and current-source acceptance are verified by the [commit-bound Final](evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json): all five stages,2736 passing tests,17 obligations and five children. Source commits are Nereus `a0ba94e01af07711abf00533be523b9216616738`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`, Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`.
-- The governance-only source successor runs new COMPONENTS at700d and preserves all four original c06 backend records and complete attachments through the reviewed input-only proof.
-- Exactly14 M5 scenarios now point to that Final. V2-KAF-DATA-012/013/022, V2-OPEN-READ-15, native Object process activation and M6/M7/M8 retain their prior boundaries; no production deployment or complete NSIP-1 claim follows. Historical M1–M4 receipts and frozen design inputs remain bound to their original sources.
-
-## Historical implementation snapshots
-
-The following focused statuses describe their original execution boundary. The current M5 result is the Final above; earlier OPEN/incomplete statements do not override it.
-
 - [NSIP-1](NSIP/nsip-1.md) is the current Kafka single-Owner contract: RF=1/minISR=1, complete shared commit for
   BK ACK/HW, checkpoint-plus-tail cold takeover, and a persisted grant for the Object core. The native BK
   Controller/Broker slice, Object authorization/KMS slice, and M4 read adaptation have limited-scope acceptance;

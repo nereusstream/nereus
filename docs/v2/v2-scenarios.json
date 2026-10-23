@@ -93,8 +93,8 @@
       "milestone": "M5",
       "contract": "an exact reference-free proof is the only authority for full aggregate to same-key permanent retired-tombstone replacement",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-META-006",
@@ -331,8 +331,8 @@
       "milestone": "M5",
       "contract": "shared worker, cache, and GC capacity cannot cross cell queue, task, cache, publication, or physical-delete authority",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-MIGRATION-001",
@@ -627,8 +627,8 @@
       "milestone": "M2/M5",
       "contract": "persisted retain BK or delete after verified policy uses irreversible BK delete none intent done and the compatibility boolean never proves physical deletion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-BK-012",
@@ -763,8 +763,8 @@
       "milestone": "M2/M5",
       "contract": "offset lookup uses floor plus coverage check plus successor across block and run compaction gaps",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-KAF-DATA-012",
@@ -867,8 +867,8 @@
       "milestone": "M5",
       "contract": "logical trim and physical GC revalidate every protocol and source protection",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-003",
@@ -899,8 +899,8 @@
       "milestone": "M4/M5",
       "contract": "fused fenced preferred with fallback E to preferred only E plus one closure current slot drain contiguous proof for each source fallback capable interval exact historical capability evidence and protection release precede Object WAL GC",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-007",
@@ -915,64 +915,64 @@
       "milestone": "M4/M5",
       "contract": "one monotonic Binding Read Admission Epoch and source independent reusable proof window continuously cover each immutable source interval without a mutable owner batch accumulator",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-009",
       "milestone": "M4/M5",
       "contract": "every historical owner grant read epoch proof fold retirement batch and protection release binds one immutable closed capability evidence generation digest",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-010",
       "milestone": "M4/M5",
       "contract": "one exact BindingReadSelector CAS or proven equivalent transaction linearizes takeover read grant against fallback removal preserves each protection identity own first epoch and reserves proof liability only for fallback bearing epochs",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-011",
       "milestone": "M4/M5",
       "contract": "every fallback relevant epoch proof follows one irreversible selector anchor bound terminal cut and uses a closed verified deterministic create only first valid publication whose immutable candidate remains safety authority while no fallback epochs remain proof free",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-012",
       "milestone": "M4/M5",
       "contract": "one fused selector CAS from preferred with fallback E to preferred only E plus one freezes shared last E closes E grants same owner no fallback E plus one and persists a durable closure anchor with complete emergency STOPPED envelope under closed ADMITTING STOPPED states",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-013",
       "milestone": "M4/M5",
       "contract": "each retirement member releases against its own first_i sharedLast interval selector only immutable activation exposes inline reference and N O N costs progress remains derived and full batch metadata retires only after all source reference prerequisites",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-014",
       "milestone": "M4/M5",
       "contract": "one small selector owned inline canonical unresolved anchor set preserves a dedicated emergency STOPPED envelope while immutable closed verified terminal candidates converge and eligible anchors prune asynchronously in batches",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-015",
       "milestone": "M4/M5",
       "contract": "a completed Source Retirement Batch changes only by exact version same key irreversible FULL_V1 to RETIRED_V1 and the compact tombstone remains permanent in zero point two without protection release or source GC authority",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-META-001",
