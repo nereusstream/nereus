@@ -61,6 +61,15 @@ while IFS= read -r script; do
     case "${script#"$repo_root/"}" in
         scripts/archive-v2-*|scripts/bootstrap-v2-*|scripts/build-v2-*|scripts/check-v2-*) ;;
         scripts/publish-v2-*|scripts/run-v2-*|scripts/v2-*|scripts/containers/*|scripts/templates/*) ;;
+        # Exact V2 M5 input/evidence helpers; other unrecognized scripts still reject.
+        scripts/continue-v2-m5-evidence.py|\
+        scripts/m5-candidate-inputs.py|\
+        scripts/m5-evidence-junit.py|\
+        scripts/m5-native-build-preparation.py|\
+        scripts/m5-native-build-proof.py|\
+        scripts/m5-native-isolated-inputs.py|\
+        scripts/m5-reader-only-evidence.py|\
+        scripts/m5-stage-input-equivalence.py) ;;
         *) fail "a V1/Phase/F9 executable script remains: ${script#"$repo_root/"}" ;;
     esac
 done < <(find "$repo_root/scripts" -type f ! -path '*/__pycache__/*' -print | sort)

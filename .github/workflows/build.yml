@@ -25,6 +25,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14.7'
+      - name: Verify evidence Python interpreter
+        run: python3 -c 'import sys; print(sys.executable); print(sys.version); assert sys.version_info[:3] == (3, 14, 7)'
       - name: Install verification tools
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: V2 documentation baseline
@@ -40,6 +45,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14.7'
+      - name: Verify evidence Python interpreter
+        run: python3 -c 'import sys; print(sys.executable); print(sys.version); assert sys.version_info[:3] == (3, 14, 7)'
       - name: Install verification tools
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: V2 M1 fast source gate
@@ -55,6 +65,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14.7'
+      - name: Verify evidence Python interpreter
+        run: python3 -c 'import sys; print(sys.executable); print(sys.version); assert sys.version_info[:3] == (3, 14, 7)'
       - name: Install verification tools
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: V2 M4 historical Final at its published source

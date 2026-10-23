@@ -920,6 +920,65 @@ class C06CheckEquivalenceContracts(unittest.TestCase):
                 self.reader.validate(root, ref, {}, C)
 
 
+class CiCheckEquivalenceContracts(unittest.TestCase):
+    def setUp(self):
+        self.reader = C.module('m5_ci_check_contract', 'm5-reader-only-evidence.py')
+
+    def freeze(self, value):
+        value['inputRootSha256'] = sha(C.canonical({key: value[key] for key in
+            ('repositories', 'extraInputs', 'inputManifests')}))
+        return value
+
+    def test_ci_successor_preserves_complete_source_and_runtime_scope(self):
+        fixture = INPUT_TESTS.Fixture()
+        self.addCleanup(fixture.temporary.cleanup)
+        prior = fixture.prepare()
+        for name, commit in self.reader.C06_SOURCE_COMMITS.items():
+            prior['repositories'][name]['baseCommit'] = commit
+        files = prior['repositories']['nereus']['files']
+        for path, (before, _) in self.reader.CI_SOURCE_HASHES.items():
+            files[path] = {'mode': '100644', 'bytes': 1, 'sha256': before}
+        files[self.reader.SCRIPT] = {'mode': '100644', 'bytes': 1, 'sha256': self.reader.CI_READER_BEFORE}
+        prior = self.freeze(prior)
+        final = copy.deepcopy(prior)
+        final['repositories']['nereus']['baseCommit'] = self.reader.CI_CHECKPOINT['commit']
+        for path, (_, after) in self.reader.CI_SOURCE_HASHES.items():
+            final['repositories']['nereus']['files'][path]['sha256'] = after
+        raw = Path(self.reader.__file__).read_bytes()
+        final['repositories']['nereus']['files'][self.reader.SCRIPT] = {
+            'mode': '100644', 'bytes': len(raw), 'sha256': sha(raw)}
+        final = self.freeze(final)
+        with patch.object(self.reader, 'CI_ROOT', prior['inputRootSha256']):
+            self.assertEqual(6, len(self.reader.check_ci_inputs(prior, final, C)))
+            for mutation in ('runtime', 'foreign-source', 'base', 'unreviewed-correction'):
+                changed = copy.deepcopy(final)
+                if mutation == 'runtime':
+                    changed['extraInputs'][str(fixture.jar)]['sha256'] = sha(b'foreign runtime')
+                elif mutation == 'base':
+                    changed['repositories']['nereus']['baseCommit'] = '0' * 40
+                else:
+                    path = 'src/main/java/Foreign.java' if mutation == 'foreign-source' else '.github/workflows/build.yml'
+                    changed['repositories']['nereus']['files'][path] = {
+                        'mode': '100644', 'bytes': 1, 'sha256': sha(b'unreviewed')}
+                with self.subTest(mutation=mutation), self.assertRaises(C.EvidenceError):
+                    self.reader.check_ci_inputs(prior, self.freeze(changed), C)
+
+    def test_checkpoint_and_original_reader_substitutions_reject(self):
+        for key in self.reader.CI_CHECKPOINT:
+            with self.subTest(key=key), self.assertRaisesRegex(C.EvidenceError, 'checkpoint identity'):
+                self.reader.check_ci_checkpoint(self.reader.CI_CHECKPOINT | {key: '0' * 40}, {}, C)
+        with tempfile.TemporaryDirectory(prefix='ci-reader-negative-') as directory:
+            root = Path(directory)
+            value = {'schema': self.reader.C06_SCHEMA, 'finalSourceObjects': [
+                {'path': self.reader.SCRIPT, 'object': {'sha256': '0' * 64}}]}
+            path = root / 'source-continuation/binding.json'
+            path.parent.mkdir();path.write_bytes(C.canonical(value))
+            reference = {'path': 'source-continuation/binding.json', 'bytes': path.stat().st_size,
+                         'sha256': sha(path.read_bytes())}
+            with self.assertRaisesRegex(C.EvidenceError, 'original c06 reader identity'):
+                self.reader.validate_original_c06(root, reference, {}, C)
+
+
 class ReaderOnlyEquivalenceContracts(unittest.TestCase):
     def setUp(self):
         self.reader = C.module('m5_reader_only_contract', 'm5-reader-only-evidence.py')

@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+from types import ModuleType
 
 
 SCHEMA = 'NEREUS_V2_M5_EB_READER_INPUT_EQUIVALENCE_V1'
@@ -69,6 +70,108 @@ C06_SOURCE_HASHES = {'.github/workflows/build.yml': ('c5cf8a1d70348ab3ee2eb5d900
                                         '0212ac504d28167fd88261be7711b09918b34df2610f522b2c5a78d4346828f6'),
  'scripts/m5-stage-input-equivalence.py': ('f78999390e62c0995311179685138f0128a3d05e22797aa583a7f19450223a2a',
                                            '5d599d5eb6d0b7fae36ba4e66e37b7c61169f4cb4debf3fa3a1f8890eae063ba')}
+
+
+CI_SCHEMA = 'NEREUS_V2_M5_CI_CHECK_INPUT_EQUIVALENCE_V1'
+CI_ROOT = '700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0'
+CI_CANDIDATE_SHA = '02fe3a0b8ddc65d5b0eb82d9ee6011e7e70390cf4a05970277e91675436bd8b4'
+CI_READER_BEFORE = '2530f5b606cbd94e2392373c5ff1cc6e1d53720bc5209328c02a8a5ec2580362'
+CI_CHECKPOINT = {'commit': 'c7d8a6b9fc527a3d1cb48f21f93693b842f6a832',
+    'parent': '4d29d0a6be788f3d2e23582ceb0b2adc335f0629',
+    'tree': 'bf35bd345e26f77ce0842f1a24023adbe1af304a',
+    'sourceTreeCommit': 'a0ba94e01af07711abf00533be523b9216616738'}
+CI_SOURCE_HASHES = {'.github/workflows/build.yml': ('f13be6b35defe87d1d13077fa824ff59e6ae05b720eeecf4965592a25352bb12',
+                                 'aaa77a96219b2ddf11f39b9f3d96942b3d8cb1d4ee53434b290110efa67e4b2c'),
+ 'scripts/check-v2-m1-active-graph.sh': ('d0b75c5cddc9b5b9b9d14be1bfef5ead77bcd39e33a42675ac6cc929a4cc62dd',
+                                         '3c6c7fe67f2232acc57727f1bff48e8bd4cf1e149e497b554a3b10992df4ae42'),
+ 'scripts/check-v2-m5-evidence-tests.py': ('0691768ce96c3ab7f98b74bf8f0e19d4924fd59182f6b136ed7c0ef7721c225d',
+                                           '6d05e0effb8b76d85ba6537e9b4b47ed6fe19f2c67dbd3b0eab6ad4b59fcf994'),
+ 'scripts/continue-v2-m5-evidence.py': ('0212ac504d28167fd88261be7711b09918b34df2610f522b2c5a78d4346828f6',
+                                        '75c24804cd020e88dbe54daf9590576194d0ae659d0e1e6b6e4e1cad1e6c84df'),
+ 'scripts/m5-stage-input-equivalence.py': ('5d599d5eb6d0b7fae36ba4e66e37b7c61169f4cb4debf3fa3a1f8890eae063ba',
+                                           '441abe4a6c2fd3e6a408819f77fba27ad0d349f8ebf089cdd2900c1dde8e758c')}
+
+
+def check_ci_inputs(prior, final, C):
+    C.INPUTS.validate_value(prior)
+    C.INPUTS.validate_value(final)
+    C.require(prior['inputRootSha256'] == CI_ROOT and final['inputRootSha256'] != CI_ROOT,
+              'CI handoff requires the exact 700d input and one successor')
+    C.require(prior['extraInputs'] == final['extraInputs'] and prior['inputManifests'] == final['inputManifests'],
+              'CI handoff changed an original runtime, tool, dependency or input manifest')
+    for name in C.INPUTS.REPOSITORIES:
+        old, new = prior['repositories'][name], final['repositories'][name]
+        expected = CI_CHECKPOINT['commit'] if name == 'nereus' else C06_SOURCE_COMMITS[name]
+        C.require(old['sourceRoot'] == new['sourceRoot'] and old['baseCommit'] == C06_SOURCE_COMMITS[name]
+                  and new['baseCommit'] == expected, 'CI handoff changed a source/base identity')
+    delta = C.EQUIVALENCE.differences(prior, final)
+    C.require({(row['repository'], row['path']) for row in delta} ==
+              {('nereus', path) for path in CI_SOURCE_HASHES.keys() | {SCRIPT}},
+              'CI handoff changed a product/fixture/build/driver source or omitted a correction')
+    for row in delta:
+        before, after = row['before'], row['after']
+        expected = (CI_READER_BEFORE, hashlib.sha256(Path(__file__).read_bytes()).hexdigest()) \
+            if row['path'] == SCRIPT else CI_SOURCE_HASHES[row['path']]
+        C.require(before is not None and after is not None
+                  and before.get('mode') == after.get('mode') in ('100644', '100755')
+                  and (before['sha256'], after['sha256']) == expected,
+                  'CI handoff source is not the exact reviewed correction: ' + row['path'])
+        C.require(str(Path(prior['repositories']['nereus']['sourceRoot']) / row['path']) not in prior['extraInputs'],
+                  'CI handoff changed an executed runtime dependency')
+    return delta
+
+
+def check_ci_checkpoint(checkpoint, prior, C):
+    C.require(checkpoint == CI_CHECKPOINT, 'CI source checkpoint identity differs')
+    I = C.INPUTS
+    C.require(I.git(C.ROOT, 'show', '-s', '--format=%P', checkpoint['commit']).decode().strip() == checkpoint['parent']
+              and I.git(C.ROOT, 'rev-parse', checkpoint['commit'] + '^{tree}').decode().strip() == checkpoint['tree']
+              and I.git(C.ROOT, 'rev-parse', checkpoint['sourceTreeCommit'] + '^{tree}').decode().strip() == checkpoint['tree'],
+              'CI checkpoint is not the real single-parent restoration of the complete a0 source tree')
+    expected = {path: row for path, row in prior['repositories']['nereus']['files'].items() if not row.get('deleted')}
+    C.require(I.committed_tree(C.ROOT, checkpoint['commit']) == expected,
+              'CI checkpoint differs from the complete 700d source inventory')
+
+
+def validate_original_c06(root, reference, final, C):
+    """Use the exact archived V1 reader, without changing its proof or writing into its archive."""
+    proof = C.load(C.resource(root, reference, 'source-continuation'))
+    C.require(proof.get('schema') == C06_SCHEMA, 'original c06 schema differs')
+    entries = [row for row in proof['finalSourceObjects'] if row.get('path') == SCRIPT]
+    C.require(len(entries) == 1 and entries[0]['object']['sha256'] == CI_READER_BEFORE,
+              'original c06 reader identity differs')
+    item = entries[0]['object']
+    raw = C.resource(root, item, 'source-continuation/after')
+    C.require(hashlib.sha256(raw).hexdigest() == CI_READER_BEFORE, 'original c06 reader bytes differ')
+    frozen = ModuleType('m5_original_700d_reader')
+    frozen.__file__ = str((root / item['path']).resolve(strict=True))
+    exec(compile(raw, frozen.__file__, 'exec'), frozen.__dict__)
+    return frozen.validate(root, reference, final, C)
+
+
+def check_ci_boundaries(before, after, C):
+    path = 'scripts/m5-stage-input-equivalence.py'
+    old, new = ast.parse(before[path]), ast.parse(after[path])
+    validate = next(node for node in new.body if isinstance(node, ast.FunctionDef) and node.name == 'validate')
+    expected = ast.parse("if proof.get('schema') == '" + CI_SCHEMA + "':\n"
+        "    return C.module('m5_ci_check_equivalence', 'm5-reader-only-evidence.py').validate(root, reference, final, C)\n").body[0]
+    C.require(ast.dump(validate.body[4]) == ast.dump(expected), 'CI dispatcher differs')
+    validate.body.pop(4)
+    original = next(node for node in old.body if isinstance(node, ast.FunctionDef) and node.name == 'validate')
+    allowed = copy.deepcopy(original.body[3])
+    allowed.body[0].value.func.attr = 'validate_original_c06'
+    C.require(ast.dump(validate.body[3]) == ast.dump(allowed), 'frozen c06 dispatcher differs')
+    validate.body[3] = copy.deepcopy(original.body[3])
+    C.require(ast.dump(old) == ast.dump(new), 'CI handoff changed the old v5/eb continuation')
+    workflow = '.github/workflows/build.yml'
+    java = b"      - uses: actions/setup-java@v5\n        with:\n          distribution: temurin\n          java-version: '21'\n"
+    python = (b"      - uses: actions/setup-python@v6\n        with:\n          python-version: '3.14.7'\n"
+        b"      - name: Verify evidence Python interpreter\n"
+        b"        run: python3 -c 'import sys; print(sys.executable); print(sys.version); assert sys.version_info[:3] == (3, 14, 7)'\n")
+    C.require(before[workflow].count(java) == 3 and after[workflow] == before[workflow].replace(java, java + python),
+              'CI workflow changed outside the three exact interpreter pins')
+    return {path: hashlib.sha256(ast.dump(old).encode()).hexdigest(),
+            workflow: hashlib.sha256(before[workflow]).hexdigest()}
 
 
 def check_c06_inputs(prior, final, C):
@@ -140,6 +243,8 @@ def c06_governance_executions(root, C):
 
 
 def check_inputs(prior, final, C):
+    if prior['inputRootSha256'] == CI_ROOT:
+        return check_ci_inputs(prior, final, C)
     if prior['inputRootSha256'] == C06_ROOT:
         return check_c06_inputs(prior, final, C)
     C.INPUTS.validate_value(prior)
@@ -257,9 +362,13 @@ def source_lineage(root, prior, final, C):
 
 def validate(root, reference, final, C):
     proof = C.load(C.resource(root, reference, 'source-continuation'))
-    c06 = proof.get('schema') == C06_SCHEMA
-    schema, prior_root, records = (C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS)
+    ci = proof.get('schema') == CI_SCHEMA
+    c06 = ci or proof.get('schema') == C06_SCHEMA
+    schema, prior_root, records = (CI_SCHEMA, CI_ROOT, C06_RECORDS) if ci else \
+        ((C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS))
     extra = ('originalCandidate', 'governanceExecutions', 'governanceVerification') if c06 else ()
+    if ci:
+        extra += ('checkpoint',)
     C.exact(proof, ('schema', 'kind', 'promotionEligible', 'executionEvidence', 'oldInputRootSha256',
         'finalInputRootSha256', 'priorInputs', 'differences', 'priorSourceObjects', 'finalSourceObjects',
         'boundaryAstSha256', 'originalExecutions', 'components', 'nativeSourceDirectory') + extra, 'reader handoff')
@@ -284,7 +393,15 @@ def validate(root, reference, final, C):
             objects[item['path']] = C.resource(root, item['object'], 'source-continuation/' + side)
             registered.add(item['object']['path'])
         sources.append(objects)
-    C.require(proof['boundaryAstSha256'] == check_boundaries(*sources, C), 'reader AST proof differs')
+    boundaries = check_ci_boundaries(*sources, C) if ci else check_boundaries(*sources, C)
+    C.require(proof['boundaryAstSha256'] == boundaries, 'reader AST proof differs')
+    origin = prior
+    if ci:
+        original = root / 'source-continuation/original-complete'
+        original_value = C.load(C.read(original, 'candidate.json'))
+        original_proof = C.load(C.resource(original, original_value['stageInputEquivalence'], 'source-continuation'))
+        origin = C.load(C.resource(original, original_proof['priorInputs'], 'source-continuation'))
+        C.require(origin['inputRootSha256'] == C06_ROOT, 'CI handoff lost the four original c06 input origins')
     C.require([row.get('stage') for row in proof['originalExecutions']] == list(records),
               'reader handoff must preserve exactly four original backend stages')
     finishes = []
@@ -292,9 +409,9 @@ def validate(root, reference, final, C):
         C.exact(item, ('stage', 'record'), 'reader original execution')
         check_record_identity(item['stage'], item['record'], C, records)
         record = C.load(C.resource(root, item['record']))
-        C.require(record['stage'] == item['stage'] and record['inputRootSha256'] == prior_root,
+        C.require(record['stage'] == item['stage'] and record['inputRootSha256'] == origin['inputRootSha256'],
                   'reader handoff relabeled an original execution')
-        C.validate_execution(root, record, prior)
+        C.validate_execution(root, record, origin)
         check_runtime(record, final, C)
         finishes.append(record['finishedAtMicros'])
     C.require(proof['components']['path'] == 'executions/COMPONENTS/record.json', 'new COMPONENTS record missing')
@@ -313,8 +430,11 @@ def validate(root, reference, final, C):
         verification = proof['governanceVerification']
         C.exact(verification, ('command', 'workingDirectory', 'inputBeforeSha256', 'inputAfterSha256',
                               'startedAtMicros', 'finishedAtMicros', 'exitCode', 'log'), 'c06 governance verification')
-        C.require(verification['command'] == ['./gradlew', '--offline', '--no-daemon',
-                    '--no-configuration-cache', '--max-workers=2', 'v2M5HistoricalM4DependencyContractTest']
+        expected_command = ['./gradlew', '--offline', '--no-daemon', '--no-configuration-cache',
+                            '--max-workers=2', 'v2M5HistoricalM4DependencyContractTest']
+        if ci:
+            expected_command.append('v2M1FastSourceCheck')
+        C.require(verification['command'] == expected_command
                   and verification['workingDirectory'] == components['workingDirectory']
                   and verification['inputBeforeSha256'] == verification['inputAfterSha256'] == final['inputRootSha256']
                   and verification['startedAtMicros'] > components['finishedAtMicros']
@@ -328,9 +448,12 @@ def validate(root, reference, final, C):
                   and 'Ran 6 tests in ' in checked and '\nOK\n' in checked
                   and 'BUILD SUCCESSFUL' in checked and 'C06_GOVERNANCE_EXIT=0' in checked,
                   'c06 historical six-contract verification did not complete')
+        if ci:
+            C.require('> Task :v2M1FastSourceCheck\n' in checked,
+                      'CI handoff did not execute the original M1 fast source gate')
         registered.add(verification['log']['path'])
         C.require(proof['originalCandidate']['path'] == 'source-continuation/original-complete/candidate.json'
-                  and proof['originalCandidate']['sha256'] == C06_CANDIDATE_SHA,
+                  and proof['originalCandidate']['sha256'] == (CI_CANDIDATE_SHA if ci else C06_CANDIDATE_SHA),
                   'c06 original complete candidate identity differs')
         original = root / 'source-continuation/original-complete'
         value = C.load(C.resource(root, proof['originalCandidate']))
@@ -339,12 +462,15 @@ def validate(root, reference, final, C):
         C.require(proof['governanceExecutions'] == c06_governance_executions(root, C),
                   'c06 governance executions were omitted or relabeled')
         registered.update('source-continuation/original-complete/' + path for path in C.inventory(original, ''))
-        expected = {path: row for path, row in prior['repositories']['nereus']['files'].items() if row != {'deleted': True}}
-        C.require(C.INPUTS.committed_tree(C.ROOT, C06_SOURCE_COMMITS['nereus']) == expected,
-                  'c06 original Root source commit differs from its complete tree')
-        C.HISTORICAL_M4.require_ancestor(C.ROOT, C06_BASE_COMMITS['nereus'], C06_SOURCE_COMMITS['nereus'])
+        if ci:
+            check_ci_checkpoint(proof['checkpoint'], prior, C)
+        else:
+            expected = {path: row for path, row in prior['repositories']['nereus']['files'].items() if row != {'deleted': True}}
+            C.require(C.INPUTS.committed_tree(C.ROOT, C06_SOURCE_COMMITS['nereus']) == expected,
+                      'c06 original Root source commit differs from its complete tree')
+            C.HISTORICAL_M4.require_ancestor(C.ROOT, C06_BASE_COMMITS['nereus'], C06_SOURCE_COMMITS['nereus'])
     C.require(C.inventory(root, 'source-continuation') == registered, 'reader handoff has unregistered files')
-    return {'prior': prior, 'stages': tuple(records), 'origins': dict.fromkeys(records, prior),
+    return {'prior': prior, 'stages': tuple(records), 'origins': dict.fromkeys(records, origin),
             'nativeSourceDirectory': source, 'paths': registered, 'proof': proof}
 
 
@@ -363,15 +489,18 @@ def main():
     C = R.C
     prior_prepared, old_package = args.prior_input_closure.resolve(strict=True), args.prior_package.resolve(strict=True)
     prior = C.INPUTS.verify(prior_prepared)
-    c06 = prior['inputRootSha256'] == C06_ROOT
-    schema, prior_root, records = (C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS)
+    ci = prior['inputRootSha256'] == CI_ROOT
+    c06 = ci or prior['inputRootSha256'] == C06_ROOT
+    schema, prior_root, records = (CI_SCHEMA, CI_ROOT, C06_RECORDS) if ci else \
+        ((C06_SCHEMA, C06_ROOT, C06_RECORDS) if c06 else (SCHEMA, PRIOR_ROOT, RECORDS))
     C.require(prior['inputRootSha256'] == prior_root, 'reader handoff requires its exact original cohort')
     if c06:
         C.validate_candidate(old_package, prior_prepared, prior_prepared / 'workspace' / C.INPUTS.LAYOUT['nereus'])
     prepared = args.input_closure.resolve()
     if not prepared.exists():
         continuation = C.module('m5_reader_input_copy', 'continue-v2-m5-evidence.py')
-        continuation.prepare_postprocessing_source(prior_prepared, prepared, reader_only_eb=not c06, reader_only_c06=c06)
+        continuation.prepare_postprocessing_source(prior_prepared, prepared, reader_only_eb=not c06,
+                                                  reader_only_c06=c06 and not ci, reader_only_ci=ci)
     target_root = prepared / 'workspace' / C.INPUTS.LAYOUT['nereus']
     if root != target_root:
         command = [sys.executable, '-u', '-B', str(target_root / SCRIPT), *sys.argv[1:]]
@@ -386,16 +515,22 @@ def main():
     package = args.output.resolve()
     package.mkdir(parents=True, exist_ok=False)
     executions, originals = {}, []
+    origin = prior
+    if ci:
+        original_value = C.load(C.read(old_package, 'candidate.json'))
+        original_proof = C.load(C.resource(old_package, original_value['stageInputEquivalence'], 'source-continuation'))
+        origin = C.load(C.resource(old_package, original_proof['priorInputs'], 'source-continuation'))
     for stage, (size, digest) in records.items():
         reference = {'path': f'executions/{stage}/record.json', 'bytes': size, 'sha256': digest}
         check_record_identity(stage, reference, C, records)
         record = C.load(C.resource(old_package, reference))
-        executions[stage] = C.validate_execution(old_package, record, prior)
+        executions[stage] = C.validate_execution(old_package, record, origin)
         check_runtime(record, final, C)
         shutil.copytree(old_package / 'executions' / stage, package / 'executions' / stage)
         originals.append({'stage': stage, 'record': reference})
     if c06:
-        C.require(hashlib.sha256(C.read(old_package, 'candidate.json')).hexdigest() == C06_CANDIDATE_SHA,
+        C.require(hashlib.sha256(C.read(old_package, 'candidate.json')).hexdigest() ==
+                  (CI_CANDIDATE_SHA if ci else C06_CANDIDATE_SHA),
                   'c06 original complete candidate differs')
         shutil.copytree(old_package, package / 'source-continuation/original-complete')
     before_sources, after_sources = {}, {}
@@ -412,7 +547,7 @@ def main():
                 C.INPUTS.write_new(package / path, raw)
             lists[side].append({'repository': row['repository'], 'path': row['path'],
                                 'object': R.reference(package, path)})
-    boundaries = check_boundaries(before_sources, after_sources, C)
+    boundaries = check_ci_boundaries(before_sources, after_sources, C) if ci else check_boundaries(before_sources, after_sources, C)
     source = source_lineage(package, prior, final, C)
     executions['COMPONENTS'] = R.execute_stage('COMPONENTS', package, prepared, final,
         args.kafka_java_home.resolve(strict=True), target_root / 'build/m5-evidence-ant-repository', None)
@@ -420,6 +555,8 @@ def main():
     if c06:
         command = ['./gradlew', '--offline', '--no-daemon', '--no-configuration-cache', '--max-workers=2',
                    'v2M5HistoricalM4DependencyContractTest']
+        if ci:
+            command.append('v2M1FastSourceCheck')
         path = 'source-continuation/historical-contract.log'
         C.require(C.INPUTS.verify(prepared) == final, 'c06 inputs changed before historical governance verification')
         started = time.time_ns() // 1000
@@ -441,6 +578,8 @@ def main():
     if c06:
         proof.update(originalCandidate=R.reference(package, 'source-continuation/original-complete/candidate.json'),
                      governanceExecutions=c06_governance_executions(package, C), governanceVerification=governance)
+    if ci:
+        proof['checkpoint'] = copy.deepcopy(CI_CHECKPOINT)
     proof_ref = R.write(package, 'source-continuation/binding.json', proof)
     validate(package, proof_ref, final, C)
     R.assemble(package, final, executions)
