@@ -1,0 +1,227 @@
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :pulsar:build-logic:conventions:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :pulsar:build-logic:conventions:generateExternalPluginSpecBuilders FROM-CACHE
+> Task :pulsar:build-logic:conventions:extractPrecompiledScriptPluginPlugins FROM-CACHE
+> Task :pulsar:build-logic:conventions:compilePluginsBlocks FROM-CACHE
+> Task :pulsar:build-logic:conventions:generatePrecompiledScriptPluginAccessors FROM-CACHE
+> Task :pulsar:build-logic:conventions:generateScriptPluginAdapters FROM-CACHE
+> Task :pulsar:build-logic:conventions:compileKotlin FROM-CACHE
+> Task :pulsar:build-logic:conventions:compileJava NO-SOURCE
+> Task :pulsar:build-logic:conventions:pluginDescriptors
+> Task :pulsar:build-logic:conventions:processResources
+> Task :pulsar:build-logic:conventions:classes
+> Task :pulsar:build-logic:conventions:jar
+Invalid Java installation found at '/Users/liusinan/.sdkman/candidates/java/8.0.472-amzn' (SDKMAN!) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+Invalid Java installation found at '/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home' (MacOS java_home) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+> Task :pulsar:pulsar-common:generateLightProto FROM-CACHE
+> Task :pulsar:managed-ledger:generateLightProto FROM-CACHE
+> Task :pulsar:pulsar-opentelemetry:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-admin-api:processResources NO-SOURCE
+> Task :pulsar:pulsar-metadata:processResources
+> Task :pulsar:pulsar-opentelemetry:processResources NO-SOURCE
+> Task :pulsar:pulsar-opentelemetry:classes UP-TO-DATE
+> Task :pulsar:pulsar-client-api:compileJava FROM-CACHE
+> Task :pulsar:pulsar-opentelemetry:jar
+> Task :pulsar:pulsar-client-api:processResources
+> Task :pulsar:pulsar-client-api:classes
+> Task :pulsar:pulsar-client-api:jar
+> Task :pulsar:pulsar-common:generatePulsarBuildInfo
+> Task :pulsar:pulsar-common:processResources
+> Task :pulsar:pulsar-client-admin-api:compileJava FROM-CACHE
+> Task :nereus-domain:compileJava FROM-CACHE
+> Task :nereus-metadata-spi:compileJava FROM-CACHE
+> Task :nereus-storage-api:compileJava FROM-CACHE
+> Task :nereus-storage-object:compileJava FROM-CACHE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :pulsar:pulsar-common:compileJava FROM-CACHE
+> Task :pulsar:pulsar-metadata:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:classes UP-TO-DATE
+> Task :pulsar:managed-ledger:jar
+> Task :pulsar:pulsar-client-admin-api:classes UP-TO-DATE
+> Task :pulsar:pulsar-client-admin-api:jar
+> Task :pulsar:pulsar-metadata:classes
+> Task :pulsar:pulsar-metadata:jar
+> Task :pulsar:pulsar-common:classes
+> Task :pulsar:pulsar-common:jar
+
+> Task :v2DocumentationCheck
+V2 documentation baseline: separated layout, contexts, positions, epochs, profiles, cell-scoped providers, authority, source locks, scenarios, tradeoffs, receipts, and links verified.
+
+> Task :v2M5HistoricalM4DependencyCheck
+M5 historical M4 dependency verified: tested=595c8b34779d1e88187eb0084bf18e65ab2dd742 closure=3c01457295258cf586d56630a63067469be34743 head=e8c12b4308dffa9357961994dc4f0395de48c825 FinalSha256=31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07 children=4 scenarios=5 sharedPredicates=9
+
+> Task :nereus-storage-object:checkstyleMain
+> Task :nereus-storage-object:compileTestJava FROM-CACHE
+> Task :nereus-storage-object:processTestResources
+> Task :nereus-storage-object:testClasses
+
+> Task :v2M5CandidateInputsContractTest
+..
+> Task :nereus-storage-object:checkstyleTest
+> Task :nereus-storage-object:spotlessJava FROM-CACHE
+> Task :nereus-storage-object:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-storage-object:spotlessCheck UP-TO-DATE
+> Task :nereus-storage-object:jar
+> Task :nereus-storage-object:m5DeleteTestFixturesJar
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes UP-TO-DATE
+> Task :nereus-domain:jar
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :nereus-storage-api:jar
+
+> Task :nereus-storage-object:v2M5MaterializationTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-bookkeeper:compileJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:compileJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:processResources NO-SOURCE
+> Task :nereus-kafka-bookkeeper:classes UP-TO-DATE
+
+> Task :v2M5CandidateInputsContractTest
+....
+> Task :nereus-kafka-bookkeeper:checkstyleMain
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileTestJava FROM-CACHE
+> Task :nereus-storage-bookkeeper:processTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:testClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:m5NativeDeleteFaultFixturesJar
+> Task :nereus-kafka-bookkeeper:compileTestJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:processTestResources
+> Task :nereus-kafka-bookkeeper:testClasses
+
+> Task :v2M5CandidateInputsContractTest
+..
+> Task :nereus-kafka-bookkeeper:checkstyleTest
+> Task :nereus-kafka-bookkeeper:spotlessJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:spotlessCheck UP-TO-DATE
+> Task :nereus-storage-bookkeeper:jar
+
+> Task :nereus-kafka-bookkeeper:v2M5KafkaCompactionTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5CandidateInputsContractTest
+.
+> Task :nereus-storage-object:v2M5RetentionCoreTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5CandidateInputsContractTest
+..
+----------------------------------------------------------------------
+Ran 11 tests in 12.012s
+
+OK
+
+> Task :v2M5EvidenceJUnitContractTest
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.004s
+
+OK
+
+> Task :nereus-storage-object:v2M5BindingAuthorityTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:v2M5ClosedWriterIntegrationTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:v2M5MaterializationWorkerTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5EvidenceContractTest
+.................
+> Task :nereus-storage-object:v2M5TaskSelectionTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:v2M5TargetDeleteAuthorityCoordinatorTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5EvidenceContractTest
+..
+> Task :nereus-storage-object:v2M5MultiWriterTicketTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:v2M4ReadViewHazardEvidenceTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:v2M4SourcePlanExecutionEvidenceTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5EvidenceContractTest
+............
+> Task :nereus-storage-object:v2M4QuiescenceProtectionReleaseEvidenceTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-metadata-oxia:compileJava FROM-CACHE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:jar
+> Task :nereus-metadata-oxia:compileTestJava FROM-CACHE
+> Task :nereus-metadata-oxia:processTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:testClasses UP-TO-DATE
+
+> Task :nereus-metadata-oxia:v2M4ReadControlOxiaAdapterTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object-s3:compileJava FROM-CACHE
+> Task :nereus-pulsar-offload:compileJava FROM-CACHE
+> Task :nereus-pulsar-offload:processResources NO-SOURCE
+> Task :nereus-pulsar-offload:classes UP-TO-DATE
+> Task :nereus-pulsar-offload:compileTestJava FROM-CACHE
+> Task :nereus-pulsar-offload:processTestResources NO-SOURCE
+> Task :nereus-pulsar-offload:testClasses UP-TO-DATE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :nereus-storage-object-s3:classes UP-TO-DATE
+> Task :nereus-storage-object-s3:jar
+
+> Task :v2M5EvidenceContractTest
+.
+> Task :nereus-pulsar-offload:v2M4CurrentSourcePulsarTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/c06-check-candidate-3/executions/COMPONENTS/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :v2M5EvidenceContractTest
+............................
+----------------------------------------------------------------------
+Ran 60 tests in 21.592s
+
+OK
+
+> Task :v2M5MaterializationContractTest
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.428s
+
+OK
+
+> Task :v2M5MaterializationSourceCheck
+PASS_V2_M5_MATERIALIZATION_IMPLEMENTATION_NON_PROMOTABLE
+
+> Task :v2M5MaterializationCheck
+
+> Task :v2M5KafkaCompactionContractTest
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.428s
+
+OK
+
+> Task :v2M5KafkaCompactionSourceCheck
+PASS_V2_M5_KAFKA_COMPACTION_IMPLEMENTATION_NON_PROMOTABLE
+
+> Task :v2M5KafkaCompactionCheck
+
+BUILD SUCCESSFUL in 1m 13s
+84 actionable tasks: 52 executed, 30 from cache, 2 up-to-date

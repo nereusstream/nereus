@@ -1,0 +1,71 @@
+{
+  "schema": "NEREUS_V2_M5_GC_QUOTA_RUN_V2",
+  "containerId": "f9d3aadf65a8aa64bc275375211356b01f338b913499d20aaa30dce0a6daebd7",
+  "startedBefore": "2026-10-23T10:50:04.808120542Z",
+  "startedAfter": "2026-10-23T10:50:59.127318512Z",
+  "sameServerContainerRestarted": true,
+  "testedInputManifestSha256": "9c43212b291f7ed4fb45d65a9646cafd10bfa082261280afab08faeae32c8962",
+  "capturedInputsUnchangedDuringRun": true,
+  "serverImageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+  "serverSource": "37a17bef17202d5fd6e23282da5fd26d94865484",
+  "clientJarSha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+  "sourceAndReferenceAuthority": "SYNTHETIC_PROOF_FACTS_WITH_REAL_NATIVE_METADATA",
+  "responseFaults": "POST_NATIVE_MUTATION_CLIENT_DELIVERY_INJECTION",
+  "continuousQuotaSettledTerminals": 130,
+  "quotaHeadEncodedBytes": 272,
+  "permanentQuotaEntryEncodedBytes": 156,
+  "canonicalNativeKeyValueBytesMeasured": true,
+  "pendingOperationsMaximum": 1,
+  "everyGrantAndRefundWriteDeliveryBoundaryRecovered": true,
+  "heldNativeReservationAndRefundAbaRejected": true,
+  "emptyRootInitializationRejectsLegacyAuthority": true,
+  "existingIntentCompletesWithFullPendingQuotaAfterRestart": true,
+  "operatorCapacityExpansionAfterRestartVerified": true,
+  "backendWalReplicaDiskSpaceReserved": false,
+  "allNamespaceWritersQuotaAdmissionComplete": false,
+  "compactDoneAndExistingIntentSurvivedServerRestart": true,
+  "actualProviderOrBookKeeperDeletionVerified": false,
+  "nativeUniqueNamespaceAdmissionComplete": false,
+  "configuredRouteDurableNamespaceQuotaIntegrated": true,
+  "physicalDeleteAuthority": false,
+  "suites": [
+    {
+      "task": "v2M5PermanentDoneTest",
+      "tests": 9,
+      "xmlSha256": "c583fcd84e7ed0d78b1b14521df546ff4e508fa3023fc548836324d3cfcf15eb"
+    },
+    {
+      "task": "v2M5TargetDeleteRouteTest",
+      "tests": 4,
+      "xmlSha256": "752215c1184026fa9b5394b510a8cf75cb2ddc7aef5026d89c4a8ed0103eda20"
+    },
+    {
+      "task": "v2M5PermanentDoneRealOxiaTest",
+      "tests": 4,
+      "xmlSha256": "29eb0f861c5174f7d0cc59dd2a3ee1d1e180e50448a94309046373e17ddea01a"
+    },
+    {
+      "task": "v2M5GcQuotaTest",
+      "tests": 14,
+      "xmlSha256": "4a3dc33d996c9e2d1ea9d38b6ed5e3ac8e6cd23be227e9049ee5f5187b62c615"
+    },
+    {
+      "task": "v2M5GcQuotaRealOxiaTest",
+      "tests": 13,
+      "xmlSha256": "2493a910f68c17e19d73b94bcf026ee0259f7c020b1997f5ed06064632efe7c1"
+    },
+    {
+      "task": "v2M5GcQuotaOxiaRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "5ad459242738ccdb618279bd70cb84b4ad7faa3e46b1a387a9acfda7410af50a"
+    },
+    {
+      "task": "v2M5GcQuotaOxiaRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "7bad766621382de04b2eb5b09e0feae2d3d43b28f3da519875c305600ce3ddb2"
+    }
+  ],
+  "m5Receipt": false,
+  "m5FinalAuthority": false,
+  "productionAuthority": false
+}

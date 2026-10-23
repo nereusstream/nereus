@@ -1,0 +1,86 @@
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Invalid Java installation found at '/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home' (MacOS java_home) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+Invalid Java installation found at '/Users/liusinan/.sdkman/candidates/java/8.0.472-amzn' (SDKMAN!) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+> Task :nereus-storage-api:compileJava UP-TO-DATE
+> Task :nereus-domain:compileJava UP-TO-DATE
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes UP-TO-DATE
+> Task :nereus-metadata-spi:compileJava UP-TO-DATE
+> Task :nereus-domain:jar UP-TO-DATE
+> Task :nereus-storage-object:compileJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :nereus-storage-object:compileTestJava UP-TO-DATE
+> Task :nereus-storage-object:processTestResources UP-TO-DATE
+> Task :nereus-storage-object:testClasses UP-TO-DATE
+> Task :nereus-storage-object:m5DeleteTestFixturesJar UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:processTestResources UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileJava UP-TO-DATE
+> Task :nereus-metadata-oxia:compileJava UP-TO-DATE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileTestJava UP-TO-DATE
+> Task :nereus-storage-bookkeeper:processTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:testClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:m5NativeDeleteFaultFixturesJar UP-TO-DATE
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:compileJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :nereus-storage-api:jar UP-TO-DATE
+> Task :nereus-storage-bookkeeper:jar UP-TO-DATE
+> Task :nereus-storage-object:jar UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:compileTestJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:testClasses UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:processRealBookKeeperTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:jar UP-TO-DATE
+> Task :nereus-storage-object-s3:compileJava UP-TO-DATE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :nereus-kafka-bookkeeper:checkstyleMain UP-TO-DATE
+> Task :nereus-storage-object-s3:classes UP-TO-DATE
+> Task :nereus-storage-object-s3:jar UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:compileRealBookKeeperTestJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:realBookKeeperTestClasses UP-TO-DATE
+> Task :nereus-storage-object-s3:compileRealProviderTestJava UP-TO-DATE
+> Task :nereus-storage-object-s3:processRealProviderTestResources NO-SOURCE
+> Task :nereus-storage-object-s3:realProviderTestClasses UP-TO-DATE
+
+> Task :nereus-kafka-bookkeeper:v2M5ObjectRunRecoveryRetirementRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object-s3:v2M5ObjectOxiaNamespaceRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-kafka-bookkeeper:nsip1ObjectAuthorizationRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object-s3:v2M5VersionMatchDeleteRealProviderTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object-s3:v2M5MultipartCleanupRealProviderTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-storage-object:checkstyleMain UP-TO-DATE
+> Task :nereus-storage-object:spotlessJava UP-TO-DATE
+> Task :nereus-storage-object:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-storage-object:spotlessCheck UP-TO-DATE
+
+> Task :nereus-kafka-bookkeeper:v2M5ObjectCellIsolationRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/OBJECT/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+> Task :nereus-kafka-bookkeeper:checkstyleRealBookKeeperTest UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:checkstyleTest UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:spotlessJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:spotlessCheck UP-TO-DATE
+
+BUILD SUCCESSFUL in 20s
+38 actionable tasks: 6 executed, 32 up-to-date

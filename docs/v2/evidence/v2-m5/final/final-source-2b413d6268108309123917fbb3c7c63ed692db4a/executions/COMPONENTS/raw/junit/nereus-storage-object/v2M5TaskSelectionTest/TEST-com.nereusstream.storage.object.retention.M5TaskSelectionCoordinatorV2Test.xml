@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:02:43.209Z" hostname="liusinandeMacBook-Pro.local" time="2.247">
+  <properties/>
+  <testcase name="bootstrapHasNoProjectedViewAndSurvivesActivationTrimAndTaskSelection()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.093"/>
+  <testcase name="cancelWinsEvenWhenArchiveClearRestoresExactlyTheSameProjectedSelectorBeforeLatePublish()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.032"/>
+  <testcase name="malformedConflictingAndWrongTaskArchiveNeverBecomesAbsence()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.012"/>
+  <testcase name="missingOrUnreadableArchiveRetainsInlineDecisionAndBlocksNextTaskAdmission()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.013"/>
+  <testcase name="moreThanFormerLifetimeCapKeepsExactlyOneFixedSizeInlineAnchor()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="2.069"/>
+  <testcase name="lostAppliedSelectorAndArchiveResponsesReconcileFromExactDurableBytes()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.003"/>
+  <testcase name="selectedTaskCannotBeReclassifiedAsUnpublishedByCompetingCancelOrFreshCoordinator()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.005"/>
+  <testcase name="legacyWireRoundTripAndOrdinarySelectorMutationPreserveDecisionWithoutDowngrade()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.004"/>
+  <testcase name="bootstrapRejectsCorruptionForeignActivationAndCompetingFirstView()" classname="com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

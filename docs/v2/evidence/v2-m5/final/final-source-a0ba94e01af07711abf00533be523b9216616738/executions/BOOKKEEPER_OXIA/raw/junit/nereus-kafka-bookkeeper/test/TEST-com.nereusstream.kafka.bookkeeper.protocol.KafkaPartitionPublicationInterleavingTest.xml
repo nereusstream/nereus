@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.461Z" hostname="liusinandeMacBook-Pro.local" time="0.002">
+  <properties/>
+  <testcase name="commitWinningFirstMakesTheOldTransitionStaleAndWakesExactlyOnce()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest" time="0.0"/>
+  <testcase name="capturesOnlyWholeBeforeOrAfterRootsAcrossPublication()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest" time="0.0"/>
+  <testcase name="fenceWinningFirstMakesTheOldCommitStaleWithoutCommitWakeup()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest" time="0.0"/>
+  <testcase name="laterDurableSlotCannotPublishAroundItsPredecessorGap()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

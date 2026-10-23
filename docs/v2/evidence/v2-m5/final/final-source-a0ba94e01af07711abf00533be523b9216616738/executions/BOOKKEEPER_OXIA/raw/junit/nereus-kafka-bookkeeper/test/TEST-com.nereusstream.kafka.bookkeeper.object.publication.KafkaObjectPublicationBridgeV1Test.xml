@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.038Z" hostname="liusinandeMacBook-Pro.local" time="0.112">
+  <properties/>
+  <testcase name="m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.08"/>
+  <testcase name="m4NullProviderCompletionReleasesTheInnerPinAndOuterHazard()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.003"/>
+  <testcase name="wholeSuffixRollbackUsesRepositoryRootCasThenReleasesExactSuffixTicket()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.002"/>
+  <testcase name="m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.004"/>
+  <testcase name="m4PhysicalRouteOrdinalCannotBeReusedAcrossReadCells()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="takeoverRejectsAssignedPositionsAndInvalidatesOnlyUnassignedReservationValues()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.003"/>
+  <testcase name="rollbackValidatesExactTicketCommitPairBeforeRootCas()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.002"/>
+  <testcase name="m4RefreshKeepsTheOldPhysicalPlanPinnedAndNewReadCapturesTheNewGeneration()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.007"/>
+  <testcase name="rollbackAfterSequenceEffectLeavesRootAndExactTicketIntact()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="invalidNativeCutFailsBeforeRootCasAndLeavesTicketAndLocatorUnpublished()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="repositoryRootSelectsLocatorNativeStateAndQueueBeforeAckThenRetainsLocatorBudget()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="retainedLocatorBudgetRequiresManifestBoundRootRetirementAndExactPinDrain()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="issuedWholeSuffixRollbackFencesSequenceUntilExactRootCasCompletes()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.0"/>
+  <testcase name="ackFailureRetainsRootPublishedTicketAndRetryDoesNotRepublish()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="noEffectSequenceClaimFreezesRollbackAndAbortRestoresExactEligibility()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.0"/>
+  <testcase name="takeoverKeepsRootSelectedLocatorBudgetUntilTypedRetirement()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="locatorReservationUsesTheActualCanonicalLocatorWireCharge()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.0"/>
+  <testcase name="forgedLastStableOffsetCannotExposeAnOpenTransaction()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <testcase name="sharedPhysicalAndBindingFailureDomainsRemainIndependent()" classname="com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test" time="0.001"/>
+  <system-out><![CDATA[M4_METRIC KAFKA_CURRENT_SOURCE operations=1000 elapsedNanos=41322708 p50Nanos=23416 p99Nanos=369542 maxNanos=1647541 throughputOpsPerSecond=24199 callerAllocatedBytes=463952 callerAllocatedBytesPerOperation=463 ownerAllocatedBytes=943960 ownerAllocatedBytesPerOperation=943 measuredAllocatedBytes=1407912 measuredAllocatedBytesPerOperation=1407 hazardCapacity=8 peakInFlight=8 rejectedAtCapacity=1 outerHazardCasPerRead=2 perCallbackSlotCas=0 reusablePlanCapacity=256
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

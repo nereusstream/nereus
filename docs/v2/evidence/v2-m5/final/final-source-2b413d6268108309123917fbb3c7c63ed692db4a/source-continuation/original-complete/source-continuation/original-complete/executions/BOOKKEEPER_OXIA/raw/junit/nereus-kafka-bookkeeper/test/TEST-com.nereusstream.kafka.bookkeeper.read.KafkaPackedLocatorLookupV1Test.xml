@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.486Z" hostname="liusinandeMacBook-Pro.local" time="0.002">
+  <properties/>
+  <testcase name="activeTailFlattensPerRecordBatchMembersIntoPrimitiveRows()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <testcase name="snapshotRejectsAnActiveRunFromAnotherPublishedGeneration()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <testcase name="directorySkipsACompactionGapToTheFirstSuccessorBlock()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <testcase name="runTableSkipsAWholeCompactedRunGap()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <testcase name="directoryResolvesExactCursorIdentityAndOrdinalSuccessor()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.001"/>
+  <testcase name="acceptsFloorOnlyWhenOneCompleteBatchCoversTheRequestedOffset()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <testcase name="rejectsDirectoryAndPackedIndexRegression()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:15.293Z" hostname="liusinandeMacBook-Pro.local" time="0.238">
+  <properties/>
+  <testcase name="rejectsPathEscapeAndAttachmentCaps()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.017"/>
+  <testcase name="canonicalRoundTripAndExactPolicyResolve()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.164"/>
+  <testcase name="rejectsWrongPrerequisiteBindingAndUnreferencedAttachment()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.008"/>
+  <testcase name="policyContainsOnlyTheTenExactlyM2Scenarios()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.001"/>
+  <testcase name="rejectsNonCanonicalBytesAndNonPassSuite()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.008"/>
+  <testcase name="rejectsDuplicateAndUnsortedIds()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.007"/>
+  <testcase name="rejectsTamperedAndSymlinkAttachments()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.015"/>
+  <testcase name="rejectsMissingOrUnownedScenarioAndSuite()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.009"/>
+  <testcase name="canonicalRootRejectsSymlinkAndOversize()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:13.673Z" hostname="liusinandeMacBook-Pro.local" time="0.389">
+  <properties/>
+  <testcase name="foreignBindingNamespaceAndProviderScopeFailBeforeWrite()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.293"/>
+  <testcase name="originalPublicationTargetsRequireExactTaskOutputsAndCanonicalUnchangedBytes()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.023"/>
+  <testcase name="selectedCacheBudgetKeepsActualTaskBoundsAndRequiresIndependentOwnerIdentity()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.015"/>
+  <testcase name="nativeReadScopeRetainsRawWireAndRejectsUnboundGenerationMembership()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.013"/>
+  <testcase name="candidateRequiresItsExactDescriptorAndTaskAndDetectsCorruptReads()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.008"/>
+  <testcase name="typedTaskPartsDescriptorCandidateAndM4ViewComposeThroughOneStore()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.02"/>
+  <testcase name="immutableMutationCannotOverwriteARecordedAllocation()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.006"/>
+  <testcase name="orphanPartAndWrongPartKeyCannotBeAdopted()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.005"/>
+  <testcase name="wrongContentAddressAndMalformedKeyAreRejectedBeforeBackendIo()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

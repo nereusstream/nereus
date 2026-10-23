@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:50:11.670Z" hostname="liusinandeMacBook-Pro.local" time="0.14">
+  <properties/>
+  <testcase name="allKindsRoundTripIncludingMaximumLedgerIdAndExactUnicode()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.102"/>
+  <testcase name="exactStableResourceHasIndependentGoldenEncodingAndDigest()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.005"/>
+  <testcase name="rejectsMalformedLengthsTagsTruncationAndLegacyWire()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.008"/>
+  <testcase name="realVersionNamespaceAndResourceKindChangesRemainDistinct()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.002"/>
+  <testcase name="rejectsWrongProviderEmptyOversizeAndInvalidUtf8Components()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.002"/>
+  <testcase name="canonicalOrderDeduplicatesMultiTargetAliasesAndKeepsDistinctVersions()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.007"/>
+  <testcase name="componentBoundariesAndNamesAreNeverNormalized()" classname="com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

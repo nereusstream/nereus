@@ -1,0 +1,219 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.transaction.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ShortNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.transaction.generated.TransactionLogValue.*;
+
+public class TransactionLogValueJsonConverter {
+    public static TransactionLogValue read(JsonNode _node, short _version) {
+        TransactionLogValue _object = new TransactionLogValue();
+        JsonNode _producerIdNode = _node.get("producerId");
+        if (_producerIdNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'producerId', which is mandatory in version " + _version);
+        } else {
+            _object.producerId = MessageUtil.jsonNodeToLong(_producerIdNode, "TransactionLogValue");
+        }
+        JsonNode _previousProducerIdNode = _node.get("previousProducerId");
+        if (_previousProducerIdNode == null) {
+            _object.previousProducerId = -1L;
+        } else {
+            _object.previousProducerId = MessageUtil.jsonNodeToLong(_previousProducerIdNode, "TransactionLogValue");
+        }
+        JsonNode _nextProducerIdNode = _node.get("nextProducerId");
+        if (_nextProducerIdNode == null) {
+            _object.nextProducerId = -1L;
+        } else {
+            _object.nextProducerId = MessageUtil.jsonNodeToLong(_nextProducerIdNode, "TransactionLogValue");
+        }
+        JsonNode _producerEpochNode = _node.get("producerEpoch");
+        if (_producerEpochNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'producerEpoch', which is mandatory in version " + _version);
+        } else {
+            _object.producerEpoch = MessageUtil.jsonNodeToShort(_producerEpochNode, "TransactionLogValue");
+        }
+        JsonNode _nextProducerEpochNode = _node.get("nextProducerEpoch");
+        if (_nextProducerEpochNode == null) {
+            _object.nextProducerEpoch = (short) -1;
+        } else {
+            _object.nextProducerEpoch = MessageUtil.jsonNodeToShort(_nextProducerEpochNode, "TransactionLogValue");
+        }
+        JsonNode _transactionTimeoutMsNode = _node.get("transactionTimeoutMs");
+        if (_transactionTimeoutMsNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'transactionTimeoutMs', which is mandatory in version " + _version);
+        } else {
+            _object.transactionTimeoutMs = MessageUtil.jsonNodeToInt(_transactionTimeoutMsNode, "TransactionLogValue");
+        }
+        JsonNode _transactionStatusNode = _node.get("transactionStatus");
+        if (_transactionStatusNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'transactionStatus', which is mandatory in version " + _version);
+        } else {
+            _object.transactionStatus = MessageUtil.jsonNodeToByte(_transactionStatusNode, "TransactionLogValue");
+        }
+        JsonNode _transactionPartitionsNode = _node.get("transactionPartitions");
+        if (_transactionPartitionsNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'transactionPartitions', which is mandatory in version " + _version);
+        } else {
+            if (_transactionPartitionsNode.isNull()) {
+                _object.transactionPartitions = null;
+            } else {
+                if (!_transactionPartitionsNode.isArray()) {
+                    throw new RuntimeException("TransactionLogValue expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<PartitionsSchema> _collection = new ArrayList<PartitionsSchema>(_transactionPartitionsNode.size());
+                _object.transactionPartitions = _collection;
+                for (JsonNode _element : _transactionPartitionsNode) {
+                    _collection.add(PartitionsSchemaJsonConverter.read(_element, _version));
+                }
+            }
+        }
+        JsonNode _transactionLastUpdateTimestampMsNode = _node.get("transactionLastUpdateTimestampMs");
+        if (_transactionLastUpdateTimestampMsNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'transactionLastUpdateTimestampMs', which is mandatory in version " + _version);
+        } else {
+            _object.transactionLastUpdateTimestampMs = MessageUtil.jsonNodeToLong(_transactionLastUpdateTimestampMsNode, "TransactionLogValue");
+        }
+        JsonNode _transactionStartTimestampMsNode = _node.get("transactionStartTimestampMs");
+        if (_transactionStartTimestampMsNode == null) {
+            throw new RuntimeException("TransactionLogValue: unable to locate field 'transactionStartTimestampMs', which is mandatory in version " + _version);
+        } else {
+            _object.transactionStartTimestampMs = MessageUtil.jsonNodeToLong(_transactionStartTimestampMsNode, "TransactionLogValue");
+        }
+        JsonNode _clientTransactionVersionNode = _node.get("clientTransactionVersion");
+        if (_clientTransactionVersionNode == null) {
+            _object.clientTransactionVersion = (short) 0;
+        } else {
+            _object.clientTransactionVersion = MessageUtil.jsonNodeToShort(_clientTransactionVersionNode, "TransactionLogValue");
+        }
+        return _object;
+    }
+    public static JsonNode write(TransactionLogValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        _node.set("producerId", new LongNode(_object.producerId));
+        if (_version >= 1) {
+            if (_object.previousProducerId != -1L) {
+                _node.set("previousProducerId", new LongNode(_object.previousProducerId));
+            }
+        } else {
+            if (_object.previousProducerId != -1L) {
+                throw new UnsupportedVersionException("Attempted to write a non-default previousProducerId at version " + _version);
+            }
+        }
+        if (_version >= 1) {
+            if (_object.nextProducerId != -1L) {
+                _node.set("nextProducerId", new LongNode(_object.nextProducerId));
+            }
+        } else {
+            if (_object.nextProducerId != -1L) {
+                throw new UnsupportedVersionException("Attempted to write a non-default nextProducerId at version " + _version);
+            }
+        }
+        _node.set("producerEpoch", new ShortNode(_object.producerEpoch));
+        if (_version >= 1) {
+            if (_object.nextProducerEpoch != (short) -1) {
+                _node.set("nextProducerEpoch", new ShortNode(_object.nextProducerEpoch));
+            }
+        } else {
+            if (_object.nextProducerEpoch != (short) -1) {
+                throw new UnsupportedVersionException("Attempted to write a non-default nextProducerEpoch at version " + _version);
+            }
+        }
+        _node.set("transactionTimeoutMs", new IntNode(_object.transactionTimeoutMs));
+        _node.set("transactionStatus", new ShortNode(_object.transactionStatus));
+        if (_object.transactionPartitions == null) {
+            _node.set("transactionPartitions", NullNode.instance);
+        } else {
+            ArrayNode _transactionPartitionsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (PartitionsSchema _element : _object.transactionPartitions) {
+                _transactionPartitionsArray.add(PartitionsSchemaJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("transactionPartitions", _transactionPartitionsArray);
+        }
+        _node.set("transactionLastUpdateTimestampMs", new LongNode(_object.transactionLastUpdateTimestampMs));
+        _node.set("transactionStartTimestampMs", new LongNode(_object.transactionStartTimestampMs));
+        if (_version >= 1) {
+            if (_object.clientTransactionVersion != (short) 0) {
+                _node.set("clientTransactionVersion", new ShortNode(_object.clientTransactionVersion));
+            }
+        } else {
+            if (_object.clientTransactionVersion != (short) 0) {
+                throw new UnsupportedVersionException("Attempted to write a non-default clientTransactionVersion at version " + _version);
+            }
+        }
+        return _node;
+    }
+    public static JsonNode write(TransactionLogValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class PartitionsSchemaJsonConverter {
+        public static PartitionsSchema read(JsonNode _node, short _version) {
+            PartitionsSchema _object = new PartitionsSchema();
+            JsonNode _topicNode = _node.get("topic");
+            if (_topicNode == null) {
+                throw new RuntimeException("PartitionsSchema: unable to locate field 'topic', which is mandatory in version " + _version);
+            } else {
+                if (!_topicNode.isTextual()) {
+                    throw new RuntimeException("PartitionsSchema expected a string type, but got " + _node.getNodeType());
+                }
+                _object.topic = _topicNode.asText();
+            }
+            JsonNode _partitionIdsNode = _node.get("partitionIds");
+            if (_partitionIdsNode == null) {
+                throw new RuntimeException("PartitionsSchema: unable to locate field 'partitionIds', which is mandatory in version " + _version);
+            } else {
+                if (!_partitionIdsNode.isArray()) {
+                    throw new RuntimeException("PartitionsSchema expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<Integer> _collection = new ArrayList<Integer>(_partitionIdsNode.size());
+                _object.partitionIds = _collection;
+                for (JsonNode _element : _partitionIdsNode) {
+                    _collection.add(MessageUtil.jsonNodeToInt(_element, "PartitionsSchema element"));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(PartitionsSchema _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("topic", new TextNode(_object.topic));
+            ArrayNode _partitionIdsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (Integer _element : _object.partitionIds) {
+                _partitionIdsArray.add(new IntNode(_element));
+            }
+            _node.set("partitionIds", _partitionIdsArray);
+            return _node;
+        }
+        public static JsonNode write(PartitionsSchema _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

@@ -1,0 +1,397 @@
+{
+  "rawCaptureRequiresExpectedBinding": true,
+  "rawCaptureReservesBeforeRootCatalogRead": true,
+  "rejectedRawCaptureDoesNotReadRootCatalog": true,
+  "wrongAdmittedBindingCannotCaptureAnotherNativeRun": true,
+  "unconfirmedRawReadRetainsShareAndTicketUntilCallback": true,
+  "unconfirmedRawCloseRetainsShareAndTicket": true,
+  "healthySameCellRawBindingReadsDuringSiblingQuarantine": true,
+  "cancelledRawObserverCannotClearQuarantine": true,
+  "confirmedRawSessionExposesExactTicketCleanupRetry": true,
+  "rawTicketCleanupRetryIsMetadataOnly": true,
+  "rawSourceRequiresSharedCellReadBudget": true,
+  "wholeRawResolutionRetainsChargeBetweenNativeSessions": true,
+  "cancelledRawResolutionKeepsChargeUntilActualCompletion": true,
+  "rawResolutionBlocksSameBindingSelectedCaptureAtCapacity": true,
+  "selectedGenerationCaptureUsesScopedM4ReadOwner": true,
+  "selectedCaptureAndScopedReadersShareCellCapacityNativeVerified": true,
+  "selectedCaptureTicketCleanupPreservesLiveSameContextSibling": true,
+  "confirmedNativeReadDrainExposesExactOperationTicketRetry": true,
+  "nativeReadTicketRetryPreservesLiveSameContextSibling": true,
+  "unknownNativeCloseExposesTicketRetry": false,
+  "nativeBkReadOwnerReservesFixedBindingShares": true,
+  "cancelledNativeReadRetainsBindingShareUntilSessionTermination": true,
+  "healthyBindingReadsInSameConfiguredCellWhileSiblingHeld": true,
+  "globalProcessReadBudgetAuthority": false,
+  "occupiedNativeCellHeadsSurvivedServiceRestart": true,
+  "freshJvmDidNotRedispatchOrReleaseActiveNativeCell": true,
+  "healthyConfiguredCellDeletesAfterOccupiedHeadsRestart": true,
+  "qualifiedActiveTransportDrain": false,
+  "successorNativeEpochReleasesFencedActiveCellCapacity": true,
+  "cellRestartStartedBefore": "2026-10-23T10:35:18.549096382Z",
+  "cellRestartStartedAfter": "2026-10-23T10:36:11.965314212Z",
+  "bookKeeperBeforeCellRestart": [
+    [
+      "2dcd0a589c24b734fbb1a24ec1c52ab9b87b2430b845216517065c2af31936a7",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.700489046Z"
+    ],
+    [
+      "700d3aaaf575de9e1f4d592cf9c9bd4105a880dbd802774180d6e7dc7280c578",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.698825046Z"
+    ],
+    [
+      "2b12e5958a0bf162ff31e18b2958bd8e94beb05551d9258aa5756e5cbb3c79d8",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.699949712Z"
+    ],
+    [
+      "2bbe46155c13000f848c328fe2b380a882075dbf70e8bad661e73eee82045303",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:07.03129471Z"
+    ]
+  ],
+  "bookKeeperAfterCellRestart": [
+    [
+      "2dcd0a589c24b734fbb1a24ec1c52ab9b87b2430b845216517065c2af31936a7",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:36:05.120973917Z"
+    ],
+    [
+      "700d3aaaf575de9e1f4d592cf9c9bd4105a880dbd802774180d6e7dc7280c578",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:36:05.122242209Z"
+    ],
+    [
+      "2b12e5958a0bf162ff31e18b2958bd8e94beb05551d9258aa5756e5cbb3c79d8",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:36:05.121596167Z"
+    ],
+    [
+      "2bbe46155c13000f848c328fe2b380a882075dbf70e8bad661e73eee82045303",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:36:00.464174013Z"
+    ]
+  ],
+  "nativeCellRestartCheckpointSha256": {
+    "native-cell-checkpoint-active": "0e3fd50566f135b5c3d646e2cbc90af3bd16493cf8ee2b9d49bc2da1d26e157a",
+    "native-cell-checkpoint-unknown": "fa53f210f149361b1f30e96d74cbe39bc6c91cd55cb6316ecce0576149c5f46d",
+    "native-cell-checkpoint-unknown-absent": "db29cc2662ccada661dbcdb6a08a5bb37d6d80d681a1f33b122e8c6766e0d4e1"
+  },
+  "nativeCellDispatchAndUnknownSlotsReservedBeforeDelete": true,
+  "observerCancellationRetainsNativeCellReservation": true,
+  "distinctNativeCellBudgetHeadsAreIndependent": true,
+  "terminalUnknownRequiresReadOnlyNativeAbsenceBeforeRelease": true,
+  "fullCellAndPerBindingDispatchAdmission": false,
+  "nativeIntentEligibilityFactsRereadBeforeAndAfterBinding": true,
+  "nativeGcCanonicalCapacityAtomicallyReserved": true,
+  "nativeGcCapacitySurvivedRestartAndDone": true,
+  "existingNativeIntentContinuesAtCapacity": true,
+  "nativeGcUsesUniqueAuthorityRoute": true,
+  "nativeGcRequiresActiveQuotaAuthority": true,
+  "boundGcEpochIntentAndM5AuthoritySurvivedRestart": true,
+  "boundCellUnknownAbsenceRecoveredAfterRestart": true,
+  "boundUnknownCheckpointSha256": "6e6ff163faaa4b2095dcdadaaef56c2b4c68e4a2dc9b3df3494471bde82298bb",
+  "nativeEpochMonotonicGracePrerequisite": true,
+  "nativeEpochGraceUsesIndependentRetainedQuotaProfile": true,
+  "nativeEpochGraceDependencyResultSha256": "94a5aa8f2b5a970a85a72228b8eca1a8f898cde03ad80ea94f3e70cb01d83d7b",
+  "nativeEpochGraceDependencyInputSha256": "7702db303372d4073891d5209a757061aeaff09aa9cbc9218db4f38851498e11",
+  "graceAndDispatchCapacityAdmitted": false,
+  "schema": "NEREUS_V2_M5_KAFKA_RUN_SOURCE_RUN_V2",
+  "suites": [
+    {
+      "task": "v2M5EpochGraceProfileDependency",
+      "tests": 1,
+      "xmlSha256": "adbc37a1b3f5eda54e9b9d4e285ef22864f56c0d3d4b4bfeb1f3cc303ae95bb4"
+    },
+    {
+      "task": "v2M5MaterializationTest",
+      "tests": 18,
+      "xmlSha256": "bd8b6fa4aa723e71580949d0bdbcbd9c592924cb15f067923ea00c38944511a4"
+    },
+    {
+      "task": "v2M5KafkaCompactionTest",
+      "tests": 22,
+      "xmlSha256": "366356b08977dcd691d87c95ca33d0528d2e7d5f7e34b60aaf56252b7d76c2d0"
+    },
+    {
+      "task": "v2M5KafkaRecordBatchBudgetTest",
+      "tests": 3,
+      "xmlSha256": "588fca97ead0cf1cdfcd6bba7594832b5f1a37794d2840c58e70433204f4acb3"
+    },
+    {
+      "task": "v2M5KafkaReadOwnerTest",
+      "tests": 8,
+      "xmlSha256": "d0fd6f3e1600b6f4705cc89e617f0a7ce62aeff4bc4f468d2fc879f8bd4fe506"
+    },
+    {
+      "task": "v2M5BookKeeperM4RecoveryTest",
+      "tests": 7,
+      "xmlSha256": "dcd7a85ccdc99a9151321bc67ccdab0f6321170ef692860f9b83b3d062be457b"
+    },
+    {
+      "task": "v2M5KafkaSelectedSourceTest",
+      "tests": 3,
+      "xmlSha256": "a0002807690b3f24962a570db6a525e20bc8e38d0474fbff4e8f6a94d3ee1e11"
+    },
+    {
+      "task": "v2M5KafkaRunSourceRealTest",
+      "tests": 14,
+      "xmlSha256": "c924eb8c333479c242abc5961b78991ace0fc6ce86f4d44a34315f3bca48ce8e"
+    },
+    {
+      "task": "v2M5KafkaRunSourceRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "6fb1c88b2a268de128b11a744c7cac8d036a465f74a3363f9d37e7fcde74073b"
+    },
+    {
+      "task": "v2M5KafkaRunSourceRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "b2b549fa0b31974aa80bf7ae6754ca8df5c1aaa097bc86324be957a7ed629b38"
+    },
+    {
+      "task": "v2M5NativeDeleteQuotaRealTest",
+      "tests": 2,
+      "xmlSha256": "b5da8c9a29387dd31688fc2c737cd903eae1c0de31d9b9169f592c117fb5be3b"
+    },
+    {
+      "task": "v2M5NativeDeleteCellBudgetRealTest",
+      "tests": 3,
+      "xmlSha256": "83d31e58f19fc5b9b41ef56a438f51569eb030d309bd6eba5c37aa63af74610b"
+    },
+    {
+      "task": "v2M5NativeDeleteCellRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "e8ee05ef9cc55d5c9a24775f05ae932fee1036cb2f1a0ad30e2b2b290576eb8b"
+    },
+    {
+      "task": "v2M5NativeDeleteCellRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "3c1668eb64d7b5d55a8c4eb4024839ab86e6783f187764cabd5ba0fa8ea8e00d"
+    },
+    {
+      "task": "v2M5NativeDeleteCellRestartRecoverTest",
+      "tests": 1,
+      "xmlSha256": "ac44862921470cf724d09acbd98c7c3cc72401366665c5eefc298449c6c7da2a"
+    },
+    {
+      "task": "v2M5BoundDeleteRealTest",
+      "tests": 1,
+      "xmlSha256": "057ea02756b3c91fb4c44801d84f3902fedfaf44b8b32c6676450b955f3b00cf"
+    },
+    {
+      "task": "v2M5BoundDeleteRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "2806da8de990ae02d8d5da43d958cdc6e3c371fd958cfc54bf2b425cb61eb810"
+    },
+    {
+      "task": "v2M5BoundDeleteRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "2791dc7579fa7e6ee11db138d301fc376405a658a321f8890d2e28c2eda49ea6"
+    },
+    {
+      "task": "v2M5KafkaRunRootTest",
+      "tests": 20,
+      "xmlSha256": "fb27e289894c87604bd9b7becd435c97e7095cd0137532ddc892d9261b8813dd"
+    },
+    {
+      "task": "v2M5KafkaRunRootsRealTest",
+      "tests": 16,
+      "xmlSha256": "067d539fcd81894651724a9af2d391f7587e03bde1e1ed699774bddcf693b6f6"
+    },
+    {
+      "task": "v2M5KafkaRunRootsRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "9be3a21fbf00c0d493b8ca4dbe9d197cc62fd5b1bd636445274063699f858194"
+    },
+    {
+      "task": "v2M5KafkaRunRootsRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "072bb0c086016182ed6384ff8139b364859bb98e6d697c051ae3ace8b4a108f7"
+    },
+    {
+      "task": "v2M5MultiWriterTicketTest",
+      "tests": 10,
+      "xmlSha256": "e502f1ff7eabb390728c318766260d54a0f5a88e4697b0bffc5faf8873440676"
+    },
+    {
+      "task": "v2M5BookKeeperDescriptorTest",
+      "tests": 13,
+      "xmlSha256": "6e40c8159d265cd2d6561bcd21ad93984145f5cf86e68ab4906dbaaf7962f955"
+    },
+    {
+      "task": "v2M5PublicationTicketsRealTest",
+      "tests": 9,
+      "xmlSha256": "714c347174ed91ea3b37b1635fcd4733af8ea183788d24472c6f6bddf310f72f"
+    },
+    {
+      "task": "v2M5PublicationTicketsRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "a4f48b9cce3f7b48abc1926b2e38ebeaa43a7f275c87e410a9ff55a70ca76673"
+    },
+    {
+      "task": "v2M5PublicationTicketsRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "1a9ceb31938dea2496d6836c195af6ba9acb53ed796793b3f7ba52baaf69d591"
+    },
+    {
+      "task": "v2M5KafkaSelectedCacheBudgetTest",
+      "tests": 9,
+      "xmlSha256": "08957c212404a640cafcedb81e24369e8170b354f71ccfceb993a1fdad6fcf8a"
+    },
+    {
+      "task": "v2M5KafkaM4BrokerReadOwnerTest",
+      "tests": 5,
+      "xmlSha256": "c2e5112dad7138484ba06589d1901cad8fceded5f4f3074d725aced1f46fb45f"
+    },
+    {
+      "task": "v2M5KafkaRecoveryArtifactUnitTest",
+      "tests": 9,
+      "xmlSha256": "43335813ddb2f9e7ee82737dbb5ab201c652f72ed40eca36fbff5f95a0c24981"
+    }
+  ],
+  "oxiaContainerId": "10971d35ad691993f29b3ed58707461baff1865870d3c17fcab919bec58351f2",
+  "startedBefore": "2026-10-23T10:30:30.936718388Z",
+  "startedAfter": "2026-10-23T10:35:18.549096382Z",
+  "sameOxiaServerContainerRestarted": true,
+  "bookKeeperClusterRetainedAcrossOxiaRestart": true,
+  "sameZooKeeperAndBookieContainersRestarted": true,
+  "bookKeeperBeforeRestart": [
+    [
+      "2dcd0a589c24b734fbb1a24ec1c52ab9b87b2430b845216517065c2af31936a7",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:30:13.946413755Z"
+    ],
+    [
+      "700d3aaaf575de9e1f4d592cf9c9bd4105a880dbd802774180d6e7dc7280c578",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:30:13.947149963Z"
+    ],
+    [
+      "2b12e5958a0bf162ff31e18b2958bd8e94beb05551d9258aa5756e5cbb3c79d8",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:30:13.945730922Z"
+    ],
+    [
+      "2bbe46155c13000f848c328fe2b380a882075dbf70e8bad661e73eee82045303",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:30:09.348264878Z"
+    ]
+  ],
+  "bookKeeperAfterRestart": [
+    [
+      "2dcd0a589c24b734fbb1a24ec1c52ab9b87b2430b845216517065c2af31936a7",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.700489046Z"
+    ],
+    [
+      "700d3aaaf575de9e1f4d592cf9c9bd4105a880dbd802774180d6e7dc7280c578",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.698825046Z"
+    ],
+    [
+      "2b12e5958a0bf162ff31e18b2958bd8e94beb05551d9258aa5756e5cbb3c79d8",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:11.699949712Z"
+    ],
+    [
+      "2bbe46155c13000f848c328fe2b380a882075dbf70e8bad661e73eee82045303",
+      "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "2026-10-23T10:35:07.03129471Z"
+    ]
+  ],
+  "guardedTaskNativeInstanceIdAndCreateFenceSurvivedRestart": true,
+  "testedInputManifestSha256": "bfc1298aeb7c368ebd5ca90760ff17c348c2b69fb861a6f1a657b751e5bc8abe",
+  "capturedInputsUnchangedDuringRun": true,
+  "everyCapturedSourceManifestCheckedIndependently": true,
+  "bookKeeperImageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+  "oxiaImageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+  "sourceAndProtocolAuthority": "SYNTHETIC_FACTS_WITH_REAL_OXIA_AND_BK",
+  "nativeM4HeldSelectorCasReadAndFenceReal": true,
+  "currentLoadedM4ReadClassSha256": {
+    "nativePartition": "09cbf969efda049098a119d0f3c8da3f9fe1324016430d1a47b409e505be7fbd",
+    "nativeReadOwner": "8c8d0f9e0d6348ab85d0e762f7afb8e1c393b38454a760c441a9d9c2d1fef4f4",
+    "readAsyncExecutor": "2884e71c67e77ae0a50c35bb157c3a458d9aa906aa9248b0b251c27b8d2443e8",
+    "selectorRuntime": "80d5619f44c7f52e877e40e85851cc3e79711b8db71e50762a11855825898567",
+    "readControl": "66dd023a545a28edf02bd10d5627e8adfa75698f2a42383a96f042045c9109d6",
+    "proofCleanupPlanner": "6ef01e63f6887b4178490096edbec9947fa2d5ffeed7f6cdedaa8b166313cdb1",
+    "oxiaReadRoute": "0584a8e92eb6650d5720fe404afd46ef9c79905537ba13848aa76cda06db6091"
+  },
+  "currentM4RuntimeArtifactSha256": {
+    "nereus-storage-api": "6823e3d42855e75ab784202e27b9a1e5390f0a46004043fb539a04fc71b72653",
+    "nereus-metadata-spi": "cd5df1456f1319d278b68061cde51dc16e5985c35538021e70152cfa0ce70a33",
+    "nereus-storage-object": "1cb9b622746b975a12eb3d4cb83a59743d7c7d8d91f32c6c13a473dfe5975f96",
+    "nereus-storage-bookkeeper": "b0c948fc65f3075c3b06605f7a37de9a00789d75327189dfeeb8ed42fa147a14",
+    "nereus-kafka-bookkeeper": "7a64b4de56c19c87aea51a9abcd2257dcf106f89e7975aebfd86d0370aa972fa",
+    "nereus-metadata-oxia": "9bf9b42057ee758e4caf6e502f65d564a43c7a6431a0aef6d3e7f8141741594a"
+  },
+  "lockedOxiaClientArtifactSha256": {
+    "oxia-client": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+    "oxia-client-api": "fa2a973c19eafa83c7f2efb8d727d744b5405fb13e5a6adb9a92225f672455bf"
+  },
+  "nativeNamespaceBoundToActualOxia": true,
+  "nativeSourceAndOutputLedgerBytesVerified": true,
+  "inputAndOutputTicketsBeforeNativeSelectorCas": true,
+  "concurrentWinnerReconcilesOlderHeldInvocationTickets": true,
+  "completePhysicalTargetSetBoundIntoTicketContext": true,
+  "terminalRecoveryAtMost256TicketRemovalsPerPass": true,
+  "fenceFirstPreventsPublicationAndReleasesAcquiredTickets": true,
+  "nativeLostSelectorResponseReconciled": true,
+  "observerCancellationRetainsTicketsUntilNativeCompletion": true,
+  "nativeTaskCancellationReconcilesUnpublishedTickets": true,
+  "missingInputMembershipRejected": true,
+  "sameServerDataRestartedWithUnresolvedPublicationTickets": true,
+  "freshJvmReconcilesTicketsFromNativeSelectionWithoutRepublishing": true,
+  "sourceOwnershipAndEligibilityAuthority": "SYNTHETIC_LOGICAL_MEMBERSHIP_AND_ELIGIBILITY",
+  "nativeKafkaRunRootsPersisted": true,
+  "nativeRunHeaderAndClosedFooterVerified": true,
+  "pendingUnselectedRootsInvisible": true,
+  "nativeParentSelectsOneSuccessor": true,
+  "bothInternalTopicRunBytesVerified": true,
+  "freshJvmRecoversSelectedPendingRootsWithoutRepublishing": true,
+  "runRootGcAdmissionAndProtocolOwnerAuthority": "SYNTHETIC_FIXTURES",
+  "runRootMetadataQuotaComplete": false,
+  "nativeReadFencedRecoveryComplete": false,
+  "nativeRunDataProducesSourceExtentsAndInputBatches": true,
+  "nativeRunMembershipChecksCompleteFrozenExtent": true,
+  "nativePlanInputListComparedBeforePublication": true,
+  "omittedReorderedRelocatedAndChangedInputBatchesRejected": true,
+  "omittedNativeInputPreventsCandidateAndSelectorWrites": true,
+  "readTicketHeldUntilOwnedSessionClosed": true,
+  "nativeGroupAndIndexCorruptionRejected": true,
+  "sourceBudgetSharedAcrossWholeResolution": true,
+  "decodedKafkaRecordCountAndBytesBounded": true,
+  "nativeSourceAndSelectedOutputReverifiedAfterRestart": true,
+  "nativeSelectedGenerationSourceAndAllPhysicalMembersVerified": true,
+  "indexOnlyGenerationCanReenterSemanticCompilerWithNoInputBatches": true,
+  "selectedGenerationSourceIdentityRederivedAfterRestart": true,
+  "secondNativePublicationAfterExactM4FallbackClosure": true,
+  "newFallbackProtectionStartsAtIntroducedEpoch": true,
+  "scopedReadOwnerTicketsPrecedeNativeSessionCreation": true,
+  "scopedReadOwnerClosesAdmissionBeforeExactM4Closure": true,
+  "scopedReadOwnerDrainWaitsForActualReadsAndSessionClose": true,
+  "scopedReadOwnerCancellationCannotReleaseTicketsEarly": true,
+  "scopedReadOwnerCreatesM4TerminalOrReleasedRecord": false,
+  "newFallbackRejectsPreviousPreferredOnlyAndFutureEpochs": true,
+  "existingFallbackFirstEpochInherited": true,
+  "syntheticM4ProofNeedsNoPreferredOnlyEpoch": true,
+  "secondSelectedGenerationReverifiedAfterRestart": true,
+  "secondGenerationTaskReadFromNativeControlAfterRestart": true,
+  "secondGenerationRestartUsesNoCopiedDescriptorOrTaskBody": true,
+  "secondGenerationRestartCoversUserInternalAndIndexOnlyRoutes": true,
+  "secondGenerationRestartCreatesNoRecordsAndDoesNotRepublish": true,
+  "oldFallbackProtectionsRemainProtectedAfterSecondPublication": true,
+  "selectedGenerationRepublicationAndFallbackRetirementComplete": false,
+  "realProtocolSemanticAndBirthAdmissionComplete": false,
+  "m5EComplete": false,
+  "allConcreteWriterRowsComplete": false,
+  "nativeInputCatalogAdmissionComplete": false,
+  "physicalDeleteVerified": false,
+  "all17AcceptanceObligationsComplete": false,
+  "legacyRegressionSummarySha256": "58d9ead12421ccfd754cdc1ee38609817afb8b5035b0fbc4509289b6aef79202",
+  "m5Receipt": false,
+  "m5FinalAuthority": false,
+  "physicalDeleteAuthority": false,
+  "productionAuthority": false
+}

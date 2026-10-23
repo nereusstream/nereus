@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.464Z" hostname="liusinandeMacBook-Pro.local" time="0.002">
+  <properties/>
+  <testcase name="committedProducerStateReturnsOriginalRangeForNativeDuplicateIdentity()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="recentDuplicateWindowIsHardBounded()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="abortMarkerBuildsNativeAbortedTransactionIndexAndAnEmptyMarkerDoesNotInventATransaction()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="newerProducerEpochResetsSequenceAndRecentWindow()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="transactionOpenAndCommitMaintainFirstUnstableAndCompletedRange()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="sequenceGapOrEpochRegressionFailsClosed()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.001"/>
+  <testcase name="nonIdempotentBatchDoesNotCreateProducerState()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <testcase name="producerSequenceCoverageMustMatchLogicalOffsetCountIncludingWrap()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.458Z" hostname="liusinandeMacBook-Pro.local" time="0.001">
+  <properties/>
+  <testcase name="rejectsNegativeStateVersion()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test" time="0.0"/>
+  <testcase name="referenceIdentityRejectsZeroDigestAndDetectsGenerationRegression()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test" time="0.0"/>
+  <testcase name="immutableStateRootIsItsOwnAllocationFreeReadSnapshot()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test" time="0.0"/>
+  <testcase name="readIsolationSelectsLeoHwAndLsoWithoutUsingDurableEnd()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

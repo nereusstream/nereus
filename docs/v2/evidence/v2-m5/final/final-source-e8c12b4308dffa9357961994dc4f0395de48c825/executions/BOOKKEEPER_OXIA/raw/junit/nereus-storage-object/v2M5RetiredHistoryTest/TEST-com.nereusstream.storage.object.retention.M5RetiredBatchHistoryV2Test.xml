@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:37:21.125Z" hostname="liusinandeMacBook-Pro.local" time="4.388">
+  <properties/>
+  <testcase name="moreThanLifetimeSlotCapCompletesWithOneActiveHoleAndBoundedResidentSelector()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="4.264"/>
+  <testcase name="observerCancellationKeepsThePrewriteReservationUntilActualMutationCompletion()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.005"/>
+  <testcase name="concurrentControlUpdateKeepsPrewrittenNodesUnselectedAndRetryUsesItsCurrentRoot()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.009"/>
+  <testcase name="immutablePrewriteConflictQuarantinesWithoutRemovingResidentTerminal()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.006"/>
+  <testcase name="missingHistoryStopsControlAdmissionAndHistoricalTicketAdmission()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.008"/>
+  <testcase name="unknownPrewriteOrSelectorResponseRetainsOneBoundedReservationAndRetriesExactly()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.01"/>
+  <testcase name="capacityRefusesNewWorkButAllowsTheSameUnknownAttemptToReconcile()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.012"/>
+  <testcase name="foldPreservesActiveHoleOrdinalsM4BytesAndPermanentBatchIdRejectionAfterRestart()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.014"/>
+  <testcase name="historyRootChangeBetweenAdmissionProofAndSelectorCasRejectsTheStaleCandidate()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.011"/>
+  <testcase name="missingCorruptAndWrongDepthNodesNeverProveAbsence()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.002"/>
+  <testcase name="legacyEnvelopeRoundTripsExactlyAndFoldUpgradesWithoutLosingOriginalTombstones()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.006"/>
+  <testcase name="membershipAndNonmembershipBindEverySiblingDepthCountKeyAndExactTombstone()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.004"/>
+  <testcase name="lostFoldResponseFollowedByAnotherFoldReconcilesExactHistoricalTombstone()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.009"/>
+  <testcase name="concurrentReconciliationCannotReleaseReservationBeforeOriginalNativeCallbackDrains()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.008"/>
+  <testcase name="changedPayloadCannotReuseHistoricalBatchIdOrAcquireANewTicket()" classname="com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,56 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :nereus-storage-api:compileJava FROM-CACHE
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :nereus-storage-api:jar
+> Task :nereus-storage-api:sourcesJar
+> Task :nereus-storage-api:generateMetadataFileForMavenJavaPublication
+> Task :nereus-storage-api:generatePomFileForMavenJavaPublication
+> Task :nereus-storage-api:publishMavenJavaPublicationToDevelopmentRepository
+> Task :nereus-domain:compileJava FROM-CACHE
+> Task :nereus-metadata-spi:compileJava FROM-CACHE
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar
+> Task :nereus-metadata-spi:sourcesJar
+> Task :nereus-metadata-spi:generateMetadataFileForMavenJavaPublication
+> Task :nereus-metadata-spi:generatePomFileForMavenJavaPublication
+> Task :nereus-metadata-spi:publishMavenJavaPublicationToDevelopmentRepository
+> Task :nereus-storage-object:compileJava FROM-CACHE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :nereus-storage-object:jar
+> Task :nereus-storage-object:sourcesJar
+> Task :nereus-storage-object:generateMetadataFileForMavenJavaPublication
+> Task :nereus-storage-object:generatePomFileForMavenJavaPublication
+> Task :nereus-storage-object:publishMavenJavaPublicationToDevelopmentRepository
+> Task :nereus-storage-bookkeeper:compileJava FROM-CACHE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:jar
+> Task :nereus-storage-bookkeeper:sourcesJar
+> Task :nereus-storage-bookkeeper:generateMetadataFileForMavenJavaPublication
+> Task :nereus-storage-bookkeeper:generatePomFileForMavenJavaPublication
+> Task :nereus-storage-bookkeeper:publishMavenJavaPublicationToDevelopmentRepository
+> Task :nereus-kafka-bookkeeper:compileJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:processResources NO-SOURCE
+> Task :nereus-kafka-bookkeeper:classes UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:jar
+> Task :nereus-kafka-bookkeeper:sourcesJar
+> Task :nereus-kafka-bookkeeper:generateMetadataFileForMavenJavaPublication
+> Task :nereus-kafka-bookkeeper:generatePomFileForMavenJavaPublication
+> Task :nereus-kafka-bookkeeper:publishMavenJavaPublicationToDevelopmentRepository
+> Task :nereus-metadata-oxia:compileJava FROM-CACHE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:jar
+> Task :nereus-metadata-oxia:sourcesJar
+> Task :nereus-metadata-oxia:generateMetadataFileForMavenJavaPublication
+> Task :nereus-metadata-oxia:generatePomFileForMavenJavaPublication
+> Task :nereus-metadata-oxia:publishMavenJavaPublicationToDevelopmentRepository
+
+BUILD SUCCESSFUL in 5s
+37 actionable tasks: 30 executed, 7 from cache
+
+M5_NATIVE_PREPARATION_EXIT=0

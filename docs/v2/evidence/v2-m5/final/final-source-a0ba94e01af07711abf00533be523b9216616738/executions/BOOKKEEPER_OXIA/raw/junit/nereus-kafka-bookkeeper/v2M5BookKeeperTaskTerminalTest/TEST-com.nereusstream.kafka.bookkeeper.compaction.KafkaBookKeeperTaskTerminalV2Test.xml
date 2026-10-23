@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:28:56.707Z" hostname="liusinandeMacBook-Pro.local" time="0.389">
+  <properties/>
+  <testcase name="truncatedNoncanonicalAndOversizedTerminalsCannotBecomeValidCuts()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test" time="0.343"/>
+  <testcase name="typedRouteRequiresExactRegisteredTaskAndCancelledSelectionArchive()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test" time="0.022"/>
+  <testcase name="completePhysicalCutRoundTripsMissingReservedAndSealedNativeStates()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test" time="0.009"/>
+  <testcase name="foreignNativeScopeDuplicateIdsAndIncompleteCutsFailClosed()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

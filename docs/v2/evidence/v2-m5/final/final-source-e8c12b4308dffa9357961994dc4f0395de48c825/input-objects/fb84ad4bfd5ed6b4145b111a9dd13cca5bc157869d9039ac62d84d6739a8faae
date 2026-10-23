@@ -1,0 +1,109 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.group.generated.OffsetCommitValue.*;
+
+public class OffsetCommitValueJsonConverter {
+    public static OffsetCommitValue read(JsonNode _node, short _version) {
+        OffsetCommitValue _object = new OffsetCommitValue();
+        JsonNode _offsetNode = _node.get("offset");
+        if (_offsetNode == null) {
+            throw new RuntimeException("OffsetCommitValue: unable to locate field 'offset', which is mandatory in version " + _version);
+        } else {
+            _object.offset = MessageUtil.jsonNodeToLong(_offsetNode, "OffsetCommitValue");
+        }
+        JsonNode _leaderEpochNode = _node.get("leaderEpoch");
+        if (_leaderEpochNode == null) {
+            if (_version >= 3) {
+                throw new RuntimeException("OffsetCommitValue: unable to locate field 'leaderEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.leaderEpoch = -1;
+            }
+        } else {
+            _object.leaderEpoch = MessageUtil.jsonNodeToInt(_leaderEpochNode, "OffsetCommitValue");
+        }
+        JsonNode _metadataNode = _node.get("metadata");
+        if (_metadataNode == null) {
+            throw new RuntimeException("OffsetCommitValue: unable to locate field 'metadata', which is mandatory in version " + _version);
+        } else {
+            if (!_metadataNode.isTextual()) {
+                throw new RuntimeException("OffsetCommitValue expected a string type, but got " + _node.getNodeType());
+            }
+            _object.metadata = _metadataNode.asText();
+        }
+        JsonNode _commitTimestampNode = _node.get("commitTimestamp");
+        if (_commitTimestampNode == null) {
+            throw new RuntimeException("OffsetCommitValue: unable to locate field 'commitTimestamp', which is mandatory in version " + _version);
+        } else {
+            _object.commitTimestamp = MessageUtil.jsonNodeToLong(_commitTimestampNode, "OffsetCommitValue");
+        }
+        JsonNode _expireTimestampNode = _node.get("expireTimestamp");
+        if (_expireTimestampNode == null) {
+            if ((_version >= 1) && (_version <= 1)) {
+                throw new RuntimeException("OffsetCommitValue: unable to locate field 'expireTimestamp', which is mandatory in version " + _version);
+            } else {
+                _object.expireTimestamp = -1L;
+            }
+        } else {
+            _object.expireTimestamp = MessageUtil.jsonNodeToLong(_expireTimestampNode, "OffsetCommitValue");
+        }
+        JsonNode _topicIdNode = _node.get("topicId");
+        if (_topicIdNode == null) {
+            _object.topicId = Uuid.ZERO_UUID;
+        } else {
+            if (!_topicIdNode.isTextual()) {
+                throw new RuntimeException("OffsetCommitValue expected a JSON string type, but got " + _node.getNodeType());
+            }
+            _object.topicId = Uuid.fromString(_topicIdNode.asText());
+        }
+        return _object;
+    }
+    public static JsonNode write(OffsetCommitValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        _node.set("offset", new LongNode(_object.offset));
+        if (_version >= 3) {
+            _node.set("leaderEpoch", new IntNode(_object.leaderEpoch));
+        }
+        _node.set("metadata", new TextNode(_object.metadata));
+        _node.set("commitTimestamp", new LongNode(_object.commitTimestamp));
+        if ((_version >= 1) && (_version <= 1)) {
+            _node.set("expireTimestamp", new LongNode(_object.expireTimestamp));
+        }
+        if (_version >= 4) {
+            if (!_object.topicId.equals(Uuid.ZERO_UUID)) {
+                _node.set("topicId", new TextNode(_object.topicId.toString()));
+            }
+        }
+        return _node;
+    }
+    public static JsonNode write(OffsetCommitValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+}

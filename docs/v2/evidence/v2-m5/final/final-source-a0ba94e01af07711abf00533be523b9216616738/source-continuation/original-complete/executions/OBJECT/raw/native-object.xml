@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:52:17.634Z" hostname="liusinandeMacBook-Pro.local" time="3.309">
+  <properties/>
+  <testcase name="absentDomainCloseSurvivesReplyLossAndFencesActualLateFirstHeadCas()" classname="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" time="1.33"/>
+  <testcase name="completeSharedRunRetiresAfterEveryMemberTransfersWhileSelectedObjectsRemainReadable()" classname="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" time="0.73"/>
+  <testcase name="checkpointOnlyEmptyRunTransfersFullStateAndColdRecoversFromSelectedCommonCheckpoint()" classname="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" time="0.537"/>
+  <testcase name="missingDirectPrefixVetoesThenExactContinuousExtensionAvoidsRetiredPayload()" classname="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" time="0.541"/>
+  <testcase name="actualHeadCasPinsNativeIoAndOriginalUnknownBeforeTerminalFence()" classname="com.nereusstream.kafka.bookkeeper.object.nwkcp1.M5ObjectRunRecoveryRetirementRealTest" time="0.16"/>
+  <system-out><![CDATA[2026-10-23T18:52:18,080 - INFO  - [oxia-client-async-1-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=1, connectionKey=0}
+M5_PROTOCOL_DOMAIN_SAMPLE kind=ABSENT_CLOSE_FIRST physicalExtents=0 actualProtocolObject=true originalUnknownCandidate=true lateFirstCasRejected=true checkpointFallbackRejected=true wholeM5Authority=false
+2026-10-23T18:52:18,976 - INFO  - [oxia-client-async-6-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=2, connectionKey=0}
+2026-10-23T18:52:19,406 - INFO  - [oxia-client-async-9-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=3, connectionKey=0}
+M5_RUN_RETIREMENT_RECOVERY retiredRuns=1 nanos=55774583 actualFreshOxiaClient=true retainedRuns=1
+M5_RUN_RETIREMENT_SAMPLE kind=SHARED_SELECTED_AND_UNSELECTED prefixRuns=1 physicalExtents=2 physicalMembers=3 protocolOnlyMembers=1 retainedRuns=1 coldPrefixGets=0 selectedOriginalBytes=true originalUnknownCandidate=true wholeM5Authority=false
+2026-10-23T18:52:19,706 - INFO  - [oxia-client-async-12-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=4, connectionKey=0}
+2026-10-23T18:52:19,990 - INFO  - [oxia-client-async-15-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=5, connectionKey=0}
+M5_RUN_RETIREMENT_RECOVERY retiredRuns=2 nanos=18833125 actualFreshOxiaClient=true retainedRuns=1
+M5_RUN_RETIREMENT_SAMPLE kind=CHECKPOINT_ONLY_EMPTY_RUN physicalExtents=0 protocolOnlyMembers=1 prefixRuns=2 fullProducerTransactionLeaderState=true sameOffsetWrongStateRejected=true freshClientColdRecovery=true selectedOriginalBytes=true wholeM5Authority=false
+2026-10-23T18:52:20,243 - INFO  - [oxia-client-async-18-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=6, connectionKey=0}
+2026-10-23T18:52:20,512 - INFO  - [oxia-client-async-21-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=7, connectionKey=0}
+M5_RUN_RETIREMENT_RECOVERY retiredRuns=2 nanos=24739917 actualFreshOxiaClient=true retainedRuns=1
+M5_RUN_RETIREMENT_SAMPLE kind=CONTIGUOUS_PREFIX prefixRuns=2 actualEpochs=1,2,5 retainedRuns=1 coldPrefixGets=0 selectedOriginalBytes=true missingPrefixVeto=true wholeM5Authority=false
+2026-10-23T18:52:20,785 - INFO  - [oxia-client-async-24-1:ConnectionManager@60] - Creating managed GRPC connection {address=127.0.0.1:50365, connectionId=8, connectionKey=0}
+M5_PROTOCOL_DOMAIN_SAMPLE kind=EXISTING_HEAD_FIRST originalIoPinned=true unknownConfirmationPinned=true lateExactCasRejected=true physicalExtents=0 wholeM5Authority=false
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

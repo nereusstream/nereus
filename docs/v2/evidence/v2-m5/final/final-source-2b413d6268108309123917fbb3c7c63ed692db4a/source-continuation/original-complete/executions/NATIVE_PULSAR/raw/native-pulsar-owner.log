@@ -1,0 +1,88 @@
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/NATIVE_PULSAR/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :pulsar:build-logic:conventions:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :pulsar:build-logic:conventions:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :pulsar:build-logic:conventions:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :pulsar:build-logic:conventions:compilePluginsBlocks UP-TO-DATE
+> Task :pulsar:build-logic:conventions:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :pulsar:build-logic:conventions:generateScriptPluginAdapters UP-TO-DATE
+> Task :pulsar:build-logic:conventions:compileKotlin UP-TO-DATE
+> Task :pulsar:build-logic:conventions:compileJava NO-SOURCE
+> Task :pulsar:build-logic:conventions:pluginDescriptors UP-TO-DATE
+> Task :pulsar:build-logic:conventions:processResources UP-TO-DATE
+> Task :pulsar:build-logic:conventions:classes UP-TO-DATE
+> Task :pulsar:build-logic:conventions:jar UP-TO-DATE
+Invalid Java installation found at '/Users/liusinan/.sdkman/candidates/java/8.0.472-amzn' (SDKMAN!) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+Invalid Java installation found at '/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home' (MacOS java_home) auto-detected. It will be re-checked in the next build. This might have performance impact if it keeps failing. Run the 'javaToolchains' task for more details.
+> Task :nereus-domain:compileJava UP-TO-DATE
+> Task :pulsar:pulsar-client-api:compileJava UP-TO-DATE
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes UP-TO-DATE
+> Task :nereus-domain:jar UP-TO-DATE
+> Task :nereus-metadata-spi:compileJava UP-TO-DATE
+> Task :nereus-storage-api:compileJava UP-TO-DATE
+> Task :pulsar:pulsar-client-admin-api:compileJava UP-TO-DATE
+> Task :pulsar:pulsar-common:generateLightProto UP-TO-DATE
+> Task :nereus-storage-object:compileJava UP-TO-DATE
+> Task :pulsar:pulsar-common:compileJava UP-TO-DATE
+> Task :nereus-metadata-oxia:compileJava UP-TO-DATE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:jar UP-TO-DATE
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileJava UP-TO-DATE
+> Task :pulsar:pulsar-metadata:compileJava UP-TO-DATE
+> Task :pulsar:managed-ledger:generateLightProto UP-TO-DATE
+> Task :nereus-storage-object-s3:compileJava UP-TO-DATE
+> Task :nereus-pulsar-offload:processResources NO-SOURCE
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :pulsar:pulsar-opentelemetry:compileJava UP-TO-DATE
+> Task :nereus-storage-api:jar UP-TO-DATE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:jar UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileTestJava UP-TO-DATE
+> Task :nereus-storage-bookkeeper:processTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:testClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:m5NativeDeleteFaultFixturesJar UP-TO-DATE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :pulsar:managed-ledger:compileJava UP-TO-DATE
+> Task :nereus-storage-object:jar UP-TO-DATE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-api:processResources UP-TO-DATE
+> Task :nereus-storage-object-s3:classes UP-TO-DATE
+> Task :pulsar:pulsar-client-api:classes UP-TO-DATE
+> Task :nereus-storage-object-s3:jar UP-TO-DATE
+> Task :pulsar:pulsar-client-api:jar UP-TO-DATE
+> Task :pulsar:pulsar-common:generatePulsarBuildInfo UP-TO-DATE
+> Task :pulsar:pulsar-common:processResources UP-TO-DATE
+> Task :pulsar:pulsar-common:classes UP-TO-DATE
+> Task :pulsar:pulsar-common:jar UP-TO-DATE
+> Task :pulsar:pulsar-client-admin-api:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-admin-api:classes UP-TO-DATE
+> Task :pulsar:pulsar-client-admin-api:jar UP-TO-DATE
+> Task :pulsar:pulsar-metadata:processResources UP-TO-DATE
+> Task :pulsar:pulsar-metadata:classes UP-TO-DATE
+> Task :pulsar:pulsar-metadata:jar UP-TO-DATE
+> Task :pulsar:managed-ledger:processResources NO-SOURCE
+> Task :pulsar:managed-ledger:classes UP-TO-DATE
+> Task :pulsar:managed-ledger:jar UP-TO-DATE
+> Task :pulsar:pulsar-opentelemetry:processResources NO-SOURCE
+> Task :pulsar:pulsar-opentelemetry:classes UP-TO-DATE
+> Task :nereus-pulsar-offload:compileJava UP-TO-DATE
+> Task :nereus-pulsar-offload:classes UP-TO-DATE
+> Task :nereus-pulsar-offload:processP6ProviderTestResources NO-SOURCE
+> Task :pulsar:pulsar-opentelemetry:jar UP-TO-DATE
+> Task :nereus-pulsar-offload:compileP6ProviderTestJava UP-TO-DATE
+> Task :nereus-pulsar-offload:p6ProviderTestClasses UP-TO-DATE
+
+> Task :nereus-pulsar-offload:v2M5NativeM4OwnerRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/NATIVE_PULSAR/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+BUILD SUCCESSFUL in 14m 36s
+46 actionable tasks: 1 executed, 45 up-to-date

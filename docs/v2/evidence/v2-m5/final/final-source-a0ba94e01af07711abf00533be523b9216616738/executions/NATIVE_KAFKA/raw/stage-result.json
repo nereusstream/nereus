@@ -1,0 +1,15 @@
+{
+  "exitCode": 0,
+  "junit": [
+    {
+      "path": "native-broker.xml",
+      "producedAtMicros": 1792754392817928,
+      "task": ":core:nereusBookKeeperM4AdmissionRealTest"
+    },
+    {
+      "path": "native-gc-internal.xml",
+      "producedAtMicros": 1792754772165005,
+      "task": ":core:nereusBookKeeperM4AdmissionRealTest"
+    }
+  ]
+}

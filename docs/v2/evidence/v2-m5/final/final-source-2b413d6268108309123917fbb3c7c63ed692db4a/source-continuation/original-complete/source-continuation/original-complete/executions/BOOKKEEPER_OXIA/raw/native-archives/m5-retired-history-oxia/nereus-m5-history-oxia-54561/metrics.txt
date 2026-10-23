@@ -1,0 +1,1268 @@
+# HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 5.5458e-05
+go_gc_duration_seconds{quantile="0.25"} 9.5542e-05
+go_gc_duration_seconds{quantile="0.5"} 0.000120625
+go_gc_duration_seconds{quantile="0.75"} 0.000141125
+go_gc_duration_seconds{quantile="1"} 0.000313584
+go_gc_duration_seconds_sum 0.00165283
+go_gc_duration_seconds_count 12
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent.
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes.
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 9.223372036854776e+18
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 74
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.26.7"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 4.331544e+07
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 1.52987184e+08
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.473073e+06
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 47563
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 3.803392e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 4.331544e+07
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 2.0504576e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 4.5522944e+07
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 34655
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 9.658368e+06
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 6.602752e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.792752596397016e+09
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 82218
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 18368
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 32144
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 343680
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 391680
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 5.9403914e+07
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.338967e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 1.081344e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 1.081344e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.414812e+07
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads.
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 8
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 13
+# HELP grpc_server_handled_total Total number of RPCs completed on the server, regardless of success or failure.
+# TYPE grpc_server_handled_total counter
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Aborted",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Canceled",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="DataLoss",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Internal",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="NotFound",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="OK",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_handled_total{grpc_code="Unknown",grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+# HELP grpc_server_msg_received_total Total number of RPC stream messages received on the server.
+# TYPE grpc_server_msg_received_total counter
+grpc_server_msg_received_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_msg_received_total{grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_received_total{grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_msg_received_total{grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+# HELP grpc_server_msg_sent_total Total number of gRPC stream messages sent by the server.
+# TYPE grpc_server_msg_sent_total counter
+grpc_server_msg_sent_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_msg_sent_total{grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_msg_sent_total{grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_msg_sent_total{grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+# HELP grpc_server_started_total Total number of RPCs started on the server.
+# TYPE grpc_server_started_total counter
+grpc_server_started_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="CloseSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="CloseSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="CreateSession",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="CreateSession",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="GetNotifications",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="GetNotifications",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="GetSequenceUpdates",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="GetSequenceUpdates",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="GetShardAssignments",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="GetShardAssignments",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="KeepAlive",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="KeepAlive",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="List",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="List",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="RangeScan",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="RangeScan",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="Read",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="Read",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+grpc_server_started_total{grpc_method="Write",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="Write",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="unary"} 0
+grpc_server_started_total{grpc_method="WriteStream",grpc_service="io.oxia.proto.v1.OxiaClient",grpc_type="bidi_stream"} 0
+grpc_server_started_total{grpc_method="WriteStream",grpc_service="io.streamnative.oxia.proto.OxiaClient",grpc_type="bidi_stream"} 0
+# HELP oxia_server_db_list_latency_milliseconds The time it takes to read a list from the db
+# TYPE oxia_server_db_list_latency_milliseconds histogram
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="100"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="200"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="500"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="+Inf"} 1
+oxia_server_db_list_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0
+oxia_server_db_list_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="100"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="200"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="500"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="+Inf"} 1
+oxia_server_db_list_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0
+oxia_server_db_list_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="100"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="200"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="500"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="+Inf"} 1
+oxia_server_db_list_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 0
+oxia_server_db_list_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="100"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="200"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="500"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50000"} 1
+oxia_server_db_list_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="+Inf"} 1
+oxia_server_db_list_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0
+oxia_server_db_list_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1
+# HELP oxia_server_db_lists_count_total The total number of list operations
+# TYPE oxia_server_db_lists_count_total counter
+oxia_server_db_lists_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1
+oxia_server_db_lists_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1
+oxia_server_db_lists_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_db_lists_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1
+# HELP oxia_server_kv_batch_commit_latency_milliseconds The latency for committing a batch into the database
+# TYPE oxia_server_kv_batch_commit_latency_milliseconds histogram
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="100"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="200"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="500"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="+Inf"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0.005
+oxia_server_kv_batch_commit_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="100"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="200"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="500"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="+Inf"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0.005
+oxia_server_kv_batch_commit_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="100"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="200"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="500"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="+Inf"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 0.005
+oxia_server_kv_batch_commit_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="100"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="200"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="500"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50000"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="+Inf"} 1
+oxia_server_kv_batch_commit_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0.005
+oxia_server_kv_batch_commit_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1
+# HELP oxia_server_kv_batch_count The number of operations in a given batch
+# TYPE oxia_server_kv_batch_count histogram
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1"} 0
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="100"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="200"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="500"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="100000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1e+06"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="+Inf"} 1
+oxia_server_kv_batch_count_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 2
+oxia_server_kv_batch_count_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1"} 0
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="100"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="200"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="500"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="100000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1e+06"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="+Inf"} 1
+oxia_server_kv_batch_count_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 2
+oxia_server_kv_batch_count_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1"} 0
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="100"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="200"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="500"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="100000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1e+06"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="+Inf"} 1
+oxia_server_kv_batch_count_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 2
+oxia_server_kv_batch_count_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1"} 0
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="100"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="200"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="500"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="100000"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1e+06"} 1
+oxia_server_kv_batch_count_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="+Inf"} 1
+oxia_server_kv_batch_count_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 2
+oxia_server_kv_batch_count_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1
+# HELP oxia_server_kv_batch_size_bytes The size in bytes for a given batch
+# TYPE oxia_server_kv_batch_size_bytes histogram
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="16"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="32"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="64"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="128"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="256"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="512"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1024"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2048"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="4096"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="8192"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="16384"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="32768"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="65536"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="131072"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="262144"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="524288"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1.048576e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2.097152e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="4.194304e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="8.388608e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="+Inf"} 1
+oxia_server_kv_batch_size_bytes_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 159
+oxia_server_kv_batch_size_bytes_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="16"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="32"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="64"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="128"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="256"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="512"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1024"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2048"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="4096"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="8192"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="16384"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="32768"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="65536"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="131072"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="262144"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="524288"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1.048576e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2.097152e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="4.194304e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="8.388608e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="+Inf"} 1
+oxia_server_kv_batch_size_bytes_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 159
+oxia_server_kv_batch_size_bytes_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="16"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="32"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="64"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="128"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="256"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="512"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1024"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2048"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="4096"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="8192"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="16384"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="32768"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="65536"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="131072"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="262144"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="524288"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1.048576e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2.097152e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="4.194304e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="8.388608e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="+Inf"} 1
+oxia_server_kv_batch_size_bytes_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 159
+oxia_server_kv_batch_size_bytes_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="16"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="32"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="64"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="128"} 0
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="256"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="512"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1024"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2048"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="4096"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="8192"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="16384"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="32768"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="65536"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="131072"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="262144"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="524288"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1.048576e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2.097152e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="4.194304e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="8.388608e+06"} 1
+oxia_server_kv_batch_size_bytes_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="+Inf"} 1
+oxia_server_kv_batch_size_bytes_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 159
+oxia_server_kv_batch_size_bytes_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1
+# HELP oxia_server_kv_pebble_block_cache_hits_count The number of hits in the block cache
+# TYPE oxia_server_kv_pebble_block_cache_hits_count gauge
+oxia_server_kv_pebble_block_cache_hits_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 64
+oxia_server_kv_pebble_block_cache_hits_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 64
+oxia_server_kv_pebble_block_cache_hits_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 64
+oxia_server_kv_pebble_block_cache_hits_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 64
+# HELP oxia_server_kv_pebble_block_cache_misses_count The number of misses in the block cache
+# TYPE oxia_server_kv_pebble_block_cache_misses_count gauge
+oxia_server_kv_pebble_block_cache_misses_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 811
+oxia_server_kv_pebble_block_cache_misses_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 811
+oxia_server_kv_pebble_block_cache_misses_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 811
+oxia_server_kv_pebble_block_cache_misses_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 811
+# HELP oxia_server_kv_pebble_block_cache_used_bytes The size of the block cache used by a given db shard
+# TYPE oxia_server_kv_pebble_block_cache_used_bytes gauge
+oxia_server_kv_pebble_block_cache_used_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 550765
+oxia_server_kv_pebble_block_cache_used_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 550765
+oxia_server_kv_pebble_block_cache_used_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 550765
+oxia_server_kv_pebble_block_cache_used_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 550765
+# HELP oxia_server_kv_pebble_compaction_debt_bytes The estimated number of bytes that need to be compacted
+# TYPE oxia_server_kv_pebble_compaction_debt_bytes gauge
+oxia_server_kv_pebble_compaction_debt_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1.1907018e+07
+oxia_server_kv_pebble_compaction_debt_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1.2007453e+07
+oxia_server_kv_pebble_compaction_debt_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 0
+oxia_server_kv_pebble_compaction_debt_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1.1875442e+07
+# HELP oxia_server_kv_pebble_compactions_total_count The number of compactions operations
+# TYPE oxia_server_kv_pebble_compactions_total_count gauge
+oxia_server_kv_pebble_compactions_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0
+oxia_server_kv_pebble_compactions_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0
+oxia_server_kv_pebble_compactions_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1
+oxia_server_kv_pebble_compactions_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0
+# HELP oxia_server_kv_pebble_disk_space_bytes The total size of all the db files
+# TYPE oxia_server_kv_pebble_disk_space_bytes gauge
+oxia_server_kv_pebble_disk_space_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1.1911107e+07
+oxia_server_kv_pebble_disk_space_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 1.2011536e+07
+oxia_server_kv_pebble_disk_space_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1.21523e+07
+oxia_server_kv_pebble_disk_space_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1.1879523e+07
+# HELP oxia_server_kv_pebble_flush_bytes The total amount of bytes flushed into the db
+# TYPE oxia_server_kv_pebble_flush_bytes gauge
+oxia_server_kv_pebble_flush_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 211
+oxia_server_kv_pebble_flush_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 219
+oxia_server_kv_pebble_flush_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 211
+oxia_server_kv_pebble_flush_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 251
+# HELP oxia_server_kv_pebble_flush_total_count The total number of db flushes
+# TYPE oxia_server_kv_pebble_flush_total_count gauge
+oxia_server_kv_pebble_flush_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 2
+oxia_server_kv_pebble_flush_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 2
+oxia_server_kv_pebble_flush_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 2
+oxia_server_kv_pebble_flush_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 2
+# HELP oxia_server_kv_pebble_max_cache_size_bytes The max size configured for the Pebble block cache in bytes
+# TYPE oxia_server_kv_pebble_max_cache_size_bytes gauge
+oxia_server_kv_pebble_max_cache_size_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version=""} 1.048576e+08
+# HELP oxia_server_kv_pebble_memtable_size_bytes The size of the memtable
+# TYPE oxia_server_kv_pebble_memtable_size_bytes gauge
+oxia_server_kv_pebble_memtable_size_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 524288
+oxia_server_kv_pebble_memtable_size_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 524288
+oxia_server_kv_pebble_memtable_size_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 524288
+oxia_server_kv_pebble_memtable_size_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 524288
+# HELP oxia_server_kv_pebble_num_files_total_count The total number of files for the db
+# TYPE oxia_server_kv_pebble_num_files_total_count gauge
+oxia_server_kv_pebble_num_files_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 4
+oxia_server_kv_pebble_num_files_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 4
+oxia_server_kv_pebble_num_files_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 3
+oxia_server_kv_pebble_num_files_total_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 4
+# HELP oxia_server_kv_pebble_per_level_num_files_count The total number of files at this db level
+# TYPE oxia_server_kv_pebble_per_level_num_files_count gauge
+oxia_server_kv_pebble_per_level_num_files_count{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 1
+oxia_server_kv_pebble_per_level_num_files_count{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 1
+oxia_server_kv_pebble_per_level_num_files_count{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 1
+oxia_server_kv_pebble_per_level_num_files_count{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_num_files_count{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 3
+oxia_server_kv_pebble_per_level_num_files_count{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 3
+oxia_server_kv_pebble_per_level_num_files_count{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 3
+oxia_server_kv_pebble_per_level_num_files_count{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 3
+# HELP oxia_server_kv_pebble_per_level_read_bytes The total amount of bytes read at this db level
+# TYPE oxia_server_kv_pebble_per_level_read_bytes gauge
+oxia_server_kv_pebble_per_level_read_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_read_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 1.3596589e+07
+oxia_server_kv_pebble_per_level_read_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+# HELP oxia_server_kv_pebble_per_level_size_bytes The total size in bytes of the files at this db level
+# TYPE oxia_server_kv_pebble_per_level_size_bytes gauge
+oxia_server_kv_pebble_per_level_size_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 895
+oxia_server_kv_pebble_per_level_size_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 895
+oxia_server_kv_pebble_per_level_size_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="0",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 895
+oxia_server_kv_pebble_per_level_size_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="1",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="2",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="3",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="4",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="5",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 0
+oxia_server_kv_pebble_per_level_size_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="0"} 1.1906123e+07
+oxia_server_kv_pebble_per_level_size_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="1"} 1.2006558e+07
+oxia_server_kv_pebble_per_level_size_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="2"} 1.2147038e+07
+oxia_server_kv_pebble_per_level_size_bytes{level="6",otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",shard="3"} 1.1874547e+07
+# HELP oxia_server_kv_pebble_read_bytes The total amount of bytes read at this db level
+# TYPE oxia_server_kv_pebble_read_bytes gauge
+oxia_server_kv_pebble_read_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0
+oxia_server_kv_pebble_read_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0
+oxia_server_kv_pebble_read_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1.3596589e+07
+oxia_server_kv_pebble_read_bytes{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0
+# HELP oxia_server_kv_pebble_read_iterators_value The number of iterators open
+# TYPE oxia_server_kv_pebble_read_iterators_value gauge
+oxia_server_kv_pebble_read_iterators_value{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0
+oxia_server_kv_pebble_read_iterators_value{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0
+oxia_server_kv_pebble_read_iterators_value{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 0
+oxia_server_kv_pebble_read_iterators_value{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0
+# HELP oxia_server_kv_pebble_write_amplification_percent The total amount of bytes read at this db level
+# TYPE oxia_server_kv_pebble_write_amplification_percent gauge
+oxia_server_kv_pebble_write_amplification_percent{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 200
+oxia_server_kv_pebble_write_amplification_percent{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 200
+oxia_server_kv_pebble_write_amplification_percent{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1.35741e+06
+oxia_server_kv_pebble_write_amplification_percent{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 200
+# HELP oxia_server_kv_write_bytes_total The amount of bytes written into the database
+# TYPE oxia_server_kv_write_bytes_total counter
+oxia_server_kv_write_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 159
+oxia_server_kv_write_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 159
+oxia_server_kv_write_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 159
+oxia_server_kv_write_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 159
+# HELP oxia_server_kv_write_ops_count_total The amount of write operations
+# TYPE oxia_server_kv_write_ops_count_total counter
+oxia_server_kv_write_ops_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 2
+oxia_server_kv_write_ops_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 2
+oxia_server_kv_write_ops_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 2
+oxia_server_kv_write_ops_count_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 2
+# HELP oxia_server_leaders_count The number of leader controller in a dataserver
+# TYPE oxia_server_leaders_count gauge
+oxia_server_leaders_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version=""} 4
+# HELP oxia_server_shards_assignments_active_clients_count The number of client currently connected for fetching the shards assignments updates
+# TYPE oxia_server_shards_assignments_active_clients_count gauge
+oxia_server_shards_assignments_active_clients_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version=""} 0
+# HELP oxia_server_wal_entries_count The number of active entries in the wal
+# TYPE oxia_server_wal_entries_count gauge
+oxia_server_wal_entries_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 71826
+oxia_server_wal_entries_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 72592
+oxia_server_wal_entries_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 78763
+oxia_server_wal_entries_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 71675
+# HELP oxia_server_wal_read_bytes_total Bytes read from the WAL
+# TYPE oxia_server_wal_read_bytes_total counter
+oxia_server_wal_read_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 1148
+oxia_server_wal_read_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 3254
+oxia_server_wal_read_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 1148
+oxia_server_wal_read_bytes_total{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 1148
+# HELP oxia_server_wal_read_latency_milliseconds The time it takes to read an entry from the WAL
+# TYPE oxia_server_wal_read_latency_milliseconds histogram
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="0.5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="100"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="200"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="500"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="1000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="2000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="5000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="10000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="20000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="50000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0",le="+Inf"} 2
+oxia_server_wal_read_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 0.10200000000000001
+oxia_server_wal_read_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="0"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="0.5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="100"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="200"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="500"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="1000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="2000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="5000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="10000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="20000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="50000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1",le="+Inf"} 2
+oxia_server_wal_read_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 0.011
+oxia_server_wal_read_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="0.5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="100"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="200"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="500"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="1000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="2000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="5000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="10000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="20000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="50000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2",le="+Inf"} 2
+oxia_server_wal_read_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 0.013000000000000001
+oxia_server_wal_read_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="0.5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="100"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="200"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="500"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="1000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="2000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="5000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="10000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="20000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="50000"} 2
+oxia_server_wal_read_latency_milliseconds_bucket{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3",le="+Inf"} 2
+oxia_server_wal_read_latency_milliseconds_sum{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 0.007
+oxia_server_wal_read_latency_milliseconds_count{otel_scope_name="oxia",otel_scope_schema_url="",otel_scope_version="",oxia_namespace="default",shard="3"} 2
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.49
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_network_receive_bytes_total Number of bytes received by the process over the network.
+# TYPE process_network_receive_bytes_total counter
+process_network_receive_bytes_total 309
+# HELP process_network_transmit_bytes_total Number of bytes sent by the process over the network.
+# TYPE process_network_transmit_bytes_total counter
+process_network_transmit_bytes_total 152
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 54
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 2.8248064e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79275259531e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.692430336e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.8446744073709552e+19
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 0
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
+# HELP target_info Target metadata
+# TYPE target_info gauge
+target_info{service_name="unknown_service:oxia",telemetry_sdk_language="go",telemetry_sdk_name="opentelemetry",telemetry_sdk_version="1.43.0"} 1

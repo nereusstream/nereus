@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:33:02.304Z" hostname="liusinandeMacBook-Pro.local" time="0.501">
+  <properties/>
+  <testcase name="selectedBirthRemainsInInventoryAfterOwnerClosure()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.172"/>
+  <testcase name="concurrentGenesisPrewritesStayInvisibleAndOnlyOneChoiceWins()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.035"/>
+  <testcase name="retiredParentWithoutSuccessorFencesNewChildAndReleasesPhysicalTickets()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.028"/>
+  <testcase name="permanentDeleteDoneRetiresExactSealedRootAndKeepsSuccessorLineage()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.045"/>
+  <testcase name="observerCancellationCannotAbandonAnAdmittedMutationOrClearTicketsEarly()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.011"/>
+  <testcase name="qualifiedRetiredAnchorPreservesDoneAndOriginalChildTicketsThroughLostReply()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.026"/>
+  <testcase name="attachmentResponseLossIsIncludedInStableClosureEvenBeforeRootPromotion()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.012"/>
+  <testcase name="birthChoiceIsDurableBeforePhysicalAuthorityAndAdoptsTheNativeWinner()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.003"/>
+  <testcase name="selectedRootRequiresPresentNonDeletedPhysicalAuthorityForMetadataReads()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.02"/>
+  <testcase name="competingSuccessorsRaceAtTheExactParentCasAndCannotFork()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.023"/>
+  <testcase name="rootCreationRequiresProtocolAdmissionIndependentlyOfGcTickets()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.006"/>
+  <testcase name="retiredRecordClosesReadAdmissionWithoutErasingItsSuccessorChoice()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.016"/>
+  <testcase name="retirementCasResponseLossIsReconciledFromTheNativeMarker()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.014"/>
+  <testcase name="closureWinsAgainstLateAttachmentAndCannotReopenTheOldOwner()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.017"/>
+  <testcase name="closedBirthInventoryRejectsContradictoryParentAndRootAdoption()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.019"/>
+  <testcase name="canonicalRecordsBindFullRootAndPermanentSuccessorWithoutChangingInitialIdentity()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.002"/>
+  <testcase name="closureResponseLossAndCrashBeforeArchiveCannotLoseTheFixedRunSet()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.007"/>
+  <testcase name="createSealAndSuccessorUseNativeVersionsAndKeepSealedHistoryReadable()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.014"/>
+  <testcase name="lostSelectedResponseAndReadDeliveryRetainTicketsUntilFreshRecovery()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.012"/>
+  <testcase name="fencedPhysicalTargetPreventsNativeVerificationAndRootPrewrite()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

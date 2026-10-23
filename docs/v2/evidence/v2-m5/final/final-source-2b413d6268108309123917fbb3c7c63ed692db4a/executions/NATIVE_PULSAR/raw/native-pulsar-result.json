@@ -1,0 +1,253 @@
+{
+  "actualGradleExit": 0,
+  "inputsUnchanged": true,
+  "junit": {
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperDependencyBoundaryTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "95fabbe4be93329c40adc24cb098363a85773623c0a8f6f29270f7d782757897",
+      "skipped": 0,
+      "tests": 1
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "7ed359ff30850856ff2d2c1f6b87f5e69cf80a7d76136c6aa840370b27fda0ed",
+      "skipped": 0,
+      "tests": 3
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.CellSessionOperationRegistryTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "064014a78a3defb6a97a93395b1e2a4b601b370077833251da796e841b533d1a",
+      "skipped": 0,
+      "tests": 8
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "856441f6a10af80d1f3d475cc3ad430f6c539e8d4048a8dd8bb764347a848d04",
+      "skipped": 0,
+      "tests": 7
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "f8b1bcce40710253e20401566381c079390af07a6aae8ecc9b3fb3b426b47480",
+      "skipped": 0,
+      "tests": 4
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "3658733fd571064a50e56d9761025a0208ced30db725d96842cf344a6780911b",
+      "skipped": 0,
+      "tests": 6
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "c67e3a0409354bc8d232cf591f0d9413ec2b486239c954e80dd0b40b5011779c",
+      "skipped": 0,
+      "tests": 9
+    },
+    "bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperClientConfigurationV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "cb2aa2464d8c97da356cc4abee5f654bd5bbff9b6d2affd3154e6df2b6e57277",
+      "skipped": 0,
+      "tests": 3
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "cf94c69153f8e36cf21ad658b4f4695b14881679abf7f2adb02835268e92823f",
+      "skipped": 0,
+      "tests": 28
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.EntryImplTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "4cefcd766c167f1bf6c56a4c4b58a4678a0d25284006f618937a9ed4d2382671",
+      "skipped": 0,
+      "tests": 11
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.ManagedCursorTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "6e7e4a30327f923737e1ee5fa3383a51d9af5f196098c6c6e47cfd2a54860d14",
+      "skipped": 0,
+      "tests": 174
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.ManagedLedgerTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "33cf77730e4c6e63e0e8c63588093b3822afb34708587c8352dcda8232e80588",
+      "skipped": 0,
+      "tests": 156
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "a508194798d17c5dec93397038227e3624d0208d5dda2c4fa71ca56e765a4d02",
+      "skipped": 0,
+      "tests": 8
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "1671931a11a8944464dabfdb9d779cbec98cc7ac3074968b57c91d30a75b24ff",
+      "skipped": 0,
+      "tests": 11
+    },
+    "native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.OffloadPrefixTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "24828ba2e41fcdf4b9a21b5a6316dc9851a52381a8792a7ea6ffe8b18ba594ca",
+      "skipped": 0,
+      "tests": 47
+    },
+    "native-namespace-negative/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "c2f8186b11cbe19ef9ad17782864c80fd6b13a7ef9fdb2666374379cf73b42a1",
+      "skipped": 0,
+      "tests": 1
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.M5PulsarObjectCleanupOrderV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "3d2bc8f6d8672d539d23c53f095fa1df62d945bd21890b89d07b860b7486d119",
+      "skipped": 0,
+      "tests": 6
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "6f2ea87abbd1be169dbfd2527deb68c1b188248f9d85872141446135b895fe0b",
+      "skipped": 0,
+      "tests": 8
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarBookKeeperDeletionCoordinatorV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "c09646c6042274c93ce752cf20664a396dcfab87acfc4f3e41d371c093ec4cf5",
+      "skipped": 0,
+      "tests": 9
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "3440a8bfb5d2d97e34b4294fd521134939c8b732d1b35348edfe9ee52adadc83",
+      "skipped": 0,
+      "tests": 10
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarNativeRetentionConfigurationV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "9bcc9b3f13d018f1b9824ab9dc9cd9191f0bb6200bd2df50aa7fe92ae045021f",
+      "skipped": 0,
+      "tests": 2
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarNativeWriterRegistryV2Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "187a2a2c35deed1a375f782b4bd0aab361aa94690bde2436c3cef0a11e1c409b",
+      "skipped": 0,
+      "tests": 3
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "ce42ab3a140606b2adc94a218ab73a572d2a4bfbd2bcc50d59745f1e7d0147f6",
+      "skipped": 0,
+      "tests": 13
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "5775875c086400694dd6de3f6f75380d1d29e4278d37a5c1ab95cb713c9b2ece",
+      "skipped": 0,
+      "tests": 3
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarOffloadP0ContractTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "becce8d98ad3fd6bed57aa4f5f00e546c32fecc498044d2928f92cf1bed6a886",
+      "skipped": 0,
+      "tests": 11
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "64f5756f935e5ec4b6e28d7f92d40db7db1e04f2895c0adb1f07eb4bbb926810",
+      "skipped": 0,
+      "tests": 7
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.evidence.PulsarM2FinalResolverV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "b14b50f7c43f492a20e0ff3462ad0d500b00f1db9068350b604b987457d66de9",
+      "skipped": 0,
+      "tests": 9
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.npd1.Npd1CodecV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "15ae49083e222a109c595a57ca2c0d291da513c95a99121e54f121ad9022dfd7",
+      "skipped": 0,
+      "tests": 15
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.npo1.Npo1CodecV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "ab00163d499ab7e4c6b43e256a91e80bef18901cec51c509efb68d6f93bd1d3c",
+      "skipped": 0,
+      "tests": 17
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "a68e7ccbb0a14f1bccf5ff0c25503f055e8aece296d5a22bb8777e53e6f1f8fe",
+      "skipped": 0,
+      "tests": 43
+    },
+    "test/TEST-com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "542a237d025f1d6e27847ea17e10bc4a98d7335e4ff65fb2ad38f2afdcc867d8",
+      "skipped": 0,
+      "tests": 7
+    },
+    "v2M5NativeBkDeleteSdkDrainRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "0fc3b75d698a58321a023847b97feac2f5a7be69b6a80f53b900eece824407be",
+      "skipped": 0,
+      "tests": 5
+    },
+    "v2M5NativeM4OwnerRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "03e085abb65bd5a0043a019daba0f29c847b624562ee4570a0a9c8d857adf3ba",
+      "skipped": 0,
+      "tests": 81
+    },
+    "v2M5NativeOffloadRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "e47dfaf88d67205a4b8cebdb5fb82986b427b97dbefc18d56472449fe3d333c7",
+      "skipped": 0,
+      "tests": 5
+    },
+    "v2M5S3ProviderDrainRealTest/TEST-com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest.xml": {
+      "errors": 0,
+      "failures": 0,
+      "sha256": "c1c47c18f456b62bd59b399cb9b5470142513d9b500caa28cba845839a3eb409",
+      "skipped": 0,
+      "tests": 5
+    }
+  },
+  "nativePulsarM5LifecycleAuthority": false,
+  "wholeM5Acceptance": false
+}

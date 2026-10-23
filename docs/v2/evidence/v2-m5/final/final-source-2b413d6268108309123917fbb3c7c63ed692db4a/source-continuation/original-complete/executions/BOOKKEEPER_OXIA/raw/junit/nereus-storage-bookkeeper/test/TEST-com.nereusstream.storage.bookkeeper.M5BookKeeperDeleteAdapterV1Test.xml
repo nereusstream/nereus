@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:28:22.607Z" hostname="liusinandeMacBook-Pro.local" time="0.034">
+  <properties/>
+  <testcase name="deleteSuccessRequiresAuthoritativePostReadAbsence()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.027"/>
+  <testcase name="unsealedOrReboundMetadataNeverBecomesADeleteTarget()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.001"/>
+  <testcase name="lostDeleteResponseCanOnlyResolveThroughAuthoritativeAbsence()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.001"/>
+  <testcase name="definitivePreReadAbsenceCompletesWithoutDispatch()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.001"/>
+  <testcase name="exactLedgerRemainingIsRetryableButChangedMetadataIsAConflict()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.001"/>
+  <testcase name="ambiguousReadsStayUnknownBeforeAndAfterDispatch()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.001"/>
+  <testcase name="capturesOnlyTheExactClosedLedgerMetadataIdentity()" classname="com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

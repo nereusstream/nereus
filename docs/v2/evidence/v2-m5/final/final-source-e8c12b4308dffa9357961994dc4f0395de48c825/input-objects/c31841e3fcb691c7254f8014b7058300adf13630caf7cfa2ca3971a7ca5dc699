@@ -1,0 +1,266 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.common.message;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ShortNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.common.message.DescribeShareGroupOffsetsResponseData.*;
+
+public class DescribeShareGroupOffsetsResponseDataJsonConverter {
+    public static DescribeShareGroupOffsetsResponseData read(JsonNode _node, short _version) {
+        DescribeShareGroupOffsetsResponseData _object = new DescribeShareGroupOffsetsResponseData();
+        JsonNode _throttleTimeMsNode = _node.get("throttleTimeMs");
+        if (_throttleTimeMsNode == null) {
+            throw new RuntimeException("DescribeShareGroupOffsetsResponseData: unable to locate field 'throttleTimeMs', which is mandatory in version " + _version);
+        } else {
+            _object.throttleTimeMs = MessageUtil.jsonNodeToInt(_throttleTimeMsNode, "DescribeShareGroupOffsetsResponseData");
+        }
+        JsonNode _groupsNode = _node.get("groups");
+        if (_groupsNode == null) {
+            throw new RuntimeException("DescribeShareGroupOffsetsResponseData: unable to locate field 'groups', which is mandatory in version " + _version);
+        } else {
+            if (!_groupsNode.isArray()) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseData expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<DescribeShareGroupOffsetsResponseGroup> _collection = new ArrayList<DescribeShareGroupOffsetsResponseGroup>(_groupsNode.size());
+            _object.groups = _collection;
+            for (JsonNode _element : _groupsNode) {
+                _collection.add(DescribeShareGroupOffsetsResponseGroupJsonConverter.read(_element, _version));
+            }
+        }
+        return _object;
+    }
+    public static JsonNode write(DescribeShareGroupOffsetsResponseData _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        _node.set("throttleTimeMs", new IntNode(_object.throttleTimeMs));
+        ArrayNode _groupsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (DescribeShareGroupOffsetsResponseGroup _element : _object.groups) {
+            _groupsArray.add(DescribeShareGroupOffsetsResponseGroupJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("groups", _groupsArray);
+        return _node;
+    }
+    public static JsonNode write(DescribeShareGroupOffsetsResponseData _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class DescribeShareGroupOffsetsResponseGroupJsonConverter {
+        public static DescribeShareGroupOffsetsResponseGroup read(JsonNode _node, short _version) {
+            DescribeShareGroupOffsetsResponseGroup _object = new DescribeShareGroupOffsetsResponseGroup();
+            JsonNode _groupIdNode = _node.get("groupId");
+            if (_groupIdNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup: unable to locate field 'groupId', which is mandatory in version " + _version);
+            } else {
+                if (!_groupIdNode.isTextual()) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup expected a string type, but got " + _node.getNodeType());
+                }
+                _object.groupId = _groupIdNode.asText();
+            }
+            JsonNode _topicsNode = _node.get("topics");
+            if (_topicsNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup: unable to locate field 'topics', which is mandatory in version " + _version);
+            } else {
+                if (!_topicsNode.isArray()) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<DescribeShareGroupOffsetsResponseTopic> _collection = new ArrayList<DescribeShareGroupOffsetsResponseTopic>(_topicsNode.size());
+                _object.topics = _collection;
+                for (JsonNode _element : _topicsNode) {
+                    _collection.add(DescribeShareGroupOffsetsResponseTopicJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _errorCodeNode = _node.get("errorCode");
+            if (_errorCodeNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup: unable to locate field 'errorCode', which is mandatory in version " + _version);
+            } else {
+                _object.errorCode = MessageUtil.jsonNodeToShort(_errorCodeNode, "DescribeShareGroupOffsetsResponseGroup");
+            }
+            JsonNode _errorMessageNode = _node.get("errorMessage");
+            if (_errorMessageNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup: unable to locate field 'errorMessage', which is mandatory in version " + _version);
+            } else {
+                if (_errorMessageNode.isNull()) {
+                    _object.errorMessage = null;
+                } else {
+                    if (!_errorMessageNode.isTextual()) {
+                        throw new RuntimeException("DescribeShareGroupOffsetsResponseGroup expected a string type, but got " + _node.getNodeType());
+                    }
+                    _object.errorMessage = _errorMessageNode.asText();
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponseGroup _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("groupId", new TextNode(_object.groupId));
+            ArrayNode _topicsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (DescribeShareGroupOffsetsResponseTopic _element : _object.topics) {
+                _topicsArray.add(DescribeShareGroupOffsetsResponseTopicJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("topics", _topicsArray);
+            _node.set("errorCode", new ShortNode(_object.errorCode));
+            if (_object.errorMessage == null) {
+                _node.set("errorMessage", NullNode.instance);
+            } else {
+                _node.set("errorMessage", new TextNode(_object.errorMessage));
+            }
+            return _node;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponseGroup _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class DescribeShareGroupOffsetsResponsePartitionJsonConverter {
+        public static DescribeShareGroupOffsetsResponsePartition read(JsonNode _node, short _version) {
+            DescribeShareGroupOffsetsResponsePartition _object = new DescribeShareGroupOffsetsResponsePartition();
+            JsonNode _partitionIndexNode = _node.get("partitionIndex");
+            if (_partitionIndexNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'partitionIndex', which is mandatory in version " + _version);
+            } else {
+                _object.partitionIndex = MessageUtil.jsonNodeToInt(_partitionIndexNode, "DescribeShareGroupOffsetsResponsePartition");
+            }
+            JsonNode _startOffsetNode = _node.get("startOffset");
+            if (_startOffsetNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'startOffset', which is mandatory in version " + _version);
+            } else {
+                _object.startOffset = MessageUtil.jsonNodeToLong(_startOffsetNode, "DescribeShareGroupOffsetsResponsePartition");
+            }
+            JsonNode _leaderEpochNode = _node.get("leaderEpoch");
+            if (_leaderEpochNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'leaderEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.leaderEpoch = MessageUtil.jsonNodeToInt(_leaderEpochNode, "DescribeShareGroupOffsetsResponsePartition");
+            }
+            JsonNode _lagNode = _node.get("lag");
+            if (_lagNode == null) {
+                if (_version >= 1) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'lag', which is mandatory in version " + _version);
+                } else {
+                    _object.lag = -1L;
+                }
+            } else {
+                _object.lag = MessageUtil.jsonNodeToLong(_lagNode, "DescribeShareGroupOffsetsResponsePartition");
+            }
+            JsonNode _errorCodeNode = _node.get("errorCode");
+            if (_errorCodeNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'errorCode', which is mandatory in version " + _version);
+            } else {
+                _object.errorCode = MessageUtil.jsonNodeToShort(_errorCodeNode, "DescribeShareGroupOffsetsResponsePartition");
+            }
+            JsonNode _errorMessageNode = _node.get("errorMessage");
+            if (_errorMessageNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition: unable to locate field 'errorMessage', which is mandatory in version " + _version);
+            } else {
+                if (_errorMessageNode.isNull()) {
+                    _object.errorMessage = null;
+                } else {
+                    if (!_errorMessageNode.isTextual()) {
+                        throw new RuntimeException("DescribeShareGroupOffsetsResponsePartition expected a string type, but got " + _node.getNodeType());
+                    }
+                    _object.errorMessage = _errorMessageNode.asText();
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponsePartition _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("partitionIndex", new IntNode(_object.partitionIndex));
+            _node.set("startOffset", new LongNode(_object.startOffset));
+            _node.set("leaderEpoch", new IntNode(_object.leaderEpoch));
+            if (_version >= 1) {
+                _node.set("lag", new LongNode(_object.lag));
+            }
+            _node.set("errorCode", new ShortNode(_object.errorCode));
+            if (_object.errorMessage == null) {
+                _node.set("errorMessage", NullNode.instance);
+            } else {
+                _node.set("errorMessage", new TextNode(_object.errorMessage));
+            }
+            return _node;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponsePartition _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class DescribeShareGroupOffsetsResponseTopicJsonConverter {
+        public static DescribeShareGroupOffsetsResponseTopic read(JsonNode _node, short _version) {
+            DescribeShareGroupOffsetsResponseTopic _object = new DescribeShareGroupOffsetsResponseTopic();
+            JsonNode _topicNameNode = _node.get("topicName");
+            if (_topicNameNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic: unable to locate field 'topicName', which is mandatory in version " + _version);
+            } else {
+                if (!_topicNameNode.isTextual()) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic expected a string type, but got " + _node.getNodeType());
+                }
+                _object.topicName = _topicNameNode.asText();
+            }
+            JsonNode _topicIdNode = _node.get("topicId");
+            if (_topicIdNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic: unable to locate field 'topicId', which is mandatory in version " + _version);
+            } else {
+                if (!_topicIdNode.isTextual()) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic expected a JSON string type, but got " + _node.getNodeType());
+                }
+                _object.topicId = Uuid.fromString(_topicIdNode.asText());
+            }
+            JsonNode _partitionsNode = _node.get("partitions");
+            if (_partitionsNode == null) {
+                throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic: unable to locate field 'partitions', which is mandatory in version " + _version);
+            } else {
+                if (!_partitionsNode.isArray()) {
+                    throw new RuntimeException("DescribeShareGroupOffsetsResponseTopic expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<DescribeShareGroupOffsetsResponsePartition> _collection = new ArrayList<DescribeShareGroupOffsetsResponsePartition>(_partitionsNode.size());
+                _object.partitions = _collection;
+                for (JsonNode _element : _partitionsNode) {
+                    _collection.add(DescribeShareGroupOffsetsResponsePartitionJsonConverter.read(_element, _version));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponseTopic _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("topicName", new TextNode(_object.topicName));
+            _node.set("topicId", new TextNode(_object.topicId.toString()));
+            ArrayNode _partitionsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (DescribeShareGroupOffsetsResponsePartition _element : _object.partitions) {
+                _partitionsArray.add(DescribeShareGroupOffsetsResponsePartitionJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("partitions", _partitionsArray);
+            return _node;
+        }
+        public static JsonNode write(DescribeShareGroupOffsetsResponseTopic _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

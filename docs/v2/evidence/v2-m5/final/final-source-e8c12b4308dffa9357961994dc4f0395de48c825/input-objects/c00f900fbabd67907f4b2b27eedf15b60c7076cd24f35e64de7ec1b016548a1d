@@ -1,0 +1,802 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.common.message;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ShortNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.common.message.StreamsGroupDescribeResponseData.*;
+
+public class StreamsGroupDescribeResponseDataJsonConverter {
+    public static StreamsGroupDescribeResponseData read(JsonNode _node, short _version) {
+        StreamsGroupDescribeResponseData _object = new StreamsGroupDescribeResponseData();
+        JsonNode _throttleTimeMsNode = _node.get("throttleTimeMs");
+        if (_throttleTimeMsNode == null) {
+            throw new RuntimeException("StreamsGroupDescribeResponseData: unable to locate field 'throttleTimeMs', which is mandatory in version " + _version);
+        } else {
+            _object.throttleTimeMs = MessageUtil.jsonNodeToInt(_throttleTimeMsNode, "StreamsGroupDescribeResponseData");
+        }
+        JsonNode _groupsNode = _node.get("groups");
+        if (_groupsNode == null) {
+            throw new RuntimeException("StreamsGroupDescribeResponseData: unable to locate field 'groups', which is mandatory in version " + _version);
+        } else {
+            if (!_groupsNode.isArray()) {
+                throw new RuntimeException("StreamsGroupDescribeResponseData expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<DescribedGroup> _collection = new ArrayList<DescribedGroup>(_groupsNode.size());
+            _object.groups = _collection;
+            for (JsonNode _element : _groupsNode) {
+                _collection.add(DescribedGroupJsonConverter.read(_element, _version));
+            }
+        }
+        return _object;
+    }
+    public static JsonNode write(StreamsGroupDescribeResponseData _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        _node.set("throttleTimeMs", new IntNode(_object.throttleTimeMs));
+        ArrayNode _groupsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (DescribedGroup _element : _object.groups) {
+            _groupsArray.add(DescribedGroupJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("groups", _groupsArray);
+        return _node;
+    }
+    public static JsonNode write(StreamsGroupDescribeResponseData _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class AssignmentJsonConverter {
+        public static Assignment read(JsonNode _node, short _version) {
+            Assignment _object = new Assignment();
+            JsonNode _activeTasksNode = _node.get("activeTasks");
+            if (_activeTasksNode == null) {
+                throw new RuntimeException("Assignment: unable to locate field 'activeTasks', which is mandatory in version " + _version);
+            } else {
+                if (!_activeTasksNode.isArray()) {
+                    throw new RuntimeException("Assignment expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_activeTasksNode.size());
+                _object.activeTasks = _collection;
+                for (JsonNode _element : _activeTasksNode) {
+                    _collection.add(TaskIdsJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _standbyTasksNode = _node.get("standbyTasks");
+            if (_standbyTasksNode == null) {
+                throw new RuntimeException("Assignment: unable to locate field 'standbyTasks', which is mandatory in version " + _version);
+            } else {
+                if (!_standbyTasksNode.isArray()) {
+                    throw new RuntimeException("Assignment expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_standbyTasksNode.size());
+                _object.standbyTasks = _collection;
+                for (JsonNode _element : _standbyTasksNode) {
+                    _collection.add(TaskIdsJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _warmupTasksNode = _node.get("warmupTasks");
+            if (_warmupTasksNode == null) {
+                throw new RuntimeException("Assignment: unable to locate field 'warmupTasks', which is mandatory in version " + _version);
+            } else {
+                if (!_warmupTasksNode.isArray()) {
+                    throw new RuntimeException("Assignment expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_warmupTasksNode.size());
+                _object.warmupTasks = _collection;
+                for (JsonNode _element : _warmupTasksNode) {
+                    _collection.add(TaskIdsJsonConverter.read(_element, _version));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(Assignment _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            ArrayNode _activeTasksArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TaskIds _element : _object.activeTasks) {
+                _activeTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("activeTasks", _activeTasksArray);
+            ArrayNode _standbyTasksArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TaskIds _element : _object.standbyTasks) {
+                _standbyTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("standbyTasks", _standbyTasksArray);
+            ArrayNode _warmupTasksArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TaskIds _element : _object.warmupTasks) {
+                _warmupTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("warmupTasks", _warmupTasksArray);
+            return _node;
+        }
+        public static JsonNode write(Assignment _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class DescribedGroupJsonConverter {
+        public static DescribedGroup read(JsonNode _node, short _version) {
+            DescribedGroup _object = new DescribedGroup();
+            JsonNode _errorCodeNode = _node.get("errorCode");
+            if (_errorCodeNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'errorCode', which is mandatory in version " + _version);
+            } else {
+                _object.errorCode = MessageUtil.jsonNodeToShort(_errorCodeNode, "DescribedGroup");
+            }
+            JsonNode _errorMessageNode = _node.get("errorMessage");
+            if (_errorMessageNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'errorMessage', which is mandatory in version " + _version);
+            } else {
+                if (_errorMessageNode.isNull()) {
+                    _object.errorMessage = null;
+                } else {
+                    if (!_errorMessageNode.isTextual()) {
+                        throw new RuntimeException("DescribedGroup expected a string type, but got " + _node.getNodeType());
+                    }
+                    _object.errorMessage = _errorMessageNode.asText();
+                }
+            }
+            JsonNode _groupIdNode = _node.get("groupId");
+            if (_groupIdNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'groupId', which is mandatory in version " + _version);
+            } else {
+                if (!_groupIdNode.isTextual()) {
+                    throw new RuntimeException("DescribedGroup expected a string type, but got " + _node.getNodeType());
+                }
+                _object.groupId = _groupIdNode.asText();
+            }
+            JsonNode _groupStateNode = _node.get("groupState");
+            if (_groupStateNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'groupState', which is mandatory in version " + _version);
+            } else {
+                if (!_groupStateNode.isTextual()) {
+                    throw new RuntimeException("DescribedGroup expected a string type, but got " + _node.getNodeType());
+                }
+                _object.groupState = _groupStateNode.asText();
+            }
+            JsonNode _groupEpochNode = _node.get("groupEpoch");
+            if (_groupEpochNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'groupEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.groupEpoch = MessageUtil.jsonNodeToInt(_groupEpochNode, "DescribedGroup");
+            }
+            JsonNode _assignmentEpochNode = _node.get("assignmentEpoch");
+            if (_assignmentEpochNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'assignmentEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.assignmentEpoch = MessageUtil.jsonNodeToInt(_assignmentEpochNode, "DescribedGroup");
+            }
+            JsonNode _topologyNode = _node.get("topology");
+            if (_topologyNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'topology', which is mandatory in version " + _version);
+            } else {
+                if (_topologyNode.isNull()) {
+                    _object.topology = null;
+                } else {
+                    _object.topology = TopologyJsonConverter.read(_topologyNode, _version);
+                }
+            }
+            JsonNode _membersNode = _node.get("members");
+            if (_membersNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'members', which is mandatory in version " + _version);
+            } else {
+                if (!_membersNode.isArray()) {
+                    throw new RuntimeException("DescribedGroup expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<Member> _collection = new ArrayList<Member>(_membersNode.size());
+                _object.members = _collection;
+                for (JsonNode _element : _membersNode) {
+                    _collection.add(MemberJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _authorizedOperationsNode = _node.get("authorizedOperations");
+            if (_authorizedOperationsNode == null) {
+                throw new RuntimeException("DescribedGroup: unable to locate field 'authorizedOperations', which is mandatory in version " + _version);
+            } else {
+                _object.authorizedOperations = MessageUtil.jsonNodeToInt(_authorizedOperationsNode, "DescribedGroup");
+            }
+            return _object;
+        }
+        public static JsonNode write(DescribedGroup _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("errorCode", new ShortNode(_object.errorCode));
+            if (_object.errorMessage == null) {
+                _node.set("errorMessage", NullNode.instance);
+            } else {
+                _node.set("errorMessage", new TextNode(_object.errorMessage));
+            }
+            _node.set("groupId", new TextNode(_object.groupId));
+            _node.set("groupState", new TextNode(_object.groupState));
+            _node.set("groupEpoch", new IntNode(_object.groupEpoch));
+            _node.set("assignmentEpoch", new IntNode(_object.assignmentEpoch));
+            if (_object.topology == null) {
+                _node.set("topology", NullNode.instance);
+            } else {
+                _node.set("topology", TopologyJsonConverter.write(_object.topology, _version, _serializeRecords));
+            }
+            ArrayNode _membersArray = new ArrayNode(JsonNodeFactory.instance);
+            for (Member _element : _object.members) {
+                _membersArray.add(MemberJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("members", _membersArray);
+            _node.set("authorizedOperations", new IntNode(_object.authorizedOperations));
+            return _node;
+        }
+        public static JsonNode write(DescribedGroup _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class EndpointJsonConverter {
+        public static Endpoint read(JsonNode _node, short _version) {
+            Endpoint _object = new Endpoint();
+            JsonNode _hostNode = _node.get("host");
+            if (_hostNode == null) {
+                throw new RuntimeException("Endpoint: unable to locate field 'host', which is mandatory in version " + _version);
+            } else {
+                if (!_hostNode.isTextual()) {
+                    throw new RuntimeException("Endpoint expected a string type, but got " + _node.getNodeType());
+                }
+                _object.host = _hostNode.asText();
+            }
+            JsonNode _portNode = _node.get("port");
+            if (_portNode == null) {
+                throw new RuntimeException("Endpoint: unable to locate field 'port', which is mandatory in version " + _version);
+            } else {
+                _object.port = MessageUtil.jsonNodeToUnsignedShort(_portNode, "Endpoint");
+            }
+            return _object;
+        }
+        public static JsonNode write(Endpoint _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("host", new TextNode(_object.host));
+            _node.set("port", new IntNode(_object.port));
+            return _node;
+        }
+        public static JsonNode write(Endpoint _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class KeyValueJsonConverter {
+        public static KeyValue read(JsonNode _node, short _version) {
+            KeyValue _object = new KeyValue();
+            JsonNode _keyNode = _node.get("key");
+            if (_keyNode == null) {
+                throw new RuntimeException("KeyValue: unable to locate field 'key', which is mandatory in version " + _version);
+            } else {
+                if (!_keyNode.isTextual()) {
+                    throw new RuntimeException("KeyValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.key = _keyNode.asText();
+            }
+            JsonNode _valueNode = _node.get("value");
+            if (_valueNode == null) {
+                throw new RuntimeException("KeyValue: unable to locate field 'value', which is mandatory in version " + _version);
+            } else {
+                if (!_valueNode.isTextual()) {
+                    throw new RuntimeException("KeyValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.value = _valueNode.asText();
+            }
+            return _object;
+        }
+        public static JsonNode write(KeyValue _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("key", new TextNode(_object.key));
+            _node.set("value", new TextNode(_object.value));
+            return _node;
+        }
+        public static JsonNode write(KeyValue _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class MemberJsonConverter {
+        public static Member read(JsonNode _node, short _version) {
+            Member _object = new Member();
+            JsonNode _memberIdNode = _node.get("memberId");
+            if (_memberIdNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'memberId', which is mandatory in version " + _version);
+            } else {
+                if (!_memberIdNode.isTextual()) {
+                    throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                }
+                _object.memberId = _memberIdNode.asText();
+            }
+            JsonNode _memberEpochNode = _node.get("memberEpoch");
+            if (_memberEpochNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'memberEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.memberEpoch = MessageUtil.jsonNodeToInt(_memberEpochNode, "Member");
+            }
+            JsonNode _instanceIdNode = _node.get("instanceId");
+            if (_instanceIdNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'instanceId', which is mandatory in version " + _version);
+            } else {
+                if (_instanceIdNode.isNull()) {
+                    _object.instanceId = null;
+                } else {
+                    if (!_instanceIdNode.isTextual()) {
+                        throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                    }
+                    _object.instanceId = _instanceIdNode.asText();
+                }
+            }
+            JsonNode _rackIdNode = _node.get("rackId");
+            if (_rackIdNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'rackId', which is mandatory in version " + _version);
+            } else {
+                if (_rackIdNode.isNull()) {
+                    _object.rackId = null;
+                } else {
+                    if (!_rackIdNode.isTextual()) {
+                        throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                    }
+                    _object.rackId = _rackIdNode.asText();
+                }
+            }
+            JsonNode _clientIdNode = _node.get("clientId");
+            if (_clientIdNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'clientId', which is mandatory in version " + _version);
+            } else {
+                if (!_clientIdNode.isTextual()) {
+                    throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                }
+                _object.clientId = _clientIdNode.asText();
+            }
+            JsonNode _clientHostNode = _node.get("clientHost");
+            if (_clientHostNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'clientHost', which is mandatory in version " + _version);
+            } else {
+                if (!_clientHostNode.isTextual()) {
+                    throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                }
+                _object.clientHost = _clientHostNode.asText();
+            }
+            JsonNode _topologyEpochNode = _node.get("topologyEpoch");
+            if (_topologyEpochNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'topologyEpoch', which is mandatory in version " + _version);
+            } else {
+                _object.topologyEpoch = MessageUtil.jsonNodeToInt(_topologyEpochNode, "Member");
+            }
+            JsonNode _processIdNode = _node.get("processId");
+            if (_processIdNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'processId', which is mandatory in version " + _version);
+            } else {
+                if (!_processIdNode.isTextual()) {
+                    throw new RuntimeException("Member expected a string type, but got " + _node.getNodeType());
+                }
+                _object.processId = _processIdNode.asText();
+            }
+            JsonNode _userEndpointNode = _node.get("userEndpoint");
+            if (_userEndpointNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'userEndpoint', which is mandatory in version " + _version);
+            } else {
+                if (_userEndpointNode.isNull()) {
+                    _object.userEndpoint = null;
+                } else {
+                    _object.userEndpoint = EndpointJsonConverter.read(_userEndpointNode, _version);
+                }
+            }
+            JsonNode _clientTagsNode = _node.get("clientTags");
+            if (_clientTagsNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'clientTags', which is mandatory in version " + _version);
+            } else {
+                if (!_clientTagsNode.isArray()) {
+                    throw new RuntimeException("Member expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<KeyValue> _collection = new ArrayList<KeyValue>(_clientTagsNode.size());
+                _object.clientTags = _collection;
+                for (JsonNode _element : _clientTagsNode) {
+                    _collection.add(KeyValueJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _taskOffsetsNode = _node.get("taskOffsets");
+            if (_taskOffsetsNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'taskOffsets', which is mandatory in version " + _version);
+            } else {
+                if (!_taskOffsetsNode.isArray()) {
+                    throw new RuntimeException("Member expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TaskOffset> _collection = new ArrayList<TaskOffset>(_taskOffsetsNode.size());
+                _object.taskOffsets = _collection;
+                for (JsonNode _element : _taskOffsetsNode) {
+                    _collection.add(TaskOffsetJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _taskEndOffsetsNode = _node.get("taskEndOffsets");
+            if (_taskEndOffsetsNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'taskEndOffsets', which is mandatory in version " + _version);
+            } else {
+                if (!_taskEndOffsetsNode.isArray()) {
+                    throw new RuntimeException("Member expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TaskOffset> _collection = new ArrayList<TaskOffset>(_taskEndOffsetsNode.size());
+                _object.taskEndOffsets = _collection;
+                for (JsonNode _element : _taskEndOffsetsNode) {
+                    _collection.add(TaskOffsetJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _assignmentNode = _node.get("assignment");
+            if (_assignmentNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'assignment', which is mandatory in version " + _version);
+            } else {
+                _object.assignment = AssignmentJsonConverter.read(_assignmentNode, _version);
+            }
+            JsonNode _targetAssignmentNode = _node.get("targetAssignment");
+            if (_targetAssignmentNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'targetAssignment', which is mandatory in version " + _version);
+            } else {
+                _object.targetAssignment = AssignmentJsonConverter.read(_targetAssignmentNode, _version);
+            }
+            JsonNode _isClassicNode = _node.get("isClassic");
+            if (_isClassicNode == null) {
+                throw new RuntimeException("Member: unable to locate field 'isClassic', which is mandatory in version " + _version);
+            } else {
+                if (!_isClassicNode.isBoolean()) {
+                    throw new RuntimeException("Member expected Boolean type, but got " + _node.getNodeType());
+                }
+                _object.isClassic = _isClassicNode.asBoolean();
+            }
+            return _object;
+        }
+        public static JsonNode write(Member _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("memberId", new TextNode(_object.memberId));
+            _node.set("memberEpoch", new IntNode(_object.memberEpoch));
+            if (_object.instanceId == null) {
+                _node.set("instanceId", NullNode.instance);
+            } else {
+                _node.set("instanceId", new TextNode(_object.instanceId));
+            }
+            if (_object.rackId == null) {
+                _node.set("rackId", NullNode.instance);
+            } else {
+                _node.set("rackId", new TextNode(_object.rackId));
+            }
+            _node.set("clientId", new TextNode(_object.clientId));
+            _node.set("clientHost", new TextNode(_object.clientHost));
+            _node.set("topologyEpoch", new IntNode(_object.topologyEpoch));
+            _node.set("processId", new TextNode(_object.processId));
+            if (_object.userEndpoint == null) {
+                _node.set("userEndpoint", NullNode.instance);
+            } else {
+                _node.set("userEndpoint", EndpointJsonConverter.write(_object.userEndpoint, _version, _serializeRecords));
+            }
+            ArrayNode _clientTagsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (KeyValue _element : _object.clientTags) {
+                _clientTagsArray.add(KeyValueJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("clientTags", _clientTagsArray);
+            ArrayNode _taskOffsetsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TaskOffset _element : _object.taskOffsets) {
+                _taskOffsetsArray.add(TaskOffsetJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("taskOffsets", _taskOffsetsArray);
+            ArrayNode _taskEndOffsetsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TaskOffset _element : _object.taskEndOffsets) {
+                _taskEndOffsetsArray.add(TaskOffsetJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("taskEndOffsets", _taskEndOffsetsArray);
+            _node.set("assignment", AssignmentJsonConverter.write(_object.assignment, _version, _serializeRecords));
+            _node.set("targetAssignment", AssignmentJsonConverter.write(_object.targetAssignment, _version, _serializeRecords));
+            _node.set("isClassic", BooleanNode.valueOf(_object.isClassic));
+            return _node;
+        }
+        public static JsonNode write(Member _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class SubtopologyJsonConverter {
+        public static Subtopology read(JsonNode _node, short _version) {
+            Subtopology _object = new Subtopology();
+            JsonNode _subtopologyIdNode = _node.get("subtopologyId");
+            if (_subtopologyIdNode == null) {
+                throw new RuntimeException("Subtopology: unable to locate field 'subtopologyId', which is mandatory in version " + _version);
+            } else {
+                if (!_subtopologyIdNode.isTextual()) {
+                    throw new RuntimeException("Subtopology expected a string type, but got " + _node.getNodeType());
+                }
+                _object.subtopologyId = _subtopologyIdNode.asText();
+            }
+            JsonNode _sourceTopicsNode = _node.get("sourceTopics");
+            if (_sourceTopicsNode == null) {
+                throw new RuntimeException("Subtopology: unable to locate field 'sourceTopics', which is mandatory in version " + _version);
+            } else {
+                if (!_sourceTopicsNode.isArray()) {
+                    throw new RuntimeException("Subtopology expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<String> _collection = new ArrayList<String>(_sourceTopicsNode.size());
+                _object.sourceTopics = _collection;
+                for (JsonNode _element : _sourceTopicsNode) {
+                    if (!_element.isTextual()) {
+                        throw new RuntimeException("Subtopology element expected a string type, but got " + _node.getNodeType());
+                    }
+                    _collection.add(_element.asText());
+                }
+            }
+            JsonNode _repartitionSinkTopicsNode = _node.get("repartitionSinkTopics");
+            if (_repartitionSinkTopicsNode == null) {
+                throw new RuntimeException("Subtopology: unable to locate field 'repartitionSinkTopics', which is mandatory in version " + _version);
+            } else {
+                if (!_repartitionSinkTopicsNode.isArray()) {
+                    throw new RuntimeException("Subtopology expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<String> _collection = new ArrayList<String>(_repartitionSinkTopicsNode.size());
+                _object.repartitionSinkTopics = _collection;
+                for (JsonNode _element : _repartitionSinkTopicsNode) {
+                    if (!_element.isTextual()) {
+                        throw new RuntimeException("Subtopology element expected a string type, but got " + _node.getNodeType());
+                    }
+                    _collection.add(_element.asText());
+                }
+            }
+            JsonNode _stateChangelogTopicsNode = _node.get("stateChangelogTopics");
+            if (_stateChangelogTopicsNode == null) {
+                throw new RuntimeException("Subtopology: unable to locate field 'stateChangelogTopics', which is mandatory in version " + _version);
+            } else {
+                if (!_stateChangelogTopicsNode.isArray()) {
+                    throw new RuntimeException("Subtopology expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TopicInfo> _collection = new ArrayList<TopicInfo>(_stateChangelogTopicsNode.size());
+                _object.stateChangelogTopics = _collection;
+                for (JsonNode _element : _stateChangelogTopicsNode) {
+                    _collection.add(TopicInfoJsonConverter.read(_element, _version));
+                }
+            }
+            JsonNode _repartitionSourceTopicsNode = _node.get("repartitionSourceTopics");
+            if (_repartitionSourceTopicsNode == null) {
+                throw new RuntimeException("Subtopology: unable to locate field 'repartitionSourceTopics', which is mandatory in version " + _version);
+            } else {
+                if (!_repartitionSourceTopicsNode.isArray()) {
+                    throw new RuntimeException("Subtopology expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<TopicInfo> _collection = new ArrayList<TopicInfo>(_repartitionSourceTopicsNode.size());
+                _object.repartitionSourceTopics = _collection;
+                for (JsonNode _element : _repartitionSourceTopicsNode) {
+                    _collection.add(TopicInfoJsonConverter.read(_element, _version));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(Subtopology _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("subtopologyId", new TextNode(_object.subtopologyId));
+            ArrayNode _sourceTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (String _element : _object.sourceTopics) {
+                _sourceTopicsArray.add(new TextNode(_element));
+            }
+            _node.set("sourceTopics", _sourceTopicsArray);
+            ArrayNode _repartitionSinkTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (String _element : _object.repartitionSinkTopics) {
+                _repartitionSinkTopicsArray.add(new TextNode(_element));
+            }
+            _node.set("repartitionSinkTopics", _repartitionSinkTopicsArray);
+            ArrayNode _stateChangelogTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TopicInfo _element : _object.stateChangelogTopics) {
+                _stateChangelogTopicsArray.add(TopicInfoJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("stateChangelogTopics", _stateChangelogTopicsArray);
+            ArrayNode _repartitionSourceTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (TopicInfo _element : _object.repartitionSourceTopics) {
+                _repartitionSourceTopicsArray.add(TopicInfoJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("repartitionSourceTopics", _repartitionSourceTopicsArray);
+            return _node;
+        }
+        public static JsonNode write(Subtopology _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class TaskIdsJsonConverter {
+        public static TaskIds read(JsonNode _node, short _version) {
+            TaskIds _object = new TaskIds();
+            JsonNode _subtopologyIdNode = _node.get("subtopologyId");
+            if (_subtopologyIdNode == null) {
+                throw new RuntimeException("TaskIds: unable to locate field 'subtopologyId', which is mandatory in version " + _version);
+            } else {
+                if (!_subtopologyIdNode.isTextual()) {
+                    throw new RuntimeException("TaskIds expected a string type, but got " + _node.getNodeType());
+                }
+                _object.subtopologyId = _subtopologyIdNode.asText();
+            }
+            JsonNode _partitionsNode = _node.get("partitions");
+            if (_partitionsNode == null) {
+                throw new RuntimeException("TaskIds: unable to locate field 'partitions', which is mandatory in version " + _version);
+            } else {
+                if (!_partitionsNode.isArray()) {
+                    throw new RuntimeException("TaskIds expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<Integer> _collection = new ArrayList<Integer>(_partitionsNode.size());
+                _object.partitions = _collection;
+                for (JsonNode _element : _partitionsNode) {
+                    _collection.add(MessageUtil.jsonNodeToInt(_element, "TaskIds element"));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(TaskIds _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("subtopologyId", new TextNode(_object.subtopologyId));
+            ArrayNode _partitionsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (Integer _element : _object.partitions) {
+                _partitionsArray.add(new IntNode(_element));
+            }
+            _node.set("partitions", _partitionsArray);
+            return _node;
+        }
+        public static JsonNode write(TaskIds _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class TaskOffsetJsonConverter {
+        public static TaskOffset read(JsonNode _node, short _version) {
+            TaskOffset _object = new TaskOffset();
+            JsonNode _subtopologyIdNode = _node.get("subtopologyId");
+            if (_subtopologyIdNode == null) {
+                throw new RuntimeException("TaskOffset: unable to locate field 'subtopologyId', which is mandatory in version " + _version);
+            } else {
+                if (!_subtopologyIdNode.isTextual()) {
+                    throw new RuntimeException("TaskOffset expected a string type, but got " + _node.getNodeType());
+                }
+                _object.subtopologyId = _subtopologyIdNode.asText();
+            }
+            JsonNode _partitionNode = _node.get("partition");
+            if (_partitionNode == null) {
+                throw new RuntimeException("TaskOffset: unable to locate field 'partition', which is mandatory in version " + _version);
+            } else {
+                _object.partition = MessageUtil.jsonNodeToInt(_partitionNode, "TaskOffset");
+            }
+            JsonNode _offsetNode = _node.get("offset");
+            if (_offsetNode == null) {
+                throw new RuntimeException("TaskOffset: unable to locate field 'offset', which is mandatory in version " + _version);
+            } else {
+                _object.offset = MessageUtil.jsonNodeToLong(_offsetNode, "TaskOffset");
+            }
+            return _object;
+        }
+        public static JsonNode write(TaskOffset _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("subtopologyId", new TextNode(_object.subtopologyId));
+            _node.set("partition", new IntNode(_object.partition));
+            _node.set("offset", new LongNode(_object.offset));
+            return _node;
+        }
+        public static JsonNode write(TaskOffset _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class TopicInfoJsonConverter {
+        public static TopicInfo read(JsonNode _node, short _version) {
+            TopicInfo _object = new TopicInfo();
+            JsonNode _nameNode = _node.get("name");
+            if (_nameNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'name', which is mandatory in version " + _version);
+            } else {
+                if (!_nameNode.isTextual()) {
+                    throw new RuntimeException("TopicInfo expected a string type, but got " + _node.getNodeType());
+                }
+                _object.name = _nameNode.asText();
+            }
+            JsonNode _partitionsNode = _node.get("partitions");
+            if (_partitionsNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'partitions', which is mandatory in version " + _version);
+            } else {
+                _object.partitions = MessageUtil.jsonNodeToInt(_partitionsNode, "TopicInfo");
+            }
+            JsonNode _replicationFactorNode = _node.get("replicationFactor");
+            if (_replicationFactorNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'replicationFactor', which is mandatory in version " + _version);
+            } else {
+                _object.replicationFactor = MessageUtil.jsonNodeToShort(_replicationFactorNode, "TopicInfo");
+            }
+            JsonNode _topicConfigsNode = _node.get("topicConfigs");
+            if (_topicConfigsNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'topicConfigs', which is mandatory in version " + _version);
+            } else {
+                if (!_topicConfigsNode.isArray()) {
+                    throw new RuntimeException("TopicInfo expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<KeyValue> _collection = new ArrayList<KeyValue>(_topicConfigsNode.size());
+                _object.topicConfigs = _collection;
+                for (JsonNode _element : _topicConfigsNode) {
+                    _collection.add(KeyValueJsonConverter.read(_element, _version));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(TopicInfo _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("name", new TextNode(_object.name));
+            _node.set("partitions", new IntNode(_object.partitions));
+            _node.set("replicationFactor", new ShortNode(_object.replicationFactor));
+            ArrayNode _topicConfigsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (KeyValue _element : _object.topicConfigs) {
+                _topicConfigsArray.add(KeyValueJsonConverter.write(_element, _version, _serializeRecords));
+            }
+            _node.set("topicConfigs", _topicConfigsArray);
+            return _node;
+        }
+        public static JsonNode write(TopicInfo _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class TopologyJsonConverter {
+        public static Topology read(JsonNode _node, short _version) {
+            Topology _object = new Topology();
+            JsonNode _epochNode = _node.get("epoch");
+            if (_epochNode == null) {
+                throw new RuntimeException("Topology: unable to locate field 'epoch', which is mandatory in version " + _version);
+            } else {
+                _object.epoch = MessageUtil.jsonNodeToInt(_epochNode, "Topology");
+            }
+            JsonNode _subtopologiesNode = _node.get("subtopologies");
+            if (_subtopologiesNode == null) {
+                throw new RuntimeException("Topology: unable to locate field 'subtopologies', which is mandatory in version " + _version);
+            } else {
+                if (_subtopologiesNode.isNull()) {
+                    _object.subtopologies = null;
+                } else {
+                    if (!_subtopologiesNode.isArray()) {
+                        throw new RuntimeException("Topology expected a JSON array, but got " + _node.getNodeType());
+                    }
+                    ArrayList<Subtopology> _collection = new ArrayList<Subtopology>(_subtopologiesNode.size());
+                    _object.subtopologies = _collection;
+                    for (JsonNode _element : _subtopologiesNode) {
+                        _collection.add(SubtopologyJsonConverter.read(_element, _version));
+                    }
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(Topology _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("epoch", new IntNode(_object.epoch));
+            if (_object.subtopologies == null) {
+                _node.set("subtopologies", NullNode.instance);
+            } else {
+                ArrayNode _subtopologiesArray = new ArrayNode(JsonNodeFactory.instance);
+                for (Subtopology _element : _object.subtopologies) {
+                    _subtopologiesArray.add(SubtopologyJsonConverter.write(_element, _version, _serializeRecords));
+                }
+                _node.set("subtopologies", _subtopologiesArray);
+            }
+            return _node;
+        }
+        public static JsonNode write(Topology _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.453Z" hostname="liusinandeMacBook-Pro.local" time="0.003">
+  <properties/>
+  <testcase name="transitionMayInstallAnElectionBoundedTruncatedStateAndNotifiesAfterCas()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <testcase name="rejectsOwnerOrKafkaLeaderEpochRegression()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <testcase name="rejectsAChangeThatAdvancesNoFence()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <testcase name="staleTransitionCannotReplaceOrNotify()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <testcase name="rejectsPartitionIdentityChange()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <testcase name="transitionRejectsReferenceGenerationRollbackWithoutReplacingOrNotifying()" classname="com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

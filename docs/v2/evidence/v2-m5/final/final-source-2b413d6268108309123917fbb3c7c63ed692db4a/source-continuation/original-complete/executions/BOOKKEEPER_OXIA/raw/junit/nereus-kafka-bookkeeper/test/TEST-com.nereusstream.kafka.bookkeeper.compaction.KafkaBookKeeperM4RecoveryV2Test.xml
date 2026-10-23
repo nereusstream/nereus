@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:14.102Z" hostname="liusinandeMacBook-Pro.local" time="0.146">
+  <properties/>
+  <testcase name="unknownSelectorClosureStopsNewRecoveryWhileOldLeaseSurvivesExactRetryAndDrain()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.052"/>
+  <testcase name="capturesCompleteDescriptorSourcePlanWithoutControlMetadataIoOrObsoleteFallback()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.025"/>
+  <testcase name="differentSelectedViewAndMalformedSourcePlanFailBeforeAnyProviderIo()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.016"/>
+  <testcase name="nativeFailureDrainsLeaseWithoutFallbackOrFurtherSourceReads()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.013"/>
+  <testcase name="hazardExhaustionRejectsBeforeProviderIoAndCapacityReturnsOnlyAfterDrain()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.015"/>
+  <testcase name="cancellationKeepsExactGenerationPinnedUntilActualNativeCompletion()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.011"/>
+  <testcase name="projectionDoesNotAcceptPredecessorSelectionOrReopenStoppedAdmission()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

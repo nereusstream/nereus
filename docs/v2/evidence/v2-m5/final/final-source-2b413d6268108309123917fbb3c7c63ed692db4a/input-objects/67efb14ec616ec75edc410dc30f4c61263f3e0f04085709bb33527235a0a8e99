@@ -1,0 +1,1416 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.protocol.Message;
+import org.apache.kafka.common.protocol.MessageSizeAccumulator;
+import org.apache.kafka.common.protocol.MessageUtil;
+import org.apache.kafka.common.protocol.ObjectSerializationCache;
+import org.apache.kafka.common.protocol.Readable;
+import org.apache.kafka.common.protocol.Writable;
+import org.apache.kafka.common.protocol.types.CompactArrayOf;
+import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.protocol.types.RawTaggedFieldWriter;
+import org.apache.kafka.common.protocol.types.Schema;
+import org.apache.kafka.common.protocol.types.Type;
+import org.apache.kafka.common.utils.ByteUtils;
+
+import static org.apache.kafka.common.protocol.types.Field.TaggedFieldsSection;
+
+
+public class StreamsGroupTopologyValue implements ApiMessage {
+    int epoch;
+    List<Subtopology> subtopologies;
+    private List<RawTaggedField> _unknownTaggedFields;
+    
+    public static final Schema SCHEMA_0 =
+        new Schema(
+            new Field("epoch", Type.INT32, "The epoch of the topology."),
+            new Field("subtopologies", new CompactArrayOf(Subtopology.SCHEMA_0), "The sub-topologies of the streams application."),
+            TaggedFieldsSection.of(
+            )
+        );
+    
+    public static final Schema[] SCHEMAS = new Schema[] {
+        SCHEMA_0
+    };
+    
+    public static final short LOWEST_SUPPORTED_VERSION = 0;
+    public static final short HIGHEST_SUPPORTED_VERSION = 0;
+    
+    public StreamsGroupTopologyValue(Readable _readable, short _version) {
+        read(_readable, _version);
+    }
+    
+    public StreamsGroupTopologyValue() {
+        this.epoch = 0;
+        this.subtopologies = new ArrayList<Subtopology>(0);
+    }
+    
+    @Override
+    public short apiKey() {
+        return 23;
+    }
+    
+    @Override
+    public short lowestSupportedVersion() {
+        return 0;
+    }
+    
+    @Override
+    public short highestSupportedVersion() {
+        return 0;
+    }
+    
+    @Override
+    public final void read(Readable _readable, short _version) {
+        this.epoch = _readable.readInt();
+        {
+            int arrayLength;
+            arrayLength = _readable.readUnsignedVarint() - 1;
+            if (arrayLength < 0) {
+                throw new RuntimeException("non-nullable field subtopologies was serialized as null");
+            } else {
+                if (arrayLength > _readable.remaining()) {
+                    throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                }
+                ArrayList<Subtopology> newCollection = new ArrayList<>(arrayLength);
+                for (int i = 0; i < arrayLength; i++) {
+                    newCollection.add(new Subtopology(_readable, _version));
+                }
+                this.subtopologies = newCollection;
+            }
+        }
+        this._unknownTaggedFields = null;
+        int _numTaggedFields = _readable.readUnsignedVarint();
+        for (int _i = 0; _i < _numTaggedFields; _i++) {
+            int _tag = _readable.readUnsignedVarint();
+            int _size = _readable.readUnsignedVarint();
+            switch (_tag) {
+                default:
+                    this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                    break;
+            }
+        }
+    }
+    
+    @Override
+    public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _writable.writeInt(epoch);
+        _writable.writeUnsignedVarint(subtopologies.size() + 1);
+        for (Subtopology subtopologiesElement : subtopologies) {
+            subtopologiesElement.write(_writable, _cache, _version);
+        }
+        RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+        _numTaggedFields += _rawWriter.numFields();
+        _writable.writeUnsignedVarint(_numTaggedFields);
+        _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+    }
+    
+    @Override
+    public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _size.addBytes(4);
+        {
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(subtopologies.size() + 1));
+            for (Subtopology subtopologiesElement : subtopologies) {
+                subtopologiesElement.addSize(_size, _cache, _version);
+            }
+        }
+        if (_unknownTaggedFields != null) {
+            _numTaggedFields += _unknownTaggedFields.size();
+            for (RawTaggedField _field : _unknownTaggedFields) {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                _size.addBytes(_field.size());
+            }
+        }
+        _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof StreamsGroupTopologyValue)) return false;
+        StreamsGroupTopologyValue other = (StreamsGroupTopologyValue) obj;
+        if (epoch != other.epoch) return false;
+        if (this.subtopologies == null) {
+            if (other.subtopologies != null) return false;
+        } else {
+            if (!this.subtopologies.equals(other.subtopologies)) return false;
+        }
+        return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+    }
+    
+    @Override
+    public int hashCode() {
+        int hashCode = 0;
+        hashCode = 31 * hashCode + epoch;
+        hashCode = 31 * hashCode + (subtopologies == null ? 0 : subtopologies.hashCode());
+        return hashCode;
+    }
+    
+    @Override
+    public StreamsGroupTopologyValue duplicate() {
+        StreamsGroupTopologyValue _duplicate = new StreamsGroupTopologyValue();
+        _duplicate.epoch = epoch;
+        ArrayList<Subtopology> newSubtopologies = new ArrayList<Subtopology>(subtopologies.size());
+        for (Subtopology _element : subtopologies) {
+            newSubtopologies.add(_element.duplicate());
+        }
+        _duplicate.subtopologies = newSubtopologies;
+        return _duplicate;
+    }
+    
+    @Override
+    public String toString() {
+        return "StreamsGroupTopologyValue("
+            + "epoch=" + epoch
+            + ", subtopologies=" + MessageUtil.deepToString(subtopologies.iterator())
+            + ")";
+    }
+    
+    public int epoch() {
+        return this.epoch;
+    }
+    
+    public List<Subtopology> subtopologies() {
+        return this.subtopologies;
+    }
+    
+    @Override
+    public List<RawTaggedField> unknownTaggedFields() {
+        if (_unknownTaggedFields == null) {
+            _unknownTaggedFields = new ArrayList<>(0);
+        }
+        return _unknownTaggedFields;
+    }
+    
+    public StreamsGroupTopologyValue setEpoch(int v) {
+        this.epoch = v;
+        return this;
+    }
+    
+    public StreamsGroupTopologyValue setSubtopologies(List<Subtopology> v) {
+        this.subtopologies = v;
+        return this;
+    }
+    
+    public static class Subtopology implements Message {
+        String subtopologyId;
+        List<String> sourceTopics;
+        List<String> sourceTopicRegex;
+        List<TopicInfo> stateChangelogTopics;
+        List<String> repartitionSinkTopics;
+        List<TopicInfo> repartitionSourceTopics;
+        List<CopartitionGroup> copartitionGroups;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("subtopology_id", Type.COMPACT_STRING, "String to uniquely identify the subtopology."),
+                new Field("source_topics", new CompactArrayOf(Type.COMPACT_STRING), "The topics the topology reads from."),
+                new Field("source_topic_regex", new CompactArrayOf(Type.COMPACT_STRING), "Regular expressions identifying topics the subtopology reads from."),
+                new Field("state_changelog_topics", new CompactArrayOf(TopicInfo.SCHEMA_0), "The set of state changelog topics associated with this subtopology."),
+                new Field("repartition_sink_topics", new CompactArrayOf(Type.COMPACT_STRING), "The repartition topics the subtopology writes to."),
+                new Field("repartition_source_topics", new CompactArrayOf(TopicInfo.SCHEMA_0), "The set of source topics that are internally created repartition topics."),
+                new Field("copartition_groups", new CompactArrayOf(CopartitionGroup.SCHEMA_0), "A subset of source topics that must be copartitioned."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Subtopology(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Subtopology() {
+            this.subtopologyId = "";
+            this.sourceTopics = new ArrayList<String>(0);
+            this.sourceTopicRegex = new ArrayList<String>(0);
+            this.stateChangelogTopics = new ArrayList<TopicInfo>(0);
+            this.repartitionSinkTopics = new ArrayList<String>(0);
+            this.repartitionSourceTopics = new ArrayList<TopicInfo>(0);
+            this.copartitionGroups = new ArrayList<CopartitionGroup>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of Subtopology");
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field subtopologyId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field subtopologyId had invalid length " + length);
+                } else {
+                    this.subtopologyId = _readable.readString(length);
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field sourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<String> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        int length;
+                        length = _readable.readUnsignedVarint() - 1;
+                        if (length < 0) {
+                            throw new RuntimeException("non-nullable field sourceTopics element was serialized as null");
+                        } else if (length > 0x7fff) {
+                            throw new RuntimeException("string field sourceTopics element had invalid length " + length);
+                        } else {
+                            newCollection.add(_readable.readString(length));
+                        }
+                    }
+                    this.sourceTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field sourceTopicRegex was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<String> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        int length;
+                        length = _readable.readUnsignedVarint() - 1;
+                        if (length < 0) {
+                            throw new RuntimeException("non-nullable field sourceTopicRegex element was serialized as null");
+                        } else if (length > 0x7fff) {
+                            throw new RuntimeException("string field sourceTopicRegex element had invalid length " + length);
+                        } else {
+                            newCollection.add(_readable.readString(length));
+                        }
+                    }
+                    this.sourceTopicRegex = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field stateChangelogTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TopicInfo> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TopicInfo(_readable, _version));
+                    }
+                    this.stateChangelogTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field repartitionSinkTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<String> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        int length;
+                        length = _readable.readUnsignedVarint() - 1;
+                        if (length < 0) {
+                            throw new RuntimeException("non-nullable field repartitionSinkTopics element was serialized as null");
+                        } else if (length > 0x7fff) {
+                            throw new RuntimeException("string field repartitionSinkTopics element had invalid length " + length);
+                        } else {
+                            newCollection.add(_readable.readString(length));
+                        }
+                    }
+                    this.repartitionSinkTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field repartitionSourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TopicInfo> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TopicInfo(_readable, _version));
+                    }
+                    this.repartitionSourceTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field copartitionGroups was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<CopartitionGroup> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new CopartitionGroup(_readable, _version));
+                    }
+                    this.copartitionGroups = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(subtopologyId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeUnsignedVarint(sourceTopics.size() + 1);
+            for (String sourceTopicsElement : sourceTopics) {
+                {
+                    byte[] _stringBytes = _cache.getSerializedValue(sourceTopicsElement);
+                    _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                    _writable.writeByteArray(_stringBytes);
+                }
+            }
+            _writable.writeUnsignedVarint(sourceTopicRegex.size() + 1);
+            for (String sourceTopicRegexElement : sourceTopicRegex) {
+                {
+                    byte[] _stringBytes = _cache.getSerializedValue(sourceTopicRegexElement);
+                    _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                    _writable.writeByteArray(_stringBytes);
+                }
+            }
+            _writable.writeUnsignedVarint(stateChangelogTopics.size() + 1);
+            for (TopicInfo stateChangelogTopicsElement : stateChangelogTopics) {
+                stateChangelogTopicsElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(repartitionSinkTopics.size() + 1);
+            for (String repartitionSinkTopicsElement : repartitionSinkTopics) {
+                {
+                    byte[] _stringBytes = _cache.getSerializedValue(repartitionSinkTopicsElement);
+                    _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                    _writable.writeByteArray(_stringBytes);
+                }
+            }
+            _writable.writeUnsignedVarint(repartitionSourceTopics.size() + 1);
+            for (TopicInfo repartitionSourceTopicsElement : repartitionSourceTopics) {
+                repartitionSourceTopicsElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(copartitionGroups.size() + 1);
+            for (CopartitionGroup copartitionGroupsElement : copartitionGroups) {
+                copartitionGroupsElement.write(_writable, _cache, _version);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of Subtopology");
+            }
+            {
+                byte[] _stringBytes = subtopologyId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'subtopologyId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(subtopologyId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(sourceTopics.size() + 1));
+                for (String sourceTopicsElement : sourceTopics) {
+                    byte[] _stringBytes = sourceTopicsElement.getBytes(StandardCharsets.UTF_8);
+                    if (_stringBytes.length > 0x7fff) {
+                        throw new RuntimeException("'sourceTopicsElement' field is too long to be serialized");
+                    }
+                    _cache.cacheSerializedValue(sourceTopicsElement, _stringBytes);
+                    _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(sourceTopicRegex.size() + 1));
+                for (String sourceTopicRegexElement : sourceTopicRegex) {
+                    byte[] _stringBytes = sourceTopicRegexElement.getBytes(StandardCharsets.UTF_8);
+                    if (_stringBytes.length > 0x7fff) {
+                        throw new RuntimeException("'sourceTopicRegexElement' field is too long to be serialized");
+                    }
+                    _cache.cacheSerializedValue(sourceTopicRegexElement, _stringBytes);
+                    _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(stateChangelogTopics.size() + 1));
+                for (TopicInfo stateChangelogTopicsElement : stateChangelogTopics) {
+                    stateChangelogTopicsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(repartitionSinkTopics.size() + 1));
+                for (String repartitionSinkTopicsElement : repartitionSinkTopics) {
+                    byte[] _stringBytes = repartitionSinkTopicsElement.getBytes(StandardCharsets.UTF_8);
+                    if (_stringBytes.length > 0x7fff) {
+                        throw new RuntimeException("'repartitionSinkTopicsElement' field is too long to be serialized");
+                    }
+                    _cache.cacheSerializedValue(repartitionSinkTopicsElement, _stringBytes);
+                    _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(repartitionSourceTopics.size() + 1));
+                for (TopicInfo repartitionSourceTopicsElement : repartitionSourceTopics) {
+                    repartitionSourceTopicsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(copartitionGroups.size() + 1));
+                for (CopartitionGroup copartitionGroupsElement : copartitionGroups) {
+                    copartitionGroupsElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Subtopology)) return false;
+            Subtopology other = (Subtopology) obj;
+            if (this.subtopologyId == null) {
+                if (other.subtopologyId != null) return false;
+            } else {
+                if (!this.subtopologyId.equals(other.subtopologyId)) return false;
+            }
+            if (this.sourceTopics == null) {
+                if (other.sourceTopics != null) return false;
+            } else {
+                if (!this.sourceTopics.equals(other.sourceTopics)) return false;
+            }
+            if (this.sourceTopicRegex == null) {
+                if (other.sourceTopicRegex != null) return false;
+            } else {
+                if (!this.sourceTopicRegex.equals(other.sourceTopicRegex)) return false;
+            }
+            if (this.stateChangelogTopics == null) {
+                if (other.stateChangelogTopics != null) return false;
+            } else {
+                if (!this.stateChangelogTopics.equals(other.stateChangelogTopics)) return false;
+            }
+            if (this.repartitionSinkTopics == null) {
+                if (other.repartitionSinkTopics != null) return false;
+            } else {
+                if (!this.repartitionSinkTopics.equals(other.repartitionSinkTopics)) return false;
+            }
+            if (this.repartitionSourceTopics == null) {
+                if (other.repartitionSourceTopics != null) return false;
+            } else {
+                if (!this.repartitionSourceTopics.equals(other.repartitionSourceTopics)) return false;
+            }
+            if (this.copartitionGroups == null) {
+                if (other.copartitionGroups != null) return false;
+            } else {
+                if (!this.copartitionGroups.equals(other.copartitionGroups)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (subtopologyId == null ? 0 : subtopologyId.hashCode());
+            hashCode = 31 * hashCode + (sourceTopics == null ? 0 : sourceTopics.hashCode());
+            hashCode = 31 * hashCode + (sourceTopicRegex == null ? 0 : sourceTopicRegex.hashCode());
+            hashCode = 31 * hashCode + (stateChangelogTopics == null ? 0 : stateChangelogTopics.hashCode());
+            hashCode = 31 * hashCode + (repartitionSinkTopics == null ? 0 : repartitionSinkTopics.hashCode());
+            hashCode = 31 * hashCode + (repartitionSourceTopics == null ? 0 : repartitionSourceTopics.hashCode());
+            hashCode = 31 * hashCode + (copartitionGroups == null ? 0 : copartitionGroups.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public Subtopology duplicate() {
+            Subtopology _duplicate = new Subtopology();
+            _duplicate.subtopologyId = subtopologyId;
+            ArrayList<String> newSourceTopics = new ArrayList<String>(sourceTopics.size());
+            for (String _element : sourceTopics) {
+                newSourceTopics.add(_element);
+            }
+            _duplicate.sourceTopics = newSourceTopics;
+            ArrayList<String> newSourceTopicRegex = new ArrayList<String>(sourceTopicRegex.size());
+            for (String _element : sourceTopicRegex) {
+                newSourceTopicRegex.add(_element);
+            }
+            _duplicate.sourceTopicRegex = newSourceTopicRegex;
+            ArrayList<TopicInfo> newStateChangelogTopics = new ArrayList<TopicInfo>(stateChangelogTopics.size());
+            for (TopicInfo _element : stateChangelogTopics) {
+                newStateChangelogTopics.add(_element.duplicate());
+            }
+            _duplicate.stateChangelogTopics = newStateChangelogTopics;
+            ArrayList<String> newRepartitionSinkTopics = new ArrayList<String>(repartitionSinkTopics.size());
+            for (String _element : repartitionSinkTopics) {
+                newRepartitionSinkTopics.add(_element);
+            }
+            _duplicate.repartitionSinkTopics = newRepartitionSinkTopics;
+            ArrayList<TopicInfo> newRepartitionSourceTopics = new ArrayList<TopicInfo>(repartitionSourceTopics.size());
+            for (TopicInfo _element : repartitionSourceTopics) {
+                newRepartitionSourceTopics.add(_element.duplicate());
+            }
+            _duplicate.repartitionSourceTopics = newRepartitionSourceTopics;
+            ArrayList<CopartitionGroup> newCopartitionGroups = new ArrayList<CopartitionGroup>(copartitionGroups.size());
+            for (CopartitionGroup _element : copartitionGroups) {
+                newCopartitionGroups.add(_element.duplicate());
+            }
+            _duplicate.copartitionGroups = newCopartitionGroups;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Subtopology("
+                + "subtopologyId=" + ((subtopologyId == null) ? "null" : "'" + subtopologyId.toString() + "'")
+                + ", sourceTopics=" + MessageUtil.deepToString(sourceTopics.iterator())
+                + ", sourceTopicRegex=" + MessageUtil.deepToString(sourceTopicRegex.iterator())
+                + ", stateChangelogTopics=" + MessageUtil.deepToString(stateChangelogTopics.iterator())
+                + ", repartitionSinkTopics=" + MessageUtil.deepToString(repartitionSinkTopics.iterator())
+                + ", repartitionSourceTopics=" + MessageUtil.deepToString(repartitionSourceTopics.iterator())
+                + ", copartitionGroups=" + MessageUtil.deepToString(copartitionGroups.iterator())
+                + ")";
+        }
+        
+        public String subtopologyId() {
+            return this.subtopologyId;
+        }
+        
+        public List<String> sourceTopics() {
+            return this.sourceTopics;
+        }
+        
+        public List<String> sourceTopicRegex() {
+            return this.sourceTopicRegex;
+        }
+        
+        public List<TopicInfo> stateChangelogTopics() {
+            return this.stateChangelogTopics;
+        }
+        
+        public List<String> repartitionSinkTopics() {
+            return this.repartitionSinkTopics;
+        }
+        
+        public List<TopicInfo> repartitionSourceTopics() {
+            return this.repartitionSourceTopics;
+        }
+        
+        public List<CopartitionGroup> copartitionGroups() {
+            return this.copartitionGroups;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Subtopology setSubtopologyId(String v) {
+            this.subtopologyId = v;
+            return this;
+        }
+        
+        public Subtopology setSourceTopics(List<String> v) {
+            this.sourceTopics = v;
+            return this;
+        }
+        
+        public Subtopology setSourceTopicRegex(List<String> v) {
+            this.sourceTopicRegex = v;
+            return this;
+        }
+        
+        public Subtopology setStateChangelogTopics(List<TopicInfo> v) {
+            this.stateChangelogTopics = v;
+            return this;
+        }
+        
+        public Subtopology setRepartitionSinkTopics(List<String> v) {
+            this.repartitionSinkTopics = v;
+            return this;
+        }
+        
+        public Subtopology setRepartitionSourceTopics(List<TopicInfo> v) {
+            this.repartitionSourceTopics = v;
+            return this;
+        }
+        
+        public Subtopology setCopartitionGroups(List<CopartitionGroup> v) {
+            this.copartitionGroups = v;
+            return this;
+        }
+    }
+    
+    public static class CopartitionGroup implements Message {
+        List<Short> sourceTopics;
+        List<Short> sourceTopicRegex;
+        List<Short> repartitionSourceTopics;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("source_topics", new CompactArrayOf(Type.INT16), "The topics the topology reads from. Index into the array on the subtopology level."),
+                new Field("source_topic_regex", new CompactArrayOf(Type.INT16), "Regular expressions identifying topics the subtopology reads from. Index into the array on the subtopology level."),
+                new Field("repartition_source_topics", new CompactArrayOf(Type.INT16), "The set of source topics that are internally created repartition topics. Index into the array on the subtopology level."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public CopartitionGroup(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public CopartitionGroup() {
+            this.sourceTopics = new ArrayList<Short>(0);
+            this.sourceTopicRegex = new ArrayList<Short>(0);
+            this.repartitionSourceTopics = new ArrayList<Short>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of CopartitionGroup");
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field sourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Short> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(_readable.readShort());
+                    }
+                    this.sourceTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field sourceTopicRegex was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Short> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(_readable.readShort());
+                    }
+                    this.sourceTopicRegex = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field repartitionSourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Short> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(_readable.readShort());
+                    }
+                    this.repartitionSourceTopics = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _writable.writeUnsignedVarint(sourceTopics.size() + 1);
+            for (Short sourceTopicsElement : sourceTopics) {
+                _writable.writeShort(sourceTopicsElement);
+            }
+            _writable.writeUnsignedVarint(sourceTopicRegex.size() + 1);
+            for (Short sourceTopicRegexElement : sourceTopicRegex) {
+                _writable.writeShort(sourceTopicRegexElement);
+            }
+            _writable.writeUnsignedVarint(repartitionSourceTopics.size() + 1);
+            for (Short repartitionSourceTopicsElement : repartitionSourceTopics) {
+                _writable.writeShort(repartitionSourceTopicsElement);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of CopartitionGroup");
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(sourceTopics.size() + 1));
+                _size.addBytes(sourceTopics.size() * 2);
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(sourceTopicRegex.size() + 1));
+                _size.addBytes(sourceTopicRegex.size() * 2);
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(repartitionSourceTopics.size() + 1));
+                _size.addBytes(repartitionSourceTopics.size() * 2);
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof CopartitionGroup)) return false;
+            CopartitionGroup other = (CopartitionGroup) obj;
+            if (this.sourceTopics == null) {
+                if (other.sourceTopics != null) return false;
+            } else {
+                if (!this.sourceTopics.equals(other.sourceTopics)) return false;
+            }
+            if (this.sourceTopicRegex == null) {
+                if (other.sourceTopicRegex != null) return false;
+            } else {
+                if (!this.sourceTopicRegex.equals(other.sourceTopicRegex)) return false;
+            }
+            if (this.repartitionSourceTopics == null) {
+                if (other.repartitionSourceTopics != null) return false;
+            } else {
+                if (!this.repartitionSourceTopics.equals(other.repartitionSourceTopics)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (sourceTopics == null ? 0 : sourceTopics.hashCode());
+            hashCode = 31 * hashCode + (sourceTopicRegex == null ? 0 : sourceTopicRegex.hashCode());
+            hashCode = 31 * hashCode + (repartitionSourceTopics == null ? 0 : repartitionSourceTopics.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public CopartitionGroup duplicate() {
+            CopartitionGroup _duplicate = new CopartitionGroup();
+            ArrayList<Short> newSourceTopics = new ArrayList<Short>(sourceTopics.size());
+            for (Short _element : sourceTopics) {
+                newSourceTopics.add(_element);
+            }
+            _duplicate.sourceTopics = newSourceTopics;
+            ArrayList<Short> newSourceTopicRegex = new ArrayList<Short>(sourceTopicRegex.size());
+            for (Short _element : sourceTopicRegex) {
+                newSourceTopicRegex.add(_element);
+            }
+            _duplicate.sourceTopicRegex = newSourceTopicRegex;
+            ArrayList<Short> newRepartitionSourceTopics = new ArrayList<Short>(repartitionSourceTopics.size());
+            for (Short _element : repartitionSourceTopics) {
+                newRepartitionSourceTopics.add(_element);
+            }
+            _duplicate.repartitionSourceTopics = newRepartitionSourceTopics;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "CopartitionGroup("
+                + "sourceTopics=" + MessageUtil.deepToString(sourceTopics.iterator())
+                + ", sourceTopicRegex=" + MessageUtil.deepToString(sourceTopicRegex.iterator())
+                + ", repartitionSourceTopics=" + MessageUtil.deepToString(repartitionSourceTopics.iterator())
+                + ")";
+        }
+        
+        public List<Short> sourceTopics() {
+            return this.sourceTopics;
+        }
+        
+        public List<Short> sourceTopicRegex() {
+            return this.sourceTopicRegex;
+        }
+        
+        public List<Short> repartitionSourceTopics() {
+            return this.repartitionSourceTopics;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public CopartitionGroup setSourceTopics(List<Short> v) {
+            this.sourceTopics = v;
+            return this;
+        }
+        
+        public CopartitionGroup setSourceTopicRegex(List<Short> v) {
+            this.sourceTopicRegex = v;
+            return this;
+        }
+        
+        public CopartitionGroup setRepartitionSourceTopics(List<Short> v) {
+            this.repartitionSourceTopics = v;
+            return this;
+        }
+    }
+    
+    public static class TopicConfig implements Message {
+        String key;
+        String value;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("key", Type.COMPACT_STRING, "The key of the topic-level configuration."),
+                new Field("value", Type.COMPACT_STRING, "The value of the topic-level configuration."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public TopicConfig(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public TopicConfig() {
+            this.key = "";
+            this.value = "";
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field key was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field key had invalid length " + length);
+                } else {
+                    this.key = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field value was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field value had invalid length " + length);
+                } else {
+                    this.value = _readable.readString(length);
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(key);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(value);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = key.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'key' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(key, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = value.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'value' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(value, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TopicConfig)) return false;
+            TopicConfig other = (TopicConfig) obj;
+            if (this.key == null) {
+                if (other.key != null) return false;
+            } else {
+                if (!this.key.equals(other.key)) return false;
+            }
+            if (this.value == null) {
+                if (other.value != null) return false;
+            } else {
+                if (!this.value.equals(other.value)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (key == null ? 0 : key.hashCode());
+            hashCode = 31 * hashCode + (value == null ? 0 : value.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public TopicConfig duplicate() {
+            TopicConfig _duplicate = new TopicConfig();
+            _duplicate.key = key;
+            _duplicate.value = value;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "TopicConfig("
+                + "key=" + ((key == null) ? "null" : "'" + key.toString() + "'")
+                + ", value=" + ((value == null) ? "null" : "'" + value.toString() + "'")
+                + ")";
+        }
+        
+        public String key() {
+            return this.key;
+        }
+        
+        public String value() {
+            return this.value;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public TopicConfig setKey(String v) {
+            this.key = v;
+            return this;
+        }
+        
+        public TopicConfig setValue(String v) {
+            this.value = v;
+            return this;
+        }
+    }
+    
+    public static class TopicInfo implements Message {
+        String name;
+        int partitions;
+        short replicationFactor;
+        List<TopicConfig> topicConfigs;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("name", Type.COMPACT_STRING, "The name of the topic."),
+                new Field("partitions", Type.INT32, "The number of partitions in the topic. Can be 0 if no specific number of partitions is enforced. Always 0 for changelog topics."),
+                new Field("replication_factor", Type.INT16, "The replication factor of the topic. Can be 0 if the default replication factor should be used."),
+                new Field("topic_configs", new CompactArrayOf(TopicConfig.SCHEMA_0), "Topic-level configurations as key-value pairs."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public TopicInfo(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public TopicInfo() {
+            this.name = "";
+            this.partitions = 0;
+            this.replicationFactor = (short) 0;
+            this.topicConfigs = new ArrayList<TopicConfig>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field name was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field name had invalid length " + length);
+                } else {
+                    this.name = _readable.readString(length);
+                }
+            }
+            this.partitions = _readable.readInt();
+            this.replicationFactor = _readable.readShort();
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field topicConfigs was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TopicConfig> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TopicConfig(_readable, _version));
+                    }
+                    this.topicConfigs = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(name);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(partitions);
+            _writable.writeShort(replicationFactor);
+            _writable.writeUnsignedVarint(topicConfigs.size() + 1);
+            for (TopicConfig topicConfigsElement : topicConfigs) {
+                topicConfigsElement.write(_writable, _cache, _version);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = name.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'name' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(name, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            _size.addBytes(2);
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(topicConfigs.size() + 1));
+                for (TopicConfig topicConfigsElement : topicConfigs) {
+                    topicConfigsElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TopicInfo)) return false;
+            TopicInfo other = (TopicInfo) obj;
+            if (this.name == null) {
+                if (other.name != null) return false;
+            } else {
+                if (!this.name.equals(other.name)) return false;
+            }
+            if (partitions != other.partitions) return false;
+            if (replicationFactor != other.replicationFactor) return false;
+            if (this.topicConfigs == null) {
+                if (other.topicConfigs != null) return false;
+            } else {
+                if (!this.topicConfigs.equals(other.topicConfigs)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (name == null ? 0 : name.hashCode());
+            hashCode = 31 * hashCode + partitions;
+            hashCode = 31 * hashCode + replicationFactor;
+            hashCode = 31 * hashCode + (topicConfigs == null ? 0 : topicConfigs.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public TopicInfo duplicate() {
+            TopicInfo _duplicate = new TopicInfo();
+            _duplicate.name = name;
+            _duplicate.partitions = partitions;
+            _duplicate.replicationFactor = replicationFactor;
+            ArrayList<TopicConfig> newTopicConfigs = new ArrayList<TopicConfig>(topicConfigs.size());
+            for (TopicConfig _element : topicConfigs) {
+                newTopicConfigs.add(_element.duplicate());
+            }
+            _duplicate.topicConfigs = newTopicConfigs;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "TopicInfo("
+                + "name=" + ((name == null) ? "null" : "'" + name.toString() + "'")
+                + ", partitions=" + partitions
+                + ", replicationFactor=" + replicationFactor
+                + ", topicConfigs=" + MessageUtil.deepToString(topicConfigs.iterator())
+                + ")";
+        }
+        
+        public String name() {
+            return this.name;
+        }
+        
+        public int partitions() {
+            return this.partitions;
+        }
+        
+        public short replicationFactor() {
+            return this.replicationFactor;
+        }
+        
+        public List<TopicConfig> topicConfigs() {
+            return this.topicConfigs;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public TopicInfo setName(String v) {
+            this.name = v;
+            return this;
+        }
+        
+        public TopicInfo setPartitions(int v) {
+            this.partitions = v;
+            return this;
+        }
+        
+        public TopicInfo setReplicationFactor(short v) {
+            this.replicationFactor = v;
+            return this;
+        }
+        
+        public TopicInfo setTopicConfigs(List<TopicConfig> v) {
+            this.topicConfigs = v;
+            return this;
+        }
+    }
+}

@@ -1,0 +1,180 @@
+{
+  "exitCode": 0,
+  "junit": [
+    {
+      "path": "native-pulsar-junit/v2M5NativeOffloadRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml",
+      "producedAtMicros": 1792754931285783,
+      "task": ":nereus-pulsar-offload:v2M5NativeOffloadRealTest"
+    },
+    {
+      "path": "native-pulsar-junit/v2M5S3ProviderDrainRealTest/TEST-com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest.xml",
+      "producedAtMicros": 1792754937865466,
+      "task": ":nereus-pulsar-offload:v2M5S3ProviderDrainRealTest"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.M5PulsarObjectCleanupOrderV1Test.xml",
+      "producedAtMicros": 1792754937897662,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1Test.xml",
+      "producedAtMicros": 1792754937897775,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarBookKeeperDeletionCoordinatorV1Test.xml",
+      "producedAtMicros": 1792754937898402,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test.xml",
+      "producedAtMicros": 1792754937898526,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarNativeRetentionConfigurationV1Test.xml",
+      "producedAtMicros": 1792754937898639,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarNativeWriterRegistryV2Test.xml",
+      "producedAtMicros": 1792754937898761,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test.xml",
+      "producedAtMicros": 1792754937898879,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1Test.xml",
+      "producedAtMicros": 1792754937899001,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarOffloadP0ContractTest.xml",
+      "producedAtMicros": 1792754937899133,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1Test.xml",
+      "producedAtMicros": 1792754937899246,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.evidence.PulsarM2FinalResolverV1Test.xml",
+      "producedAtMicros": 1792754937897535,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.npd1.Npd1CodecV1Test.xml",
+      "producedAtMicros": 1792754937897892,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.npo1.Npo1CodecV1Test.xml",
+      "producedAtMicros": 1792754937897997,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test.xml",
+      "producedAtMicros": 1792754937898143,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/test/TEST-com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test.xml",
+      "producedAtMicros": 1792754937898286,
+      "task": ":nereus-pulsar-offload:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest.xml",
+      "producedAtMicros": 1792754872933264,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.EntryImplTest.xml",
+      "producedAtMicros": 1792754872933458,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.ManagedCursorTest.xml",
+      "producedAtMicros": 1792754872943778,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.ManagedLedgerTest.xml",
+      "producedAtMicros": 1792754872957001,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.xml",
+      "producedAtMicros": 1792754872957376,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.xml",
+      "producedAtMicros": 1792754872957730,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/native-managed-ledger-test/TEST-org.apache.bookkeeper.mledger.impl.OffloadPrefixTest.xml",
+      "producedAtMicros": 1792754872960152,
+      "task": ":managed-ledger:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperDependencyBoundaryTest.xml",
+      "producedAtMicros": 1792754872277177,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test.xml",
+      "producedAtMicros": 1792754872277429,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.CellSessionOperationRegistryTest.xml",
+      "producedAtMicros": 1792754872277677,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test.xml",
+      "producedAtMicros": 1792754872277914,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2Test.xml",
+      "producedAtMicros": 1792754872278296,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1Test.xml",
+      "producedAtMicros": 1792754872278597,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1Test.xml",
+      "producedAtMicros": 1792754872278840,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/bookkeeper-module-test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperClientConfigurationV1Test.xml",
+      "producedAtMicros": 1792754872279088,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "native-pulsar-junit/v2M5NativeBkDeleteSdkDrainRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml",
+      "producedAtMicros": 1792755005733823,
+      "task": ":nereus-pulsar-offload:v2M5NativeBkDeleteSdkDrainRealTest"
+    },
+    {
+      "path": "native-pulsar-junit/v2M5NativeM4OwnerRealTest/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml",
+      "producedAtMicros": 1792755882159851,
+      "task": ":nereus-pulsar-offload:v2M5NativeM4OwnerRealTest"
+    },
+    {
+      "path": "native-pulsar-junit/native-namespace-negative/TEST-com.nereusstream.pulsar.offload.M5NativePulsarOffloadRealTest.xml",
+      "producedAtMicros": 1792755898212674,
+      "task": ":nereus-pulsar-offload:v2M5NativeOffloadRealTest"
+    }
+  ]
+}

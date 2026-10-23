@@ -1,0 +1,15 @@
+{
+  "endpoint": "http://127.0.0.1:50360",
+  "kmsTransport": "ADMITTED_M2_TEST_TRANSPORT",
+  "minioImage": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+  "minioImageId": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+  "nativeProcessActivation": false,
+  "oxiaAddress": "127.0.0.1:50365",
+  "oxiaImage": "nereus/oxia-m3-allocator:37a17bef1720",
+  "oxiaImageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+  "project": "nereus-m5-object-cell-71737",
+  "realBoundaries": [
+    "OBJECT",
+    "OXIA"
+  ]
+}

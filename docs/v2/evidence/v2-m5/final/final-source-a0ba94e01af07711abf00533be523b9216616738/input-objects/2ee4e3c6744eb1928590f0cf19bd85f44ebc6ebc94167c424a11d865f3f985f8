@@ -1,0 +1,463 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.server.log.remote.metadata.storage.generated;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.protocol.Message;
+import org.apache.kafka.common.protocol.MessageSizeAccumulator;
+import org.apache.kafka.common.protocol.MessageUtil;
+import org.apache.kafka.common.protocol.ObjectSerializationCache;
+import org.apache.kafka.common.protocol.Readable;
+import org.apache.kafka.common.protocol.Writable;
+import org.apache.kafka.common.protocol.types.ArrayOf;
+import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.protocol.types.RawTaggedFieldWriter;
+import org.apache.kafka.common.protocol.types.Schema;
+import org.apache.kafka.common.protocol.types.Type;
+import org.apache.kafka.common.utils.ByteUtils;
+
+
+public class ProducerSnapshot implements ApiMessage {
+    long crc;
+    List<ProducerEntry> producerEntries;
+    private List<RawTaggedField> _unknownTaggedFields;
+    
+    public static final Schema SCHEMA_1 =
+        new Schema(
+            new Field("crc", Type.UNSIGNED_INT32, "CRC of the snapshot data"),
+            new Field("producer_entries", new ArrayOf(ProducerEntry.SCHEMA_1), "The entries in the producer table")
+        );
+    
+    public static final Schema[] SCHEMAS = new Schema[] {
+        null,
+        SCHEMA_1
+    };
+    
+    public static final short LOWEST_SUPPORTED_VERSION = 1;
+    public static final short HIGHEST_SUPPORTED_VERSION = 1;
+    
+    public ProducerSnapshot(Readable _readable, short _version) {
+        read(_readable, _version);
+    }
+    
+    public ProducerSnapshot() {
+        this.crc = 0;
+        this.producerEntries = new ArrayList<ProducerEntry>(0);
+    }
+    
+    @Override
+    public short apiKey() {
+        return -1;
+    }
+    
+    @Override
+    public short lowestSupportedVersion() {
+        return 1;
+    }
+    
+    @Override
+    public short highestSupportedVersion() {
+        return 1;
+    }
+    
+    @Override
+    public final void read(Readable _readable, short _version) {
+        this.crc = _readable.readUnsignedInt();
+        {
+            int arrayLength;
+            arrayLength = _readable.readInt();
+            if (arrayLength < 0) {
+                throw new RuntimeException("non-nullable field producerEntries was serialized as null");
+            } else {
+                if (arrayLength > _readable.remaining()) {
+                    throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                }
+                ArrayList<ProducerEntry> newCollection = new ArrayList<>(arrayLength);
+                for (int i = 0; i < arrayLength; i++) {
+                    newCollection.add(new ProducerEntry(_readable, _version));
+                }
+                this.producerEntries = newCollection;
+            }
+        }
+        this._unknownTaggedFields = null;
+    }
+    
+    @Override
+    public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _writable.writeUnsignedInt(crc);
+        _writable.writeInt(producerEntries.size());
+        for (ProducerEntry producerEntriesElement : producerEntries) {
+            producerEntriesElement.write(_writable, _cache, _version);
+        }
+        RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+        _numTaggedFields += _rawWriter.numFields();
+        if (_numTaggedFields > 0) {
+            throw new UnsupportedVersionException("Tagged fields were set, but version " + _version + " of this message does not support them.");
+        }
+    }
+    
+    @Override
+    public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _size.addBytes(4);
+        {
+            _size.addBytes(4);
+            for (ProducerEntry producerEntriesElement : producerEntries) {
+                producerEntriesElement.addSize(_size, _cache, _version);
+            }
+        }
+        if (_unknownTaggedFields != null) {
+            _numTaggedFields += _unknownTaggedFields.size();
+            for (RawTaggedField _field : _unknownTaggedFields) {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                _size.addBytes(_field.size());
+            }
+        }
+        if (_numTaggedFields > 0) {
+            throw new UnsupportedVersionException("Tagged fields were set, but version " + _version + " of this message does not support them.");
+        }
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof ProducerSnapshot)) return false;
+        ProducerSnapshot other = (ProducerSnapshot) obj;
+        if (crc != other.crc) return false;
+        if (this.producerEntries == null) {
+            if (other.producerEntries != null) return false;
+        } else {
+            if (!this.producerEntries.equals(other.producerEntries)) return false;
+        }
+        return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+    }
+    
+    @Override
+    public int hashCode() {
+        int hashCode = 0;
+        hashCode = 31 * hashCode + ((int) (crc >> 32) ^ (int) crc);
+        hashCode = 31 * hashCode + (producerEntries == null ? 0 : producerEntries.hashCode());
+        return hashCode;
+    }
+    
+    @Override
+    public ProducerSnapshot duplicate() {
+        ProducerSnapshot _duplicate = new ProducerSnapshot();
+        _duplicate.crc = crc;
+        ArrayList<ProducerEntry> newProducerEntries = new ArrayList<ProducerEntry>(producerEntries.size());
+        for (ProducerEntry _element : producerEntries) {
+            newProducerEntries.add(_element.duplicate());
+        }
+        _duplicate.producerEntries = newProducerEntries;
+        return _duplicate;
+    }
+    
+    @Override
+    public String toString() {
+        return "ProducerSnapshot("
+            + "crc=" + crc
+            + ", producerEntries=" + MessageUtil.deepToString(producerEntries.iterator())
+            + ")";
+    }
+    
+    public long crc() {
+        return this.crc;
+    }
+    
+    public List<ProducerEntry> producerEntries() {
+        return this.producerEntries;
+    }
+    
+    @Override
+    public List<RawTaggedField> unknownTaggedFields() {
+        if (_unknownTaggedFields == null) {
+            _unknownTaggedFields = new ArrayList<>(0);
+        }
+        return _unknownTaggedFields;
+    }
+    
+    public ProducerSnapshot setCrc(long v) {
+        if (v < 0 || v > 4294967295L) {
+            throw new RuntimeException("Invalid value " + v + " for unsigned int field.");
+        }
+        this.crc = v;
+        return this;
+    }
+    
+    public ProducerSnapshot setProducerEntries(List<ProducerEntry> v) {
+        this.producerEntries = v;
+        return this;
+    }
+    
+    public static class ProducerEntry implements Message {
+        long producerId;
+        short epoch;
+        int lastSequence;
+        long lastOffset;
+        int offsetDelta;
+        long timestamp;
+        int coordinatorEpoch;
+        long currentTxnFirstOffset;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_1 =
+            new Schema(
+                new Field("producer_id", Type.INT64, "The producer ID"),
+                new Field("epoch", Type.INT16, "Current epoch of the producer"),
+                new Field("last_sequence", Type.INT32, "Last written sequence of the producer"),
+                new Field("last_offset", Type.INT64, "Last written offset of the producer"),
+                new Field("offset_delta", Type.INT32, "The difference of the last sequence and first sequence in the last written batch"),
+                new Field("timestamp", Type.INT64, "Max timestamp from the last written entry"),
+                new Field("coordinator_epoch", Type.INT32, "The epoch of the last transaction coordinator to send an end transaction marker"),
+                new Field("current_txn_first_offset", Type.INT64, "The first offset of the on-going transaction (-1 if there is none)")
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            null,
+            SCHEMA_1
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 1;
+        public static final short HIGHEST_SUPPORTED_VERSION = 1;
+        
+        public ProducerEntry(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public ProducerEntry() {
+            this.producerId = 0L;
+            this.epoch = (short) 0;
+            this.lastSequence = 0;
+            this.lastOffset = 0L;
+            this.offsetDelta = 0;
+            this.timestamp = 0L;
+            this.coordinatorEpoch = 0;
+            this.currentTxnFirstOffset = 0L;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 1;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 1;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            this.producerId = _readable.readLong();
+            this.epoch = _readable.readShort();
+            this.lastSequence = _readable.readInt();
+            this.lastOffset = _readable.readLong();
+            this.offsetDelta = _readable.readInt();
+            this.timestamp = _readable.readLong();
+            this.coordinatorEpoch = _readable.readInt();
+            this.currentTxnFirstOffset = _readable.readLong();
+            this._unknownTaggedFields = null;
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _writable.writeLong(producerId);
+            _writable.writeShort(epoch);
+            _writable.writeInt(lastSequence);
+            _writable.writeLong(lastOffset);
+            _writable.writeInt(offsetDelta);
+            _writable.writeLong(timestamp);
+            _writable.writeInt(coordinatorEpoch);
+            _writable.writeLong(currentTxnFirstOffset);
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            if (_numTaggedFields > 0) {
+                throw new UnsupportedVersionException("Tagged fields were set, but version " + _version + " of this message does not support them.");
+            }
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _size.addBytes(8);
+            _size.addBytes(2);
+            _size.addBytes(4);
+            _size.addBytes(8);
+            _size.addBytes(4);
+            _size.addBytes(8);
+            _size.addBytes(4);
+            _size.addBytes(8);
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            if (_numTaggedFields > 0) {
+                throw new UnsupportedVersionException("Tagged fields were set, but version " + _version + " of this message does not support them.");
+            }
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof ProducerEntry)) return false;
+            ProducerEntry other = (ProducerEntry) obj;
+            if (producerId != other.producerId) return false;
+            if (epoch != other.epoch) return false;
+            if (lastSequence != other.lastSequence) return false;
+            if (lastOffset != other.lastOffset) return false;
+            if (offsetDelta != other.offsetDelta) return false;
+            if (timestamp != other.timestamp) return false;
+            if (coordinatorEpoch != other.coordinatorEpoch) return false;
+            if (currentTxnFirstOffset != other.currentTxnFirstOffset) return false;
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + ((int) (producerId >> 32) ^ (int) producerId);
+            hashCode = 31 * hashCode + epoch;
+            hashCode = 31 * hashCode + lastSequence;
+            hashCode = 31 * hashCode + ((int) (lastOffset >> 32) ^ (int) lastOffset);
+            hashCode = 31 * hashCode + offsetDelta;
+            hashCode = 31 * hashCode + ((int) (timestamp >> 32) ^ (int) timestamp);
+            hashCode = 31 * hashCode + coordinatorEpoch;
+            hashCode = 31 * hashCode + ((int) (currentTxnFirstOffset >> 32) ^ (int) currentTxnFirstOffset);
+            return hashCode;
+        }
+        
+        @Override
+        public ProducerEntry duplicate() {
+            ProducerEntry _duplicate = new ProducerEntry();
+            _duplicate.producerId = producerId;
+            _duplicate.epoch = epoch;
+            _duplicate.lastSequence = lastSequence;
+            _duplicate.lastOffset = lastOffset;
+            _duplicate.offsetDelta = offsetDelta;
+            _duplicate.timestamp = timestamp;
+            _duplicate.coordinatorEpoch = coordinatorEpoch;
+            _duplicate.currentTxnFirstOffset = currentTxnFirstOffset;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "ProducerEntry("
+                + "producerId=" + producerId
+                + ", epoch=" + epoch
+                + ", lastSequence=" + lastSequence
+                + ", lastOffset=" + lastOffset
+                + ", offsetDelta=" + offsetDelta
+                + ", timestamp=" + timestamp
+                + ", coordinatorEpoch=" + coordinatorEpoch
+                + ", currentTxnFirstOffset=" + currentTxnFirstOffset
+                + ")";
+        }
+        
+        public long producerId() {
+            return this.producerId;
+        }
+        
+        public short epoch() {
+            return this.epoch;
+        }
+        
+        public int lastSequence() {
+            return this.lastSequence;
+        }
+        
+        public long lastOffset() {
+            return this.lastOffset;
+        }
+        
+        public int offsetDelta() {
+            return this.offsetDelta;
+        }
+        
+        public long timestamp() {
+            return this.timestamp;
+        }
+        
+        public int coordinatorEpoch() {
+            return this.coordinatorEpoch;
+        }
+        
+        public long currentTxnFirstOffset() {
+            return this.currentTxnFirstOffset;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public ProducerEntry setProducerId(long v) {
+            this.producerId = v;
+            return this;
+        }
+        
+        public ProducerEntry setEpoch(short v) {
+            this.epoch = v;
+            return this;
+        }
+        
+        public ProducerEntry setLastSequence(int v) {
+            this.lastSequence = v;
+            return this;
+        }
+        
+        public ProducerEntry setLastOffset(long v) {
+            this.lastOffset = v;
+            return this;
+        }
+        
+        public ProducerEntry setOffsetDelta(int v) {
+            this.offsetDelta = v;
+            return this;
+        }
+        
+        public ProducerEntry setTimestamp(long v) {
+            this.timestamp = v;
+            return this;
+        }
+        
+        public ProducerEntry setCoordinatorEpoch(int v) {
+            this.coordinatorEpoch = v;
+            return this;
+        }
+        
+        public ProducerEntry setCurrentTxnFirstOffset(long v) {
+            this.currentTxnFirstOffset = v;
+            return this;
+        }
+    }
+}

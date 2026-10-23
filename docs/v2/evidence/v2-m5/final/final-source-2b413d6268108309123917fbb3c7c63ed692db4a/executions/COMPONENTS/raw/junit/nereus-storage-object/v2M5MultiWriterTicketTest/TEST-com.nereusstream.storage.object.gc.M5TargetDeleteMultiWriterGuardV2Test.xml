@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:02:47.088Z" hostname="liusinandeMacBook-Pro.local" time="1.512">
+  <properties/>
+  <testcase name="appliedAcquisitionResponseLossUsesTheExactDurableTicket()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.179"/>
+  <testcase name="concurrentLogicalRetriesHaveDistinctTicketsAndOneCompletionCannotReleaseTheOther()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.019"/>
+  <testcase name="unresolvedAcquisitionCanArriveLateButNeverInvokesTheAbandonedWriter()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.034"/>
+  <testcase name="unknownExternalResponseRetainsEveryTicketUntilExplicitTerminalReconciliation()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.022"/>
+  <testcase name="missingPermanentAuthorityAndTargetBoundsFailBeforeWriterInvocation()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.001"/>
+  <testcase name="terminalRecoveryLeavesUnscannedTargetsForAnotherBoundedPass()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="1.199"/>
+  <testcase name="deduplicatesAndOrdersEveryTargetBeforeDispatchAndClearsOnlyAfterTerminal()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.013"/>
+  <testcase name="freezesDifferentTargetContextsAndReconcilesOnlyTheOriginalMixedInvocation()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.011"/>
+  <testcase name="observerCancellationKeepsNativeCompletionAndCleanupAlive()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.007"/>
+  <testcase name="laterFencePreventsAllDispatchAndRollsBackOnlyThisInvocationsTickets()" classname="com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

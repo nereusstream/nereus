@@ -1,0 +1,156 @@
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/NATIVE_KAFKA/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Starting build with version 4.3.0-SNAPSHOT (commit id 020f3390) using Gradle 9.2.1, Java 17 and Scala 2.13.18
+Build properties: ignoreFailures=false, maxParallelForks=1, maxScalacThreads=8, maxTestRetries=0
+
+> Task :core:processResources NO-SOURCE
+> Task :clients:processResources UP-TO-DATE
+> Task :generator:compileJava UP-TO-DATE
+> Task :clients:createVersionFile UP-TO-DATE
+> Task :generator:processResources NO-SOURCE
+> Task :generator:classes UP-TO-DATE
+> Task :coordinator-common:processResources NO-SOURCE
+> Task :generator:jar UP-TO-DATE
+> Task :group-coordinator:processResources UP-TO-DATE
+> Task :metadata:processMessages UP-TO-DATE
+> Task :raft:processMessages UP-TO-DATE
+> Task :clients:processMessages UP-TO-DATE
+> Task :storage:processMessages UP-TO-DATE
+> Task :group-coordinator:processMessages UP-TO-DATE
+> Task :share-coordinator:processMessages UP-TO-DATE
+> Task :transaction-coordinator:processMessages UP-TO-DATE
+> Task :metadata:processResources UP-TO-DATE
+> Task :raft:processResources UP-TO-DATE
+> Task :raft:createVersionFile UP-TO-DATE
+> Task :server:processResources NO-SOURCE
+> Task :server:createVersionFile UP-TO-DATE
+> Task :server-common:processResources NO-SOURCE
+> Task :server-common:createVersionFile UP-TO-DATE
+> Task :share-coordinator:processResources UP-TO-DATE
+> Task :storage:processResources UP-TO-DATE
+> Task :storage:createVersionFile UP-TO-DATE
+> Task :transaction-coordinator:processResources UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:processResources NO-SOURCE
+> Task :group-coordinator:group-coordinator-api:createVersionFile UP-TO-DATE
+> Task :storage:storage-api:processResources NO-SOURCE
+> Task :storage:storage-api:createVersionFile UP-TO-DATE
+> Task :tools:tools-api:processResources NO-SOURCE
+> Task :tools:tools-api:createVersionFile UP-TO-DATE
+> Task :test-common:test-common-util:compileJava UP-TO-DATE
+> Task :server-common:processTestResources UP-TO-DATE
+> Task :coordinator-common:processTestResources UP-TO-DATE
+> Task :group-coordinator:processTestResources UP-TO-DATE
+> Task :raft:processTestResources UP-TO-DATE
+> Task :metadata:processTestResources UP-TO-DATE
+> Task :storage:storage-api:processTestResources UP-TO-DATE
+> Task :clients:compileJava UP-TO-DATE
+> Task :server:processTestResources UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:compileJava UP-TO-DATE
+> Task :tools:tools-api:compileJava UP-TO-DATE
+> Task :clients:classes UP-TO-DATE
+> Task :server-common:compileJava UP-TO-DATE
+> Task :storage:storage-api:compileJava UP-TO-DATE
+> Task :clients:shadowJar UP-TO-DATE
+> Task :clients:jar SKIPPED
+> Task :server-common:classes UP-TO-DATE
+> Task :server-common:jar UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:classes UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:jar UP-TO-DATE
+> Task :storage:storage-api:classes UP-TO-DATE
+> Task :storage:storage-api:jar UP-TO-DATE
+> Task :tools:tools-api:classes UP-TO-DATE
+> Task :tools:tools-api:jar UP-TO-DATE
+> Task :clients:processTestMessages UP-TO-DATE
+> Task :storage:compileJava UP-TO-DATE
+> Task :raft:compileJava UP-TO-DATE
+> Task :metadata:compileJava UP-TO-DATE
+> Task :coordinator-common:compileJava UP-TO-DATE
+> Task :clients:compileTestJava UP-TO-DATE
+> Task :share-coordinator:compileJava UP-TO-DATE
+> Task :group-coordinator:compileJava UP-TO-DATE
+> Task :coordinator-common:classes UP-TO-DATE
+> Task :coordinator-common:jar UP-TO-DATE
+> Task :group-coordinator:classes UP-TO-DATE
+> Task :group-coordinator:jar UP-TO-DATE
+> Task :metadata:classes UP-TO-DATE
+> Task :transaction-coordinator:compileJava UP-TO-DATE
+> Task :metadata:jar UP-TO-DATE
+> Task :raft:classes UP-TO-DATE
+> Task :raft:jar UP-TO-DATE
+> Task :share-coordinator:classes UP-TO-DATE
+> Task :share-coordinator:jar UP-TO-DATE
+> Task :storage:classes UP-TO-DATE
+> Task :storage:jar UP-TO-DATE
+> Task :transaction-coordinator:classes UP-TO-DATE
+> Task :transaction-coordinator:jar UP-TO-DATE
+> Task :clients:processTestResources UP-TO-DATE
+> Task :clients:testClasses UP-TO-DATE
+> Task :server:compileJava UP-TO-DATE
+> Task :core:compileJava NO-SOURCE
+> Task :server-common:compileTestJava UP-TO-DATE
+> Task :server:classes UP-TO-DATE
+> Task :server:jar UP-TO-DATE
+> Task :server-common:testClasses UP-TO-DATE
+> Task :coordinator-common:compileTestJava UP-TO-DATE
+> Task :coordinator-common:testClasses UP-TO-DATE
+> Task :group-coordinator:compileTestJava UP-TO-DATE
+> Task :group-coordinator:testClasses UP-TO-DATE
+> Task :raft:compileTestJava UP-TO-DATE
+> Task :raft:testClasses UP-TO-DATE
+> Task :metadata:compileTestJava UP-TO-DATE
+> Task :metadata:testClasses UP-TO-DATE
+> Task :storage:storage-api:compileTestJava UP-TO-DATE
+> Task :storage:storage-api:testClasses UP-TO-DATE
+> Task :test-common:test-common-internal-api:compileJava UP-TO-DATE
+> Task :share-coordinator:compileTestJava UP-TO-DATE
+> Task :share-coordinator:processTestResources UP-TO-DATE
+> Task :share-coordinator:testClasses UP-TO-DATE
+> Task :test-common:test-common-internal-api:processResources NO-SOURCE
+> Task :test-common:test-common-internal-api:classes UP-TO-DATE
+> Task :test-common:test-common-internal-api:jar UP-TO-DATE
+> Task :test-common:test-common-runtime:processResources UP-TO-DATE
+> Task :test-common:test-common-util:processResources UP-TO-DATE
+> Task :test-common:test-common-util:classes UP-TO-DATE
+> Task :test-common:test-common-util:jar UP-TO-DATE
+> Task :core:compileScala UP-TO-DATE
+> Task :core:classes UP-TO-DATE
+> Task :test-common:test-common-runtime:compileJava UP-TO-DATE
+> Task :server:compileTestJava UP-TO-DATE
+> Task :server:testClasses UP-TO-DATE
+> Task :test-common:test-common-runtime:classes UP-TO-DATE
+> Task :test-common:test-common-runtime:jar UP-TO-DATE
+> Task :core:copyDependantLibs UP-TO-DATE
+> Task :core:jar UP-TO-DATE
+> Task :core:checkstyleMain UP-TO-DATE
+> Task :core:compileTestJava NO-SOURCE
+> Task :core:compileTestScala UP-TO-DATE
+> Task :core:processTestResources UP-TO-DATE
+> Task :core:testClasses UP-TO-DATE
+> Task :core:checkstyleTest UP-TO-DATE
+> Task :core:compileNereusM5SourceFenceFixtures UP-TO-DATE
+> Task :core:spotbugsMain UP-TO-DATE
+
+> Task :core:nereusBookKeeperM4AdmissionRealTest
+Picked up JAVA_TOOL_OPTIONS:  -Xlog:class+load=info:file=/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/candidate-native-bk-attempt-6/executions/NATIVE_KAFKA/classes/classes-%p.log -Djunit.jupiter.params.displayname.default={displayName}[{index}]{arguments}
+
+[Incubating] Problems report is available at: file:///Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/nereusstream/kafka/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 6m 19s
+87 actionable tasks: 1 executed, 86 up-to-date
+The build is running offline. A build scan will not be published at this time, but it can be published if you run the 'buildScanPublishPrevious' task in the next build.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:28:06.836Z" hostname="liusinandeMacBook-Pro.local" time="0.442">
+  <properties/>
+  <testcase name="layoutSegmentsOnlyRetainedBatchesAndAllEightIndexesWithinNativeBounds()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.378"/>
+  <testcase name="emptyOutputHasNoDataLedgerButKeepsEightDecodableIndexesAndGap()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.006"/>
+  <testcase name="taskAndPartCodecRejectTrailingTruncatedForeignVersionAndOversizedInput()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.022"/>
+  <testcase name="unknownTaskOrAllocationNeverDispatchesLedgerCreation()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.006"/>
+  <testcase name="lostCreateResponseRequiresRecoveryAndForeignRunNeverBecomesWritable()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.006"/>
+  <testcase name="lostInventoryResponseAndRestartRetainTheSameIdAndCreateOnlyAfterExactReread()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.007"/>
+  <testcase name="concurrentNativeReservationsAdoptTheWinnerAndBurnOnlyTheUnusedId()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.004"/>
+  <testcase name="corruptedInventoryCannotDispatchAProviderOperation()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

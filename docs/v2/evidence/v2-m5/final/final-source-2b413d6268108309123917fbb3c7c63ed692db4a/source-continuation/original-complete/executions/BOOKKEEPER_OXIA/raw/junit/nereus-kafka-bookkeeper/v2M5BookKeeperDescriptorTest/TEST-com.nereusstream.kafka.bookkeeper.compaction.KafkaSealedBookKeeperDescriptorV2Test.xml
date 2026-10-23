@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:32:02.515Z" hostname="liusinandeMacBook-Pro.local" time="0.71">
+  <properties/>
+  <testcase name="strictDescriptorRoundTripRejectsTrailingTruncatedForeignVersionAndOversizedBytes()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.401"/>
+  <testcase name="lostSelectorResponseReconcilesExactDescriptorAndRetryDoesNotSelectAgain()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.044"/>
+  <testcase name="emptyDescriptorRecoversCompleteGapAndIndexesWithoutADataLedger()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.009"/>
+  <testcase name="recoveryUsesOnlyDescriptorAndLedgerBytesAndPreservesSuccessorTimestampAndSuppression()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.013"/>
+  <testcase name="unappliedImmutableOrSelectorResponseNeverClaimsSelectionAndRetriesExactCandidate()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.024"/>
+  <testcase name="sameDescriptorWithDifferentFallbackSelectionIsNotAnExactRetry()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.012"/>
+  <testcase name="wrongPhysicalIndexLocatorAndReadBudgetFailClosed()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.008"/>
+  <testcase name="changedNativeSealedFingerprintPreventsReadsAndSelection()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.007"/>
+  <testcase name="changedProtocolStateAndMissingSelectedDescriptorNeverUseOldInputs()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.018"/>
+  <testcase name="competingNativeSelectionReconcilesUnknownPublicationTickets()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.132"/>
+  <testcase name="selectedTaskDecisionRejectsAReplayWithDifferentFallbackMembership()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.012"/>
+  <testcase name="corruptedPartPreventsTheWholeDescriptorFromBeingSelected()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.007"/>
+  <testcase name="ownerTakeoverBetweenTheLastRereadAndSelectorCasWinsOverStalePublication()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

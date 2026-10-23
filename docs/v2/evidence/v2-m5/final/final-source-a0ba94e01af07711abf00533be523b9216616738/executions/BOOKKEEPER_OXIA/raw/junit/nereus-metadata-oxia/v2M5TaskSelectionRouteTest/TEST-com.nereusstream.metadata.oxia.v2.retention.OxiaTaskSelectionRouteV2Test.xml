@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:29:06.161Z" hostname="liusinandeMacBook-Pro.local" time="0.254">
+  <properties/>
+  <testcase name="workerReplacementAndTaskSelectionCompeteOnTheSameNativeVersion()" classname="com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test" time="0.184"/>
+  <testcase name="decisionArchivesAreImmutableBindingBoundAndKeyBound()" classname="com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test" time="0.017"/>
+  <testcase name="archivedTaskCannotAttachAgainEvenIfItsProjectedSelectorIsIdentical()" classname="com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test" time="0.022"/>
+  <testcase name="archiveRequiresItsDurableAnchorAndClearingRequiresItsExactArchive()" classname="com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

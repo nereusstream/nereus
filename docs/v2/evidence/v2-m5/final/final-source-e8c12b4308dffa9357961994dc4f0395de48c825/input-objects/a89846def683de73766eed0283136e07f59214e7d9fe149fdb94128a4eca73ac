@@ -1,0 +1,230 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.protocol.ApiMessage;
+
+public enum CoordinatorRecordType {
+    LEGACY_OFFSET_COMMIT("LegacyOffsetCommit", (short) 0, (short) 0, (short) 0),
+    OFFSET_COMMIT("OffsetCommit", (short) 1, (short) 0, (short) 4),
+    GROUP_METADATA("GroupMetadata", (short) 2, (short) 0, (short) 4),
+    CONSUMER_GROUP_METADATA("ConsumerGroupMetadata", (short) 3, (short) 0, (short) 0),
+    CONSUMER_GROUP_PARTITION_METADATA("ConsumerGroupPartitionMetadata", (short) 4, (short) 0, (short) 0),
+    CONSUMER_GROUP_MEMBER_METADATA("ConsumerGroupMemberMetadata", (short) 5, (short) 0, (short) 0),
+    CONSUMER_GROUP_TARGET_ASSIGNMENT_METADATA("ConsumerGroupTargetAssignmentMetadata", (short) 6, (short) 0, (short) 0),
+    CONSUMER_GROUP_TARGET_ASSIGNMENT_MEMBER("ConsumerGroupTargetAssignmentMember", (short) 7, (short) 0, (short) 0),
+    CONSUMER_GROUP_CURRENT_MEMBER_ASSIGNMENT("ConsumerGroupCurrentMemberAssignment", (short) 8, (short) 0, (short) 0),
+    SHARE_GROUP_MEMBER_METADATA("ShareGroupMemberMetadata", (short) 10, (short) 0, (short) 0),
+    SHARE_GROUP_METADATA("ShareGroupMetadata", (short) 11, (short) 0, (short) 0),
+    SHARE_GROUP_TARGET_ASSIGNMENT_METADATA("ShareGroupTargetAssignmentMetadata", (short) 12, (short) 0, (short) 0),
+    SHARE_GROUP_TARGET_ASSIGNMENT_MEMBER("ShareGroupTargetAssignmentMember", (short) 13, (short) 0, (short) 0),
+    SHARE_GROUP_CURRENT_MEMBER_ASSIGNMENT("ShareGroupCurrentMemberAssignment", (short) 14, (short) 0, (short) 0),
+    SHARE_GROUP_STATE_PARTITION_METADATA("ShareGroupStatePartitionMetadata", (short) 15, (short) 0, (short) 0),
+    CONSUMER_GROUP_REGULAR_EXPRESSION("ConsumerGroupRegularExpression", (short) 16, (short) 0, (short) 0),
+    STREAMS_GROUP_METADATA("StreamsGroupMetadata", (short) 17, (short) 0, (short) 0),
+    STREAMS_GROUP_MEMBER_METADATA("StreamsGroupMemberMetadata", (short) 19, (short) 0, (short) 0),
+    STREAMS_GROUP_TARGET_ASSIGNMENT_METADATA("StreamsGroupTargetAssignmentMetadata", (short) 20, (short) 0, (short) 0),
+    STREAMS_GROUP_TARGET_ASSIGNMENT_MEMBER("StreamsGroupTargetAssignmentMember", (short) 21, (short) 0, (short) 0),
+    STREAMS_GROUP_CURRENT_MEMBER_ASSIGNMENT("StreamsGroupCurrentMemberAssignment", (short) 22, (short) 0, (short) 0),
+    STREAMS_GROUP_TOPOLOGY("StreamsGroupTopology", (short) 23, (short) 0, (short) 0);
+    
+    private final String name;
+    private final short id;
+    private final short lowestSupportedVersion;
+    private final short highestSupportedVersion;
+    
+    CoordinatorRecordType(String name, short id, short lowestSupportedVersion, short highestSupportedVersion) {
+        this.name = name;
+        this.id = id;
+        this.lowestSupportedVersion = lowestSupportedVersion;
+        this.highestSupportedVersion = highestSupportedVersion;
+    }
+    
+    public static CoordinatorRecordType fromId(short id) {
+        switch (id) {
+            case 0:
+                return LEGACY_OFFSET_COMMIT;
+            case 1:
+                return OFFSET_COMMIT;
+            case 2:
+                return GROUP_METADATA;
+            case 3:
+                return CONSUMER_GROUP_METADATA;
+            case 4:
+                return CONSUMER_GROUP_PARTITION_METADATA;
+            case 5:
+                return CONSUMER_GROUP_MEMBER_METADATA;
+            case 6:
+                return CONSUMER_GROUP_TARGET_ASSIGNMENT_METADATA;
+            case 7:
+                return CONSUMER_GROUP_TARGET_ASSIGNMENT_MEMBER;
+            case 8:
+                return CONSUMER_GROUP_CURRENT_MEMBER_ASSIGNMENT;
+            case 10:
+                return SHARE_GROUP_MEMBER_METADATA;
+            case 11:
+                return SHARE_GROUP_METADATA;
+            case 12:
+                return SHARE_GROUP_TARGET_ASSIGNMENT_METADATA;
+            case 13:
+                return SHARE_GROUP_TARGET_ASSIGNMENT_MEMBER;
+            case 14:
+                return SHARE_GROUP_CURRENT_MEMBER_ASSIGNMENT;
+            case 15:
+                return SHARE_GROUP_STATE_PARTITION_METADATA;
+            case 16:
+                return CONSUMER_GROUP_REGULAR_EXPRESSION;
+            case 17:
+                return STREAMS_GROUP_METADATA;
+            case 19:
+                return STREAMS_GROUP_MEMBER_METADATA;
+            case 20:
+                return STREAMS_GROUP_TARGET_ASSIGNMENT_METADATA;
+            case 21:
+                return STREAMS_GROUP_TARGET_ASSIGNMENT_MEMBER;
+            case 22:
+                return STREAMS_GROUP_CURRENT_MEMBER_ASSIGNMENT;
+            case 23:
+                return STREAMS_GROUP_TOPOLOGY;
+            default:
+                throw new UnsupportedVersionException("Unknown record id " + id);
+        }
+    }
+    
+    public ApiMessage newRecordKey() {
+        switch (id) {
+            case 0:
+                return new LegacyOffsetCommitKey();
+            case 1:
+                return new OffsetCommitKey();
+            case 2:
+                return new GroupMetadataKey();
+            case 3:
+                return new ConsumerGroupMetadataKey();
+            case 4:
+                return new ConsumerGroupPartitionMetadataKey();
+            case 5:
+                return new ConsumerGroupMemberMetadataKey();
+            case 6:
+                return new ConsumerGroupTargetAssignmentMetadataKey();
+            case 7:
+                return new ConsumerGroupTargetAssignmentMemberKey();
+            case 8:
+                return new ConsumerGroupCurrentMemberAssignmentKey();
+            case 10:
+                return new ShareGroupMemberMetadataKey();
+            case 11:
+                return new ShareGroupMetadataKey();
+            case 12:
+                return new ShareGroupTargetAssignmentMetadataKey();
+            case 13:
+                return new ShareGroupTargetAssignmentMemberKey();
+            case 14:
+                return new ShareGroupCurrentMemberAssignmentKey();
+            case 15:
+                return new ShareGroupStatePartitionMetadataKey();
+            case 16:
+                return new ConsumerGroupRegularExpressionKey();
+            case 17:
+                return new StreamsGroupMetadataKey();
+            case 19:
+                return new StreamsGroupMemberMetadataKey();
+            case 20:
+                return new StreamsGroupTargetAssignmentMetadataKey();
+            case 21:
+                return new StreamsGroupTargetAssignmentMemberKey();
+            case 22:
+                return new StreamsGroupCurrentMemberAssignmentKey();
+            case 23:
+                return new StreamsGroupTopologyKey();
+            default:
+                throw new UnsupportedVersionException("Unknown record id " + id);
+        }
+    }
+    
+    public ApiMessage newRecordValue() {
+        switch (id) {
+            case 0:
+                return new LegacyOffsetCommitValue();
+            case 1:
+                return new OffsetCommitValue();
+            case 2:
+                return new GroupMetadataValue();
+            case 3:
+                return new ConsumerGroupMetadataValue();
+            case 4:
+                return new ConsumerGroupPartitionMetadataValue();
+            case 5:
+                return new ConsumerGroupMemberMetadataValue();
+            case 6:
+                return new ConsumerGroupTargetAssignmentMetadataValue();
+            case 7:
+                return new ConsumerGroupTargetAssignmentMemberValue();
+            case 8:
+                return new ConsumerGroupCurrentMemberAssignmentValue();
+            case 10:
+                return new ShareGroupMemberMetadataValue();
+            case 11:
+                return new ShareGroupMetadataValue();
+            case 12:
+                return new ShareGroupTargetAssignmentMetadataValue();
+            case 13:
+                return new ShareGroupTargetAssignmentMemberValue();
+            case 14:
+                return new ShareGroupCurrentMemberAssignmentValue();
+            case 15:
+                return new ShareGroupStatePartitionMetadataValue();
+            case 16:
+                return new ConsumerGroupRegularExpressionValue();
+            case 17:
+                return new StreamsGroupMetadataValue();
+            case 19:
+                return new StreamsGroupMemberMetadataValue();
+            case 20:
+                return new StreamsGroupTargetAssignmentMetadataValue();
+            case 21:
+                return new StreamsGroupTargetAssignmentMemberValue();
+            case 22:
+                return new StreamsGroupCurrentMemberAssignmentValue();
+            case 23:
+                return new StreamsGroupTopologyValue();
+            default:
+                throw new UnsupportedVersionException("Unknown record id " + id);
+        }
+    }
+    
+    public short id() {
+        return this.id;
+    }
+    
+    public short lowestSupportedVersion() {
+        return this.lowestSupportedVersion;
+    }
+    
+    public short highestSupportedVersion() {
+        return this.highestSupportedVersion;
+    }
+    
+    @Override
+    public String toString() {
+        return this.name();
+    }
+}

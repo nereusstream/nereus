@@ -1,0 +1,47 @@
+M build.gradle
+ M checkstyle/import-control-core.xml
+ M coordinator-common/src/main/java/org/apache/kafka/coordinator/common/runtime/CoordinatorRuntime.java
+ M coordinator-common/src/test/java/org/apache/kafka/coordinator/common/runtime/CoordinatorRuntimeTest.java
+ M core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
+ M core/src/main/java/kafka/server/nereus/NereusBookKeeperCapability.java
+ M core/src/main/java/kafka/server/nereus/NereusKafkaOwnedProviderRuntime.java
+ M core/src/main/scala/kafka/cluster/Partition.scala
+ M core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
+ M core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
+ M core/src/main/scala/kafka/server/BrokerServer.scala
+ M core/src/main/scala/kafka/server/DynamicBrokerConfig.scala
+ M core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
+ M core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
+ M core/src/test/java/kafka/server/nsip/KafkaBookKeeperOwnerRelocationRealTest.java
+ M core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+ M core/src/test/scala/unit/kafka/server/DynamicBrokerConfigTest.scala
+ M core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
+ M core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
+ M group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupCoordinator.java
+ M group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupCoordinatorService.java
+ M server/src/main/java/org/apache/kafka/server/config/NereusKafkaBookKeeperConfig.java
+ M server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
+ M server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
+ M server/src/test/java/org/apache/kafka/server/config/NereusKafkaStorageConfigTest.java
+ M share-coordinator/src/main/java/org/apache/kafka/coordinator/share/ShareCoordinator.java
+ M share-coordinator/src/main/java/org/apache/kafka/coordinator/share/ShareCoordinatorService.java
+ M test-common/test-common-runtime/src/main/java/org/apache/kafka/common/test/KafkaClusterTestKit.java
+ M test-common/test-common-runtime/src/main/java/org/apache/kafka/common/test/PreboundSocketFactoryManager.java
+ M test-common/test-common-runtime/src/test/java/org/apache/kafka/common/test/KafkaClusterTestKitTest.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaCompactionPlanV2.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM4AdmissionV2.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5GcInputsV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5GcReferencesV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5GcScopeV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5PolicyInputV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5SourceScanV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaM5WriterRegistryV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaNativeInputV2.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaPreparedTaskV2.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaReadScopeV2.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaRunBirthWriterAdmissionV1.java
+?? core/src/main/java/kafka/server/nereus/NereusKafkaUnpublishedScopeV2.java
+?? core/src/test/java/kafka/server/nereus/
+?? core/src/test/java/kafka/server/nsip/FailFirstNereusStorageCloseFactory.java
+?? core/src/test/java/kafka/server/nsip/KafkaBookKeeperM4AdmissionRealTest.java
+?? core/src/test/java/kafka/server/nsip/KafkaBookKeeperOpenResponseLossRealScenario.java

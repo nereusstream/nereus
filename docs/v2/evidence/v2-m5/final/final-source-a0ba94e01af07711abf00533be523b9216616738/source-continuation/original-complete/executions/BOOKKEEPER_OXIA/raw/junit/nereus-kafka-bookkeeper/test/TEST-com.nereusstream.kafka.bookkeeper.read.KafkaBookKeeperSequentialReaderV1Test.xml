@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.466Z" hostname="liusinandeMacBook-Pro.local" time="0.015">
+  <properties/>
+  <testcase name="firstOversizedBatchIsReturnedWholeAndNeverSplit()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.009"/>
+  <testcase name="ownerFenceChangeDiscardsCursorEvenWhenRunAndOffsetStillMatch()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="sequentialReadCrossesIndexAndCompactionGapsUnderOneByteBudget()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="readCommittedReturnsAbortedMetadataWithoutStorageFilteringData()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="exactCursorIsAcceptedOnlyAgainstTheFreshCoherentSnapshot()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="staleCursorIsDiscardedAndThePackedLookupIsReplanned()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="refusesALocatorWhoseCompleteBatchCrossesTheCapturedUpperBound()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.001"/>
+  <testcase name="byteBudgetStopsBeforeTheNextCompleteBatchAndReturnsADisposableCursor()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

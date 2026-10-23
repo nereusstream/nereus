@@ -1,0 +1,286 @@
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Starting build with version 4.3.0-SNAPSHOT (commit id 020f3390) using Gradle 9.2.1, Java 17 and Scala 2.13.18
+Build properties: ignoreFailures=false, maxParallelForks=1, maxScalacThreads=8, maxTestRetries=0
+
+> Task :m5CaptureNativeInputsBeforeBuild
+> Task :clients:m5CaptureNativeInputsBeforeBuild
+> Task :connect:m5CaptureNativeInputsBeforeBuild
+> Task :coordinator-common:m5CaptureNativeInputsBeforeBuild
+> Task :core:m5CaptureNativeInputsBeforeBuild
+> Task :examples:m5CaptureNativeInputsBeforeBuild
+> Task :generator:m5CaptureNativeInputsBeforeBuild
+> Task :group-coordinator:m5CaptureNativeInputsBeforeBuild
+> Task :jmh-benchmarks:m5CaptureNativeInputsBeforeBuild
+> Task :metadata:m5CaptureNativeInputsBeforeBuild
+> Task :raft:m5CaptureNativeInputsBeforeBuild
+> Task :server:m5CaptureNativeInputsBeforeBuild
+> Task :server-common:m5CaptureNativeInputsBeforeBuild
+> Task :share-coordinator:m5CaptureNativeInputsBeforeBuild
+> Task :shell:m5CaptureNativeInputsBeforeBuild
+> Task :storage:m5CaptureNativeInputsBeforeBuild
+> Task :streams:m5CaptureNativeInputsBeforeBuild
+> Task :test-common:m5CaptureNativeInputsBeforeBuild
+> Task :tools:m5CaptureNativeInputsBeforeBuild
+> Task :transaction-coordinator:m5CaptureNativeInputsBeforeBuild
+> Task :trogdor:m5CaptureNativeInputsBeforeBuild
+> Task :clients:clients-integration-tests:m5CaptureNativeInputsBeforeBuild
+> Task :connect:api:m5CaptureNativeInputsBeforeBuild
+> Task :connect:basic-auth-extension:m5CaptureNativeInputsBeforeBuild
+> Task :connect:file:m5CaptureNativeInputsBeforeBuild
+> Task :connect:json:m5CaptureNativeInputsBeforeBuild
+> Task :connect:mirror:m5CaptureNativeInputsBeforeBuild
+> Task :connect:mirror-client:m5CaptureNativeInputsBeforeBuild
+> Task :connect:runtime:m5CaptureNativeInputsBeforeBuild
+> Task :connect:test-plugins:m5CaptureNativeInputsBeforeBuild
+> Task :connect:transforms:m5CaptureNativeInputsBeforeBuild
+> Task :group-coordinator:group-coordinator-api:m5CaptureNativeInputsBeforeBuild
+> Task :storage:storage-api:m5CaptureNativeInputsBeforeBuild
+> Task :streams:examples:m5CaptureNativeInputsBeforeBuild
+> Task :streams:integration-tests:m5CaptureNativeInputsBeforeBuild
+> Task :streams:streams-scala:m5CaptureNativeInputsBeforeBuild
+> Task :streams:test-utils:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-0110:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-10:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-11:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-20:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-21:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-22:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-23:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-24:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-25:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-26:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-27:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-28:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-30:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-31:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-32:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-33:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-34:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-35:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-36:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-37:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-38:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-39:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-40:m5CaptureNativeInputsBeforeBuild
+> Task :streams:upgrade-system-tests-41:m5CaptureNativeInputsBeforeBuild
+> Task :test-common:test-common-internal-api:m5CaptureNativeInputsBeforeBuild
+> Task :test-common:test-common-runtime:m5CaptureNativeInputsBeforeBuild
+> Task :test-common:test-common-util:m5CaptureNativeInputsBeforeBuild
+> Task :tools:tools-api:m5CaptureNativeInputsBeforeBuild
+> Task :generator:compileJava UP-TO-DATE
+> Task :generator:processResources NO-SOURCE
+> Task :generator:classes UP-TO-DATE
+> Task :generator:jar UP-TO-DATE
+> Task :clients:processMessages UP-TO-DATE
+> Task :clients:compileJava UP-TO-DATE
+> Task :metadata:processMessages UP-TO-DATE
+> Task :raft:processMessages UP-TO-DATE
+> Task :server-common:compileJava UP-TO-DATE
+> Task :storage:processMessages UP-TO-DATE
+> Task :storage:storage-api:compileJava UP-TO-DATE
+> Task :storage:compileJava UP-TO-DATE
+> Task :raft:compileJava UP-TO-DATE
+> Task :metadata:compileJava UP-TO-DATE
+> Task :coordinator-common:compileJava UP-TO-DATE
+> Task :group-coordinator:processMessages UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:compileJava UP-TO-DATE
+> Task :group-coordinator:compileJava UP-TO-DATE
+> Task :share-coordinator:processMessages UP-TO-DATE
+> Task :share-coordinator:compileJava UP-TO-DATE
+> Task :transaction-coordinator:processMessages UP-TO-DATE
+> Task :transaction-coordinator:compileJava UP-TO-DATE
+> Task :server:compileJava UP-TO-DATE
+> Task :tools:tools-api:compileJava UP-TO-DATE
+> Task :core:compileJava NO-SOURCE
+> Task :core:compileScala UP-TO-DATE
+> Task :core:processResources NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:checkstyleMain UP-TO-DATE
+> Task :clients:processResources UP-TO-DATE
+> Task :clients:classes UP-TO-DATE
+> Task :clients:processTestMessages UP-TO-DATE
+> Task :test-common:test-common-util:compileJava UP-TO-DATE
+> Task :clients:compileTestJava UP-TO-DATE
+> Task :clients:processTestResources UP-TO-DATE
+> Task :clients:testClasses UP-TO-DATE
+> Task :coordinator-common:processResources NO-SOURCE
+> Task :coordinator-common:classes UP-TO-DATE
+> Task :server-common:processResources NO-SOURCE
+> Task :server-common:classes UP-TO-DATE
+> Task :server-common:compileTestJava UP-TO-DATE
+> Task :server-common:processTestResources UP-TO-DATE
+> Task :server-common:testClasses UP-TO-DATE
+> Task :coordinator-common:compileTestJava UP-TO-DATE
+> Task :coordinator-common:processTestResources UP-TO-DATE
+> Task :coordinator-common:testClasses UP-TO-DATE
+> Task :group-coordinator:processResources UP-TO-DATE
+> Task :group-coordinator:classes UP-TO-DATE
+> Task :group-coordinator:compileTestJava UP-TO-DATE
+> Task :group-coordinator:processTestResources UP-TO-DATE
+> Task :group-coordinator:testClasses UP-TO-DATE
+> Task :metadata:processResources UP-TO-DATE
+> Task :metadata:classes UP-TO-DATE
+> Task :raft:processResources UP-TO-DATE
+> Task :raft:classes UP-TO-DATE
+> Task :raft:compileTestJava UP-TO-DATE
+> Task :raft:processTestResources UP-TO-DATE
+> Task :raft:testClasses UP-TO-DATE
+> Task :metadata:compileTestJava UP-TO-DATE
+> Task :metadata:processTestResources UP-TO-DATE
+> Task :metadata:testClasses UP-TO-DATE
+> Task :server:processResources NO-SOURCE
+> Task :server:classes UP-TO-DATE
+> Task :storage:storage-api:processResources NO-SOURCE
+> Task :storage:storage-api:classes UP-TO-DATE
+> Task :storage:storage-api:compileTestJava UP-TO-DATE
+> Task :storage:storage-api:processTestResources UP-TO-DATE
+> Task :storage:storage-api:testClasses UP-TO-DATE
+> Task :test-common:test-common-internal-api:compileJava UP-TO-DATE
+> Task :test-common:test-common-runtime:compileJava UP-TO-DATE
+> Task :server:compileTestJava UP-TO-DATE
+> Task :server:processTestResources UP-TO-DATE
+> Task :server:testClasses UP-TO-DATE
+> Task :share-coordinator:processResources UP-TO-DATE
+> Task :share-coordinator:classes UP-TO-DATE
+> Task :share-coordinator:compileTestJava UP-TO-DATE
+> Task :share-coordinator:processTestResources UP-TO-DATE
+> Task :share-coordinator:testClasses UP-TO-DATE
+> Task :core:compileTestJava NO-SOURCE
+> Task :core:compileTestScala UP-TO-DATE
+> Task :core:processTestResources UP-TO-DATE
+> Task :core:testClasses UP-TO-DATE
+> Task :core:checkstyleTest UP-TO-DATE
+> Task :clients:createVersionFile UP-TO-DATE
+> Task :clients:shadowJar UP-TO-DATE
+> Task :clients:jar SKIPPED
+> Task :coordinator-common:jar UP-TO-DATE
+> Task :group-coordinator:jar UP-TO-DATE
+> Task :metadata:jar UP-TO-DATE
+> Task :raft:createVersionFile UP-TO-DATE
+> Task :raft:jar UP-TO-DATE
+> Task :server:createVersionFile UP-TO-DATE
+> Task :server:jar UP-TO-DATE
+> Task :server-common:createVersionFile UP-TO-DATE
+> Task :server-common:jar UP-TO-DATE
+> Task :share-coordinator:jar UP-TO-DATE
+> Task :storage:processResources UP-TO-DATE
+> Task :storage:classes UP-TO-DATE
+> Task :storage:createVersionFile UP-TO-DATE
+> Task :storage:jar UP-TO-DATE
+> Task :transaction-coordinator:processResources UP-TO-DATE
+> Task :transaction-coordinator:classes UP-TO-DATE
+> Task :transaction-coordinator:jar UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:processResources NO-SOURCE
+> Task :group-coordinator:group-coordinator-api:classes UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:createVersionFile UP-TO-DATE
+> Task :group-coordinator:group-coordinator-api:jar UP-TO-DATE
+> Task :storage:storage-api:createVersionFile UP-TO-DATE
+> Task :storage:storage-api:jar UP-TO-DATE
+> Task :tools:tools-api:processResources NO-SOURCE
+> Task :tools:tools-api:classes UP-TO-DATE
+> Task :tools:tools-api:createVersionFile UP-TO-DATE
+> Task :tools:tools-api:jar UP-TO-DATE
+> Task :core:copyDependantLibs UP-TO-DATE
+> Task :core:jar UP-TO-DATE
+> Task :test-common:test-common-internal-api:processResources NO-SOURCE
+> Task :test-common:test-common-internal-api:classes UP-TO-DATE
+> Task :test-common:test-common-internal-api:jar UP-TO-DATE
+> Task :test-common:test-common-runtime:processResources UP-TO-DATE
+> Task :test-common:test-common-runtime:classes UP-TO-DATE
+> Task :test-common:test-common-runtime:jar UP-TO-DATE
+> Task :test-common:test-common-util:processResources UP-TO-DATE
+> Task :test-common:test-common-util:classes UP-TO-DATE
+> Task :test-common:test-common-util:jar UP-TO-DATE
+> Task :core:compileNereusM5SourceFenceFixtures UP-TO-DATE
+> Task :core:spotbugsMain UP-TO-DATE
+> Task :core:m5PrepareNativeArtifacts
+> Task :m5CaptureNativeProducerInputs
+> Task :clients:m5CaptureNativeProducerInputs
+> Task :connect:m5CaptureNativeProducerInputs
+> Task :coordinator-common:m5CaptureNativeProducerInputs
+> Task :core:m5CaptureNativeProducerInputs
+> Task :examples:m5CaptureNativeProducerInputs
+> Task :generator:m5CaptureNativeProducerInputs
+> Task :group-coordinator:m5CaptureNativeProducerInputs
+> Task :jmh-benchmarks:m5CaptureNativeProducerInputs
+> Task :metadata:m5CaptureNativeProducerInputs
+> Task :raft:m5CaptureNativeProducerInputs
+> Task :server:m5CaptureNativeProducerInputs
+> Task :server-common:m5CaptureNativeProducerInputs
+> Task :share-coordinator:m5CaptureNativeProducerInputs
+> Task :shell:m5CaptureNativeProducerInputs
+> Task :storage:m5CaptureNativeProducerInputs
+> Task :streams:m5CaptureNativeProducerInputs
+> Task :test-common:m5CaptureNativeProducerInputs
+> Task :tools:m5CaptureNativeProducerInputs
+> Task :transaction-coordinator:m5CaptureNativeProducerInputs
+> Task :trogdor:m5CaptureNativeProducerInputs
+> Task :clients:clients-integration-tests:m5CaptureNativeProducerInputs
+> Task :connect:api:m5CaptureNativeProducerInputs
+> Task :connect:basic-auth-extension:m5CaptureNativeProducerInputs
+> Task :connect:file:m5CaptureNativeProducerInputs
+> Task :connect:json:m5CaptureNativeProducerInputs
+> Task :connect:mirror:m5CaptureNativeProducerInputs
+> Task :connect:mirror-client:m5CaptureNativeProducerInputs
+> Task :connect:runtime:m5CaptureNativeProducerInputs
+> Task :connect:test-plugins:m5CaptureNativeProducerInputs
+> Task :connect:transforms:m5CaptureNativeProducerInputs
+> Task :group-coordinator:group-coordinator-api:m5CaptureNativeProducerInputs
+> Task :storage:storage-api:m5CaptureNativeProducerInputs
+> Task :streams:examples:m5CaptureNativeProducerInputs
+> Task :streams:integration-tests:m5CaptureNativeProducerInputs
+> Task :streams:streams-scala:m5CaptureNativeProducerInputs
+> Task :streams:test-utils:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-0110:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-10:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-11:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-20:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-21:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-22:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-23:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-24:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-25:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-26:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-27:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-28:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-30:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-31:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-32:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-33:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-34:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-35:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-36:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-37:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-38:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-39:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-40:m5CaptureNativeProducerInputs
+> Task :streams:upgrade-system-tests-41:m5CaptureNativeProducerInputs
+> Task :test-common:test-common-internal-api:m5CaptureNativeProducerInputs
+> Task :test-common:test-common-runtime:m5CaptureNativeProducerInputs
+> Task :test-common:test-common-util:m5CaptureNativeProducerInputs
+> Task :tools:tools-api:m5CaptureNativeProducerInputs
+> Task :core:m5CapturePreparedNativeArtifacts
+
+[Incubating] Problems report is available at: file:///Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/nereusstream/kafka/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 3s
+216 actionable tasks: 130 executed, 86 up-to-date
+The build is running offline. A build scan will not be published at this time, but it can be published if you run the 'buildScanPublishPrevious' task in the next build.
+
+M5_NATIVE_PREPARATION_EXIT=0

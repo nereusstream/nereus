@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:02:42.549Z" hostname="liusinandeMacBook-Pro.local" time="0.276">
+  <properties/>
+  <testcase name="workerWireRejectsUnknownVersionsTruncationTrailingBytesAndZeroFences()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.075"/>
+  <testcase name="legacyMigrationAndRestartKeepAnIndependentMonotonicWorkerEpoch()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.032"/>
+  <testcase name="competingProposalsAndUnappliedUnknownNeverGrantTheLosingTask()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.029"/>
+  <testcase name="pendingInventoryBindsTheFullPlanAndCancelsOnlyItsOriginalPreparedKeys()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.04"/>
+  <testcase name="newWorkerCannotChangeImmutableScopeOrStorageAndWireCannotDowngrade()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.021"/>
+  <testcase name="terminalTaskAndDifferentCellChargeCannotBeUsedForACompletePlanGrant()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.015"/>
+  <testcase name="ownerSelectorSuccessorPreservesTheGrantButInvalidatesItsAdmission()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.017"/>
+  <testcase name="completePlanAdmissionRequiresOriginalValuesAndSharedCellReservation()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.009"/>
+  <testcase name="replacementWorkerWinsTheSameCasAgainstALatePublisherWithIdenticalSelectorProjection()" classname="com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test" time="0.025"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,120 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :nereus-domain:compileJava UP-TO-DATE
+> Task :nereus-domain:v2DependencyBoundary
+> Task :nereus-metadata-spi:compileJava UP-TO-DATE
+> Task :nereus-metadata-spi:v2DependencyBoundary
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes UP-TO-DATE
+> Task :nereus-domain:jar UP-TO-DATE
+> Task :nereus-domain:compileTestJava FROM-CACHE
+> Task :nereus-domain:processTestResources
+> Task :nereus-domain:testClasses
+
+> Task :v2M4EvidenceContractTest
+test_accepts_exact_four_child_final_and_scenario_allowlist (__main__.M4EvidenceContractTest.test_accepts_exact_four_child_final_and_scenario_allowlist) ... ok
+test_rejects_behavior_change_after_tested_source (__main__.M4EvidenceContractTest.test_rejects_behavior_change_after_tested_source) ... ok
+test_rejects_borrowed_scenario (__main__.M4EvidenceContractTest.test_rejects_borrowed_scenario) ... 
+> Task :nereus-domain:g1ReceiptValidationTest
+> Task :nereus-domain:m1AllocatorHarnessTest
+
+> Task :v2M4EvidenceContractTest
+ok
+test_rejects_duplicate_json_member (__main__.M4EvidenceContractTest.test_rejects_duplicate_json_member) ... ok
+test_rejects_extra_child (__main__.M4EvidenceContractTest.test_rejects_extra_child) ... ok
+test_rejects_missing_child (__main__.M4EvidenceContractTest.test_rejects_missing_child) ... ok
+test_rejects_partial_shared_predicate_promotion (__main__.M4EvidenceContractTest.test_rejects_partial_shared_predicate_promotion) ... 
+> Task :nereus-domain:checkstyleMain
+> Task :nereus-domain:checkstyleTest
+
+> Task :v2M4EvidenceContractTest
+ok
+test_rejects_split_current_final_scenario_bindings (__main__.M4EvidenceContractTest.test_rejects_split_current_final_scenario_bindings) ... ok
+test_rejects_stale_attachment_digest (__main__.M4EvidenceContractTest.test_rejects_stale_attachment_digest) ... ok
+test_rejects_tampered_governed_performance_metric (__main__.M4EvidenceContractTest.test_rejects_tampered_governed_performance_metric) ... ok
+test_rejects_wrong_tested_source (__main__.M4EvidenceContractTest.test_rejects_wrong_tested_source) ... 
+> Task :nereus-domain:spotlessJava
+> Task :nereus-domain:spotlessJavaCheck
+> Task :nereus-domain:spotlessCheck
+
+> Task :v2M4EvidenceContractTest
+ok
+test_resolves_current_final_from_exact_promoted_scenarios (__main__.M4EvidenceContractTest.test_resolves_current_final_from_exact_promoted_scenarios) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 9.450s
+
+OK
+
+> Task :v2M5HistoricalM4DependencyContractTest
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.550s
+
+OK
+
+> Task :v2M1ActiveGraphCheck
+V2 active graph contains only the accepted V2 modules; V1 runtime, Phase/F9 scripts, and KoP runtime are absent.
+
+> Task :v2M1FoundationApiCheck
+V2 M1.1a-A foundation API check passed; later domain codecs do not change its partial boundary; no M1 PASS.
+
+> Task :v2M1FoundationDependencyCheck
+
+> Task :v2M1G1ValidatorSourceCheck
+G1 production validator: 4 suites/49 tests; allocator evidence: 2 suites/14 tests; all clean
+V2 M1 G1 production validator and evidence-only allocator harness verified; focused evidence remains non-promotable, and any current promotion is restricted to the exact N3 footprint.
+
+> Task :nereus-storage-api:compileJava UP-TO-DATE
+> Task :nereus-storage-object:compileJava UP-TO-DATE
+> Task :nereus-metadata-oxia:compileJava UP-TO-DATE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:checkstyleMain
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar UP-TO-DATE
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :nereus-storage-api:jar UP-TO-DATE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :nereus-storage-object:jar UP-TO-DATE
+> Task :nereus-storage-object:compileTestJava UP-TO-DATE
+> Task :nereus-storage-object:processTestResources UP-TO-DATE
+> Task :nereus-storage-object:testClasses UP-TO-DATE
+> Task :nereus-storage-object:m5DeleteTestFixturesJar UP-TO-DATE
+> Task :nereus-metadata-oxia:compileOxiaIntegrationTestJava FROM-CACHE
+> Task :nereus-metadata-oxia:processOxiaIntegrationTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:oxiaIntegrationTestClasses UP-TO-DATE
+> Task :nereus-metadata-oxia:checkstyleOxiaIntegrationTest
+> Task :nereus-metadata-oxia:compileTestJava UP-TO-DATE
+> Task :nereus-metadata-oxia:processTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:testClasses UP-TO-DATE
+> Task :nereus-metadata-oxia:checkstyleTest
+> Task :nereus-metadata-oxia:spotlessJava FROM-CACHE
+> Task :nereus-metadata-oxia:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-metadata-oxia:spotlessCheck UP-TO-DATE
+> Task :nereus-domain:test
+> Task :nereus-domain:check
+> Task :nereus-metadata-spi:checkstyleMain
+> Task :nereus-metadata-spi:compileTestJava FROM-CACHE
+> Task :nereus-metadata-spi:processTestResources NO-SOURCE
+> Task :nereus-metadata-spi:testClasses UP-TO-DATE
+> Task :nereus-metadata-spi:checkstyleTest
+> Task :nereus-metadata-spi:spotlessJava FROM-CACHE
+> Task :nereus-metadata-spi:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-metadata-spi:spotlessCheck UP-TO-DATE
+> Task :nereus-metadata-spi:test
+> Task :nereus-metadata-spi:check
+> Task :nereus-metadata-oxia:test
+
+> Task :v2M1FastSourceCheck
+V2 active graph contains only the accepted V2 modules; V1 runtime, Phase/F9 scripts, and KoP runtime are absent.
+V2 M1 fast local tests: suites=75 tests=540 failures=0 errors=0 skipped=0
+V2 M1 fast gate passed: deterministic local contracts and pure-V2/V1-absence boundary only.
+
+BUILD SUCCESSFUL in 19s
+43 actionable tasks: 23 executed, 5 from cache, 15 up-to-date
+
+C06_GOVERNANCE_EXIT=0

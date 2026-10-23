@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-23T11:28:51.800Z" hostname="liusinandeMacBook-Pro.local" time="6.049">
+  <properties/>
+  <testcase name="rejectedExecutorReturnsFailureAndLeavesNoProviderWorkToDrain()" classname="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" time="0.058"/>
+  <testcase name="boundVersionRangeIgnoresNewCurrentVersionAndRejectsWrongProof()" classname="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" time="5.245"/>
+  <testcase name="unversionedRangeUsesConditionalEtagAndRejectsReplacement()" classname="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" time="0.025"/>
+  <testcase name="closeWaitsForRealPutAfterObserverCancellationAndRejectsQueuedDispatch()" classname="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" time="0.018"/>
+  <testcase name="failedActualClientCloseCannotBecomeSuccessOnRetry()" classname="com.nereusstream.pulsar.offload.M5S3PulsarObjectStoreDrainTest" time="0.038"/>
+  <system-out><![CDATA[ACTUAL_PROVIDER_DELETE_POLICY emptyRetention=true legalHoldVeto=true retentionVeto=true serverTimeExpiry=true absentIsNotDone=true missingBucketVeto=true wholeM5Authority=false
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

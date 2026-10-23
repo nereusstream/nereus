@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:33:11.754Z" hostname="liusinandeMacBook-Pro.local" time="0.49">
+  <properties/>
+  <testcase name="replacesPreparationAllowanceWithoutDroppingTheCellReservation()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.048"/>
+  <testcase name="independentSemanticValidationRejectsSelfConsistentWrongPayloadLocator()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.271"/>
+  <testcase name="persistedCellAdmissionReservesAllCompactionResourcesBeforeDispatch()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.004"/>
+  <testcase name="emptyNonNullKeyHasItsOwnLatestValueAndTombstoneProof()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.013"/>
+  <testcase name="compactsAcrossBatchesWithSparseAndNoDataCoverageAtExactTombstoneBoundary()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.026"/>
+  <testcase name="independentSemanticValidationRejectsMissingProducerTransactionAndAbortedRows()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.011"/>
+  <testcase name="independentSemanticValidationReparsesStoredBatchBytesAndRejectsIncompleteGaps()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.003"/>
+  <testcase name="outputAndAllRootsAreDeterministic()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.009"/>
+  <testcase name="unknownReservationReplyRetainsUncertaintyAndTerminalCasRejectsLateArrival()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.001"/>
+  <testcase name="semanticCompilationSharesObjectRecordSelectionWithoutConstructingObjectCandidates()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.007"/>
+  <testcase name="producerCompressionPreservesFirstCleanTombstoneHorizonAcrossFurtherCleaning()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.004"/>
+  <testcase name="retainsTransactionalDataAndExactControlMarkerWithAbortedAndLeaderEpochIndexes()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.004"/>
+  <testcase name="semanticEmptyCoverageHasNoBatchAndStillCarriesAllEightIndexes()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.002"/>
+  <testcase name="independentValidationRejectsWrongCodecUnderProducerCompression()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.002"/>
+  <testcase name="nativeFixedCodecPolicyRetainsOffsetHeadersAndFirstCleanHorizon()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.004"/>
+  <testcase name="producerCompressionPreservesMixedInputCodecsDuringSparseRewrite()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.047"/>
+  <testcase name="acceptsKafkaProducedEmptyBatchAndEmitsAuthoritativeNoDataGap()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.003"/>
+  <testcase name="failsClosedForOpenTransactionsCapsAndMutatedRebuiltIndexes()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.002"/>
+  <testcase name="abortedIndexDoesNotCaptureOtherProducersOrNonTransactionalBatchesInsideTheRange()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.004"/>
+  <testcase name="rejectsChangedPreparationOrOverCapTaskWithoutLosingTheOriginalAllowance()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.0"/>
+  <testcase name="semanticProofFeedsM5PublicationEnvelopeAndBindsSuppressionRoot()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.01"/>
+  <testcase name="preservesIdempotentProducerSequencesAcrossPartialSparseRewrite()" classname="com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

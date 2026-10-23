@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:48:38.296Z" hostname="liusinandeMacBook-Pro.local" time="0.275">
+  <properties/>
+  <testcase name="rejectsInvalidOrInsufficientFrameLimits()" classname="com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test" time="0.002"/>
+  <testcase name="derivesTheExactRelease4180NormalAddPayloadAllowance()" classname="com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test" time="0.001"/>
+  <testcase name="formulaMatchesTheSourceLockedBookKeeperLightProtobufSerializer()" classname="com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test" time="0.271"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

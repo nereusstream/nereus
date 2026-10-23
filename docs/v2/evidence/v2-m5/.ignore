@@ -1,0 +1,11 @@
+final/**/executions/NATIVE_KAFKA/raw/kafka-source/
+
+# Hash-addressed source snapshots are code; only documentation discovery ignores them.
+final/final-source-a0ba94e01af07711abf00533be523b9216616738/source-continuation/before/
+final/final-source-a0ba94e01af07711abf00533be523b9216616738/source-continuation/after/
+
+# Exact reviewed source objects in the CI governance successor.
+final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/source-continuation/before/
+final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/source-continuation/after/
+final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/source-continuation/original-complete/source-continuation/before/
+final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/source-continuation/original-complete/source-continuation/after/

@@ -1,0 +1,42 @@
+{
+  "schema": "NEREUS_V2_M5_RETIRED_HISTORY_OXIA_RUN_V1",
+  "containerId": "88b4d8c73556dd052756d2a64e38d9c98190f323f01d7926f210424988c73963",
+  "startedBefore": "2026-10-23T10:36:54.856161844Z",
+  "startedAfter": "2026-10-23T10:49:55.919837177Z",
+  "sameServerContainerRestarted": true,
+  "testedJavaInputManifestSha256": "fcce324688dbf588012f9d324244897853637717d44bd8b5499da7d5bc7d5f16",
+  "nativeJavaInputsUnchangedDuringRun": true,
+  "serverImageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+  "serverSource": "37a17bef17202d5fd6e23282da5fd26d94865484",
+  "clientJarSha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+  "sourceAndReferenceAuthority": "SYNTHETIC_PROOF_FACTS_WITH_REAL_NATIVE_METADATA",
+  "responseFaults": "POST_NATIVE_MUTATION_CLIENT_DELIVERY_INJECTION",
+  "continuousRetirements": 1026,
+  "activeHoles": 1,
+  "selectorBytesStrictlyBelow": 2048,
+  "suites": [
+    {
+      "task": "v2M5RetiredHistoryRealOxiaTest",
+      "tests": 9,
+      "xmlSha256": "f4e86e5f2e760222d9cc66cca5dfb8fcd81ef30077f78c4ee550b702bb8ac891"
+    },
+    {
+      "task": "v2M5RetiredHistoryOxiaRestartWriteTest",
+      "tests": 1,
+      "xmlSha256": "0ccbfbc626b49e59bf3cbfb47b42aabb940ac1df8d0dccfbff417929900321da"
+    },
+    {
+      "task": "v2M5RetiredHistoryOxiaRestartReadTest",
+      "tests": 1,
+      "xmlSha256": "d084bdc4ccd1d12a890582857c8f60929170e7c1ec0d0057546268927a267aae"
+    },
+    {
+      "task": "v2M5RetentionRealOxiaTest",
+      "tests": 5,
+      "xmlSha256": "179e1db2a492b9f615b84ee247c4be650a579b0abb0998ac4a5008a52acbcf9c"
+    }
+  ],
+  "m5Receipt": false,
+  "m5FinalAuthority": false,
+  "productionAuthority": false
+}

@@ -1,0 +1,1442 @@
+[
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "/opt/bookkeeper/scripts/entrypoint.sh",
+      "bookie"
+    ],
+    "Config": {
+      "AttachStderr": true,
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "Cmd": [
+        "bookie"
+      ],
+      "Domainname": "",
+      "Entrypoint": [
+        "/bin/bash",
+        "/opt/bookkeeper/scripts/entrypoint.sh"
+      ],
+      "Env": [
+        "BK_advertisedAddress=127.0.0.1",
+        "BK_metadataServiceUri=zk://metadata-service:2181/ledgers",
+        "BK_httpServerEnabled=false",
+        "BK_extraServerComponents=",
+        "BK_zkServers=metadata-service:2181",
+        "BK_zkLedgersRootPath=/ledgers",
+        "BK_journalSyncData=true",
+        "BK_allowLoopback=true",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin",
+        "BOOKIE_PORT=3181",
+        "BOOKIE_HTTP_PORT=8080",
+        "BK_USER=bookkeeper",
+        "BK_HOME=/opt/bookkeeper",
+        "DEBIAN_FRONTEND=noninteractive",
+        "JAVA_HOME=/opt/java/openjdk",
+        "ZK_dataDir=/opt/bookkeeper/data/zookeeper/data",
+        "ZK_dataLogDir=/opt/bookkeeper/data/zookeeper/txlog",
+        "BK_DATA_DIR=/opt/bookkeeper/data",
+        "BK_journalDirectory=/opt/bookkeeper/data/journal",
+        "BK_ledgerDirectories=/opt/bookkeeper/data/ledgers",
+        "ZK_SHELL_HOME=/opt/bookkeeper/data"
+      ],
+      "ExposedPorts": {
+        "3181/tcp": {},
+        "8080/tcp": {}
+      },
+      "Healthcheck": {
+        "Interval": 2000000000,
+        "Retries": 60,
+        "Test": [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/3181"
+        ],
+        "Timeout": 2000000000
+      },
+      "Hostname": "feb7df4e21e8",
+      "Image": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+      "Labels": {
+        "com.docker.compose.config-hash": "8529ab460b21facfb0392c95fd1cb39c032a5aa576338d5050b31cdd9c9e074a",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "metadata-service:service_healthy:false",
+        "com.docker.compose.image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "nereus-m5-native-authority-facts-broker-72542",
+        "com.docker.compose.project.config_files": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml",
+        "com.docker.compose.project.working_dir": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9",
+        "com.docker.compose.service": "bookie-0",
+        "com.docker.compose.version": "5.4.0",
+        "org.opencontainers.image.version": "22.04"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "10000",
+      "Volumes": null,
+      "WorkingDir": "/opt/bookkeeper"
+    },
+    "Created": "2026-10-23T10:53:13.293551005Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c",
+        "LowerDir": "/var/lib/docker/overlay2/e99549c92dd2fdced60b145349b276b64526d141a702e6bcea3efc1c763fa228-init/diff:/var/lib/docker/overlay2/9ed13b19aeefcd495dd145a904342fc003c7fc3354f5012d727633879328456d/diff:/var/lib/docker/overlay2/cc59d940ff951a815eb313f1f2c58a414b6e0f0ac75fe3210acb93abfba9d58e/diff:/var/lib/docker/overlay2/f171e7100b5ebf91c03aefe08d564cfa135d37b1b6b13da1cf6531d00a1edb19/diff:/var/lib/docker/overlay2/258b5c5581e4e60c1a0a7ccb4b59b26f5c0fa22aeae5a85304d2c7e0a5ffd16e/diff:/var/lib/docker/overlay2/1ea9aff73e8e0b9e5ce68f538b06b365db9af1e16957b52e348cb0cfbc5aa0a4/diff:/var/lib/docker/overlay2/c89d2dafead35e48ff149b1aaeb79466a96d2edbd6c6921030858260a9d7e3f0/diff",
+        "MergedDir": "/var/lib/docker/overlay2/e99549c92dd2fdced60b145349b276b64526d141a702e6bcea3efc1c763fa228/merged",
+        "UpperDir": "/var/lib/docker/overlay2/e99549c92dd2fdced60b145349b276b64526d141a702e6bcea3efc1c763fa228/diff",
+        "WorkDir": "/var/lib/docker/overlay2/e99549c92dd2fdced60b145349b276b64526d141a702e6bcea3efc1c763fa228/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": [
+        "nereus-m5-native-authority-facts-broker-72542_bookie-0-data:/opt/bookkeeper/data:rw"
+      ],
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceWriteIOps": null,
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": null,
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "nereus-m5-native-authority-facts-broker-72542_default",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "3181/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3181"
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": null,
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c/hostname",
+    "HostsPath": "/var/lib/docker/containers/feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c/hosts",
+    "Id": "feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c",
+    "Image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "LogPath": "/var/lib/docker/containers/feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c/feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c-json.log",
+    "MountLabel": "",
+    "Mounts": [
+      {
+        "Destination": "/opt/bookkeeper/data",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "nereus-m5-native-authority-facts-broker-72542_bookie-0-data",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/nereus-m5-native-authority-facts-broker-72542_bookie-0-data/_data",
+        "Type": "volume"
+      }
+    ],
+    "Name": "/nereus-m5-native-authority-facts-broker-72542-bookie-0-1",
+    "NetworkSettings": {
+      "Networks": {
+        "nereus-m5-native-authority-facts-broker-72542_default": {
+          "Aliases": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-0-1",
+            "bookie-0"
+          ],
+          "DNSNames": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-0-1",
+            "bookie-0",
+            "feb7df4e21e8"
+          ],
+          "DriverOpts": null,
+          "EndpointID": "fd00b503a9cac1b98c83689f60758660aa759d2136ec4f0b3d3cf019db38bdd3",
+          "Gateway": "172.19.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.19.0.3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "f6:c4:90:cc:41:60",
+          "NetworkID": "b3cd026be62d1cb06a0f9c299ab39befc72b71c185e1f99f4e4136142df5450a"
+        }
+      },
+      "Ports": {
+        "3181/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3181"
+          }
+        ]
+      },
+      "SandboxID": "17134a22891cd388365f39406fdb93875b7d294355465375defb857adcde23bd",
+      "SandboxKey": "/var/run/docker/netns/17134a22891c"
+    },
+    "Path": "/bin/bash",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/feb7df4e21e8113cf65758967369919e474d73435f75eb16d7b64207fbb42e3c/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "End": "2026-10-23T10:53:26.175038886Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3181: Connection refused\n",
+            "Start": "2026-10-23T10:53:26.119352261Z"
+          },
+          {
+            "End": "2026-10-23T10:53:28.241906345Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3181: Connection refused\n",
+            "Start": "2026-10-23T10:53:28.175970095Z"
+          },
+          {
+            "End": "2026-10-23T10:53:30.290194388Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3181: Connection refused\n",
+            "Start": "2026-10-23T10:53:30.242837388Z"
+          },
+          {
+            "End": "2026-10-23T10:53:32.347399847Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3181: Connection refused\n",
+            "Start": "2026-10-23T10:53:32.290798389Z"
+          },
+          {
+            "End": "2026-10-23T10:53:34.415344542Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:34.358116084Z"
+          }
+        ],
+        "Status": "healthy"
+      },
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 92737,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:53:17.915917132Z",
+      "Status": "running"
+    }
+  },
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "/opt/bookkeeper/scripts/entrypoint.sh",
+      "bookie"
+    ],
+    "Config": {
+      "AttachStderr": true,
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "Cmd": [
+        "bookie"
+      ],
+      "Domainname": "",
+      "Entrypoint": [
+        "/bin/bash",
+        "/opt/bookkeeper/scripts/entrypoint.sh"
+      ],
+      "Env": [
+        "BK_journalSyncData=true",
+        "BK_advertisedAddress=127.0.0.1",
+        "BK_extraServerComponents=",
+        "BK_httpServerEnabled=false",
+        "BK_bookiePort=3182",
+        "BK_metadataServiceUri=zk://metadata-service:2181/ledgers",
+        "BK_allowLoopback=true",
+        "BK_zkServers=metadata-service:2181",
+        "BK_zkLedgersRootPath=/ledgers",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin",
+        "BOOKIE_PORT=3181",
+        "BOOKIE_HTTP_PORT=8080",
+        "BK_USER=bookkeeper",
+        "BK_HOME=/opt/bookkeeper",
+        "DEBIAN_FRONTEND=noninteractive",
+        "JAVA_HOME=/opt/java/openjdk",
+        "ZK_dataDir=/opt/bookkeeper/data/zookeeper/data",
+        "ZK_dataLogDir=/opt/bookkeeper/data/zookeeper/txlog",
+        "BK_DATA_DIR=/opt/bookkeeper/data",
+        "BK_journalDirectory=/opt/bookkeeper/data/journal",
+        "BK_ledgerDirectories=/opt/bookkeeper/data/ledgers",
+        "ZK_SHELL_HOME=/opt/bookkeeper/data"
+      ],
+      "ExposedPorts": {
+        "3181/tcp": {},
+        "3182/tcp": {},
+        "8080/tcp": {}
+      },
+      "Healthcheck": {
+        "Interval": 2000000000,
+        "Retries": 60,
+        "Test": [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/3182"
+        ],
+        "Timeout": 2000000000
+      },
+      "Hostname": "60f7125b4526",
+      "Image": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+      "Labels": {
+        "com.docker.compose.config-hash": "744e3e16baeffb5e1abfd8e325caac599a24c1634f1d8f1352c24310fe47e744",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "metadata-service:service_healthy:false",
+        "com.docker.compose.image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "nereus-m5-native-authority-facts-broker-72542",
+        "com.docker.compose.project.config_files": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml",
+        "com.docker.compose.project.working_dir": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9",
+        "com.docker.compose.service": "bookie-1",
+        "com.docker.compose.version": "5.4.0",
+        "org.opencontainers.image.version": "22.04"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "10000",
+      "Volumes": null,
+      "WorkingDir": "/opt/bookkeeper"
+    },
+    "Created": "2026-10-23T10:53:13.283133505Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b",
+        "LowerDir": "/var/lib/docker/overlay2/8fab0a279127bea70cc724356fadda97e0a65d75101c381210c471457cde89b1-init/diff:/var/lib/docker/overlay2/9ed13b19aeefcd495dd145a904342fc003c7fc3354f5012d727633879328456d/diff:/var/lib/docker/overlay2/cc59d940ff951a815eb313f1f2c58a414b6e0f0ac75fe3210acb93abfba9d58e/diff:/var/lib/docker/overlay2/f171e7100b5ebf91c03aefe08d564cfa135d37b1b6b13da1cf6531d00a1edb19/diff:/var/lib/docker/overlay2/258b5c5581e4e60c1a0a7ccb4b59b26f5c0fa22aeae5a85304d2c7e0a5ffd16e/diff:/var/lib/docker/overlay2/1ea9aff73e8e0b9e5ce68f538b06b365db9af1e16957b52e348cb0cfbc5aa0a4/diff:/var/lib/docker/overlay2/c89d2dafead35e48ff149b1aaeb79466a96d2edbd6c6921030858260a9d7e3f0/diff",
+        "MergedDir": "/var/lib/docker/overlay2/8fab0a279127bea70cc724356fadda97e0a65d75101c381210c471457cde89b1/merged",
+        "UpperDir": "/var/lib/docker/overlay2/8fab0a279127bea70cc724356fadda97e0a65d75101c381210c471457cde89b1/diff",
+        "WorkDir": "/var/lib/docker/overlay2/8fab0a279127bea70cc724356fadda97e0a65d75101c381210c471457cde89b1/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": [
+        "nereus-m5-native-authority-facts-broker-72542_bookie-1-data:/opt/bookkeeper/data:rw"
+      ],
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceWriteIOps": null,
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": null,
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "nereus-m5-native-authority-facts-broker-72542_default",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "3182/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3182"
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": null,
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b/hostname",
+    "HostsPath": "/var/lib/docker/containers/60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b/hosts",
+    "Id": "60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b",
+    "Image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "LogPath": "/var/lib/docker/containers/60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b/60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b-json.log",
+    "MountLabel": "",
+    "Mounts": [
+      {
+        "Destination": "/opt/bookkeeper/data",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "nereus-m5-native-authority-facts-broker-72542_bookie-1-data",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/nereus-m5-native-authority-facts-broker-72542_bookie-1-data/_data",
+        "Type": "volume"
+      }
+    ],
+    "Name": "/nereus-m5-native-authority-facts-broker-72542-bookie-1-1",
+    "NetworkSettings": {
+      "Networks": {
+        "nereus-m5-native-authority-facts-broker-72542_default": {
+          "Aliases": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-1-1",
+            "bookie-1"
+          ],
+          "DNSNames": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-1-1",
+            "bookie-1",
+            "60f7125b4526"
+          ],
+          "DriverOpts": null,
+          "EndpointID": "3bcdf39df1f6d9488779d6de8c702b051067404c0adbb3921a996db632bc0c8d",
+          "Gateway": "172.19.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.19.0.5",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "32:43:c1:d3:6d:15",
+          "NetworkID": "b3cd026be62d1cb06a0f9c299ab39befc72b71c185e1f99f4e4136142df5450a"
+        }
+      },
+      "Ports": {
+        "3182/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3182"
+          }
+        ]
+      },
+      "SandboxID": "2f0fbc1c2a80844a129463826980b53dcef0054607aae8a5c6f918b5f628b2f4",
+      "SandboxKey": "/var/run/docker/netns/2f0fbc1c2a80"
+    },
+    "Path": "/bin/bash",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/60f7125b4526e23a108a6b71bb446ffb2fe947b710cecb882c02b16a6773c11b/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "End": "2026-10-23T10:53:26.191202136Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3182: Connection refused\n",
+            "Start": "2026-10-23T10:53:26.142563677Z"
+          },
+          {
+            "End": "2026-10-23T10:53:28.247757845Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3182: Connection refused\n",
+            "Start": "2026-10-23T10:53:28.191582595Z"
+          },
+          {
+            "End": "2026-10-23T10:53:30.293271388Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3182: Connection refused\n",
+            "Start": "2026-10-23T10:53:30.248402054Z"
+          },
+          {
+            "End": "2026-10-23T10:53:32.361615722Z",
+            "ExitCode": 1,
+            "Output": "/bin/bash: connect: Connection refused\n/bin/bash: line 1: /dev/tcp/127.0.0.1/3182: Connection refused\n",
+            "Start": "2026-10-23T10:53:32.293736639Z"
+          },
+          {
+            "End": "2026-10-23T10:53:34.416262334Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:34.362462584Z"
+          }
+        ],
+        "Status": "healthy"
+      },
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 92736,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:53:17.916340132Z",
+      "Status": "running"
+    }
+  },
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "/opt/bookkeeper/scripts/entrypoint.sh",
+      "bookie"
+    ],
+    "Config": {
+      "AttachStderr": true,
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "Cmd": [
+        "bookie"
+      ],
+      "Domainname": "",
+      "Entrypoint": [
+        "/bin/bash",
+        "/opt/bookkeeper/scripts/entrypoint.sh"
+      ],
+      "Env": [
+        "BK_journalSyncData=true",
+        "BK_extraServerComponents=",
+        "BK_zkServers=metadata-service:2181",
+        "BK_advertisedAddress=127.0.0.1",
+        "BK_allowLoopback=true",
+        "BK_httpServerEnabled=false",
+        "BK_bookiePort=3183",
+        "BK_zkLedgersRootPath=/ledgers",
+        "BK_metadataServiceUri=zk://metadata-service:2181/ledgers",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin",
+        "BOOKIE_PORT=3181",
+        "BOOKIE_HTTP_PORT=8080",
+        "BK_USER=bookkeeper",
+        "BK_HOME=/opt/bookkeeper",
+        "DEBIAN_FRONTEND=noninteractive",
+        "JAVA_HOME=/opt/java/openjdk",
+        "ZK_dataDir=/opt/bookkeeper/data/zookeeper/data",
+        "ZK_dataLogDir=/opt/bookkeeper/data/zookeeper/txlog",
+        "BK_DATA_DIR=/opt/bookkeeper/data",
+        "BK_journalDirectory=/opt/bookkeeper/data/journal",
+        "BK_ledgerDirectories=/opt/bookkeeper/data/ledgers",
+        "ZK_SHELL_HOME=/opt/bookkeeper/data"
+      ],
+      "ExposedPorts": {
+        "3181/tcp": {},
+        "3183/tcp": {},
+        "8080/tcp": {}
+      },
+      "Healthcheck": {
+        "Interval": 2000000000,
+        "Retries": 60,
+        "Test": [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/3183"
+        ],
+        "Timeout": 2000000000
+      },
+      "Hostname": "819c5d3e072c",
+      "Image": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+      "Labels": {
+        "com.docker.compose.config-hash": "c32510db038c8838864e5eb9ea4ed4d924f131fdc1eed728785c1af3e158edce",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "metadata-service:service_healthy:false",
+        "com.docker.compose.image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "nereus-m5-native-authority-facts-broker-72542",
+        "com.docker.compose.project.config_files": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml",
+        "com.docker.compose.project.working_dir": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9",
+        "com.docker.compose.service": "bookie-2",
+        "com.docker.compose.version": "5.4.0",
+        "org.opencontainers.image.version": "22.04"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "10000",
+      "Volumes": null,
+      "WorkingDir": "/opt/bookkeeper"
+    },
+    "Created": "2026-10-23T10:53:13.274240338Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73",
+        "LowerDir": "/var/lib/docker/overlay2/14f1d012a455e31377b65187c2ad2af58413029684905183932378bab516e3c8-init/diff:/var/lib/docker/overlay2/9ed13b19aeefcd495dd145a904342fc003c7fc3354f5012d727633879328456d/diff:/var/lib/docker/overlay2/cc59d940ff951a815eb313f1f2c58a414b6e0f0ac75fe3210acb93abfba9d58e/diff:/var/lib/docker/overlay2/f171e7100b5ebf91c03aefe08d564cfa135d37b1b6b13da1cf6531d00a1edb19/diff:/var/lib/docker/overlay2/258b5c5581e4e60c1a0a7ccb4b59b26f5c0fa22aeae5a85304d2c7e0a5ffd16e/diff:/var/lib/docker/overlay2/1ea9aff73e8e0b9e5ce68f538b06b365db9af1e16957b52e348cb0cfbc5aa0a4/diff:/var/lib/docker/overlay2/c89d2dafead35e48ff149b1aaeb79466a96d2edbd6c6921030858260a9d7e3f0/diff",
+        "MergedDir": "/var/lib/docker/overlay2/14f1d012a455e31377b65187c2ad2af58413029684905183932378bab516e3c8/merged",
+        "UpperDir": "/var/lib/docker/overlay2/14f1d012a455e31377b65187c2ad2af58413029684905183932378bab516e3c8/diff",
+        "WorkDir": "/var/lib/docker/overlay2/14f1d012a455e31377b65187c2ad2af58413029684905183932378bab516e3c8/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": [
+        "nereus-m5-native-authority-facts-broker-72542_bookie-2-data:/opt/bookkeeper/data:rw"
+      ],
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceWriteIOps": null,
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": null,
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "nereus-m5-native-authority-facts-broker-72542_default",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "3183/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3183"
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": null,
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73/hostname",
+    "HostsPath": "/var/lib/docker/containers/819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73/hosts",
+    "Id": "819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73",
+    "Image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "LogPath": "/var/lib/docker/containers/819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73/819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73-json.log",
+    "MountLabel": "",
+    "Mounts": [
+      {
+        "Destination": "/opt/bookkeeper/data",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "nereus-m5-native-authority-facts-broker-72542_bookie-2-data",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/nereus-m5-native-authority-facts-broker-72542_bookie-2-data/_data",
+        "Type": "volume"
+      }
+    ],
+    "Name": "/nereus-m5-native-authority-facts-broker-72542-bookie-2-1",
+    "NetworkSettings": {
+      "Networks": {
+        "nereus-m5-native-authority-facts-broker-72542_default": {
+          "Aliases": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-2-1",
+            "bookie-2"
+          ],
+          "DNSNames": [
+            "nereus-m5-native-authority-facts-broker-72542-bookie-2-1",
+            "bookie-2",
+            "819c5d3e072c"
+          ],
+          "DriverOpts": null,
+          "EndpointID": "4f5e511118085701d9ef7581e7da1cd255ef3846e4cdea184c1deffebbed0f83",
+          "Gateway": "172.19.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.19.0.4",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "c2:ac:31:e3:e9:21",
+          "NetworkID": "b3cd026be62d1cb06a0f9c299ab39befc72b71c185e1f99f4e4136142df5450a"
+        }
+      },
+      "Ports": {
+        "3183/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3183"
+          }
+        ]
+      },
+      "SandboxID": "cca31e0a3b9c3243b631175b9c1500252316dea1a3e0f8377c919291a35fcf70",
+      "SandboxKey": "/var/run/docker/netns/cca31e0a3b9c"
+    },
+    "Path": "/bin/bash",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/819c5d3e072c488b57aa5ad59bdd59220d2c75ee7506411c3f22d330e2268b73/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "End": "2026-10-23T10:53:26.183512552Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:26.133299552Z"
+          },
+          {
+            "End": "2026-10-23T10:53:28.244148303Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:28.184583928Z"
+          },
+          {
+            "End": "2026-10-23T10:53:30.290131054Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:30.244623929Z"
+          },
+          {
+            "End": "2026-10-23T10:53:32.351127222Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:32.290815847Z"
+          },
+          {
+            "End": "2026-10-23T10:53:34.415039834Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:34.358151334Z"
+          }
+        ],
+        "Status": "healthy"
+      },
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 92735,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:53:17.912651048Z",
+      "Status": "running"
+    }
+  },
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "/opt/bookkeeper/scripts/entrypoint.sh",
+      "zookeeper"
+    ],
+    "Config": {
+      "AttachStderr": true,
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "Cmd": [
+        "zookeeper"
+      ],
+      "Domainname": "",
+      "Entrypoint": [
+        "/bin/bash",
+        "/opt/bookkeeper/scripts/entrypoint.sh"
+      ],
+      "Env": [
+        "ZK_dataDir=/opt/bookkeeper/data/zookeeper/data",
+        "ZK_dataLogDir=/opt/bookkeeper/data/zookeeper/txlog",
+        "ZK_standaloneEnabled=true",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin",
+        "BOOKIE_PORT=3181",
+        "BOOKIE_HTTP_PORT=8080",
+        "BK_USER=bookkeeper",
+        "BK_HOME=/opt/bookkeeper",
+        "DEBIAN_FRONTEND=noninteractive",
+        "JAVA_HOME=/opt/java/openjdk",
+        "BK_DATA_DIR=/opt/bookkeeper/data",
+        "BK_journalDirectory=/opt/bookkeeper/data/journal",
+        "BK_ledgerDirectories=/opt/bookkeeper/data/ledgers",
+        "ZK_SHELL_HOME=/opt/bookkeeper/data"
+      ],
+      "ExposedPorts": {
+        "2181/tcp": {},
+        "3181/tcp": {},
+        "8080/tcp": {}
+      },
+      "Healthcheck": {
+        "Interval": 2000000000,
+        "Retries": 30,
+        "Test": [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/2181"
+        ],
+        "Timeout": 2000000000
+      },
+      "Hostname": "4af64b184ad7",
+      "Image": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+      "Labels": {
+        "com.docker.compose.config-hash": "584b7a024cb32edc88ef409922ddab6da5312049c3bdd7a10dbd4cb9085c7976",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "nereus-m5-native-authority-facts-broker-72542",
+        "com.docker.compose.project.config_files": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml",
+        "com.docker.compose.project.working_dir": "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/config/v2/m2/kafka/k9",
+        "com.docker.compose.service": "metadata-service",
+        "com.docker.compose.version": "5.4.0",
+        "org.opencontainers.image.version": "22.04"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "10000",
+      "Volumes": null,
+      "WorkingDir": "/opt/bookkeeper"
+    },
+    "Created": "2026-10-23T10:53:13.242091671Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a",
+        "LowerDir": "/var/lib/docker/overlay2/768905a00c1c277ff1288cf85a0a6dc3d95ab27713388899663876ec122a07b3-init/diff:/var/lib/docker/overlay2/9ed13b19aeefcd495dd145a904342fc003c7fc3354f5012d727633879328456d/diff:/var/lib/docker/overlay2/cc59d940ff951a815eb313f1f2c58a414b6e0f0ac75fe3210acb93abfba9d58e/diff:/var/lib/docker/overlay2/f171e7100b5ebf91c03aefe08d564cfa135d37b1b6b13da1cf6531d00a1edb19/diff:/var/lib/docker/overlay2/258b5c5581e4e60c1a0a7ccb4b59b26f5c0fa22aeae5a85304d2c7e0a5ffd16e/diff:/var/lib/docker/overlay2/1ea9aff73e8e0b9e5ce68f538b06b365db9af1e16957b52e348cb0cfbc5aa0a4/diff:/var/lib/docker/overlay2/c89d2dafead35e48ff149b1aaeb79466a96d2edbd6c6921030858260a9d7e3f0/diff",
+        "MergedDir": "/var/lib/docker/overlay2/768905a00c1c277ff1288cf85a0a6dc3d95ab27713388899663876ec122a07b3/merged",
+        "UpperDir": "/var/lib/docker/overlay2/768905a00c1c277ff1288cf85a0a6dc3d95ab27713388899663876ec122a07b3/diff",
+        "WorkDir": "/var/lib/docker/overlay2/768905a00c1c277ff1288cf85a0a6dc3d95ab27713388899663876ec122a07b3/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": [
+        "nereus-m5-native-authority-facts-broker-72542_metadata-data:/opt/bookkeeper/data:rw"
+      ],
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceWriteIOps": null,
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": null,
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "nereus-m5-native-authority-facts-broker-72542_default",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "2181/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "2181"
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": null,
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a/hostname",
+    "HostsPath": "/var/lib/docker/containers/4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a/hosts",
+    "Id": "4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a",
+    "Image": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "LogPath": "/var/lib/docker/containers/4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a/4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a-json.log",
+    "MountLabel": "",
+    "Mounts": [
+      {
+        "Destination": "/opt/bookkeeper/data",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "nereus-m5-native-authority-facts-broker-72542_metadata-data",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/nereus-m5-native-authority-facts-broker-72542_metadata-data/_data",
+        "Type": "volume"
+      }
+    ],
+    "Name": "/nereus-m5-native-authority-facts-broker-72542-metadata-service-1",
+    "NetworkSettings": {
+      "Networks": {
+        "nereus-m5-native-authority-facts-broker-72542_default": {
+          "Aliases": [
+            "nereus-m5-native-authority-facts-broker-72542-metadata-service-1",
+            "metadata-service"
+          ],
+          "DNSNames": [
+            "nereus-m5-native-authority-facts-broker-72542-metadata-service-1",
+            "metadata-service",
+            "4af64b184ad7"
+          ],
+          "DriverOpts": null,
+          "EndpointID": "913673aebd19f3a96c404723989d25a37e5edb506e5cb83a761bfc946c15762d",
+          "Gateway": "172.19.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.19.0.2",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "c6:27:d4:cd:05:09",
+          "NetworkID": "b3cd026be62d1cb06a0f9c299ab39befc72b71c185e1f99f4e4136142df5450a"
+        }
+      },
+      "Ports": {
+        "2181/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "2181"
+          }
+        ]
+      },
+      "SandboxID": "d92d1a362a685dd41979cfb8347bb9de0c16f4d1d881aa8684a9b70a7a5db62a",
+      "SandboxKey": "/var/run/docker/netns/d92d1a362a68"
+    },
+    "Path": "/bin/bash",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/4af64b184ad7a138baad63df8c2f248ce3b456d7c0f616628e377ad9d511ea4a/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "End": "2026-10-23T10:53:25.680951511Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:25.63713526Z"
+          },
+          {
+            "End": "2026-10-23T10:53:27.733852386Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:27.681318553Z"
+          },
+          {
+            "End": "2026-10-23T10:53:29.778990804Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:29.734196679Z"
+          },
+          {
+            "End": "2026-10-23T10:53:31.825839305Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:31.779259222Z"
+          },
+          {
+            "End": "2026-10-23T10:53:33.901658625Z",
+            "ExitCode": 0,
+            "Output": "",
+            "Start": "2026-10-23T10:53:33.835460917Z"
+          }
+        ],
+        "Status": "healthy"
+      },
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 92476,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:53:13.325205713Z",
+      "Status": "running"
+    }
+  },
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "standalone",
+      "--shards=4"
+    ],
+    "Config": {
+      "AttachStderr": false,
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "Cmd": [
+        "oxia",
+        "standalone",
+        "--shards=4"
+      ],
+      "Domainname": "",
+      "Entrypoint": null,
+      "Env": [
+        "PATH=/oxia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "ExposedPorts": {
+        "6648/tcp": {},
+        "8080/tcp": {}
+      },
+      "Hostname": "ad4c54a4cff9",
+      "Image": "nereus/oxia-m3-allocator:37a17bef1720",
+      "Labels": {
+        "com.nereusstream.evidence": "m5-native-authority-facts-broker",
+        "com.nereusstream.evidence.recipe": "NEREUS_V2_M3_ALLOCATOR_OXIA_IMAGE_V1",
+        "org.opencontainers.image.revision": "37a17bef17202d5fd6e23282da5fd26d94865484",
+        "org.opencontainers.image.source": "https://github.com/oxia-db/oxia.git"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "",
+      "Volumes": null,
+      "WorkingDir": "/oxia"
+    },
+    "Created": "2026-10-23T10:53:34.53097625Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb",
+        "LowerDir": "/var/lib/docker/overlay2/7e1ec9c38c81415ba60d36d19cdd3282d6dc8b5496fa3d1432a5b8e6a32fe995-init/diff:/var/lib/docker/overlay2/ym4w22dtnaqzijn7kh4sot6vd/diff:/var/lib/docker/overlay2/y7j80ye2wfgadyf7em2njy3qg/diff:/var/lib/docker/overlay2/vtf8p1zyyn9w53wg9y6qi5hs3/diff:/var/lib/docker/overlay2/f9v9m6jt7otez4cqdbqo11sqy/diff:/var/lib/docker/overlay2/f7da608e8b76663c305acf8a64944f0562927a3250f71f9803d1d7b222a5eccd/diff",
+        "MergedDir": "/var/lib/docker/overlay2/7e1ec9c38c81415ba60d36d19cdd3282d6dc8b5496fa3d1432a5b8e6a32fe995/merged",
+        "UpperDir": "/var/lib/docker/overlay2/7e1ec9c38c81415ba60d36d19cdd3282d6dc8b5496fa3d1432a5b8e6a32fe995/diff",
+        "WorkDir": "/var/lib/docker/overlay2/7e1ec9c38c81415ba60d36d19cdd3282d6dc8b5496fa3d1432a5b8e6a32fe995/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": null,
+      "BlkioDeviceReadBps": [],
+      "BlkioDeviceReadIOps": [],
+      "BlkioDeviceWriteBps": [],
+      "BlkioDeviceWriteIOps": [],
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": [],
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": [],
+      "Dns": null,
+      "DnsOptions": [],
+      "DnsSearch": [],
+      "ExtraHosts": null,
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "bridge",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "6648/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": ""
+          }
+        ],
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": ""
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": [],
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb/hostname",
+    "HostsPath": "/var/lib/docker/containers/ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb/hosts",
+    "Id": "ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb",
+    "Image": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+    "LogPath": "/var/lib/docker/containers/ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb/ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb-json.log",
+    "MountLabel": "",
+    "Mounts": [],
+    "Name": "/nereus-m5-native-authority-facts-broker-72542-oxia",
+    "NetworkSettings": {
+      "Networks": {
+        "bridge": {
+          "Aliases": null,
+          "DNSNames": null,
+          "DriverOpts": null,
+          "EndpointID": "a785a3ea7567db78f7c2c746656e7911efb856182ec82991bbb908b818a77c93",
+          "Gateway": "172.17.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.17.0.2",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "c6:c4:a8:57:74:33",
+          "NetworkID": "41abcea3ec656fcaf099bce6c090ce973be5910f197ea25676ed222be37d5433"
+        }
+      },
+      "Ports": {
+        "6648/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50555"
+          }
+        ],
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50556"
+          }
+        ]
+      },
+      "SandboxID": "03ed03e7bb1c6a4753dabcf9176109aa7f454fd66faa7c1ce22a31c021cabb88",
+      "SandboxKey": "/var/run/docker/netns/03ed03e7bb1c"
+    },
+    "Path": "oxia",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/ad4c54a4cff9bccfae1e272395fa9789c6f119552ba540cf9819674dcf83c9fb/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 93968,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:53:34.556503875Z",
+      "Status": "running"
+    }
+  }
+]

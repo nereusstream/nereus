@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:47:51.440Z" hostname="liusinandeMacBook-Pro.local" time="0.036">
+  <properties/>
+  <testcase name="deleteNonExistingML" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="failInCreatingMLnode" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="getMLList" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="readMalformedCursorNode" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="readMalformedML" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="testGetChildrenWatch" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.014"/>
+  <testcase name="updatingCursorNode" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <testcase name="updatingMLNode" classname="org.apache.bookkeeper.mledger.impl.MetaStoreImplTest" time="0.001"/>
+  <system-out><![CDATA[2026-10-23T13:47:51,441 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.deleteNonExistingML() throws java.lang.Exception}
+2026-10-23T13:47:51,442 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].deleteNonExistingML([])-------
+2026-10-23T13:47:51,443 - INFO  - [TestNG-method=deleteNonExistingML-1:MetaStoreImpl@460] - Remove ManagedLedger {ledgerName=non-existing}
+2026-10-23T13:47:51,443 - INFO  - [TestNG-method=deleteNonExistingML-1:AbstractMetadataStore@471] - Deleting path {expectedVersion=Optional.empty, path=/managed-ledgers/non-existing}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].deleteNonExistingML([])-------
+2026-10-23T13:47:51,443 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.deleteNonExistingML() throws java.lang.Exception}
+2026-10-23T13:47:51,443 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,443 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,443 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.deleteNonExistingML() throws java.lang.Exception}
+2026-10-23T13:47:51,444 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.failInCreatingMLnode() throws java.lang.Exception}
+2026-10-23T13:47:51,445 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].failInCreatingMLnode([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].failInCreatingMLnode([])-------
+2026-10-23T13:47:51,446 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.failInCreatingMLnode() throws java.lang.Exception}
+2026-10-23T13:47:51,447 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,447 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,447 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.failInCreatingMLnode() throws java.lang.Exception}
+2026-10-23T13:47:51,447 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.getMLList() throws java.lang.Exception}
+2026-10-23T13:47:51,448 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].getMLList([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].getMLList([])-------
+2026-10-23T13:47:51,449 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.getMLList() throws java.lang.Exception}
+2026-10-23T13:47:51,449 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,449 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,449 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.getMLList() throws java.lang.Exception}
+2026-10-23T13:47:51,449 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,450 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].readMalformedCursorNode([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].readMalformedCursorNode([])-------
+2026-10-23T13:47:51,451 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,451 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,451 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,451 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,452 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedML() throws java.lang.Exception}
+2026-10-23T13:47:51,453 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].readMalformedML([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].readMalformedML([])-------
+2026-10-23T13:47:51,454 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedML() throws java.lang.Exception}
+2026-10-23T13:47:51,454 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,454 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,455 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.readMalformedML() throws java.lang.Exception}
+2026-10-23T13:47:51,455 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.testGetChildrenWatch() throws java.lang.Exception}
+2026-10-23T13:47:51,456 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].testGetChildrenWatch([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].testGetChildrenWatch([])-------
+2026-10-23T13:47:51,470 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.testGetChildrenWatch() throws java.lang.Exception}
+2026-10-23T13:47:51,470 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,470 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,470 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.testGetChildrenWatch() throws java.lang.Exception}
+2026-10-23T13:47:51,471 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,472 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].updatingCursorNode([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].updatingCursorNode([])-------
+2026-10-23T13:47:51,473 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,473 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,473 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,474 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingCursorNode() throws java.lang.Exception}
+2026-10-23T13:47:51,474 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingMLNode() throws java.lang.Exception}
+2026-10-23T13:47:51,475 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].updatingMLNode([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.MetaStoreImplTest].updatingMLNode([])-------
+2026-10-23T13:47:51,477 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingMLNode() throws java.lang.Exception}
+2026-10-23T13:47:51,477 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,477 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:51,477 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=void org.apache.bookkeeper.mledger.impl.MetaStoreImplTest.updatingMLNode() throws java.lang.Exception}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

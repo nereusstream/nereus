@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:02:48.984Z" hostname="liusinandeMacBook-Pro.local" time="0.179">
+  <properties/>
+  <testcase name="asyncExecutorPreallocatesAndReusesBoundedBatchContexts()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.037"/>
+  <testcase name="authoritySwitchRejectsOldAdmissionAndNewCaptureUsesSuccessorGeneration()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.007"/>
+  <testcase name="plannedPoolCloseRejectsNewAdmissionWithoutForceClearingLiveLease()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.001"/>
+  <testcase name="stoppedAuthorityAndExhaustedPoolFailBeforeSourceUse()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.001"/>
+  <testcase name="lifecycleRejectsCrossThreadMutation()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.002"/>
+  <testcase name="multiBindingReservationReleasesEveryPartialLease()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.0"/>
+  <testcase name="concurrentCaptureAndStableScanMeetBoundedLatencyAndThroughput()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.098"/>
+  <testcase name="capturedGenerationRemainsPinnedThroughProviderAndBufferDrain()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.001"/>
+  <testcase name="scanTreatsClaimedLeaseWithUnpublishedPayloadAsInconclusive()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.001"/>
+  <testcase name="asyncSuccessReleasesExactLeaseBeforeMakingHeapOwnedResultObservable()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.003"/>
+  <testcase name="asyncCancellationClosesGateButRetainsLeaseUntilRealProviderCompletion()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.002"/>
+  <testcase name="leaseGenerationWrapRetiresSlotInsteadOfReusingAbaIdentity()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.001"/>
+  <testcase name="steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread()" classname="com.nereusstream.storage.object.read.BindingReadM4KernelV1Test" time="0.015"/>
+  <system-out><![CDATA[M4_METRIC CONCURRENT_HAZARD threads=4 operations=80000 elapsedNanos=85019333 p50Nanos=3333 p99Nanos=13167 maxNanos=473625 throughputOpsPerSecond=940962 scans=602370 pinnedScans=491128 cleanScans=37125 inconclusiveScans=74117 poolCapacity=16
+M4_METRIC HOT_PATH operations=100000 allocatedBytes=0 elapsedNanos=6501292 p50Nanos=42 p99Nanos=84 maxNanos=7333 throughputOpsPerSecond=15381558 atomicCasPerOperation=2 fullFencesPerOperation=1 authorityAcquireLoadsPerOperation=2 perCallbackSlotCas=0 ordinaryReadRemoteMetadataOperations=0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

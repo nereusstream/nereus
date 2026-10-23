@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:47:52.697Z" hostname="liusinandeMacBook-Pro.local" time="1.076">
+  <properties/>
+  <testcase name="rejectsUnboundProviderBeforeAnyRange()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.004"/>
+  <testcase name="rejectsRootOuterDigestAndSelfDigestCorruptionBeforeIndexUse()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.004"/>
+  <testcase name="verifiesTheCompleteDataShaCountsLengthAndEveryBlock()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.003"/>
+  <testcase name="nativeCloseWaitsForResultDeliveryAfterObjectReadHasCompleted()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="1.024"/>
+  <testcase name="productionPublicationVerifierUsesTheRealObjectReadPath()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.009"/>
+  <testcase name="rejectsShortRootAndMissingRootWithTypedFailures()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.007"/>
+  <testcase name="rejectsCorruptEncodedBlockWithoutReturningAPartialRange()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.005"/>
+  <testcase name="closeDrainsTheWholeAdmittedRangeDespiteCancelledObservers()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.004"/>
+  <testcase name="closeDrainsAFailedCompleteVerificationBeforeReportingLocalQuiescence()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.003"/>
+  <testcase name="nativeCloseObserverCancellationCannotReplaceTheOwnedDrain()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.004"/>
+  <testcase name="opensTheBoundedPairAndReadsExactRangesAcrossSparseBlocks()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.003"/>
+  <testcase name="rejectsInvalidRangesAndReadsAfterCloseWithoutProviderIo()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.002"/>
+  <testcase name="rejectsDataImmutableVersionSubstitutionAtOpen()" classname="com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

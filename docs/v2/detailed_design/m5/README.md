@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDesignIndex
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json
 ---
 
 # M5 detailed-design index
@@ -21,10 +22,18 @@ that historical result.
 
 ## Current effective contracts
 
+The current [commit-bound M5 Final](../../evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json) binds Nereus `2b413d6268108309123917fbb3c7c63ed692db4a`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667` and Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8` to input `8598b8d2c76dca9fb2aed08f2585c95b88bd01f2cfc58ad5c46fd9a148572339`. All five stages pass566/1332/39/63/736, totaling2736 tests with zero failures/errors/skips. C4 verifies all17 obligations and five source-bound children. Native BK replacement/expiry include actual UNKNOWN reconciliation, real absence, D/Cell settlement, Native DONE and backlog; Object GC retains its separate evidence. Exactly14 scenarios are promoted; the three M6-deferred Kafka rows and V2-OPEN-READ-15 remain unchanged. This bounded result grants no production deployment, M6/M7/M8 or complete NSIP-1 acceptance.
+
+The final source input is `8598b8d2c76dca9fb2aed08f2585c95b88bd01f2cfc58ad5c46fd9a148572339`. COMPONENTS executes at this root; the four backend records retain their original `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` roots, times, commands and attachments. The reviewed governance-only input-equivalence proof and fresh historical six-contract verification bind those origins without rerunning or relabeling a backend.
+
 Start with [ADR 0148 and the current contract view](m5-current-contracts.md). The
 [lifecycle amendment](m5-lifecycle-contract-amendment.md) and [manifest 3](m5-design-amendment-3.json) select exact
 supersession of the historical clauses below. Earlier focused gates do not satisfy revised implementation or Final.
-The current guarded BK delete primitive adds a permanent native GC epoch and one server transaction checking
+
+### Earlier focused boundary snapshot (historical)
+
+The following paragraph records the earlier focused boundary, including its then-open obligations.
+The guarded BK delete primitive adds a permanent native GC epoch and one server transaction checking
 namespace/task/reservation/epoch and exact ledger version before metadata deletion. Real competing clients, lost
 responses and separate JVMs across service restart validate that native boundary. Actual native GC owner/capability
 facts now feed the coordinator, and one permanent native intent record binds its exact M5 token/authority and ledger

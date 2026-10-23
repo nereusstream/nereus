@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-23T14:24:13.970Z" hostname="liusinandeMacBook-Pro.local" time="0.18">
+  <properties/>
+  <testcase name="m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.073"/>
+  <testcase name="m4PulsarCurrentSourceLatencyAndAllocationAreBounded()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.096"/>
+  <testcase name="m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.002"/>
+  <system-out><![CDATA[M4_METRIC PULSAR_CURRENT_SOURCE operations=1000 elapsedNanos=52417208 p50Nanos=43458 p99Nanos=148292 maxNanos=224042 throughputOpsPerSecond=19077 callerAllocatedBytes=472464 callerAllocatedBytesPerOperation=472 ownerAllocatedBytes=9082104 ownerAllocatedBytesPerOperation=9082 measuredAllocatedBytes=9554568 measuredAllocatedBytesPerOperation=9554 hazardCapacity=8 outerHazardCasPerRead=2 perCallbackSlotCas=0 reusablePlanCapacity=1
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

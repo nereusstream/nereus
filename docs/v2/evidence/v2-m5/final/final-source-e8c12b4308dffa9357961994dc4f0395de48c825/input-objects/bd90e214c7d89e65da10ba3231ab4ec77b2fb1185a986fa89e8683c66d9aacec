@@ -1,0 +1,80 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.group.generated.ConsumerGroupRegularExpressionValue.*;
+
+public class ConsumerGroupRegularExpressionValueJsonConverter {
+    public static ConsumerGroupRegularExpressionValue read(JsonNode _node, short _version) {
+        ConsumerGroupRegularExpressionValue _object = new ConsumerGroupRegularExpressionValue();
+        JsonNode _topicsNode = _node.get("topics");
+        if (_topicsNode == null) {
+            throw new RuntimeException("ConsumerGroupRegularExpressionValue: unable to locate field 'topics', which is mandatory in version " + _version);
+        } else {
+            if (!_topicsNode.isArray()) {
+                throw new RuntimeException("ConsumerGroupRegularExpressionValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<String> _collection = new ArrayList<String>(_topicsNode.size());
+            _object.topics = _collection;
+            for (JsonNode _element : _topicsNode) {
+                if (!_element.isTextual()) {
+                    throw new RuntimeException("ConsumerGroupRegularExpressionValue element expected a string type, but got " + _node.getNodeType());
+                }
+                _collection.add(_element.asText());
+            }
+        }
+        JsonNode _versionNode = _node.get("version");
+        if (_versionNode == null) {
+            throw new RuntimeException("ConsumerGroupRegularExpressionValue: unable to locate field 'version', which is mandatory in version " + _version);
+        } else {
+            _object.version = MessageUtil.jsonNodeToLong(_versionNode, "ConsumerGroupRegularExpressionValue");
+        }
+        JsonNode _timestampNode = _node.get("timestamp");
+        if (_timestampNode == null) {
+            throw new RuntimeException("ConsumerGroupRegularExpressionValue: unable to locate field 'timestamp', which is mandatory in version " + _version);
+        } else {
+            _object.timestamp = MessageUtil.jsonNodeToLong(_timestampNode, "ConsumerGroupRegularExpressionValue");
+        }
+        return _object;
+    }
+    public static JsonNode write(ConsumerGroupRegularExpressionValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        ArrayNode _topicsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (String _element : _object.topics) {
+            _topicsArray.add(new TextNode(_element));
+        }
+        _node.set("topics", _topicsArray);
+        _node.set("version", new LongNode(_object.version));
+        _node.set("timestamp", new LongNode(_object.timestamp));
+        return _node;
+    }
+    public static JsonNode write(ConsumerGroupRegularExpressionValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+}
