@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" tests="28" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:47:09.968Z" hostname="liusinandeMacBook-Pro.local" time="1.323">
+  <properties/>
+  <testcase name="bookKeeperFenceDrainsAcceptedRangeAndReroutesNewRead" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.538"/>
+  <testcase name="bookKeeperFirstFallsBackOnlyForNoSuchLedger" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.005"/>
+  <testcase name="bothSourcesFailWithPrimaryAndSuppressedSecondary" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.003"/>
+  <testcase name="cancelledCapturedReadDrainsPrimaryWithoutStartingFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="cancelledObjectReadDoesNotFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="cancelledObserverReleasesUndeliverableFallbackRange" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="cancelledObserverReleasesUndeliverablePrimaryRange" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="capturedGateFailureAfterPinReleasesAdmission" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="capturedReadDoesNotRecaptureVersionAfterPrimaryFailure" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.004"/>
+  <testcase name="capturedReadDoesNotRetargetFencedBookKeeperSource" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="capturedReadKeepsWholeRangeFallbackWhenStateIsUnchanged" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="capturedReadRejectsChangedVersionBeforeSourceUse" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="capturedSourceGateRejectsBeforeProviderUse" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="closeWaitsForRangePinAndClosesInitializedChildExactlyOnce" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="closedCapturedSourceGateWaitsForPrimaryAndRejectsNewFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="completedObserverReleasesUndeliverablePrimaryRange" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="deleteIntentUsesObjectEvenWhenBookKeeperStillOpens" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="failedDeletionFenceUnfencesOnlyAfterLateBookKeeperPinDrains" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="identityCaptureGateFailureAfterPinReleasesAdmission" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="invalidObjectRangeIsClosedQuarantinedAndRetriedWithoutMixing" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="metadataAttemptChangeAfterPrimaryFailureForbidsFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="missingBookKeeperAtOpenUsesObjectMetadata" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="objectFirstReturnsOneExactObjectRange" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="objectOnlyOpenFailureCannotOpenBookKeeper" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="objectOnlyOverridesBookKeeperPriorityAndNeverOpensFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="objectOpenFailureUsesBookKeeperMetadataAndPreservesWholeRangeFallback" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <testcase name="objectTimeoutReleasesPrimaryAndRetriesWholeRangeFromBookKeeper" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.001"/>
+  <testcase name="unsupportedIdentityCaptureReleasesPinAndRetainsOrdinaryReads" classname="org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest" time="0.002"/>
+  <system-out><![CDATA[------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bookKeeperFenceDrainsAcceptedRangeAndReroutesNewRead([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bookKeeperFenceDrainsAcceptedRangeAndReroutesNewRead([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bookKeeperFirstFallsBackOnlyForNoSuchLedger([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bookKeeperFirstFallsBackOnlyForNoSuchLedger([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bothSourcesFailWithPrimaryAndSuppressedSecondary([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].bothSourcesFailWithPrimaryAndSuppressedSecondary([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledCapturedReadDrainsPrimaryWithoutStartingFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledCapturedReadDrainsPrimaryWithoutStartingFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObjectReadDoesNotFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObjectReadDoesNotFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObserverReleasesUndeliverableFallbackRange([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObserverReleasesUndeliverableFallbackRange([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObserverReleasesUndeliverablePrimaryRange([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].cancelledObserverReleasesUndeliverablePrimaryRange([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedGateFailureAfterPinReleasesAdmission([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedGateFailureAfterPinReleasesAdmission([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadDoesNotRecaptureVersionAfterPrimaryFailure([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadDoesNotRecaptureVersionAfterPrimaryFailure([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadDoesNotRetargetFencedBookKeeperSource([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadDoesNotRetargetFencedBookKeeperSource([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadKeepsWholeRangeFallbackWhenStateIsUnchanged([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadKeepsWholeRangeFallbackWhenStateIsUnchanged([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadRejectsChangedVersionBeforeSourceUse([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedReadRejectsChangedVersionBeforeSourceUse([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedSourceGateRejectsBeforeProviderUse([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].capturedSourceGateRejectsBeforeProviderUse([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].closeWaitsForRangePinAndClosesInitializedChildExactlyOnce([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].closeWaitsForRangePinAndClosesInitializedChildExactlyOnce([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].closedCapturedSourceGateWaitsForPrimaryAndRejectsNewFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].closedCapturedSourceGateWaitsForPrimaryAndRejectsNewFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].completedObserverReleasesUndeliverablePrimaryRange([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].completedObserverReleasesUndeliverablePrimaryRange([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].deleteIntentUsesObjectEvenWhenBookKeeperStillOpens([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].deleteIntentUsesObjectEvenWhenBookKeeperStillOpens([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].failedDeletionFenceUnfencesOnlyAfterLateBookKeeperPinDrains([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].failedDeletionFenceUnfencesOnlyAfterLateBookKeeperPinDrains([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].identityCaptureGateFailureAfterPinReleasesAdmission([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].identityCaptureGateFailureAfterPinReleasesAdmission([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].invalidObjectRangeIsClosedQuarantinedAndRetriedWithoutMixing([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].invalidObjectRangeIsClosedQuarantinedAndRetriedWithoutMixing([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].metadataAttemptChangeAfterPrimaryFailureForbidsFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].metadataAttemptChangeAfterPrimaryFailureForbidsFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].missingBookKeeperAtOpenUsesObjectMetadata([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].missingBookKeeperAtOpenUsesObjectMetadata([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectFirstReturnsOneExactObjectRange([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectFirstReturnsOneExactObjectRange([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOnlyOpenFailureCannotOpenBookKeeper([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOnlyOpenFailureCannotOpenBookKeeper([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOnlyOverridesBookKeeperPriorityAndNeverOpensFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOnlyOverridesBookKeeperPriorityAndNeverOpensFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOpenFailureUsesBookKeeperMetadataAndPreservesWholeRangeFallback([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectOpenFailureUsesBookKeeperMetadataAndPreservesWholeRangeFallback([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectTimeoutReleasesPrimaryAndRetriesWholeRangeFromBookKeeper([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].objectTimeoutReleasesPrimaryAndRetriesWholeRangeFromBookKeeper([])-------
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].unsupportedIdentityCaptureReleasesPinAndRetainsOrdinaryReads([])-------
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest].unsupportedIdentityCaptureReleasesPinAndRetainsOrdinaryReads([])-------
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

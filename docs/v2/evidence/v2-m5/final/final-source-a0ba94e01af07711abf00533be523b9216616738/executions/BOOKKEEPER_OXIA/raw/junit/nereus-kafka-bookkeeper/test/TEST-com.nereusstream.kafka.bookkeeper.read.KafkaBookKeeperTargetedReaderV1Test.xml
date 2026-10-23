@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:16.482Z" hostname="liusinandeMacBook-Pro.local" time="0.004">
+  <properties/>
+  <testcase name="distinguishesClosedProviderOutcomesAtTheIndexReadBoundary()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.001"/>
+  <testcase name="refusesDurableAsAReadBoundForReplicaAndConsumerIsolation()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.0"/>
+  <testcase name="compactionGapSelectsTheFirstSuccessorWithoutReadingAnOldBlockOrWholeRun()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.001"/>
+  <testcase name="boundedLruEvictsOnlyDisposableValidatedIndexAcceleration()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.0"/>
+  <testcase name="rejectsEntryLocalNbke2CorruptionWithoutReadingAnotherEntry()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.0"/>
+  <testcase name="sealedRandomReadLoadsOneIndexBlockThenOneTargetDataEntry()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.0"/>
+  <testcase name="rejectsRawKafkaCrcCorruptionEvenWhenTheOuterNbke2FrameIsValid()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.001"/>
+  <testcase name="activeTailReadTargetsDataDirectlyWithoutAnIndexEntryRead()" classname="com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

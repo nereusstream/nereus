@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:47:43.822Z" hostname="liusinandeMacBook-Pro.local" time="1.519">
+  <properties/>
+  <testcase name="testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.143"/>
+  <testcase name="testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.027"/>
+  <testcase name="testSourceSafeActiveDeletionRejectsSourceEnrollment" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.129"/>
+  <testcase name="testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.025"/>
+  <testcase name="testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.001"/>
+  <testcase name="testSourceSafeDeletePersistsIntentDeletesAndProvesDone" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.024"/>
+  <testcase name="testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="1.036"/>
+  <testcase name="testSourceSafeIntentResumesWithoutRepeatingRevalidation" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.026"/>
+  <testcase name="testSourceSafePreparedOwnerCannotUseLegacyDeletion" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.026"/>
+  <testcase name="testSourceSafeRetainClassNeverDeletesBookKeeper" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.026"/>
+  <testcase name="testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper" classname="org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest" time="0.025"/>
+  <system-out><![CDATA[2026-10-23T13:47:43,823 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence() throws java.lang.Exception}
+2026-10-23T13:47:43,826 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence([])-------
+2026-10-23T13:47:43,829 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,829 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/native-delete-metadata}
+2026-10-23T13:47:43,829 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:43,829 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=native-delete-metadata, previousLedgerId=null}
+2026-10-23T13:47:43,830 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,845 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,846 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=native-delete-metadata, previousLedgerId=3}
+2026-10-23T13:47:43,846 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:43,846 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,854 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=native-delete-metadata, totalSize=110}
+2026-10-23T13:47:43,854 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,854 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=native-delete-metadata, uuid=f98fafc4-bbef-4c34-b8c3-cbf74903daef}
+2026-10-23T13:47:43,854 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=native-delete-metadata, uuid=f98fafc4-bbef-4c34-b8c3-cbf74903daef}
+2026-10-23T13:47:43,854 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=native-delete-metadata, uuid=f98fafc4-bbef-4c34-b8c3-cbf74903daef}
+2026-10-23T13:47:43,854 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=native-delete-metadata, uuid=f98fafc4-bbef-4c34-b8c3-cbf74903daef}
+2026-10-23T13:47:43,854 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=native-delete-metadata, timestamp=1792734463854}
+2026-10-23T13:47:43,966 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,966 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,966 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=5}
+2026-10-23T13:47:43,966 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=5, managedLedger=native-delete-metadata, previousLedgerId=null}
+2026-10-23T13:47:43,966 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,968 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,968 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,968 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=6}
+2026-10-23T13:47:43,968 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=6, managedLedger=native-delete-metadata, previousLedgerId=null}
+2026-10-23T13:47:43,968 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=native-delete-metadata}
+2026-10-23T13:47:43,968 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl$2@638] - Deleted empty ledger {ledgerId=5, managedLedger=native-delete-metadata, rc=0}
+2026-10-23T13:47:43,969 - INFO  - [TestNG-method=testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence-1:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=native-delete-metadata}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence([])-------
+2026-10-23T13:47:43,969 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence() throws java.lang.Exception}
+2026-10-23T13:47:43,969 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:43,969 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:43,970 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRequiresDrainRetainsCancelledOperationAndProvesAbsence() throws java.lang.Exception}
+2026-10-23T13:47:43,970 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads() throws java.lang.Exception}
+2026-10-23T13:47:43,972 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads([])-------
+2026-10-23T13:47:43,972 - INFO  - [TestNG-method=testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=native-delete-retain}
+2026-10-23T13:47:43,972 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/native-delete-retain}
+2026-10-23T13:47:43,973 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:43,973 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=native-delete-retain, previousLedgerId=null}
+2026-10-23T13:47:43,973 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=native-delete-retain}
+2026-10-23T13:47:43,989 - INFO  - [test-OrderedScheduler-0-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=native-delete-retain}
+2026-10-23T13:47:43,989 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=native-delete-retain, previousLedgerId=3}
+2026-10-23T13:47:43,989 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:43,989 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=native-delete-retain}
+2026-10-23T13:47:43,997 - INFO  - [TestNG-method=testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=native-delete-retain, totalSize=110}
+2026-10-23T13:47:43,997 - INFO  - [TestNG-method=testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=native-delete-retain}
+2026-10-23T13:47:43,997 - INFO  - [TestNG-method=testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=native-delete-retain, uuid=f61aa9d8-3946-4683-8ac6-897595507be3}
+2026-10-23T13:47:43,998 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=native-delete-retain, uuid=f61aa9d8-3946-4683-8ac6-897595507be3}
+2026-10-23T13:47:43,998 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=native-delete-retain, uuid=f61aa9d8-3946-4683-8ac6-897595507be3}
+2026-10-23T13:47:43,998 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=native-delete-retain, uuid=f61aa9d8-3946-4683-8ac6-897595507be3}
+2026-10-23T13:47:43,998 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=native-delete-retain, timestamp=1792734463998}
+2026-10-23T13:47:43,998 - INFO  - [TestNG-method=testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads-1:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=native-delete-retain}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads([])-------
+2026-10-23T13:47:43,999 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads() throws java.lang.Exception}
+2026-10-23T13:47:43,999 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:43,999 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:43,999 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testNativeDeleteMetadataRetainClassCannotCaptureDeletionOrFenceReads() throws java.lang.Exception}
+2026-10-23T13:47:44,000 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeActiveDeletionRejectsSourceEnrollment() throws java.lang.Exception}
+2026-10-23T13:47:44,001 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeActiveDeletionRejectsSourceEnrollment([])-------
+2026-10-23T13:47:44,001 - INFO  - [TestNG-method=testSourceSafeActiveDeletionRejectsSourceEnrollment-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,001 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-active-delete-no-enrollment}
+2026-10-23T13:47:44,001 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:44,002 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-active-delete-no-enrollment, previousLedgerId=null}
+2026-10-23T13:47:44,002 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,017 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,018 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-active-delete-no-enrollment, previousLedgerId=3}
+2026-10-23T13:47:44,018 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:44,018 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,026 - INFO  - [TestNG-method=testSourceSafeActiveDeletionRejectsSourceEnrollment-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-active-delete-no-enrollment, totalSize=110}
+2026-10-23T13:47:44,026 - INFO  - [TestNG-method=testSourceSafeActiveDeletionRejectsSourceEnrollment-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,026 - INFO  - [TestNG-method=testSourceSafeActiveDeletionRejectsSourceEnrollment-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-active-delete-no-enrollment, uuid=ea290026-4031-4f26-aa6c-b281148e01a5}
+2026-10-23T13:47:44,026 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-active-delete-no-enrollment, uuid=ea290026-4031-4f26-aa6c-b281148e01a5}
+2026-10-23T13:47:44,026 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-active-delete-no-enrollment, uuid=ea290026-4031-4f26-aa6c-b281148e01a5}
+2026-10-23T13:47:44,026 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-active-delete-no-enrollment, uuid=ea290026-4031-4f26-aa6c-b281148e01a5}
+2026-10-23T13:47:44,026 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-active-delete-no-enrollment, timestamp=1792734464026}
+2026-10-23T13:47:44,027 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-active-delete-no-enrollment, totalSize=110}
+2026-10-23T13:47:44,027 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-active-delete-no-enrollment, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeActiveDeletionRejectsSourceEnrollment([])-------
+2026-10-23T13:47:44,130 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeActiveDeletionRejectsSourceEnrollment() throws java.lang.Exception}
+2026-10-23T13:47:44,130 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:44,130 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:44,130 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-active-delete-no-enrollment}
+2026-10-23T13:47:44,131 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeActiveDeletionRejectsSourceEnrollment() throws java.lang.Exception}
+2026-10-23T13:47:44,131 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim() throws java.lang.Exception}
+2026-10-23T13:47:44,132 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim([])-------
+2026-10-23T13:47:44,133 - INFO  - [TestNG-method=testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,133 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-full-trim}
+2026-10-23T13:47:44,133 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:44,133 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-full-trim, previousLedgerId=null}
+2026-10-23T13:47:44,133 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,147 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,148 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-full-trim, previousLedgerId=3}
+2026-10-23T13:47:44,148 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:44,148 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,155 - INFO  - [TestNG-method=testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-full-trim, totalSize=110}
+2026-10-23T13:47:44,155 - INFO  - [TestNG-method=testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,155 - INFO  - [TestNG-method=testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-full-trim, uuid=a7199d2c-fc77-4e86-a1fa-566074e06923}
+2026-10-23T13:47:44,155 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-full-trim, uuid=a7199d2c-fc77-4e86-a1fa-566074e06923}
+2026-10-23T13:47:44,155 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-full-trim, uuid=a7199d2c-fc77-4e86-a1fa-566074e06923}
+2026-10-23T13:47:44,155 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-full-trim, uuid=a7199d2c-fc77-4e86-a1fa-566074e06923}
+2026-10-23T13:47:44,155 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-full-trim, timestamp=1792734464155}
+2026-10-23T13:47:44,156 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-safe-full-trim, totalSize=110}
+2026-10-23T13:47:44,156 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-safe-full-trim, size=70}
+2026-10-23T13:47:44,156 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=1, managedLedger=source-safe-full-trim, totalSize=40}
+2026-10-23T13:47:44,156 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5278] - Removing ledger {ledgerId=3, managedLedger=source-safe-full-trim, size=70}
+2026-10-23T13:47:44,156 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:OffloadUtils@196] - Cleanup offload {cleanupReason=Trimming, ledgerId=3, name=source-safe-full-trim, uuid=a7199d2c-fc77-4e86-a1fa-566074e06923}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim([])-------
+2026-10-23T13:47:44,157 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim() throws java.lang.Exception}
+2026-10-23T13:47:44,157 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:44,157 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:44,157 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-full-trim}
+2026-10-23T13:47:44,158 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteCompletesBeforeLogicalRetentionTrim() throws java.lang.Exception}
+2026-10-23T13:47:44,158 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence() throws java.lang.Exception}
+2026-10-23T13:47:44,159 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence([])-------
+2026-10-23T13:47:44,160 - INFO  - [TestNG-method=testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-delete-eligibility}
+2026-10-23T13:47:44,160 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-delete-eligibility}
+2026-10-23T13:47:44,160 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:44,160 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-delete-eligibility, previousLedgerId=null}
+2026-10-23T13:47:44,160 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-delete-eligibility}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence([])-------
+2026-10-23T13:47:44,160 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence() throws java.lang.Exception}
+2026-10-23T13:47:44,161 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:44,161 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:44,161 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-6-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-delete-eligibility}
+2026-10-23T13:47:44,161 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeleteEligibilityRequiresConsistentCompatibilityFence() throws java.lang.Exception}
+2026-10-23T13:47:44,161 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeletePersistsIntentDeletesAndProvesDone() throws java.lang.Exception}
+2026-10-23T13:47:44,162 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeletePersistsIntentDeletesAndProvesDone([])-------
+2026-10-23T13:47:44,163 - INFO  - [TestNG-method=testSourceSafeDeletePersistsIntentDeletesAndProvesDone-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-delete}
+2026-10-23T13:47:44,163 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-delete}
+2026-10-23T13:47:44,163 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:44,163 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-delete, previousLedgerId=null}
+2026-10-23T13:47:44,163 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-delete}
+2026-10-23T13:47:44,179 - INFO  - [test-OrderedScheduler-0-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-delete}
+2026-10-23T13:47:44,179 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-delete, previousLedgerId=3}
+2026-10-23T13:47:44,179 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:44,179 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-delete}
+2026-10-23T13:47:44,187 - INFO  - [TestNG-method=testSourceSafeDeletePersistsIntentDeletesAndProvesDone-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-delete, totalSize=110}
+2026-10-23T13:47:44,187 - INFO  - [TestNG-method=testSourceSafeDeletePersistsIntentDeletesAndProvesDone-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-delete}
+2026-10-23T13:47:44,187 - INFO  - [TestNG-method=testSourceSafeDeletePersistsIntentDeletesAndProvesDone-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-delete, uuid=e07b48b5-2779-404f-9114-2d084697d8fe}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-delete, uuid=e07b48b5-2779-404f-9114-2d084697d8fe}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-delete, uuid=e07b48b5-2779-404f-9114-2d084697d8fe}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-delete, uuid=e07b48b5-2779-404f-9114-2d084697d8fe}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-delete, timestamp=1792734464187}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-safe-delete, totalSize=110}
+2026-10-23T13:47:44,187 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-safe-delete, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDeletePersistsIntentDeletesAndProvesDone([])-------
+2026-10-23T13:47:44,188 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeletePersistsIntentDeletesAndProvesDone() throws java.lang.Exception}
+2026-10-23T13:47:44,188 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:44,188 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:44,188 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-0-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-delete}
+2026-10-23T13:47:44,188 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDeletePersistsIntentDeletesAndProvesDone() throws java.lang.Exception}
+2026-10-23T13:47:44,189 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease() throws java.lang.Exception}
+2026-10-23T13:47:44,190 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease([])-------
+2026-10-23T13:47:44,190 - INFO  - [TestNG-method=testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:44,190 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-drain-timeout}
+2026-10-23T13:47:44,190 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:44,190 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-drain-timeout, previousLedgerId=null}
+2026-10-23T13:47:44,190 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:44,206 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:44,206 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-drain-timeout, previousLedgerId=3}
+2026-10-23T13:47:44,206 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:44,206 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:44,214 - INFO  - [TestNG-method=testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-drain-timeout, totalSize=110}
+2026-10-23T13:47:44,214 - INFO  - [TestNG-method=testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:44,214 - INFO  - [TestNG-method=testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-drain-timeout, uuid=30d46875-d734-4531-9d5e-c46f8fe59102}
+2026-10-23T13:47:44,214 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-drain-timeout, uuid=30d46875-d734-4531-9d5e-c46f8fe59102}
+2026-10-23T13:47:44,214 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-drain-timeout, uuid=30d46875-d734-4531-9d5e-c46f8fe59102}
+2026-10-23T13:47:44,214 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-drain-timeout, uuid=30d46875-d734-4531-9d5e-c46f8fe59102}
+2026-10-23T13:47:44,214 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-drain-timeout, timestamp=1792734464214}
+2026-10-23T13:47:44,215 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-safe-drain-timeout, totalSize=110}
+2026-10-23T13:47:44,215 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-7-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-safe-drain-timeout, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease([])-------
+2026-10-23T13:47:45,226 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease() throws java.lang.Exception}
+2026-10-23T13:47:45,226 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:45,226 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:45,226 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-drain-timeout}
+2026-10-23T13:47:45,227 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeDrainTimeoutDoesNotDeleteAndUnfencesAfterLateRelease() throws java.lang.Exception}
+2026-10-23T13:47:45,227 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeIntentResumesWithoutRepeatingRevalidation() throws java.lang.Exception}
+2026-10-23T13:47:45,229 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeIntentResumesWithoutRepeatingRevalidation([])-------
+2026-10-23T13:47:45,230 - INFO  - [TestNG-method=testSourceSafeIntentResumesWithoutRepeatingRevalidation-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,230 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-intent-resume}
+2026-10-23T13:47:45,230 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:45,230 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-intent-resume, previousLedgerId=null}
+2026-10-23T13:47:45,230 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,246 - INFO  - [test-OrderedScheduler-0-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,246 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-intent-resume, previousLedgerId=3}
+2026-10-23T13:47:45,246 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:45,246 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,254 - INFO  - [TestNG-method=testSourceSafeIntentResumesWithoutRepeatingRevalidation-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-intent-resume, totalSize=110}
+2026-10-23T13:47:45,254 - INFO  - [TestNG-method=testSourceSafeIntentResumesWithoutRepeatingRevalidation-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,254 - INFO  - [TestNG-method=testSourceSafeIntentResumesWithoutRepeatingRevalidation-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-intent-resume, uuid=6274020e-74dd-43ce-a084-162633adf733}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-intent-resume, uuid=6274020e-74dd-43ce-a084-162633adf733}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-intent-resume, uuid=6274020e-74dd-43ce-a084-162633adf733}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-intent-resume, uuid=6274020e-74dd-43ce-a084-162633adf733}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-intent-resume, timestamp=1792734465254}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-safe-intent-resume, totalSize=110}
+2026-10-23T13:47:45,254 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-safe-intent-resume, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeIntentResumesWithoutRepeatingRevalidation([])-------
+2026-10-23T13:47:45,255 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeIntentResumesWithoutRepeatingRevalidation() throws java.lang.Exception}
+2026-10-23T13:47:45,255 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:45,255 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:45,255 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-8-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-intent-resume}
+2026-10-23T13:47:45,255 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeIntentResumesWithoutRepeatingRevalidation() throws java.lang.Exception}
+2026-10-23T13:47:45,256 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafePreparedOwnerCannotUseLegacyDeletion() throws java.lang.Exception}
+2026-10-23T13:47:45,257 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafePreparedOwnerCannotUseLegacyDeletion([])-------
+2026-10-23T13:47:45,258 - INFO  - [TestNG-method=testSourceSafePreparedOwnerCannotUseLegacyDeletion-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,258 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,258 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:45,258 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, previousLedgerId=null}
+2026-10-23T13:47:45,259 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,274 - INFO  - [test-OrderedScheduler-0-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,274 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-prepared-no-legacy-delete, previousLedgerId=3}
+2026-10-23T13:47:45,275 - INFO  - [test-OrderedScheduler-1-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:45,275 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,283 - INFO  - [TestNG-method=testSourceSafePreparedOwnerCannotUseLegacyDeletion-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-prepared-no-legacy-delete, totalSize=110}
+2026-10-23T13:47:45,283 - INFO  - [TestNG-method=testSourceSafePreparedOwnerCannotUseLegacyDeletion-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,283 - INFO  - [TestNG-method=testSourceSafePreparedOwnerCannotUseLegacyDeletion-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, uuid=08c09af4-d608-4801-a7b7-4967c91e8631}
+2026-10-23T13:47:45,283 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, uuid=08c09af4-d608-4801-a7b7-4967c91e8631}
+2026-10-23T13:47:45,283 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, uuid=08c09af4-d608-4801-a7b7-4967c91e8631}
+2026-10-23T13:47:45,283 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, uuid=08c09af4-d608-4801-a7b7-4967c91e8631}
+2026-10-23T13:47:45,283 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, timestamp=1792734465283}
+2026-10-23T13:47:45,284 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-prepared-no-legacy-delete, totalSize=110}
+2026-10-23T13:47:45,284 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-4-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-prepared-no-legacy-delete, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafePreparedOwnerCannotUseLegacyDeletion([])-------
+2026-10-23T13:47:45,284 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafePreparedOwnerCannotUseLegacyDeletion() throws java.lang.Exception}
+2026-10-23T13:47:45,284 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:45,284 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:45,285 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-1-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-prepared-no-legacy-delete}
+2026-10-23T13:47:45,285 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafePreparedOwnerCannotUseLegacyDeletion() throws java.lang.Exception}
+2026-10-23T13:47:45,286 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRetainClassNeverDeletesBookKeeper() throws java.lang.Exception}
+2026-10-23T13:47:45,287 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeRetainClassNeverDeletesBookKeeper([])-------
+2026-10-23T13:47:45,288 - INFO  - [TestNG-method=testSourceSafeRetainClassNeverDeletesBookKeeper-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-retain}
+2026-10-23T13:47:45,288 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-retain}
+2026-10-23T13:47:45,288 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:45,288 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-retain, previousLedgerId=null}
+2026-10-23T13:47:45,289 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-retain}
+2026-10-23T13:47:45,304 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-retain}
+2026-10-23T13:47:45,304 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-retain, previousLedgerId=3}
+2026-10-23T13:47:45,305 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:45,305 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-retain}
+2026-10-23T13:47:45,312 - INFO  - [TestNG-method=testSourceSafeRetainClassNeverDeletesBookKeeper-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-retain, totalSize=110}
+2026-10-23T13:47:45,312 - INFO  - [TestNG-method=testSourceSafeRetainClassNeverDeletesBookKeeper-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-retain}
+2026-10-23T13:47:45,312 - INFO  - [TestNG-method=testSourceSafeRetainClassNeverDeletesBookKeeper-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-retain, uuid=fd3bdff8-d17e-4325-85ac-af184682d6ba}
+2026-10-23T13:47:45,313 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-retain, uuid=fd3bdff8-d17e-4325-85ac-af184682d6ba}
+2026-10-23T13:47:45,313 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-retain, uuid=fd3bdff8-d17e-4325-85ac-af184682d6ba}
+2026-10-23T13:47:45,313 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-retain, uuid=fd3bdff8-d17e-4325-85ac-af184682d6ba}
+2026-10-23T13:47:45,313 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-3-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-retain, timestamp=1792734465313}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeRetainClassNeverDeletesBookKeeper([])-------
+2026-10-23T13:47:45,313 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRetainClassNeverDeletesBookKeeper() throws java.lang.Exception}
+2026-10-23T13:47:45,313 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:45,313 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:45,313 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-9-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-retain}
+2026-10-23T13:47:45,314 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRetainClassNeverDeletesBookKeeper() throws java.lang.Exception}
+2026-10-23T13:47:45,314 - INFO  - [Test worker:MockedBookKeeperTestCase@71] - >>>>>> Starting test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper() throws java.lang.Exception}
+2026-10-23T13:47:45,316 - INFO  - [Test worker:RangeEntryCacheManagerImpl@83] - Initialized managed-ledger entry cache {maxSizeMb=128.0}
+------- Starting test [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper([])-------
+2026-10-23T13:47:45,316 - INFO  - [TestNG-method=testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper-1:ManagedLedgerImpl@473] - Opening managed ledger {managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,316 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:MetaStoreImpl@237] - Creating managed ledger path {path=/managed-ledgers/source-safe-revalidation-failure}
+2026-10-23T13:47:45,316 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=3}
+2026-10-23T13:47:45,317 - INFO  - [test-OrderedScheduler-1-0:ManagedLedgerImpl@675] - Created ledger after closed {ledgerId=3, managedLedger=source-safe-revalidation-failure, previousLedgerId=null}
+2026-10-23T13:47:45,317 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerFactoryImpl$2@493] - Successfully initialize managed ledger {managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,332 - INFO  - [test-OrderedScheduler-1-0:OpAddEntry@293] - Closing ledger for being full {ledgerId=3, managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,332 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@2069] - Creating a new ledger after closed {managedLedger=source-safe-revalidation-failure, previousLedgerId=3}
+2026-10-23T13:47:45,333 - INFO  - [test-OrderedScheduler-0-0:PulsarMockBookKeeper@143] - Creating ledger {ledgerId=4}
+2026-10-23T13:47:45,333 - INFO  - [test-OrderedScheduler-0-0:ManagedLedgerImpl@1825] - Created new ledger {ledgerId=4, managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,340 - INFO  - [TestNG-method=testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper-1:ManagedLedgerImpl@6139] - Start ledgersOffload {ledgers=[3, 4], managedLedger=source-safe-revalidation-failure, totalSize=110}
+2026-10-23T13:47:45,341 - INFO  - [TestNG-method=testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper-1:ManagedLedgerImpl@6189] - Going to offload ledgers {ledgers=[3], managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,341 - INFO  - [TestNG-method=testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper-1:ManagedLedgerImpl@6386] - Preparing metadata to offload ledger {ledgerId=3, managedLedger=source-safe-revalidation-failure, uuid=df81412a-c5fd-4c34-a9b7-64fe37d3ba77}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6439] - Metadata prepared for offload {ledgerId=3, managedLedger=source-safe-revalidation-failure, uuid=df81412a-c5fd-4c34-a9b7-64fe37d3ba77}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6445] - Completing metadata for offload {ledgerId=3, managedLedger=source-safe-revalidation-failure, uuid=df81412a-c5fd-4c34-a9b7-64fe37d3ba77}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6476] - End Offload {ledgerId=3, managedLedger=source-safe-revalidation-failure, uuid=df81412a-c5fd-4c34-a9b7-64fe37d3ba77}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl@6300] - Offload succeed {ledgerId=3, managedLedger=source-safe-revalidation-failure, timestamp=1792734465341}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5272] - End TrimConsumedLedgers {ledgerCount=2, managedLedger=source-safe-revalidation-failure, totalSize=110}
+2026-10-23T13:47:45,341 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-5-0:ManagedLedgerImpl$19@5285] - Deleting offloaded ledger from bookkeeper {ledgerId=3, managedLedger=source-safe-revalidation-failure, size=70}
+------- SUCCESS -- [TestClass name=class org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest].testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper([])-------
+2026-10-23T13:47:45,342 - INFO  - [Test worker:MockedBookKeeperTestCase@117] - @@@@@@@@@ Stopping test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper() throws java.lang.Exception}
+2026-10-23T13:47:45,342 - INFO  - [Test worker:ManagedLedgerFactoryImpl@672] - Closing ledgers {numLedgers=1}
+2026-10-23T13:47:45,342 - INFO  - [Test worker:ManagedLedgerFactoryImpl@711] - Closing ledgers {numLedgers=0}
+2026-10-23T13:47:45,342 - INFO  - [bookkeeper-ml-scheduler-OrderedScheduler-2-0:ManagedLedgerImpl@1707] - Closing managed ledger {managedLedger=source-safe-revalidation-failure}
+2026-10-23T13:47:45,342 - INFO  - [Test worker:MockedBookKeeperTestCase@131] - --------- Stopped test method {method=public void org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.testSourceSafeRevalidationFailureLeavesNoneAndUnfencesBookKeeper() throws java.lang.Exception}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

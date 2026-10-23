@@ -1,0 +1,186 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.group.generated.ShareGroupStatePartitionMetadataValue.*;
+
+public class ShareGroupStatePartitionMetadataValueJsonConverter {
+    public static ShareGroupStatePartitionMetadataValue read(JsonNode _node, short _version) {
+        ShareGroupStatePartitionMetadataValue _object = new ShareGroupStatePartitionMetadataValue();
+        JsonNode _initializingTopicsNode = _node.get("initializingTopics");
+        if (_initializingTopicsNode == null) {
+            throw new RuntimeException("ShareGroupStatePartitionMetadataValue: unable to locate field 'initializingTopics', which is mandatory in version " + _version);
+        } else {
+            if (!_initializingTopicsNode.isArray()) {
+                throw new RuntimeException("ShareGroupStatePartitionMetadataValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TopicPartitionsInfo> _collection = new ArrayList<TopicPartitionsInfo>(_initializingTopicsNode.size());
+            _object.initializingTopics = _collection;
+            for (JsonNode _element : _initializingTopicsNode) {
+                _collection.add(TopicPartitionsInfoJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _initializedTopicsNode = _node.get("initializedTopics");
+        if (_initializedTopicsNode == null) {
+            throw new RuntimeException("ShareGroupStatePartitionMetadataValue: unable to locate field 'initializedTopics', which is mandatory in version " + _version);
+        } else {
+            if (!_initializedTopicsNode.isArray()) {
+                throw new RuntimeException("ShareGroupStatePartitionMetadataValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TopicPartitionsInfo> _collection = new ArrayList<TopicPartitionsInfo>(_initializedTopicsNode.size());
+            _object.initializedTopics = _collection;
+            for (JsonNode _element : _initializedTopicsNode) {
+                _collection.add(TopicPartitionsInfoJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _deletingTopicsNode = _node.get("deletingTopics");
+        if (_deletingTopicsNode == null) {
+            throw new RuntimeException("ShareGroupStatePartitionMetadataValue: unable to locate field 'deletingTopics', which is mandatory in version " + _version);
+        } else {
+            if (!_deletingTopicsNode.isArray()) {
+                throw new RuntimeException("ShareGroupStatePartitionMetadataValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TopicInfo> _collection = new ArrayList<TopicInfo>(_deletingTopicsNode.size());
+            _object.deletingTopics = _collection;
+            for (JsonNode _element : _deletingTopicsNode) {
+                _collection.add(TopicInfoJsonConverter.read(_element, _version));
+            }
+        }
+        return _object;
+    }
+    public static JsonNode write(ShareGroupStatePartitionMetadataValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        ArrayNode _initializingTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TopicPartitionsInfo _element : _object.initializingTopics) {
+            _initializingTopicsArray.add(TopicPartitionsInfoJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("initializingTopics", _initializingTopicsArray);
+        ArrayNode _initializedTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TopicPartitionsInfo _element : _object.initializedTopics) {
+            _initializedTopicsArray.add(TopicPartitionsInfoJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("initializedTopics", _initializedTopicsArray);
+        ArrayNode _deletingTopicsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TopicInfo _element : _object.deletingTopics) {
+            _deletingTopicsArray.add(TopicInfoJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("deletingTopics", _deletingTopicsArray);
+        return _node;
+    }
+    public static JsonNode write(ShareGroupStatePartitionMetadataValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class TopicInfoJsonConverter {
+        public static TopicInfo read(JsonNode _node, short _version) {
+            TopicInfo _object = new TopicInfo();
+            JsonNode _topicIdNode = _node.get("topicId");
+            if (_topicIdNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'topicId', which is mandatory in version " + _version);
+            } else {
+                if (!_topicIdNode.isTextual()) {
+                    throw new RuntimeException("TopicInfo expected a JSON string type, but got " + _node.getNodeType());
+                }
+                _object.topicId = Uuid.fromString(_topicIdNode.asText());
+            }
+            JsonNode _topicNameNode = _node.get("topicName");
+            if (_topicNameNode == null) {
+                throw new RuntimeException("TopicInfo: unable to locate field 'topicName', which is mandatory in version " + _version);
+            } else {
+                if (!_topicNameNode.isTextual()) {
+                    throw new RuntimeException("TopicInfo expected a string type, but got " + _node.getNodeType());
+                }
+                _object.topicName = _topicNameNode.asText();
+            }
+            return _object;
+        }
+        public static JsonNode write(TopicInfo _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("topicId", new TextNode(_object.topicId.toString()));
+            _node.set("topicName", new TextNode(_object.topicName));
+            return _node;
+        }
+        public static JsonNode write(TopicInfo _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class TopicPartitionsInfoJsonConverter {
+        public static TopicPartitionsInfo read(JsonNode _node, short _version) {
+            TopicPartitionsInfo _object = new TopicPartitionsInfo();
+            JsonNode _topicIdNode = _node.get("topicId");
+            if (_topicIdNode == null) {
+                throw new RuntimeException("TopicPartitionsInfo: unable to locate field 'topicId', which is mandatory in version " + _version);
+            } else {
+                if (!_topicIdNode.isTextual()) {
+                    throw new RuntimeException("TopicPartitionsInfo expected a JSON string type, but got " + _node.getNodeType());
+                }
+                _object.topicId = Uuid.fromString(_topicIdNode.asText());
+            }
+            JsonNode _topicNameNode = _node.get("topicName");
+            if (_topicNameNode == null) {
+                throw new RuntimeException("TopicPartitionsInfo: unable to locate field 'topicName', which is mandatory in version " + _version);
+            } else {
+                if (!_topicNameNode.isTextual()) {
+                    throw new RuntimeException("TopicPartitionsInfo expected a string type, but got " + _node.getNodeType());
+                }
+                _object.topicName = _topicNameNode.asText();
+            }
+            JsonNode _partitionsNode = _node.get("partitions");
+            if (_partitionsNode == null) {
+                throw new RuntimeException("TopicPartitionsInfo: unable to locate field 'partitions', which is mandatory in version " + _version);
+            } else {
+                if (!_partitionsNode.isArray()) {
+                    throw new RuntimeException("TopicPartitionsInfo expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<Integer> _collection = new ArrayList<Integer>(_partitionsNode.size());
+                _object.partitions = _collection;
+                for (JsonNode _element : _partitionsNode) {
+                    _collection.add(MessageUtil.jsonNodeToInt(_element, "TopicPartitionsInfo element"));
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(TopicPartitionsInfo _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("topicId", new TextNode(_object.topicId.toString()));
+            _node.set("topicName", new TextNode(_object.topicName));
+            ArrayNode _partitionsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (Integer _element : _object.partitions) {
+                _partitionsArray.add(new IntNode(_element));
+            }
+            _node.set("partitions", _partitionsArray);
+            return _node;
+        }
+        public static JsonNode write(TopicPartitionsInfo _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

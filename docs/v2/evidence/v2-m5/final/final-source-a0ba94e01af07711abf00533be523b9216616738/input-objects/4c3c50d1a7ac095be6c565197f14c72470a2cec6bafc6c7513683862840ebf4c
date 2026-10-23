@@ -1,0 +1,374 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :pulsar
+M5_PULSAR_AUXILIARY_BUILD build-logic
+
+> Task :pulsar:build-logic:conventions:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :pulsar:build-logic:conventions:generateExternalPluginSpecBuilders FROM-CACHE
+> Task :pulsar:build-logic:conventions:extractPrecompiledScriptPluginPlugins FROM-CACHE
+> Task :pulsar:build-logic:conventions:compilePluginsBlocks FROM-CACHE
+> Task :pulsar:build-logic:conventions:generatePrecompiledScriptPluginAccessors FROM-CACHE
+> Task :pulsar:build-logic:conventions:generateScriptPluginAdapters FROM-CACHE
+> Task :pulsar:build-logic:conventions:compileKotlin FROM-CACHE
+> Task :pulsar:build-logic:conventions:compileJava NO-SOURCE
+> Task :pulsar:build-logic:conventions:pluginDescriptors
+> Task :pulsar:build-logic:conventions:processResources
+> Task :pulsar:build-logic:conventions:classes
+> Task :pulsar:build-logic:conventions:jar
+> Task :m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-bom:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:buildtools:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:distribution:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:docker:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:jclouds-shaded:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:jetty-upgrade:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-domain:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-kafka-bookkeeper:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:managed-ledger:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:microbench:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-bom:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-broker:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-broker-auth-athenz:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-broker-auth-oidc:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-broker-auth-sasl:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-broker-common:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-cli-utils:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-admin-api:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-admin-original:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-admin-shaded:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-all:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-api:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-api-v5:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-auth-athenz:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-auth-sasl:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-messagecrypto-bc:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-original:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-shaded:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-tools:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-tools-api:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-tools-customcommand-example:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-tools-test:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-v5:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-metadata-oxia:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-metadata-spi:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-common:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-config-validation:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-dependencies:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-docs-tools:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-metadata:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-opentelemetry:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-package-management:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-proxy:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-testclient:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-transaction:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-websocket:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:testmocks:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tiered-storage:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:distribution:pulsar-offloader-distribution:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:distribution:pulsar-server-distribution:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:distribution:pulsar-shell-distribution:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:docker:pulsar-docker-image:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:jetty-upgrade:pulsar-zookeeper-prometheus-metrics:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:jetty-upgrade:zookeeper-with-patched-admin:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-api:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-api-examples:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-api-examples-builtin:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-instance:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-local-runner-original:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-local-runner-shaded:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-proto:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime-all:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-secrets:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-utils:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-functions:pulsar-functions-worker:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:pulsar-io-batch-data-generator:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:pulsar-io-batch-discovery-triggerers:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:pulsar-io-common:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:pulsar-io-core:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-io:pulsar-io-data-generator:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-package-management:pulsar-package-bookkeeper-storage:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-package-management:pulsar-package-core:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-package-management:pulsar-package-filesystem-storage:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-transaction:pulsar-transaction-common:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-transaction:pulsar-transaction-coordinator:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:integration:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:java-test-functions:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:java-test-image:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:java-test-plugins:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:latest-version-image:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:pulsar-client-admin-shade-test:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:pulsar-client-all-shade-test:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:pulsar-client-native-image:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:pulsar-client-shade-test:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tests:pulsar-client-test-bcfips:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tiered-storage:tiered-storage-file-system:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:tiered-storage:tiered-storage-jcloud:m5CaptureNativeInputsBeforeBuild
+> Task :pulsar:pulsar-client-api:compileJava FROM-CACHE
+> Task :pulsar:pulsar-client-admin-api:compileJava FROM-CACHE
+> Task :pulsar:pulsar-common:generateLightProto FROM-CACHE
+> Task :pulsar:pulsar-common:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:generateLightProto FROM-CACHE
+> Task :pulsar:pulsar-metadata:compileJava FROM-CACHE
+> Task :pulsar:pulsar-opentelemetry:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:compileJava FROM-CACHE
+> Task :pulsar:pulsar-common:generatePulsarBuildInfo
+> Task :pulsar:pulsar-common:processResources
+> Task :pulsar:pulsar-common:classes
+> Task :pulsar:pulsar-common:jar
+> Task :pulsar:pulsar-client-admin-api:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-admin-api:classes UP-TO-DATE
+> Task :pulsar:pulsar-client-admin-api:jar
+> Task :pulsar:pulsar-opentelemetry:processResources NO-SOURCE
+> Task :pulsar:pulsar-opentelemetry:classes UP-TO-DATE
+> Task :pulsar:pulsar-opentelemetry:jar
+> Task :pulsar:pulsar-metadata:processResources
+> Task :pulsar:pulsar-metadata:classes
+> Task :pulsar:pulsar-metadata:jar
+> Task :pulsar:managed-ledger:processResources NO-SOURCE
+> Task :pulsar:managed-ledger:classes UP-TO-DATE
+> Task :pulsar:managed-ledger:jar
+> Task :pulsar:pulsar-client-api:processResources
+> Task :pulsar:pulsar-client-api:classes
+> Task :pulsar:pulsar-client-api:jar
+> Task :pulsar:buildtools:compileJava FROM-CACHE
+> Task :pulsar:buildtools:processResources
+> Task :pulsar:buildtools:classes
+> Task :pulsar:buildtools:jar
+> Task :nereus-pulsar-offload:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-storage-api:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-storage-bookkeeper:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-storage-object:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-storage-object-s3:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-storage-object-vault:m5CaptureNativeInputsBeforeBuild
+> Task :nereus-domain:compileJava UP-TO-DATE
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes UP-TO-DATE
+> Task :nereus-domain:compileTestJava FROM-CACHE
+> Task :nereus-domain:jar
+> Task :nereus-domain:processTestResources
+> Task :nereus-domain:testClasses
+> Task :nereus-metadata-spi:compileJava UP-TO-DATE
+> Task :nereus-storage-api:compileJava UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileJava UP-TO-DATE
+> Task :nereus-storage-object:compileJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:compileJava UP-TO-DATE
+> Task :nereus-kafka-bookkeeper:processResources NO-SOURCE
+> Task :nereus-kafka-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes UP-TO-DATE
+> Task :nereus-storage-bookkeeper:compileTestJava FROM-CACHE
+> Task :nereus-storage-bookkeeper:processTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:testClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:m5NativeDeleteFaultFixturesJar
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes UP-TO-DATE
+> Task :nereus-storage-object:compileTestJava FROM-CACHE
+> Task :nereus-storage-object:processTestResources
+> Task :nereus-storage-object:testClasses
+> Task :nereus-storage-object:m5DeleteTestFixturesJar
+> Task :nereus-kafka-bookkeeper:compileTestJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:processTestResources
+> Task :nereus-kafka-bookkeeper:testClasses
+> Task :nereus-metadata-oxia:compileJava UP-TO-DATE
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes UP-TO-DATE
+> Task :nereus-metadata-spi:jar UP-TO-DATE
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes UP-TO-DATE
+> Task :nereus-storage-api:jar UP-TO-DATE
+> Task :nereus-storage-bookkeeper:jar UP-TO-DATE
+> Task :nereus-storage-object:jar UP-TO-DATE
+> Task :nereus-storage-object-s3:compileJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:compileRealBookKeeperTestJava FROM-CACHE
+> Task :nereus-kafka-bookkeeper:processRealBookKeeperTestResources NO-SOURCE
+> Task :nereus-kafka-bookkeeper:realBookKeeperTestClasses UP-TO-DATE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-metadata-oxia:classes UP-TO-DATE
+> Task :nereus-metadata-oxia:compileOxiaIntegrationTestJava FROM-CACHE
+> Task :nereus-metadata-oxia:compileTestJava FROM-CACHE
+> Task :nereus-metadata-oxia:jar UP-TO-DATE
+> Task :nereus-metadata-oxia:processOxiaIntegrationTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:oxiaIntegrationTestClasses UP-TO-DATE
+> Task :nereus-metadata-oxia:processTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:testClasses UP-TO-DATE
+> Task :nereus-metadata-spi:compileTestJava FROM-CACHE
+> Task :nereus-metadata-spi:processTestResources NO-SOURCE
+> Task :nereus-metadata-spi:testClasses UP-TO-DATE
+> Task :nereus-pulsar-offload:compileJava FROM-CACHE
+> Task :nereus-pulsar-offload:processResources NO-SOURCE
+> Task :nereus-pulsar-offload:classes UP-TO-DATE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :nereus-storage-object-s3:classes UP-TO-DATE
+> Task :nereus-storage-object-s3:jar
+> Task :nereus-pulsar-offload:compileP6ProviderTestJava FROM-CACHE
+> Task :nereus-pulsar-offload:processP6ProviderTestResources NO-SOURCE
+> Task :nereus-pulsar-offload:p6ProviderTestClasses UP-TO-DATE
+> Task :pulsar:managed-ledger:checkstyleMain
+> Task :pulsar:managed-ledger:generateTestLightProto SKIPPED
+> Task :pulsar:testmocks:compileJava FROM-CACHE
+> Task :pulsar:managed-ledger:compileTestJava FROM-CACHE
+> Task :pulsar:managed-ledger:processTestResources NO-SOURCE
+> Task :pulsar:managed-ledger:testClasses UP-TO-DATE
+> Task :nereus-pulsar-offload:checkstyleP6ProviderTest
+> Task :nereus-pulsar-offload:compileTestJava FROM-CACHE
+> Task :nereus-pulsar-offload:processTestResources NO-SOURCE
+> Task :nereus-pulsar-offload:testClasses UP-TO-DATE
+> Task :pulsar:managed-ledger:checkstyleTest
+> Task :pulsar:managed-ledger:spotlessJava FROM-CACHE
+> Task :pulsar:managed-ledger:spotlessJavaCheck UP-TO-DATE
+> Task :pulsar:managed-ledger:spotlessProto FROM-CACHE
+> Task :pulsar:managed-ledger:spotlessProtoCheck UP-TO-DATE
+> Task :pulsar:managed-ledger:spotlessCheck UP-TO-DATE
+> Task :pulsar:testmocks:processResources NO-SOURCE
+> Task :pulsar:testmocks:classes UP-TO-DATE
+> Task :pulsar:testmocks:jar
+> Task :pulsar:managed-ledger:m5PrepareNativeArtifacts
+> Task :pulsar:m5CaptureNativeProducerInputs
+> Task :pulsar:buildtools:m5CaptureNativeProducerInputs
+> Task :pulsar:distribution:m5CaptureNativeProducerInputs
+> Task :pulsar:docker:m5CaptureNativeProducerInputs
+> Task :pulsar:jclouds-shaded:m5CaptureNativeProducerInputs
+> Task :pulsar:jetty-upgrade:m5CaptureNativeProducerInputs
+> Task :nereus-pulsar-offload:checkstyleTest
+> Task :nereus-pulsar-offload:spotlessJava FROM-CACHE
+> Task :nereus-pulsar-offload:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-pulsar-offload:spotlessCheck UP-TO-DATE
+> Task :nereus-storage-api:compileTestJava FROM-CACHE
+> Task :nereus-storage-api:processTestResources NO-SOURCE
+> Task :nereus-storage-api:testClasses UP-TO-DATE
+> Task :nereus-pulsar-offload:checkstyleMain
+> Task :pulsar:managed-ledger:m5CaptureNativeProducerInputs
+> Task :pulsar:microbench:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-bom:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-broker:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-broker-auth-athenz:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-broker-auth-oidc:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-broker-auth-sasl:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-broker-common:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-cli-utils:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-admin-api:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-admin-original:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-admin-shaded:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-all:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-api:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-api-v5:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-auth-athenz:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-auth-sasl:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-messagecrypto-bc:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-original:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-shaded:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-tools:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-tools-api:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-tools-customcommand-example:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-tools-test:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-client-v5:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-common:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-config-validation:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-dependencies:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-docs-tools:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-metadata:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-opentelemetry:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-package-management:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-proxy:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-testclient:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-transaction:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-websocket:m5CaptureNativeProducerInputs
+> Task :pulsar:testmocks:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:m5CaptureNativeProducerInputs
+> Task :pulsar:tiered-storage:m5CaptureNativeProducerInputs
+> Task :pulsar:distribution:pulsar-offloader-distribution:m5CaptureNativeProducerInputs
+> Task :pulsar:distribution:pulsar-server-distribution:m5CaptureNativeProducerInputs
+> Task :pulsar:distribution:pulsar-shell-distribution:m5CaptureNativeProducerInputs
+> Task :pulsar:docker:pulsar-docker-image:m5CaptureNativeProducerInputs
+> Task :pulsar:jetty-upgrade:pulsar-zookeeper-prometheus-metrics:m5CaptureNativeProducerInputs
+> Task :pulsar:jetty-upgrade:zookeeper-with-patched-admin:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-api:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-api-examples:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-api-examples-builtin:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-instance:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-local-runner-original:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-local-runner-shaded:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-proto:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime-all:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-secrets:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-utils:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-functions:pulsar-functions-worker:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:pulsar-io-batch-data-generator:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:pulsar-io-batch-discovery-triggerers:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:pulsar-io-common:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:pulsar-io-core:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-io:pulsar-io-data-generator:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-package-management:pulsar-package-bookkeeper-storage:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-package-management:pulsar-package-core:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-package-management:pulsar-package-filesystem-storage:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-transaction:pulsar-transaction-common:m5CaptureNativeProducerInputs
+> Task :pulsar:pulsar-transaction:pulsar-transaction-coordinator:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:integration:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:java-test-functions:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:java-test-image:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:java-test-plugins:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:latest-version-image:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:pulsar-client-admin-shade-test:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:pulsar-client-all-shade-test:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:pulsar-client-native-image:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:pulsar-client-shade-test:m5CaptureNativeProducerInputs
+> Task :pulsar:tests:pulsar-client-test-bcfips:m5CaptureNativeProducerInputs
+> Task :pulsar:tiered-storage:tiered-storage-file-system:m5CaptureNativeProducerInputs
+> Task :pulsar:tiered-storage:tiered-storage-jcloud:m5CaptureNativeProducerInputs
+> Task :pulsar:managed-ledger:m5CapturePreparedNativeArtifacts
+> Task :nereus-storage-bookkeeper:checkstyleTest
+> Task :nereus-storage-bookkeeper:compileRealBookKeeperTestJava FROM-CACHE
+> Task :nereus-storage-bookkeeper:processRealBookKeeperTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:realBookKeeperTestClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:spotlessJava FROM-CACHE
+> Task :nereus-storage-bookkeeper:spotlessJavaCheck UP-TO-DATE
+> Task :nereus-storage-bookkeeper:spotlessCheck UP-TO-DATE
+> Task :nereus-storage-object-s3:compileRealProviderTestJava FROM-CACHE
+> Task :nereus-storage-object-s3:compileTestJava FROM-CACHE
+> Task :nereus-storage-object-s3:processRealProviderTestResources NO-SOURCE
+> Task :nereus-storage-object-s3:realProviderTestClasses UP-TO-DATE
+> Task :nereus-storage-object-s3:processTestResources NO-SOURCE
+> Task :nereus-storage-object-s3:testClasses UP-TO-DATE
+> Task :nereus-storage-object-vault:compileJava FROM-CACHE
+> Task :nereus-storage-object-vault:processResources NO-SOURCE
+> Task :nereus-storage-object-vault:classes UP-TO-DATE
+> Task :nereus-storage-object-vault:compileTestJava FROM-CACHE
+> Task :nereus-storage-object-vault:processTestResources NO-SOURCE
+> Task :nereus-storage-object-vault:testClasses UP-TO-DATE
+> Task :nereus-storage-bookkeeper:checkstyleMain
+> Task :nereus-pulsar-offload:m5PrepareNativeArtifacts
+> Task :m5CaptureNativeProducerInputs
+> Task :nereus-bom:m5CaptureNativeProducerInputs
+> Task :nereus-domain:m5CaptureNativeProducerInputs
+> Task :nereus-kafka-bookkeeper:m5CaptureNativeProducerInputs
+> Task :nereus-metadata-oxia:m5CaptureNativeProducerInputs
+> Task :nereus-metadata-spi:m5CaptureNativeProducerInputs
+> Task :nereus-pulsar-offload:m5CaptureNativeProducerInputs
+> Task :nereus-storage-api:m5CaptureNativeProducerInputs
+> Task :nereus-storage-bookkeeper:m5CaptureNativeProducerInputs
+> Task :nereus-storage-object:m5CaptureNativeProducerInputs
+> Task :nereus-storage-object-s3:m5CaptureNativeProducerInputs
+> Task :nereus-storage-object-vault:m5CaptureNativeProducerInputs
+> Task :nereus-pulsar-offload:m5CapturePreparedNativeArtifacts
+
+[Incubating] Problems report is available at: file:///Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 8s
+283 actionable tasks: 228 executed, 39 from cache, 16 up-to-date
+
+M5_NATIVE_PREPARATION_EXIT=0

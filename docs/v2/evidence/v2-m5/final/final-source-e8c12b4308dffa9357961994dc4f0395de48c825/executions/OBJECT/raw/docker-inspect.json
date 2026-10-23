@@ -1,0 +1,471 @@
+[
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "server",
+      "/data"
+    ],
+    "Config": {
+      "AttachStderr": false,
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "Cmd": [
+        "server",
+        "/data"
+      ],
+      "Domainname": "",
+      "Entrypoint": [
+        "/usr/bin/docker-entrypoint.sh"
+      ],
+      "Env": [
+        "MINIO_ROOT_USER=nereus-m3-evidence",
+        "MINIO_ROOT_PASSWORD=nereus-m3-evidence-secret",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "MINIO_ACCESS_KEY_FILE=access_key",
+        "MINIO_SECRET_KEY_FILE=secret_key",
+        "MINIO_ROOT_USER_FILE=access_key",
+        "MINIO_ROOT_PASSWORD_FILE=secret_key",
+        "MINIO_KMS_SECRET_KEY_FILE=kms_master_key",
+        "MINIO_UPDATE_MINISIGN_PUBKEY=RWTx5Zr1tiHQLwG9keckT0c45M3AGeHD6IvimQHpyRywVWGbP1aVSGav",
+        "MINIO_CONFIG_ENV_FILE=config.env",
+        "MC_CONFIG_DIR=/tmp/.mc"
+      ],
+      "ExposedPorts": {
+        "9000/tcp": {}
+      },
+      "Hostname": "ffbfdb129de7",
+      "Image": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "Labels": {
+        "architecture": "aarch64",
+        "build-date": "2025-08-06T08:17:03",
+        "com.redhat.component": "ubi9-micro-container",
+        "com.redhat.license_terms": "https://www.redhat.com/en/about/red-hat-end-user-license-agreements#UBI",
+        "description": "MinIO object storage is fundamentally different. Designed for performance and the S3 API, it is 100% open-source. MinIO is ideal for large, private cloud environments with stringent security requirements and delivers mission-critical availability across a diverse range of workloads.",
+        "distribution-scope": "public",
+        "io.buildah.version": "1.40.1",
+        "io.k8s.description": "Very small image which doesn't install the package manager.",
+        "io.k8s.display-name": "Red Hat Universal Base Image 9 Micro",
+        "io.openshift.expose-services": "",
+        "maintainer": "MinIO Inc <dev@min.io>",
+        "name": "MinIO",
+        "release": "RELEASE.2025-09-07T16-13-09Z",
+        "summary": "MinIO is a High Performance Object Storage, API compatible with Amazon S3 cloud storage service.",
+        "url": "https://catalog.redhat.com/en/search?searchType=containers",
+        "vcs-ref": "32d8e5209f029a1fb7235308ab32253bface1001",
+        "vcs-type": "git",
+        "vendor": "MinIO Inc <dev@min.io>",
+        "version": "RELEASE.2025-09-07T16-13-09Z"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "",
+      "Volumes": {
+        "/data": {}
+      },
+      "WorkingDir": "/"
+    },
+    "Created": "2026-10-23T10:52:11.52439367Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4",
+        "LowerDir": "/var/lib/docker/overlay2/7de2eb1563a53b44c8e954be9af83eb48dc4c77a26ab547182a63f5870a38710-init/diff:/var/lib/docker/overlay2/c73d790e4744bddfccccfb6a5b7aa82811673afb7f95eeefc2e962328399da7c/diff:/var/lib/docker/overlay2/53c13c2075117aaab80e3f5526c9f557fc3d107f525fe1c0a2f0592956113732/diff:/var/lib/docker/overlay2/2c4bd5154d2ceb3fd8c227cea8f8cd751a98082adc2502f827f219a60957d531/diff:/var/lib/docker/overlay2/0ebcd8e084ede25611f7ad4fee845d136314c958110641b5aa3d9da4c310945e/diff:/var/lib/docker/overlay2/db4b3752372d14a58b075ba372f1680de7795d6703293d5d71988c5ffcb32521/diff:/var/lib/docker/overlay2/673c709761352f89a1b393e02f04de1cc1c869fbfa08a065f1efdf62f681f75f/diff:/var/lib/docker/overlay2/5ff99394cf06aaa4f5b45448fdf880d4050a29c4558c33c5a1f17c5cdd79b694/diff:/var/lib/docker/overlay2/b02a16c1308e61f7212f579096e1d0fae91542fc3ced7d5e5e0610731bb9b120/diff:/var/lib/docker/overlay2/55649d37c04ccad8b4abaaf5b1d2d37ab1f63ff20422e7967a8a97807fbf6eba/diff",
+        "MergedDir": "/var/lib/docker/overlay2/7de2eb1563a53b44c8e954be9af83eb48dc4c77a26ab547182a63f5870a38710/merged",
+        "UpperDir": "/var/lib/docker/overlay2/7de2eb1563a53b44c8e954be9af83eb48dc4c77a26ab547182a63f5870a38710/diff",
+        "WorkDir": "/var/lib/docker/overlay2/7de2eb1563a53b44c8e954be9af83eb48dc4c77a26ab547182a63f5870a38710/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": null,
+      "BlkioDeviceReadBps": [],
+      "BlkioDeviceReadIOps": [],
+      "BlkioDeviceWriteBps": [],
+      "BlkioDeviceWriteIOps": [],
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": [],
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": [],
+      "Dns": null,
+      "DnsOptions": [],
+      "DnsSearch": [],
+      "ExtraHosts": null,
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "bridge",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "9000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": ""
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": [],
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4/hostname",
+    "HostsPath": "/var/lib/docker/containers/ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4/hosts",
+    "Id": "ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4",
+    "Image": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+    "LogPath": "/var/lib/docker/containers/ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4/ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4-json.log",
+    "MountLabel": "",
+    "Mounts": [
+      {
+        "Destination": "/data",
+        "Driver": "local",
+        "Mode": "",
+        "Name": "c594d74f4d5ff14d1298106c80452a48e736af5000413b5a0b0fad972332ab6d",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/c594d74f4d5ff14d1298106c80452a48e736af5000413b5a0b0fad972332ab6d/_data",
+        "Type": "volume"
+      }
+    ],
+    "Name": "/nereus-m5-object-cell-71737-minio",
+    "NetworkSettings": {
+      "Networks": {
+        "bridge": {
+          "Aliases": null,
+          "DNSNames": null,
+          "DriverOpts": null,
+          "EndpointID": "13a8e14070c8f0131b6dbb5b15dbb7b3033d09029db05611c2a7526433a1d864",
+          "Gateway": "172.17.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.17.0.2",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "ca:7f:a5:24:97:c2",
+          "NetworkID": "41abcea3ec656fcaf099bce6c090ce973be5910f197ea25676ed222be37d5433"
+        }
+      },
+      "Ports": {
+        "9000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50360"
+          }
+        ]
+      },
+      "SandboxID": "4e5d2342644b2b536e9c913a1ba00948143a1f9439caff3c9043df5e434ac7ee",
+      "SandboxKey": "/var/run/docker/netns/4e5d2342644b"
+    },
+    "Path": "/usr/bin/docker-entrypoint.sh",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/ffbfdb129de73b57155b4630a5dc5ae5bc99427b6494e925292d8a65a5caffb4/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 91761,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:52:11.55016292Z",
+      "Status": "running"
+    }
+  },
+  {
+    "AppArmorProfile": "",
+    "Args": [
+      "standalone",
+      "--shards=4"
+    ],
+    "Config": {
+      "AttachStderr": false,
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "Cmd": [
+        "oxia",
+        "standalone",
+        "--shards=4"
+      ],
+      "Domainname": "",
+      "Entrypoint": null,
+      "Env": [
+        "PATH=/oxia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "ExposedPorts": {
+        "6648/tcp": {},
+        "8080/tcp": {}
+      },
+      "Hostname": "2e39d4e39416",
+      "Image": "nereus/oxia-m3-allocator:37a17bef1720",
+      "Labels": {
+        "com.nereusstream.evidence.recipe": "NEREUS_V2_M3_ALLOCATOR_OXIA_IMAGE_V1",
+        "org.opencontainers.image.revision": "37a17bef17202d5fd6e23282da5fd26d94865484",
+        "org.opencontainers.image.source": "https://github.com/oxia-db/oxia.git"
+      },
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Tty": false,
+      "User": "",
+      "Volumes": null,
+      "WorkingDir": "/oxia"
+    },
+    "Created": "2026-10-23T10:52:12.703400588Z",
+    "Driver": "overlay2",
+    "ExecIDs": null,
+    "GraphDriver": {
+      "Data": {
+        "ID": "2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d",
+        "LowerDir": "/var/lib/docker/overlay2/e144ab875dfa6b8eb38fe75054902c78a2c5df076baf519db42fb8a90205ab88-init/diff:/var/lib/docker/overlay2/ym4w22dtnaqzijn7kh4sot6vd/diff:/var/lib/docker/overlay2/y7j80ye2wfgadyf7em2njy3qg/diff:/var/lib/docker/overlay2/vtf8p1zyyn9w53wg9y6qi5hs3/diff:/var/lib/docker/overlay2/f9v9m6jt7otez4cqdbqo11sqy/diff:/var/lib/docker/overlay2/f7da608e8b76663c305acf8a64944f0562927a3250f71f9803d1d7b222a5eccd/diff",
+        "MergedDir": "/var/lib/docker/overlay2/e144ab875dfa6b8eb38fe75054902c78a2c5df076baf519db42fb8a90205ab88/merged",
+        "UpperDir": "/var/lib/docker/overlay2/e144ab875dfa6b8eb38fe75054902c78a2c5df076baf519db42fb8a90205ab88/diff",
+        "WorkDir": "/var/lib/docker/overlay2/e144ab875dfa6b8eb38fe75054902c78a2c5df076baf519db42fb8a90205ab88/work"
+      },
+      "Name": "overlay2"
+    },
+    "HostConfig": {
+      "AutoRemove": false,
+      "Binds": null,
+      "BlkioDeviceReadBps": [],
+      "BlkioDeviceReadIOps": [],
+      "BlkioDeviceWriteBps": [],
+      "BlkioDeviceWriteIOps": [],
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": [],
+      "CapAdd": null,
+      "CapDrop": null,
+      "Cgroup": "",
+      "CgroupParent": "",
+      "CgroupnsMode": "private",
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "ContainerIDFile": "",
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpuShares": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "Devices": [],
+      "Dns": null,
+      "DnsOptions": [],
+      "DnsSearch": [],
+      "ExtraHosts": null,
+      "GroupAdd": null,
+      "IOMaximumBandwidth": 0,
+      "IOMaximumIOps": 0,
+      "IpcMode": "private",
+      "Isolation": "",
+      "Links": null,
+      "LogConfig": {
+        "Config": {},
+        "Type": "json-file"
+      },
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "Memory": 0,
+      "MemoryReservation": 0,
+      "MemorySwap": 0,
+      "MemorySwappiness": null,
+      "NanoCpus": 0,
+      "NetworkMode": "bridge",
+      "OomKillDisable": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "PidsLimit": null,
+      "PortBindings": {
+        "6648/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": ""
+          }
+        ],
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": ""
+          }
+        ]
+      },
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "ReadonlyRootfs": false,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Runtime": "runc",
+      "SecurityOpt": null,
+      "ShmSize": 67108864,
+      "UTSMode": "",
+      "Ulimits": [],
+      "UsernsMode": "",
+      "VolumeDriver": "",
+      "VolumesFrom": null
+    },
+    "HostnamePath": "/var/lib/docker/containers/2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d/hostname",
+    "HostsPath": "/var/lib/docker/containers/2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d/hosts",
+    "Id": "2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d",
+    "Image": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+    "LogPath": "/var/lib/docker/containers/2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d/2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d-json.log",
+    "MountLabel": "",
+    "Mounts": [],
+    "Name": "/nereus-m5-object-cell-71737-oxia",
+    "NetworkSettings": {
+      "Networks": {
+        "bridge": {
+          "Aliases": null,
+          "DNSNames": null,
+          "DriverOpts": null,
+          "EndpointID": "250f672113a1c75e9a7a46d22d552b014ba3f9594f486d64a81079bdea0137da",
+          "Gateway": "172.17.0.1",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "GwPriority": 0,
+          "IPAMConfig": null,
+          "IPAddress": "172.17.0.3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "Links": null,
+          "MacAddress": "f6:90:37:8c:97:d6",
+          "NetworkID": "41abcea3ec656fcaf099bce6c090ce973be5910f197ea25676ed222be37d5433"
+        }
+      },
+      "Ports": {
+        "6648/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50365"
+          }
+        ],
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50366"
+          }
+        ]
+      },
+      "SandboxID": "930cab21134f0b90f5c6d50663cb500f5ee7bb34f34a5bd24552c5af89c5c56b",
+      "SandboxKey": "/var/run/docker/netns/930cab21134f"
+    },
+    "Path": "oxia",
+    "Platform": "linux",
+    "ProcessLabel": "",
+    "ResolvConfPath": "/var/lib/docker/containers/2e39d4e394161ba06a10a7a0b23d3dfa32c3d8151539b11dfd982a4d316de53d/resolv.conf",
+    "RestartCount": 0,
+    "State": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 91831,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-23T10:52:12.732767338Z",
+      "Status": "running"
+    }
+  }
+]

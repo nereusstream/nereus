@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:47:52.664Z" hostname="liusinandeMacBook-Pro.local" time="0.009">
+  <properties/>
+  <testcase name="cancellationInvalidRangeAndUnsupportedErrorsNeverFallback()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.001"/>
+  <testcase name="deleteIntentAuthorizesObjectOnlyEvenWhenPhysicalBookKeeperStillExists()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.001"/>
+  <testcase name="beforeCompletionReadsBookKeeperOnlyDespiteObjectPreference()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.0"/>
+  <testcase name="wrongChildSourceIsReleasedAndCannotMixWithFallback()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.002"/>
+  <testcase name="closeDrainsAcceptedRangeAndClosesEachInitializedChildExactlyOnce()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.001"/>
+  <testcase name="bookKeeperFirstFallsBackOnlyForNoSuchLedger()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.0"/>
+  <testcase name="dualFailureReturnsPrimaryAndSuppressesSecondary()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.002"/>
+  <testcase name="objectIntegrityFailureReleasesPartialRangeAndRetriesWholeRangeFromBookKeeper()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.0"/>
+  <testcase name="completeLedgerUsesPreferredObjectAndKeepsBookKeeperLazy()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.001"/>
+  <testcase name="bookKeeperFenceWaitsForAdmittedPinAndReroutesNewReadsToObject()" classname="com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

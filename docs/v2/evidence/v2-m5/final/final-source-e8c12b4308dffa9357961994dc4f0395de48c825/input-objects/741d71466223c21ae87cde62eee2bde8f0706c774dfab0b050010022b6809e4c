@@ -1,0 +1,246 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ShortNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.group.generated.StreamsGroupCurrentMemberAssignmentValue.*;
+
+public class StreamsGroupCurrentMemberAssignmentValueJsonConverter {
+    public static StreamsGroupCurrentMemberAssignmentValue read(JsonNode _node, short _version) {
+        StreamsGroupCurrentMemberAssignmentValue _object = new StreamsGroupCurrentMemberAssignmentValue();
+        JsonNode _memberEpochNode = _node.get("memberEpoch");
+        if (_memberEpochNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'memberEpoch', which is mandatory in version " + _version);
+        } else {
+            _object.memberEpoch = MessageUtil.jsonNodeToInt(_memberEpochNode, "StreamsGroupCurrentMemberAssignmentValue");
+        }
+        JsonNode _previousMemberEpochNode = _node.get("previousMemberEpoch");
+        if (_previousMemberEpochNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'previousMemberEpoch', which is mandatory in version " + _version);
+        } else {
+            _object.previousMemberEpoch = MessageUtil.jsonNodeToInt(_previousMemberEpochNode, "StreamsGroupCurrentMemberAssignmentValue");
+        }
+        JsonNode _stateNode = _node.get("state");
+        if (_stateNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'state', which is mandatory in version " + _version);
+        } else {
+            _object.state = MessageUtil.jsonNodeToByte(_stateNode, "StreamsGroupCurrentMemberAssignmentValue");
+        }
+        JsonNode _activeTasksNode = _node.get("activeTasks");
+        if (_activeTasksNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'activeTasks', which is mandatory in version " + _version);
+        } else {
+            if (!_activeTasksNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_activeTasksNode.size());
+            _object.activeTasks = _collection;
+            for (JsonNode _element : _activeTasksNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _standbyTasksNode = _node.get("standbyTasks");
+        if (_standbyTasksNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'standbyTasks', which is mandatory in version " + _version);
+        } else {
+            if (!_standbyTasksNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_standbyTasksNode.size());
+            _object.standbyTasks = _collection;
+            for (JsonNode _element : _standbyTasksNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _warmupTasksNode = _node.get("warmupTasks");
+        if (_warmupTasksNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'warmupTasks', which is mandatory in version " + _version);
+        } else {
+            if (!_warmupTasksNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_warmupTasksNode.size());
+            _object.warmupTasks = _collection;
+            for (JsonNode _element : _warmupTasksNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _activeTasksPendingRevocationNode = _node.get("activeTasksPendingRevocation");
+        if (_activeTasksPendingRevocationNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'activeTasksPendingRevocation', which is mandatory in version " + _version);
+        } else {
+            if (!_activeTasksPendingRevocationNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_activeTasksPendingRevocationNode.size());
+            _object.activeTasksPendingRevocation = _collection;
+            for (JsonNode _element : _activeTasksPendingRevocationNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _standbyTasksPendingRevocationNode = _node.get("standbyTasksPendingRevocation");
+        if (_standbyTasksPendingRevocationNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'standbyTasksPendingRevocation', which is mandatory in version " + _version);
+        } else {
+            if (!_standbyTasksPendingRevocationNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_standbyTasksPendingRevocationNode.size());
+            _object.standbyTasksPendingRevocation = _collection;
+            for (JsonNode _element : _standbyTasksPendingRevocationNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        JsonNode _warmupTasksPendingRevocationNode = _node.get("warmupTasksPendingRevocation");
+        if (_warmupTasksPendingRevocationNode == null) {
+            throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue: unable to locate field 'warmupTasksPendingRevocation', which is mandatory in version " + _version);
+        } else {
+            if (!_warmupTasksPendingRevocationNode.isArray()) {
+                throw new RuntimeException("StreamsGroupCurrentMemberAssignmentValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<TaskIds> _collection = new ArrayList<TaskIds>(_warmupTasksPendingRevocationNode.size());
+            _object.warmupTasksPendingRevocation = _collection;
+            for (JsonNode _element : _warmupTasksPendingRevocationNode) {
+                _collection.add(TaskIdsJsonConverter.read(_element, _version));
+            }
+        }
+        return _object;
+    }
+    public static JsonNode write(StreamsGroupCurrentMemberAssignmentValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        _node.set("memberEpoch", new IntNode(_object.memberEpoch));
+        _node.set("previousMemberEpoch", new IntNode(_object.previousMemberEpoch));
+        _node.set("state", new ShortNode(_object.state));
+        ArrayNode _activeTasksArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.activeTasks) {
+            _activeTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("activeTasks", _activeTasksArray);
+        ArrayNode _standbyTasksArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.standbyTasks) {
+            _standbyTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("standbyTasks", _standbyTasksArray);
+        ArrayNode _warmupTasksArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.warmupTasks) {
+            _warmupTasksArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("warmupTasks", _warmupTasksArray);
+        ArrayNode _activeTasksPendingRevocationArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.activeTasksPendingRevocation) {
+            _activeTasksPendingRevocationArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("activeTasksPendingRevocation", _activeTasksPendingRevocationArray);
+        ArrayNode _standbyTasksPendingRevocationArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.standbyTasksPendingRevocation) {
+            _standbyTasksPendingRevocationArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("standbyTasksPendingRevocation", _standbyTasksPendingRevocationArray);
+        ArrayNode _warmupTasksPendingRevocationArray = new ArrayNode(JsonNodeFactory.instance);
+        for (TaskIds _element : _object.warmupTasksPendingRevocation) {
+            _warmupTasksPendingRevocationArray.add(TaskIdsJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("warmupTasksPendingRevocation", _warmupTasksPendingRevocationArray);
+        return _node;
+    }
+    public static JsonNode write(StreamsGroupCurrentMemberAssignmentValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class TaskIdsJsonConverter {
+        public static TaskIds read(JsonNode _node, short _version) {
+            TaskIds _object = new TaskIds();
+            JsonNode _subtopologyIdNode = _node.get("subtopologyId");
+            if (_subtopologyIdNode == null) {
+                throw new RuntimeException("TaskIds: unable to locate field 'subtopologyId', which is mandatory in version " + _version);
+            } else {
+                if (!_subtopologyIdNode.isTextual()) {
+                    throw new RuntimeException("TaskIds expected a string type, but got " + _node.getNodeType());
+                }
+                _object.subtopologyId = _subtopologyIdNode.asText();
+            }
+            JsonNode _partitionsNode = _node.get("partitions");
+            if (_partitionsNode == null) {
+                throw new RuntimeException("TaskIds: unable to locate field 'partitions', which is mandatory in version " + _version);
+            } else {
+                if (!_partitionsNode.isArray()) {
+                    throw new RuntimeException("TaskIds expected a JSON array, but got " + _node.getNodeType());
+                }
+                ArrayList<Integer> _collection = new ArrayList<Integer>(_partitionsNode.size());
+                _object.partitions = _collection;
+                for (JsonNode _element : _partitionsNode) {
+                    _collection.add(MessageUtil.jsonNodeToInt(_element, "TaskIds element"));
+                }
+            }
+            JsonNode _assignmentEpochsNode = _node.get("assignmentEpochs");
+            if (_assignmentEpochsNode == null) {
+                _object.assignmentEpochs = new ArrayList<Integer>(0);
+            } else {
+                if (_assignmentEpochsNode.isNull()) {
+                    _object.assignmentEpochs = null;
+                } else {
+                    if (!_assignmentEpochsNode.isArray()) {
+                        throw new RuntimeException("TaskIds expected a JSON array, but got " + _node.getNodeType());
+                    }
+                    ArrayList<Integer> _collection = new ArrayList<Integer>(_assignmentEpochsNode.size());
+                    _object.assignmentEpochs = _collection;
+                    for (JsonNode _element : _assignmentEpochsNode) {
+                        _collection.add(MessageUtil.jsonNodeToInt(_element, "TaskIds element"));
+                    }
+                }
+            }
+            return _object;
+        }
+        public static JsonNode write(TaskIds _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("subtopologyId", new TextNode(_object.subtopologyId));
+            ArrayNode _partitionsArray = new ArrayNode(JsonNodeFactory.instance);
+            for (Integer _element : _object.partitions) {
+                _partitionsArray.add(new IntNode(_element));
+            }
+            _node.set("partitions", _partitionsArray);
+            if (_object.assignmentEpochs == null || !_object.assignmentEpochs.isEmpty()) {
+                if (_object.assignmentEpochs == null) {
+                    _node.set("assignmentEpochs", NullNode.instance);
+                } else {
+                    ArrayNode _assignmentEpochsArray = new ArrayNode(JsonNodeFactory.instance);
+                    for (Integer _element : _object.assignmentEpochs) {
+                        _assignmentEpochsArray.add(new IntNode(_element));
+                    }
+                    _node.set("assignmentEpochs", _assignmentEpochsArray);
+                }
+            }
+            return _node;
+        }
+        public static JsonNode write(TaskIds _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

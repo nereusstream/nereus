@@ -1,0 +1,3166 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.common.message;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.protocol.Message;
+import org.apache.kafka.common.protocol.MessageSizeAccumulator;
+import org.apache.kafka.common.protocol.MessageUtil;
+import org.apache.kafka.common.protocol.ObjectSerializationCache;
+import org.apache.kafka.common.protocol.Readable;
+import org.apache.kafka.common.protocol.Writable;
+import org.apache.kafka.common.protocol.types.CompactArrayOf;
+import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.common.protocol.types.NullableSchema;
+import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.protocol.types.RawTaggedFieldWriter;
+import org.apache.kafka.common.protocol.types.Schema;
+import org.apache.kafka.common.protocol.types.Type;
+import org.apache.kafka.common.utils.ByteUtils;
+
+import static org.apache.kafka.common.protocol.types.Field.TaggedFieldsSection;
+
+
+public class StreamsGroupDescribeResponseData implements ApiMessage {
+    int throttleTimeMs;
+    List<DescribedGroup> groups;
+    private List<RawTaggedField> _unknownTaggedFields;
+    
+    public static final Schema SCHEMA_0 =
+        new Schema(
+            new Field("throttle_time_ms", Type.INT32, "The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota."),
+            new Field("groups", new CompactArrayOf(DescribedGroup.SCHEMA_0), "Each described group."),
+            TaggedFieldsSection.of(
+            )
+        );
+    
+    public static final Schema[] SCHEMAS = new Schema[] {
+        SCHEMA_0
+    };
+    
+    public static final short LOWEST_SUPPORTED_VERSION = 0;
+    public static final short HIGHEST_SUPPORTED_VERSION = 0;
+    
+    public StreamsGroupDescribeResponseData(Readable _readable, short _version) {
+        read(_readable, _version);
+    }
+    
+    public StreamsGroupDescribeResponseData() {
+        this.throttleTimeMs = 0;
+        this.groups = new ArrayList<DescribedGroup>(0);
+    }
+    
+    @Override
+    public short apiKey() {
+        return 89;
+    }
+    
+    @Override
+    public short lowestSupportedVersion() {
+        return 0;
+    }
+    
+    @Override
+    public short highestSupportedVersion() {
+        return 0;
+    }
+    
+    @Override
+    public final void read(Readable _readable, short _version) {
+        this.throttleTimeMs = _readable.readInt();
+        {
+            int arrayLength;
+            arrayLength = _readable.readUnsignedVarint() - 1;
+            if (arrayLength < 0) {
+                throw new RuntimeException("non-nullable field groups was serialized as null");
+            } else {
+                if (arrayLength > _readable.remaining()) {
+                    throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                }
+                ArrayList<DescribedGroup> newCollection = new ArrayList<>(arrayLength);
+                for (int i = 0; i < arrayLength; i++) {
+                    newCollection.add(new DescribedGroup(_readable, _version));
+                }
+                this.groups = newCollection;
+            }
+        }
+        this._unknownTaggedFields = null;
+        int _numTaggedFields = _readable.readUnsignedVarint();
+        for (int _i = 0; _i < _numTaggedFields; _i++) {
+            int _tag = _readable.readUnsignedVarint();
+            int _size = _readable.readUnsignedVarint();
+            switch (_tag) {
+                default:
+                    this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                    break;
+            }
+        }
+    }
+    
+    @Override
+    public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _writable.writeInt(throttleTimeMs);
+        _writable.writeUnsignedVarint(groups.size() + 1);
+        for (DescribedGroup groupsElement : groups) {
+            groupsElement.write(_writable, _cache, _version);
+        }
+        RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+        _numTaggedFields += _rawWriter.numFields();
+        _writable.writeUnsignedVarint(_numTaggedFields);
+        _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+    }
+    
+    @Override
+    public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+        int _numTaggedFields = 0;
+        _size.addBytes(4);
+        {
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(groups.size() + 1));
+            for (DescribedGroup groupsElement : groups) {
+                groupsElement.addSize(_size, _cache, _version);
+            }
+        }
+        if (_unknownTaggedFields != null) {
+            _numTaggedFields += _unknownTaggedFields.size();
+            for (RawTaggedField _field : _unknownTaggedFields) {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                _size.addBytes(_field.size());
+            }
+        }
+        _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof StreamsGroupDescribeResponseData)) return false;
+        StreamsGroupDescribeResponseData other = (StreamsGroupDescribeResponseData) obj;
+        if (throttleTimeMs != other.throttleTimeMs) return false;
+        if (this.groups == null) {
+            if (other.groups != null) return false;
+        } else {
+            if (!this.groups.equals(other.groups)) return false;
+        }
+        return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+    }
+    
+    @Override
+    public int hashCode() {
+        int hashCode = 0;
+        hashCode = 31 * hashCode + throttleTimeMs;
+        hashCode = 31 * hashCode + (groups == null ? 0 : groups.hashCode());
+        return hashCode;
+    }
+    
+    @Override
+    public StreamsGroupDescribeResponseData duplicate() {
+        StreamsGroupDescribeResponseData _duplicate = new StreamsGroupDescribeResponseData();
+        _duplicate.throttleTimeMs = throttleTimeMs;
+        ArrayList<DescribedGroup> newGroups = new ArrayList<DescribedGroup>(groups.size());
+        for (DescribedGroup _element : groups) {
+            newGroups.add(_element.duplicate());
+        }
+        _duplicate.groups = newGroups;
+        return _duplicate;
+    }
+    
+    @Override
+    public String toString() {
+        return "StreamsGroupDescribeResponseData("
+            + "throttleTimeMs=" + throttleTimeMs
+            + ", groups=" + MessageUtil.deepToString(groups.iterator())
+            + ")";
+    }
+    
+    public int throttleTimeMs() {
+        return this.throttleTimeMs;
+    }
+    
+    public List<DescribedGroup> groups() {
+        return this.groups;
+    }
+    
+    @Override
+    public List<RawTaggedField> unknownTaggedFields() {
+        if (_unknownTaggedFields == null) {
+            _unknownTaggedFields = new ArrayList<>(0);
+        }
+        return _unknownTaggedFields;
+    }
+    
+    public StreamsGroupDescribeResponseData setThrottleTimeMs(int v) {
+        this.throttleTimeMs = v;
+        return this;
+    }
+    
+    public StreamsGroupDescribeResponseData setGroups(List<DescribedGroup> v) {
+        this.groups = v;
+        return this;
+    }
+    
+    public static class DescribedGroup implements Message {
+        short errorCode;
+        String errorMessage;
+        String groupId;
+        String groupState;
+        int groupEpoch;
+        int assignmentEpoch;
+        Topology topology;
+        List<Member> members;
+        int authorizedOperations;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("error_code", Type.INT16, "The describe error, or 0 if there was no error."),
+                new Field("error_message", Type.COMPACT_NULLABLE_STRING, "The top-level error message, or null if there was no error."),
+                new Field("group_id", Type.COMPACT_STRING, "The group ID string."),
+                new Field("group_state", Type.COMPACT_STRING, "The group state string, or the empty string."),
+                new Field("group_epoch", Type.INT32, "The group epoch."),
+                new Field("assignment_epoch", Type.INT32, "The assignment epoch."),
+                new Field("topology", new NullableSchema(Topology.SCHEMA_0), "The topology metadata currently initialized for the streams application. Can be null in case of a describe error."),
+                new Field("members", new CompactArrayOf(Member.SCHEMA_0), "The members."),
+                new Field("authorized_operations", Type.INT32, "32-bit bitfield to represent authorized operations for this group."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public DescribedGroup(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public DescribedGroup() {
+            this.errorCode = (short) 0;
+            this.errorMessage = null;
+            this.groupId = "";
+            this.groupState = "";
+            this.groupEpoch = 0;
+            this.assignmentEpoch = 0;
+            this.topology = null;
+            this.members = new ArrayList<Member>(0);
+            this.authorizedOperations = -2147483648;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of DescribedGroup");
+            }
+            this.errorCode = _readable.readShort();
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    this.errorMessage = null;
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field errorMessage had invalid length " + length);
+                } else {
+                    this.errorMessage = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field groupId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field groupId had invalid length " + length);
+                } else {
+                    this.groupId = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field groupState was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field groupState had invalid length " + length);
+                } else {
+                    this.groupState = _readable.readString(length);
+                }
+            }
+            this.groupEpoch = _readable.readInt();
+            this.assignmentEpoch = _readable.readInt();
+            {
+                if (_readable.readByte() < 0) {
+                    this.topology = null;
+                } else {
+                    this.topology = new Topology(_readable, _version);
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field members was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Member> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new Member(_readable, _version));
+                    }
+                    this.members = newCollection;
+                }
+            }
+            this.authorizedOperations = _readable.readInt();
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _writable.writeShort(errorCode);
+            if (errorMessage == null) {
+                _writable.writeUnsignedVarint(0);
+            } else {
+                byte[] _stringBytes = _cache.getSerializedValue(errorMessage);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(groupId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(groupState);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(groupEpoch);
+            _writable.writeInt(assignmentEpoch);
+            if (topology == null) {
+                _writable.writeByte((byte) -1);
+            } else {
+                _writable.writeByte((byte) 1);
+                topology.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(members.size() + 1);
+            for (Member membersElement : members) {
+                membersElement.write(_writable, _cache, _version);
+            }
+            _writable.writeInt(authorizedOperations);
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of DescribedGroup");
+            }
+            _size.addBytes(2);
+            if (errorMessage == null) {
+                _size.addBytes(1);
+            } else {
+                byte[] _stringBytes = errorMessage.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'errorMessage' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(errorMessage, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = groupId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'groupId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(groupId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = groupState.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'groupState' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(groupState, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            _size.addBytes(4);
+            if (topology == null) {
+                _size.addBytes(1);
+            } else {
+                _size.addBytes(1);
+                this.topology.addSize(_size, _cache, _version);
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(members.size() + 1));
+                for (Member membersElement : members) {
+                    membersElement.addSize(_size, _cache, _version);
+                }
+            }
+            _size.addBytes(4);
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof DescribedGroup)) return false;
+            DescribedGroup other = (DescribedGroup) obj;
+            if (errorCode != other.errorCode) return false;
+            if (this.errorMessage == null) {
+                if (other.errorMessage != null) return false;
+            } else {
+                if (!this.errorMessage.equals(other.errorMessage)) return false;
+            }
+            if (this.groupId == null) {
+                if (other.groupId != null) return false;
+            } else {
+                if (!this.groupId.equals(other.groupId)) return false;
+            }
+            if (this.groupState == null) {
+                if (other.groupState != null) return false;
+            } else {
+                if (!this.groupState.equals(other.groupState)) return false;
+            }
+            if (groupEpoch != other.groupEpoch) return false;
+            if (assignmentEpoch != other.assignmentEpoch) return false;
+            if (this.topology == null) {
+                if (other.topology != null) return false;
+            } else {
+                if (!this.topology.equals(other.topology)) return false;
+            }
+            if (this.members == null) {
+                if (other.members != null) return false;
+            } else {
+                if (!this.members.equals(other.members)) return false;
+            }
+            if (authorizedOperations != other.authorizedOperations) return false;
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + errorCode;
+            hashCode = 31 * hashCode + (errorMessage == null ? 0 : errorMessage.hashCode());
+            hashCode = 31 * hashCode + (groupId == null ? 0 : groupId.hashCode());
+            hashCode = 31 * hashCode + (groupState == null ? 0 : groupState.hashCode());
+            hashCode = 31 * hashCode + groupEpoch;
+            hashCode = 31 * hashCode + assignmentEpoch;
+            hashCode = 31 * hashCode + (topology == null ? 0 : topology.hashCode());
+            hashCode = 31 * hashCode + (members == null ? 0 : members.hashCode());
+            hashCode = 31 * hashCode + authorizedOperations;
+            return hashCode;
+        }
+        
+        @Override
+        public DescribedGroup duplicate() {
+            DescribedGroup _duplicate = new DescribedGroup();
+            _duplicate.errorCode = errorCode;
+            if (errorMessage == null) {
+                _duplicate.errorMessage = null;
+            } else {
+                _duplicate.errorMessage = errorMessage;
+            }
+            _duplicate.groupId = groupId;
+            _duplicate.groupState = groupState;
+            _duplicate.groupEpoch = groupEpoch;
+            _duplicate.assignmentEpoch = assignmentEpoch;
+            if (topology == null) {
+                _duplicate.topology = null;
+            } else {
+                _duplicate.topology = topology.duplicate();
+            }
+            ArrayList<Member> newMembers = new ArrayList<Member>(members.size());
+            for (Member _element : members) {
+                newMembers.add(_element.duplicate());
+            }
+            _duplicate.members = newMembers;
+            _duplicate.authorizedOperations = authorizedOperations;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "DescribedGroup("
+                + "errorCode=" + errorCode
+                + ", errorMessage=" + ((errorMessage == null) ? "null" : "'" + errorMessage.toString() + "'")
+                + ", groupId=" + ((groupId == null) ? "null" : "'" + groupId.toString() + "'")
+                + ", groupState=" + ((groupState == null) ? "null" : "'" + groupState.toString() + "'")
+                + ", groupEpoch=" + groupEpoch
+                + ", assignmentEpoch=" + assignmentEpoch
+                + ", topology=" + ((topology == null) ? "null" : topology.toString())
+                + ", members=" + MessageUtil.deepToString(members.iterator())
+                + ", authorizedOperations=" + authorizedOperations
+                + ")";
+        }
+        
+        public short errorCode() {
+            return this.errorCode;
+        }
+        
+        public String errorMessage() {
+            return this.errorMessage;
+        }
+        
+        public String groupId() {
+            return this.groupId;
+        }
+        
+        public String groupState() {
+            return this.groupState;
+        }
+        
+        public int groupEpoch() {
+            return this.groupEpoch;
+        }
+        
+        public int assignmentEpoch() {
+            return this.assignmentEpoch;
+        }
+        
+        public Topology topology() {
+            return this.topology;
+        }
+        
+        public List<Member> members() {
+            return this.members;
+        }
+        
+        public int authorizedOperations() {
+            return this.authorizedOperations;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public DescribedGroup setErrorCode(short v) {
+            this.errorCode = v;
+            return this;
+        }
+        
+        public DescribedGroup setErrorMessage(String v) {
+            this.errorMessage = v;
+            return this;
+        }
+        
+        public DescribedGroup setGroupId(String v) {
+            this.groupId = v;
+            return this;
+        }
+        
+        public DescribedGroup setGroupState(String v) {
+            this.groupState = v;
+            return this;
+        }
+        
+        public DescribedGroup setGroupEpoch(int v) {
+            this.groupEpoch = v;
+            return this;
+        }
+        
+        public DescribedGroup setAssignmentEpoch(int v) {
+            this.assignmentEpoch = v;
+            return this;
+        }
+        
+        public DescribedGroup setTopology(Topology v) {
+            this.topology = v;
+            return this;
+        }
+        
+        public DescribedGroup setMembers(List<Member> v) {
+            this.members = v;
+            return this;
+        }
+        
+        public DescribedGroup setAuthorizedOperations(int v) {
+            this.authorizedOperations = v;
+            return this;
+        }
+    }
+    
+    public static class Topology implements Message {
+        int epoch;
+        List<Subtopology> subtopologies;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("epoch", Type.INT32, "The epoch of the currently initialized topology for this group."),
+                new Field("subtopologies", CompactArrayOf.nullable(Subtopology.SCHEMA_0), "The subtopologies of the streams application. This contains the configured subtopologies, where the number of partitions are set and any regular expressions are resolved to actual topics. Null if the group is uninitialized, source topics are missing or incorrectly partitioned."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Topology(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Topology() {
+            this.epoch = 0;
+            this.subtopologies = null;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of Topology");
+            }
+            this.epoch = _readable.readInt();
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    this.subtopologies = null;
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Subtopology> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new Subtopology(_readable, _version));
+                    }
+                    this.subtopologies = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _writable.writeInt(epoch);
+            if (subtopologies == null) {
+                _writable.writeUnsignedVarint(0);
+            } else {
+                _writable.writeUnsignedVarint(subtopologies.size() + 1);
+                for (Subtopology subtopologiesElement : subtopologies) {
+                    subtopologiesElement.write(_writable, _cache, _version);
+                }
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of Topology");
+            }
+            _size.addBytes(4);
+            if (subtopologies == null) {
+                _size.addBytes(1);
+            } else {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(subtopologies.size() + 1));
+                for (Subtopology subtopologiesElement : subtopologies) {
+                    subtopologiesElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Topology)) return false;
+            Topology other = (Topology) obj;
+            if (epoch != other.epoch) return false;
+            if (this.subtopologies == null) {
+                if (other.subtopologies != null) return false;
+            } else {
+                if (!this.subtopologies.equals(other.subtopologies)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + epoch;
+            hashCode = 31 * hashCode + (subtopologies == null ? 0 : subtopologies.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public Topology duplicate() {
+            Topology _duplicate = new Topology();
+            _duplicate.epoch = epoch;
+            if (subtopologies == null) {
+                _duplicate.subtopologies = null;
+            } else {
+                ArrayList<Subtopology> newSubtopologies = new ArrayList<Subtopology>(subtopologies.size());
+                for (Subtopology _element : subtopologies) {
+                    newSubtopologies.add(_element.duplicate());
+                }
+                _duplicate.subtopologies = newSubtopologies;
+            }
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Topology("
+                + "epoch=" + epoch
+                + ", subtopologies=" + ((subtopologies == null) ? "null" : MessageUtil.deepToString(subtopologies.iterator()))
+                + ")";
+        }
+        
+        public int epoch() {
+            return this.epoch;
+        }
+        
+        public List<Subtopology> subtopologies() {
+            return this.subtopologies;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Topology setEpoch(int v) {
+            this.epoch = v;
+            return this;
+        }
+        
+        public Topology setSubtopologies(List<Subtopology> v) {
+            this.subtopologies = v;
+            return this;
+        }
+    }
+    
+    public static class Subtopology implements Message {
+        String subtopologyId;
+        List<String> sourceTopics;
+        List<String> repartitionSinkTopics;
+        List<TopicInfo> stateChangelogTopics;
+        List<TopicInfo> repartitionSourceTopics;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("subtopology_id", Type.COMPACT_STRING, "String to uniquely identify the subtopology."),
+                new Field("source_topics", new CompactArrayOf(Type.COMPACT_STRING), "The topics the subtopology reads from."),
+                new Field("repartition_sink_topics", new CompactArrayOf(Type.COMPACT_STRING), "The repartition topics the subtopology writes to."),
+                new Field("state_changelog_topics", new CompactArrayOf(TopicInfo.SCHEMA_0), "The set of state changelog topics associated with this subtopology. Created automatically."),
+                new Field("repartition_source_topics", new CompactArrayOf(TopicInfo.SCHEMA_0), "The set of source topics that are internally created repartition topics. Created automatically."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Subtopology(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Subtopology() {
+            this.subtopologyId = "";
+            this.sourceTopics = new ArrayList<String>(0);
+            this.repartitionSinkTopics = new ArrayList<String>(0);
+            this.stateChangelogTopics = new ArrayList<TopicInfo>(0);
+            this.repartitionSourceTopics = new ArrayList<TopicInfo>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of Subtopology");
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field subtopologyId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field subtopologyId had invalid length " + length);
+                } else {
+                    this.subtopologyId = _readable.readString(length);
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field sourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<String> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        int length;
+                        length = _readable.readUnsignedVarint() - 1;
+                        if (length < 0) {
+                            throw new RuntimeException("non-nullable field sourceTopics element was serialized as null");
+                        } else if (length > 0x7fff) {
+                            throw new RuntimeException("string field sourceTopics element had invalid length " + length);
+                        } else {
+                            newCollection.add(_readable.readString(length));
+                        }
+                    }
+                    this.sourceTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field repartitionSinkTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<String> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        int length;
+                        length = _readable.readUnsignedVarint() - 1;
+                        if (length < 0) {
+                            throw new RuntimeException("non-nullable field repartitionSinkTopics element was serialized as null");
+                        } else if (length > 0x7fff) {
+                            throw new RuntimeException("string field repartitionSinkTopics element had invalid length " + length);
+                        } else {
+                            newCollection.add(_readable.readString(length));
+                        }
+                    }
+                    this.repartitionSinkTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field stateChangelogTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TopicInfo> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TopicInfo(_readable, _version));
+                    }
+                    this.stateChangelogTopics = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field repartitionSourceTopics was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TopicInfo> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TopicInfo(_readable, _version));
+                    }
+                    this.repartitionSourceTopics = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(subtopologyId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeUnsignedVarint(sourceTopics.size() + 1);
+            for (String sourceTopicsElement : sourceTopics) {
+                {
+                    byte[] _stringBytes = _cache.getSerializedValue(sourceTopicsElement);
+                    _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                    _writable.writeByteArray(_stringBytes);
+                }
+            }
+            _writable.writeUnsignedVarint(repartitionSinkTopics.size() + 1);
+            for (String repartitionSinkTopicsElement : repartitionSinkTopics) {
+                {
+                    byte[] _stringBytes = _cache.getSerializedValue(repartitionSinkTopicsElement);
+                    _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                    _writable.writeByteArray(_stringBytes);
+                }
+            }
+            _writable.writeUnsignedVarint(stateChangelogTopics.size() + 1);
+            for (TopicInfo stateChangelogTopicsElement : stateChangelogTopics) {
+                stateChangelogTopicsElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(repartitionSourceTopics.size() + 1);
+            for (TopicInfo repartitionSourceTopicsElement : repartitionSourceTopics) {
+                repartitionSourceTopicsElement.write(_writable, _cache, _version);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of Subtopology");
+            }
+            {
+                byte[] _stringBytes = subtopologyId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'subtopologyId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(subtopologyId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(sourceTopics.size() + 1));
+                for (String sourceTopicsElement : sourceTopics) {
+                    byte[] _stringBytes = sourceTopicsElement.getBytes(StandardCharsets.UTF_8);
+                    if (_stringBytes.length > 0x7fff) {
+                        throw new RuntimeException("'sourceTopicsElement' field is too long to be serialized");
+                    }
+                    _cache.cacheSerializedValue(sourceTopicsElement, _stringBytes);
+                    _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(repartitionSinkTopics.size() + 1));
+                for (String repartitionSinkTopicsElement : repartitionSinkTopics) {
+                    byte[] _stringBytes = repartitionSinkTopicsElement.getBytes(StandardCharsets.UTF_8);
+                    if (_stringBytes.length > 0x7fff) {
+                        throw new RuntimeException("'repartitionSinkTopicsElement' field is too long to be serialized");
+                    }
+                    _cache.cacheSerializedValue(repartitionSinkTopicsElement, _stringBytes);
+                    _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(stateChangelogTopics.size() + 1));
+                for (TopicInfo stateChangelogTopicsElement : stateChangelogTopics) {
+                    stateChangelogTopicsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(repartitionSourceTopics.size() + 1));
+                for (TopicInfo repartitionSourceTopicsElement : repartitionSourceTopics) {
+                    repartitionSourceTopicsElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Subtopology)) return false;
+            Subtopology other = (Subtopology) obj;
+            if (this.subtopologyId == null) {
+                if (other.subtopologyId != null) return false;
+            } else {
+                if (!this.subtopologyId.equals(other.subtopologyId)) return false;
+            }
+            if (this.sourceTopics == null) {
+                if (other.sourceTopics != null) return false;
+            } else {
+                if (!this.sourceTopics.equals(other.sourceTopics)) return false;
+            }
+            if (this.repartitionSinkTopics == null) {
+                if (other.repartitionSinkTopics != null) return false;
+            } else {
+                if (!this.repartitionSinkTopics.equals(other.repartitionSinkTopics)) return false;
+            }
+            if (this.stateChangelogTopics == null) {
+                if (other.stateChangelogTopics != null) return false;
+            } else {
+                if (!this.stateChangelogTopics.equals(other.stateChangelogTopics)) return false;
+            }
+            if (this.repartitionSourceTopics == null) {
+                if (other.repartitionSourceTopics != null) return false;
+            } else {
+                if (!this.repartitionSourceTopics.equals(other.repartitionSourceTopics)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (subtopologyId == null ? 0 : subtopologyId.hashCode());
+            hashCode = 31 * hashCode + (sourceTopics == null ? 0 : sourceTopics.hashCode());
+            hashCode = 31 * hashCode + (repartitionSinkTopics == null ? 0 : repartitionSinkTopics.hashCode());
+            hashCode = 31 * hashCode + (stateChangelogTopics == null ? 0 : stateChangelogTopics.hashCode());
+            hashCode = 31 * hashCode + (repartitionSourceTopics == null ? 0 : repartitionSourceTopics.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public Subtopology duplicate() {
+            Subtopology _duplicate = new Subtopology();
+            _duplicate.subtopologyId = subtopologyId;
+            ArrayList<String> newSourceTopics = new ArrayList<String>(sourceTopics.size());
+            for (String _element : sourceTopics) {
+                newSourceTopics.add(_element);
+            }
+            _duplicate.sourceTopics = newSourceTopics;
+            ArrayList<String> newRepartitionSinkTopics = new ArrayList<String>(repartitionSinkTopics.size());
+            for (String _element : repartitionSinkTopics) {
+                newRepartitionSinkTopics.add(_element);
+            }
+            _duplicate.repartitionSinkTopics = newRepartitionSinkTopics;
+            ArrayList<TopicInfo> newStateChangelogTopics = new ArrayList<TopicInfo>(stateChangelogTopics.size());
+            for (TopicInfo _element : stateChangelogTopics) {
+                newStateChangelogTopics.add(_element.duplicate());
+            }
+            _duplicate.stateChangelogTopics = newStateChangelogTopics;
+            ArrayList<TopicInfo> newRepartitionSourceTopics = new ArrayList<TopicInfo>(repartitionSourceTopics.size());
+            for (TopicInfo _element : repartitionSourceTopics) {
+                newRepartitionSourceTopics.add(_element.duplicate());
+            }
+            _duplicate.repartitionSourceTopics = newRepartitionSourceTopics;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Subtopology("
+                + "subtopologyId=" + ((subtopologyId == null) ? "null" : "'" + subtopologyId.toString() + "'")
+                + ", sourceTopics=" + MessageUtil.deepToString(sourceTopics.iterator())
+                + ", repartitionSinkTopics=" + MessageUtil.deepToString(repartitionSinkTopics.iterator())
+                + ", stateChangelogTopics=" + MessageUtil.deepToString(stateChangelogTopics.iterator())
+                + ", repartitionSourceTopics=" + MessageUtil.deepToString(repartitionSourceTopics.iterator())
+                + ")";
+        }
+        
+        public String subtopologyId() {
+            return this.subtopologyId;
+        }
+        
+        public List<String> sourceTopics() {
+            return this.sourceTopics;
+        }
+        
+        public List<String> repartitionSinkTopics() {
+            return this.repartitionSinkTopics;
+        }
+        
+        public List<TopicInfo> stateChangelogTopics() {
+            return this.stateChangelogTopics;
+        }
+        
+        public List<TopicInfo> repartitionSourceTopics() {
+            return this.repartitionSourceTopics;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Subtopology setSubtopologyId(String v) {
+            this.subtopologyId = v;
+            return this;
+        }
+        
+        public Subtopology setSourceTopics(List<String> v) {
+            this.sourceTopics = v;
+            return this;
+        }
+        
+        public Subtopology setRepartitionSinkTopics(List<String> v) {
+            this.repartitionSinkTopics = v;
+            return this;
+        }
+        
+        public Subtopology setStateChangelogTopics(List<TopicInfo> v) {
+            this.stateChangelogTopics = v;
+            return this;
+        }
+        
+        public Subtopology setRepartitionSourceTopics(List<TopicInfo> v) {
+            this.repartitionSourceTopics = v;
+            return this;
+        }
+    }
+    
+    public static class Member implements Message {
+        String memberId;
+        int memberEpoch;
+        String instanceId;
+        String rackId;
+        String clientId;
+        String clientHost;
+        int topologyEpoch;
+        String processId;
+        Endpoint userEndpoint;
+        List<KeyValue> clientTags;
+        List<TaskOffset> taskOffsets;
+        List<TaskOffset> taskEndOffsets;
+        Assignment assignment;
+        Assignment targetAssignment;
+        boolean isClassic;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("member_id", Type.COMPACT_STRING, "The member ID."),
+                new Field("member_epoch", Type.INT32, "The member epoch."),
+                new Field("instance_id", Type.COMPACT_NULLABLE_STRING, "The member instance ID for static membership."),
+                new Field("rack_id", Type.COMPACT_NULLABLE_STRING, "The rack ID."),
+                new Field("client_id", Type.COMPACT_STRING, "The client ID."),
+                new Field("client_host", Type.COMPACT_STRING, "The client host."),
+                new Field("topology_epoch", Type.INT32, "The epoch of the topology on the client."),
+                new Field("process_id", Type.COMPACT_STRING, "Identity of the streams instance that may have multiple clients. "),
+                new Field("user_endpoint", new NullableSchema(Endpoint.SCHEMA_0), "User-defined endpoint for Interactive Queries. Null if not defined for this client."),
+                new Field("client_tags", new CompactArrayOf(KeyValue.SCHEMA_0), "Used for rack-aware assignment algorithm."),
+                new Field("task_offsets", new CompactArrayOf(TaskOffset.SCHEMA_0), "Cumulative changelog offsets for tasks."),
+                new Field("task_end_offsets", new CompactArrayOf(TaskOffset.SCHEMA_0), "Cumulative changelog end offsets for tasks."),
+                new Field("assignment", Assignment.SCHEMA_0, "The current assignment."),
+                new Field("target_assignment", Assignment.SCHEMA_0, "The target assignment."),
+                new Field("is_classic", Type.BOOLEAN, "True for classic members that have not been upgraded yet."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Member(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Member() {
+            this.memberId = "";
+            this.memberEpoch = 0;
+            this.instanceId = null;
+            this.rackId = null;
+            this.clientId = "";
+            this.clientHost = "";
+            this.topologyEpoch = 0;
+            this.processId = "";
+            this.userEndpoint = null;
+            this.clientTags = new ArrayList<KeyValue>(0);
+            this.taskOffsets = new ArrayList<TaskOffset>(0);
+            this.taskEndOffsets = new ArrayList<TaskOffset>(0);
+            this.assignment = new Assignment();
+            this.targetAssignment = new Assignment();
+            this.isClassic = false;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't read version " + _version + " of Member");
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field memberId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field memberId had invalid length " + length);
+                } else {
+                    this.memberId = _readable.readString(length);
+                }
+            }
+            this.memberEpoch = _readable.readInt();
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    this.instanceId = null;
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field instanceId had invalid length " + length);
+                } else {
+                    this.instanceId = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    this.rackId = null;
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field rackId had invalid length " + length);
+                } else {
+                    this.rackId = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field clientId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field clientId had invalid length " + length);
+                } else {
+                    this.clientId = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field clientHost was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field clientHost had invalid length " + length);
+                } else {
+                    this.clientHost = _readable.readString(length);
+                }
+            }
+            this.topologyEpoch = _readable.readInt();
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field processId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field processId had invalid length " + length);
+                } else {
+                    this.processId = _readable.readString(length);
+                }
+            }
+            {
+                if (_readable.readByte() < 0) {
+                    this.userEndpoint = null;
+                } else {
+                    this.userEndpoint = new Endpoint(_readable, _version);
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field clientTags was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<KeyValue> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new KeyValue(_readable, _version));
+                    }
+                    this.clientTags = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field taskOffsets was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TaskOffset> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TaskOffset(_readable, _version));
+                    }
+                    this.taskOffsets = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field taskEndOffsets was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TaskOffset> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TaskOffset(_readable, _version));
+                    }
+                    this.taskEndOffsets = newCollection;
+                }
+            }
+            {
+                this.assignment = new Assignment(_readable, _version);
+            }
+            {
+                this.targetAssignment = new Assignment(_readable, _version);
+            }
+            this.isClassic = _readable.readByte() != 0;
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(memberId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(memberEpoch);
+            if (instanceId == null) {
+                _writable.writeUnsignedVarint(0);
+            } else {
+                byte[] _stringBytes = _cache.getSerializedValue(instanceId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            if (rackId == null) {
+                _writable.writeUnsignedVarint(0);
+            } else {
+                byte[] _stringBytes = _cache.getSerializedValue(rackId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(clientId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(clientHost);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(topologyEpoch);
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(processId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            if (userEndpoint == null) {
+                _writable.writeByte((byte) -1);
+            } else {
+                _writable.writeByte((byte) 1);
+                userEndpoint.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(clientTags.size() + 1);
+            for (KeyValue clientTagsElement : clientTags) {
+                clientTagsElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(taskOffsets.size() + 1);
+            for (TaskOffset taskOffsetsElement : taskOffsets) {
+                taskOffsetsElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(taskEndOffsets.size() + 1);
+            for (TaskOffset taskEndOffsetsElement : taskEndOffsets) {
+                taskEndOffsetsElement.write(_writable, _cache, _version);
+            }
+            assignment.write(_writable, _cache, _version);
+            targetAssignment.write(_writable, _cache, _version);
+            _writable.writeByte(isClassic ? (byte) 1 : (byte) 0);
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            if (_version > 0) {
+                throw new UnsupportedVersionException("Can't size version " + _version + " of Member");
+            }
+            {
+                byte[] _stringBytes = memberId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'memberId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(memberId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            if (instanceId == null) {
+                _size.addBytes(1);
+            } else {
+                byte[] _stringBytes = instanceId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'instanceId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(instanceId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            if (rackId == null) {
+                _size.addBytes(1);
+            } else {
+                byte[] _stringBytes = rackId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'rackId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(rackId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = clientId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'clientId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(clientId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = clientHost.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'clientHost' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(clientHost, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            {
+                byte[] _stringBytes = processId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'processId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(processId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            if (userEndpoint == null) {
+                _size.addBytes(1);
+            } else {
+                _size.addBytes(1);
+                this.userEndpoint.addSize(_size, _cache, _version);
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(clientTags.size() + 1));
+                for (KeyValue clientTagsElement : clientTags) {
+                    clientTagsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(taskOffsets.size() + 1));
+                for (TaskOffset taskOffsetsElement : taskOffsets) {
+                    taskOffsetsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(taskEndOffsets.size() + 1));
+                for (TaskOffset taskEndOffsetsElement : taskEndOffsets) {
+                    taskEndOffsetsElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                this.assignment.addSize(_size, _cache, _version);
+            }
+            {
+                this.targetAssignment.addSize(_size, _cache, _version);
+            }
+            _size.addBytes(1);
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Member)) return false;
+            Member other = (Member) obj;
+            if (this.memberId == null) {
+                if (other.memberId != null) return false;
+            } else {
+                if (!this.memberId.equals(other.memberId)) return false;
+            }
+            if (memberEpoch != other.memberEpoch) return false;
+            if (this.instanceId == null) {
+                if (other.instanceId != null) return false;
+            } else {
+                if (!this.instanceId.equals(other.instanceId)) return false;
+            }
+            if (this.rackId == null) {
+                if (other.rackId != null) return false;
+            } else {
+                if (!this.rackId.equals(other.rackId)) return false;
+            }
+            if (this.clientId == null) {
+                if (other.clientId != null) return false;
+            } else {
+                if (!this.clientId.equals(other.clientId)) return false;
+            }
+            if (this.clientHost == null) {
+                if (other.clientHost != null) return false;
+            } else {
+                if (!this.clientHost.equals(other.clientHost)) return false;
+            }
+            if (topologyEpoch != other.topologyEpoch) return false;
+            if (this.processId == null) {
+                if (other.processId != null) return false;
+            } else {
+                if (!this.processId.equals(other.processId)) return false;
+            }
+            if (this.userEndpoint == null) {
+                if (other.userEndpoint != null) return false;
+            } else {
+                if (!this.userEndpoint.equals(other.userEndpoint)) return false;
+            }
+            if (this.clientTags == null) {
+                if (other.clientTags != null) return false;
+            } else {
+                if (!this.clientTags.equals(other.clientTags)) return false;
+            }
+            if (this.taskOffsets == null) {
+                if (other.taskOffsets != null) return false;
+            } else {
+                if (!this.taskOffsets.equals(other.taskOffsets)) return false;
+            }
+            if (this.taskEndOffsets == null) {
+                if (other.taskEndOffsets != null) return false;
+            } else {
+                if (!this.taskEndOffsets.equals(other.taskEndOffsets)) return false;
+            }
+            if (this.assignment == null) {
+                if (other.assignment != null) return false;
+            } else {
+                if (!this.assignment.equals(other.assignment)) return false;
+            }
+            if (this.targetAssignment == null) {
+                if (other.targetAssignment != null) return false;
+            } else {
+                if (!this.targetAssignment.equals(other.targetAssignment)) return false;
+            }
+            if (isClassic != other.isClassic) return false;
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (memberId == null ? 0 : memberId.hashCode());
+            hashCode = 31 * hashCode + memberEpoch;
+            hashCode = 31 * hashCode + (instanceId == null ? 0 : instanceId.hashCode());
+            hashCode = 31 * hashCode + (rackId == null ? 0 : rackId.hashCode());
+            hashCode = 31 * hashCode + (clientId == null ? 0 : clientId.hashCode());
+            hashCode = 31 * hashCode + (clientHost == null ? 0 : clientHost.hashCode());
+            hashCode = 31 * hashCode + topologyEpoch;
+            hashCode = 31 * hashCode + (processId == null ? 0 : processId.hashCode());
+            hashCode = 31 * hashCode + (userEndpoint == null ? 0 : userEndpoint.hashCode());
+            hashCode = 31 * hashCode + (clientTags == null ? 0 : clientTags.hashCode());
+            hashCode = 31 * hashCode + (taskOffsets == null ? 0 : taskOffsets.hashCode());
+            hashCode = 31 * hashCode + (taskEndOffsets == null ? 0 : taskEndOffsets.hashCode());
+            hashCode = 31 * hashCode + (assignment == null ? 0 : assignment.hashCode());
+            hashCode = 31 * hashCode + (targetAssignment == null ? 0 : targetAssignment.hashCode());
+            hashCode = 31 * hashCode + (isClassic ? 1231 : 1237);
+            return hashCode;
+        }
+        
+        @Override
+        public Member duplicate() {
+            Member _duplicate = new Member();
+            _duplicate.memberId = memberId;
+            _duplicate.memberEpoch = memberEpoch;
+            if (instanceId == null) {
+                _duplicate.instanceId = null;
+            } else {
+                _duplicate.instanceId = instanceId;
+            }
+            if (rackId == null) {
+                _duplicate.rackId = null;
+            } else {
+                _duplicate.rackId = rackId;
+            }
+            _duplicate.clientId = clientId;
+            _duplicate.clientHost = clientHost;
+            _duplicate.topologyEpoch = topologyEpoch;
+            _duplicate.processId = processId;
+            if (userEndpoint == null) {
+                _duplicate.userEndpoint = null;
+            } else {
+                _duplicate.userEndpoint = userEndpoint.duplicate();
+            }
+            ArrayList<KeyValue> newClientTags = new ArrayList<KeyValue>(clientTags.size());
+            for (KeyValue _element : clientTags) {
+                newClientTags.add(_element.duplicate());
+            }
+            _duplicate.clientTags = newClientTags;
+            ArrayList<TaskOffset> newTaskOffsets = new ArrayList<TaskOffset>(taskOffsets.size());
+            for (TaskOffset _element : taskOffsets) {
+                newTaskOffsets.add(_element.duplicate());
+            }
+            _duplicate.taskOffsets = newTaskOffsets;
+            ArrayList<TaskOffset> newTaskEndOffsets = new ArrayList<TaskOffset>(taskEndOffsets.size());
+            for (TaskOffset _element : taskEndOffsets) {
+                newTaskEndOffsets.add(_element.duplicate());
+            }
+            _duplicate.taskEndOffsets = newTaskEndOffsets;
+            _duplicate.assignment = assignment.duplicate();
+            _duplicate.targetAssignment = targetAssignment.duplicate();
+            _duplicate.isClassic = isClassic;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Member("
+                + "memberId=" + ((memberId == null) ? "null" : "'" + memberId.toString() + "'")
+                + ", memberEpoch=" + memberEpoch
+                + ", instanceId=" + ((instanceId == null) ? "null" : "'" + instanceId.toString() + "'")
+                + ", rackId=" + ((rackId == null) ? "null" : "'" + rackId.toString() + "'")
+                + ", clientId=" + ((clientId == null) ? "null" : "'" + clientId.toString() + "'")
+                + ", clientHost=" + ((clientHost == null) ? "null" : "'" + clientHost.toString() + "'")
+                + ", topologyEpoch=" + topologyEpoch
+                + ", processId=" + ((processId == null) ? "null" : "'" + processId.toString() + "'")
+                + ", userEndpoint=" + ((userEndpoint == null) ? "null" : userEndpoint.toString())
+                + ", clientTags=" + MessageUtil.deepToString(clientTags.iterator())
+                + ", taskOffsets=" + MessageUtil.deepToString(taskOffsets.iterator())
+                + ", taskEndOffsets=" + MessageUtil.deepToString(taskEndOffsets.iterator())
+                + ", assignment=" + assignment.toString()
+                + ", targetAssignment=" + targetAssignment.toString()
+                + ", isClassic=" + (isClassic ? "true" : "false")
+                + ")";
+        }
+        
+        public String memberId() {
+            return this.memberId;
+        }
+        
+        public int memberEpoch() {
+            return this.memberEpoch;
+        }
+        
+        public String instanceId() {
+            return this.instanceId;
+        }
+        
+        public String rackId() {
+            return this.rackId;
+        }
+        
+        public String clientId() {
+            return this.clientId;
+        }
+        
+        public String clientHost() {
+            return this.clientHost;
+        }
+        
+        public int topologyEpoch() {
+            return this.topologyEpoch;
+        }
+        
+        public String processId() {
+            return this.processId;
+        }
+        
+        public Endpoint userEndpoint() {
+            return this.userEndpoint;
+        }
+        
+        public List<KeyValue> clientTags() {
+            return this.clientTags;
+        }
+        
+        public List<TaskOffset> taskOffsets() {
+            return this.taskOffsets;
+        }
+        
+        public List<TaskOffset> taskEndOffsets() {
+            return this.taskEndOffsets;
+        }
+        
+        public Assignment assignment() {
+            return this.assignment;
+        }
+        
+        public Assignment targetAssignment() {
+            return this.targetAssignment;
+        }
+        
+        public boolean isClassic() {
+            return this.isClassic;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Member setMemberId(String v) {
+            this.memberId = v;
+            return this;
+        }
+        
+        public Member setMemberEpoch(int v) {
+            this.memberEpoch = v;
+            return this;
+        }
+        
+        public Member setInstanceId(String v) {
+            this.instanceId = v;
+            return this;
+        }
+        
+        public Member setRackId(String v) {
+            this.rackId = v;
+            return this;
+        }
+        
+        public Member setClientId(String v) {
+            this.clientId = v;
+            return this;
+        }
+        
+        public Member setClientHost(String v) {
+            this.clientHost = v;
+            return this;
+        }
+        
+        public Member setTopologyEpoch(int v) {
+            this.topologyEpoch = v;
+            return this;
+        }
+        
+        public Member setProcessId(String v) {
+            this.processId = v;
+            return this;
+        }
+        
+        public Member setUserEndpoint(Endpoint v) {
+            this.userEndpoint = v;
+            return this;
+        }
+        
+        public Member setClientTags(List<KeyValue> v) {
+            this.clientTags = v;
+            return this;
+        }
+        
+        public Member setTaskOffsets(List<TaskOffset> v) {
+            this.taskOffsets = v;
+            return this;
+        }
+        
+        public Member setTaskEndOffsets(List<TaskOffset> v) {
+            this.taskEndOffsets = v;
+            return this;
+        }
+        
+        public Member setAssignment(Assignment v) {
+            this.assignment = v;
+            return this;
+        }
+        
+        public Member setTargetAssignment(Assignment v) {
+            this.targetAssignment = v;
+            return this;
+        }
+        
+        public Member setIsClassic(boolean v) {
+            this.isClassic = v;
+            return this;
+        }
+    }
+    
+    public static class Assignment implements Message {
+        List<TaskIds> activeTasks;
+        List<TaskIds> standbyTasks;
+        List<TaskIds> warmupTasks;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("active_tasks", new CompactArrayOf(TaskIds.SCHEMA_0), "Active tasks for this client."),
+                new Field("standby_tasks", new CompactArrayOf(TaskIds.SCHEMA_0), "Standby tasks for this client."),
+                new Field("warmup_tasks", new CompactArrayOf(TaskIds.SCHEMA_0), "Warm-up tasks for this client. "),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Assignment(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Assignment() {
+            this.activeTasks = new ArrayList<TaskIds>(0);
+            this.standbyTasks = new ArrayList<TaskIds>(0);
+            this.warmupTasks = new ArrayList<TaskIds>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field activeTasks was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TaskIds> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TaskIds(_readable, _version));
+                    }
+                    this.activeTasks = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field standbyTasks was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TaskIds> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TaskIds(_readable, _version));
+                    }
+                    this.standbyTasks = newCollection;
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field warmupTasks was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<TaskIds> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new TaskIds(_readable, _version));
+                    }
+                    this.warmupTasks = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            _writable.writeUnsignedVarint(activeTasks.size() + 1);
+            for (TaskIds activeTasksElement : activeTasks) {
+                activeTasksElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(standbyTasks.size() + 1);
+            for (TaskIds standbyTasksElement : standbyTasks) {
+                standbyTasksElement.write(_writable, _cache, _version);
+            }
+            _writable.writeUnsignedVarint(warmupTasks.size() + 1);
+            for (TaskIds warmupTasksElement : warmupTasks) {
+                warmupTasksElement.write(_writable, _cache, _version);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(activeTasks.size() + 1));
+                for (TaskIds activeTasksElement : activeTasks) {
+                    activeTasksElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(standbyTasks.size() + 1));
+                for (TaskIds standbyTasksElement : standbyTasks) {
+                    standbyTasksElement.addSize(_size, _cache, _version);
+                }
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(warmupTasks.size() + 1));
+                for (TaskIds warmupTasksElement : warmupTasks) {
+                    warmupTasksElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Assignment)) return false;
+            Assignment other = (Assignment) obj;
+            if (this.activeTasks == null) {
+                if (other.activeTasks != null) return false;
+            } else {
+                if (!this.activeTasks.equals(other.activeTasks)) return false;
+            }
+            if (this.standbyTasks == null) {
+                if (other.standbyTasks != null) return false;
+            } else {
+                if (!this.standbyTasks.equals(other.standbyTasks)) return false;
+            }
+            if (this.warmupTasks == null) {
+                if (other.warmupTasks != null) return false;
+            } else {
+                if (!this.warmupTasks.equals(other.warmupTasks)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (activeTasks == null ? 0 : activeTasks.hashCode());
+            hashCode = 31 * hashCode + (standbyTasks == null ? 0 : standbyTasks.hashCode());
+            hashCode = 31 * hashCode + (warmupTasks == null ? 0 : warmupTasks.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public Assignment duplicate() {
+            Assignment _duplicate = new Assignment();
+            ArrayList<TaskIds> newActiveTasks = new ArrayList<TaskIds>(activeTasks.size());
+            for (TaskIds _element : activeTasks) {
+                newActiveTasks.add(_element.duplicate());
+            }
+            _duplicate.activeTasks = newActiveTasks;
+            ArrayList<TaskIds> newStandbyTasks = new ArrayList<TaskIds>(standbyTasks.size());
+            for (TaskIds _element : standbyTasks) {
+                newStandbyTasks.add(_element.duplicate());
+            }
+            _duplicate.standbyTasks = newStandbyTasks;
+            ArrayList<TaskIds> newWarmupTasks = new ArrayList<TaskIds>(warmupTasks.size());
+            for (TaskIds _element : warmupTasks) {
+                newWarmupTasks.add(_element.duplicate());
+            }
+            _duplicate.warmupTasks = newWarmupTasks;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Assignment("
+                + "activeTasks=" + MessageUtil.deepToString(activeTasks.iterator())
+                + ", standbyTasks=" + MessageUtil.deepToString(standbyTasks.iterator())
+                + ", warmupTasks=" + MessageUtil.deepToString(warmupTasks.iterator())
+                + ")";
+        }
+        
+        public List<TaskIds> activeTasks() {
+            return this.activeTasks;
+        }
+        
+        public List<TaskIds> standbyTasks() {
+            return this.standbyTasks;
+        }
+        
+        public List<TaskIds> warmupTasks() {
+            return this.warmupTasks;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Assignment setActiveTasks(List<TaskIds> v) {
+            this.activeTasks = v;
+            return this;
+        }
+        
+        public Assignment setStandbyTasks(List<TaskIds> v) {
+            this.standbyTasks = v;
+            return this;
+        }
+        
+        public Assignment setWarmupTasks(List<TaskIds> v) {
+            this.warmupTasks = v;
+            return this;
+        }
+    }
+    
+    public static class Endpoint implements Message {
+        String host;
+        int port;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("host", Type.COMPACT_STRING, "host of the endpoint"),
+                new Field("port", Type.UINT16, "port of the endpoint"),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public Endpoint(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public Endpoint() {
+            this.host = "";
+            this.port = 0;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field host was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field host had invalid length " + length);
+                } else {
+                    this.host = _readable.readString(length);
+                }
+            }
+            this.port = _readable.readUnsignedShort();
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(host);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeUnsignedShort(port);
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = host.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'host' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(host, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(2);
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Endpoint)) return false;
+            Endpoint other = (Endpoint) obj;
+            if (this.host == null) {
+                if (other.host != null) return false;
+            } else {
+                if (!this.host.equals(other.host)) return false;
+            }
+            if (port != other.port) return false;
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (host == null ? 0 : host.hashCode());
+            hashCode = 31 * hashCode + port;
+            return hashCode;
+        }
+        
+        @Override
+        public Endpoint duplicate() {
+            Endpoint _duplicate = new Endpoint();
+            _duplicate.host = host;
+            _duplicate.port = port;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "Endpoint("
+                + "host=" + ((host == null) ? "null" : "'" + host.toString() + "'")
+                + ", port=" + port
+                + ")";
+        }
+        
+        public String host() {
+            return this.host;
+        }
+        
+        public int port() {
+            return this.port;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public Endpoint setHost(String v) {
+            this.host = v;
+            return this;
+        }
+        
+        public Endpoint setPort(int v) {
+            if (v < 0 || v > 65535) {
+                throw new RuntimeException("Invalid value " + v + " for unsigned short field.");
+            }
+            this.port = v;
+            return this;
+        }
+    }
+    
+    public static class KeyValue implements Message {
+        String key;
+        String value;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("key", Type.COMPACT_STRING, "key of the config"),
+                new Field("value", Type.COMPACT_STRING, "value of the config"),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public KeyValue(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public KeyValue() {
+            this.key = "";
+            this.value = "";
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field key was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field key had invalid length " + length);
+                } else {
+                    this.key = _readable.readString(length);
+                }
+            }
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field value was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field value had invalid length " + length);
+                } else {
+                    this.value = _readable.readString(length);
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(key);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(value);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = key.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'key' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(key, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                byte[] _stringBytes = value.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'value' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(value, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof KeyValue)) return false;
+            KeyValue other = (KeyValue) obj;
+            if (this.key == null) {
+                if (other.key != null) return false;
+            } else {
+                if (!this.key.equals(other.key)) return false;
+            }
+            if (this.value == null) {
+                if (other.value != null) return false;
+            } else {
+                if (!this.value.equals(other.value)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (key == null ? 0 : key.hashCode());
+            hashCode = 31 * hashCode + (value == null ? 0 : value.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public KeyValue duplicate() {
+            KeyValue _duplicate = new KeyValue();
+            _duplicate.key = key;
+            _duplicate.value = value;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "KeyValue("
+                + "key=" + ((key == null) ? "null" : "'" + key.toString() + "'")
+                + ", value=" + ((value == null) ? "null" : "'" + value.toString() + "'")
+                + ")";
+        }
+        
+        public String key() {
+            return this.key;
+        }
+        
+        public String value() {
+            return this.value;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public KeyValue setKey(String v) {
+            this.key = v;
+            return this;
+        }
+        
+        public KeyValue setValue(String v) {
+            this.value = v;
+            return this;
+        }
+    }
+    
+    public static class TaskIds implements Message {
+        String subtopologyId;
+        List<Integer> partitions;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("subtopology_id", Type.COMPACT_STRING, "The subtopology identifier."),
+                new Field("partitions", new CompactArrayOf(Type.INT32), "The partitions of the input topics processed by this member."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public TaskIds(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public TaskIds() {
+            this.subtopologyId = "";
+            this.partitions = new ArrayList<Integer>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field subtopologyId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field subtopologyId had invalid length " + length);
+                } else {
+                    this.subtopologyId = _readable.readString(length);
+                }
+            }
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field partitions was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<Integer> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(_readable.readInt());
+                    }
+                    this.partitions = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(subtopologyId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeUnsignedVarint(partitions.size() + 1);
+            for (Integer partitionsElement : partitions) {
+                _writable.writeInt(partitionsElement);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = subtopologyId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'subtopologyId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(subtopologyId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(partitions.size() + 1));
+                _size.addBytes(partitions.size() * 4);
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TaskIds)) return false;
+            TaskIds other = (TaskIds) obj;
+            if (this.subtopologyId == null) {
+                if (other.subtopologyId != null) return false;
+            } else {
+                if (!this.subtopologyId.equals(other.subtopologyId)) return false;
+            }
+            if (this.partitions == null) {
+                if (other.partitions != null) return false;
+            } else {
+                if (!this.partitions.equals(other.partitions)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (subtopologyId == null ? 0 : subtopologyId.hashCode());
+            hashCode = 31 * hashCode + (partitions == null ? 0 : partitions.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public TaskIds duplicate() {
+            TaskIds _duplicate = new TaskIds();
+            _duplicate.subtopologyId = subtopologyId;
+            ArrayList<Integer> newPartitions = new ArrayList<Integer>(partitions.size());
+            for (Integer _element : partitions) {
+                newPartitions.add(_element);
+            }
+            _duplicate.partitions = newPartitions;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "TaskIds("
+                + "subtopologyId=" + ((subtopologyId == null) ? "null" : "'" + subtopologyId.toString() + "'")
+                + ", partitions=" + MessageUtil.deepToString(partitions.iterator())
+                + ")";
+        }
+        
+        public String subtopologyId() {
+            return this.subtopologyId;
+        }
+        
+        public List<Integer> partitions() {
+            return this.partitions;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public TaskIds setSubtopologyId(String v) {
+            this.subtopologyId = v;
+            return this;
+        }
+        
+        public TaskIds setPartitions(List<Integer> v) {
+            this.partitions = v;
+            return this;
+        }
+    }
+    
+    public static class TaskOffset implements Message {
+        String subtopologyId;
+        int partition;
+        long offset;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("subtopology_id", Type.COMPACT_STRING, "The subtopology identifier."),
+                new Field("partition", Type.INT32, "The partition."),
+                new Field("offset", Type.INT64, "The offset."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public TaskOffset(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public TaskOffset() {
+            this.subtopologyId = "";
+            this.partition = 0;
+            this.offset = 0L;
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field subtopologyId was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field subtopologyId had invalid length " + length);
+                } else {
+                    this.subtopologyId = _readable.readString(length);
+                }
+            }
+            this.partition = _readable.readInt();
+            this.offset = _readable.readLong();
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(subtopologyId);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(partition);
+            _writable.writeLong(offset);
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = subtopologyId.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'subtopologyId' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(subtopologyId, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            _size.addBytes(8);
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TaskOffset)) return false;
+            TaskOffset other = (TaskOffset) obj;
+            if (this.subtopologyId == null) {
+                if (other.subtopologyId != null) return false;
+            } else {
+                if (!this.subtopologyId.equals(other.subtopologyId)) return false;
+            }
+            if (partition != other.partition) return false;
+            if (offset != other.offset) return false;
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (subtopologyId == null ? 0 : subtopologyId.hashCode());
+            hashCode = 31 * hashCode + partition;
+            hashCode = 31 * hashCode + ((int) (offset >> 32) ^ (int) offset);
+            return hashCode;
+        }
+        
+        @Override
+        public TaskOffset duplicate() {
+            TaskOffset _duplicate = new TaskOffset();
+            _duplicate.subtopologyId = subtopologyId;
+            _duplicate.partition = partition;
+            _duplicate.offset = offset;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "TaskOffset("
+                + "subtopologyId=" + ((subtopologyId == null) ? "null" : "'" + subtopologyId.toString() + "'")
+                + ", partition=" + partition
+                + ", offset=" + offset
+                + ")";
+        }
+        
+        public String subtopologyId() {
+            return this.subtopologyId;
+        }
+        
+        public int partition() {
+            return this.partition;
+        }
+        
+        public long offset() {
+            return this.offset;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public TaskOffset setSubtopologyId(String v) {
+            this.subtopologyId = v;
+            return this;
+        }
+        
+        public TaskOffset setPartition(int v) {
+            this.partition = v;
+            return this;
+        }
+        
+        public TaskOffset setOffset(long v) {
+            this.offset = v;
+            return this;
+        }
+    }
+    
+    public static class TopicInfo implements Message {
+        String name;
+        int partitions;
+        short replicationFactor;
+        List<KeyValue> topicConfigs;
+        private List<RawTaggedField> _unknownTaggedFields;
+        
+        public static final Schema SCHEMA_0 =
+            new Schema(
+                new Field("name", Type.COMPACT_STRING, "The name of the topic."),
+                new Field("partitions", Type.INT32, "The number of partitions in the topic. Can be 0 if no specific number of partitions is enforced. Always 0 for changelog topics."),
+                new Field("replication_factor", Type.INT16, "The replication factor of the topic. Can be 0 if the default replication factor should be used."),
+                new Field("topic_configs", new CompactArrayOf(KeyValue.SCHEMA_0), "Topic-level configurations as key-value pairs."),
+                TaggedFieldsSection.of(
+                )
+            );
+        
+        public static final Schema[] SCHEMAS = new Schema[] {
+            SCHEMA_0
+        };
+        
+        public static final short LOWEST_SUPPORTED_VERSION = 0;
+        public static final short HIGHEST_SUPPORTED_VERSION = 0;
+        
+        public TopicInfo(Readable _readable, short _version) {
+            read(_readable, _version);
+        }
+        
+        public TopicInfo() {
+            this.name = "";
+            this.partitions = 0;
+            this.replicationFactor = (short) 0;
+            this.topicConfigs = new ArrayList<KeyValue>(0);
+        }
+        
+        
+        @Override
+        public short lowestSupportedVersion() {
+            return 0;
+        }
+        
+        @Override
+        public short highestSupportedVersion() {
+            return 32767;
+        }
+        
+        @Override
+        public final void read(Readable _readable, short _version) {
+            {
+                int length;
+                length = _readable.readUnsignedVarint() - 1;
+                if (length < 0) {
+                    throw new RuntimeException("non-nullable field name was serialized as null");
+                } else if (length > 0x7fff) {
+                    throw new RuntimeException("string field name had invalid length " + length);
+                } else {
+                    this.name = _readable.readString(length);
+                }
+            }
+            this.partitions = _readable.readInt();
+            this.replicationFactor = _readable.readShort();
+            {
+                int arrayLength;
+                arrayLength = _readable.readUnsignedVarint() - 1;
+                if (arrayLength < 0) {
+                    throw new RuntimeException("non-nullable field topicConfigs was serialized as null");
+                } else {
+                    if (arrayLength > _readable.remaining()) {
+                        throw new RuntimeException("Tried to allocate a collection of size " + arrayLength + ", but there are only " + _readable.remaining() + " bytes remaining.");
+                    }
+                    ArrayList<KeyValue> newCollection = new ArrayList<>(arrayLength);
+                    for (int i = 0; i < arrayLength; i++) {
+                        newCollection.add(new KeyValue(_readable, _version));
+                    }
+                    this.topicConfigs = newCollection;
+                }
+            }
+            this._unknownTaggedFields = null;
+            int _numTaggedFields = _readable.readUnsignedVarint();
+            for (int _i = 0; _i < _numTaggedFields; _i++) {
+                int _tag = _readable.readUnsignedVarint();
+                int _size = _readable.readUnsignedVarint();
+                switch (_tag) {
+                    default:
+                        this._unknownTaggedFields = _readable.readUnknownTaggedField(this._unknownTaggedFields, _tag, _size);
+                        break;
+                }
+            }
+        }
+        
+        @Override
+        public void write(Writable _writable, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = _cache.getSerializedValue(name);
+                _writable.writeUnsignedVarint(_stringBytes.length + 1);
+                _writable.writeByteArray(_stringBytes);
+            }
+            _writable.writeInt(partitions);
+            _writable.writeShort(replicationFactor);
+            _writable.writeUnsignedVarint(topicConfigs.size() + 1);
+            for (KeyValue topicConfigsElement : topicConfigs) {
+                topicConfigsElement.write(_writable, _cache, _version);
+            }
+            RawTaggedFieldWriter _rawWriter = RawTaggedFieldWriter.forFields(_unknownTaggedFields);
+            _numTaggedFields += _rawWriter.numFields();
+            _writable.writeUnsignedVarint(_numTaggedFields);
+            _rawWriter.writeRawTags(_writable, Integer.MAX_VALUE);
+        }
+        
+        @Override
+        public void addSize(MessageSizeAccumulator _size, ObjectSerializationCache _cache, short _version) {
+            int _numTaggedFields = 0;
+            {
+                byte[] _stringBytes = name.getBytes(StandardCharsets.UTF_8);
+                if (_stringBytes.length > 0x7fff) {
+                    throw new RuntimeException("'name' field is too long to be serialized");
+                }
+                _cache.cacheSerializedValue(name, _stringBytes);
+                _size.addBytes(_stringBytes.length + ByteUtils.sizeOfUnsignedVarint(_stringBytes.length + 1));
+            }
+            _size.addBytes(4);
+            _size.addBytes(2);
+            {
+                _size.addBytes(ByteUtils.sizeOfUnsignedVarint(topicConfigs.size() + 1));
+                for (KeyValue topicConfigsElement : topicConfigs) {
+                    topicConfigsElement.addSize(_size, _cache, _version);
+                }
+            }
+            if (_unknownTaggedFields != null) {
+                _numTaggedFields += _unknownTaggedFields.size();
+                for (RawTaggedField _field : _unknownTaggedFields) {
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.tag()));
+                    _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_field.size()));
+                    _size.addBytes(_field.size());
+                }
+            }
+            _size.addBytes(ByteUtils.sizeOfUnsignedVarint(_numTaggedFields));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TopicInfo)) return false;
+            TopicInfo other = (TopicInfo) obj;
+            if (this.name == null) {
+                if (other.name != null) return false;
+            } else {
+                if (!this.name.equals(other.name)) return false;
+            }
+            if (partitions != other.partitions) return false;
+            if (replicationFactor != other.replicationFactor) return false;
+            if (this.topicConfigs == null) {
+                if (other.topicConfigs != null) return false;
+            } else {
+                if (!this.topicConfigs.equals(other.topicConfigs)) return false;
+            }
+            return MessageUtil.compareRawTaggedFields(_unknownTaggedFields, other._unknownTaggedFields);
+        }
+        
+        @Override
+        public int hashCode() {
+            int hashCode = 0;
+            hashCode = 31 * hashCode + (name == null ? 0 : name.hashCode());
+            hashCode = 31 * hashCode + partitions;
+            hashCode = 31 * hashCode + replicationFactor;
+            hashCode = 31 * hashCode + (topicConfigs == null ? 0 : topicConfigs.hashCode());
+            return hashCode;
+        }
+        
+        @Override
+        public TopicInfo duplicate() {
+            TopicInfo _duplicate = new TopicInfo();
+            _duplicate.name = name;
+            _duplicate.partitions = partitions;
+            _duplicate.replicationFactor = replicationFactor;
+            ArrayList<KeyValue> newTopicConfigs = new ArrayList<KeyValue>(topicConfigs.size());
+            for (KeyValue _element : topicConfigs) {
+                newTopicConfigs.add(_element.duplicate());
+            }
+            _duplicate.topicConfigs = newTopicConfigs;
+            return _duplicate;
+        }
+        
+        @Override
+        public String toString() {
+            return "TopicInfo("
+                + "name=" + ((name == null) ? "null" : "'" + name.toString() + "'")
+                + ", partitions=" + partitions
+                + ", replicationFactor=" + replicationFactor
+                + ", topicConfigs=" + MessageUtil.deepToString(topicConfigs.iterator())
+                + ")";
+        }
+        
+        public String name() {
+            return this.name;
+        }
+        
+        public int partitions() {
+            return this.partitions;
+        }
+        
+        public short replicationFactor() {
+            return this.replicationFactor;
+        }
+        
+        public List<KeyValue> topicConfigs() {
+            return this.topicConfigs;
+        }
+        
+        @Override
+        public List<RawTaggedField> unknownTaggedFields() {
+            if (_unknownTaggedFields == null) {
+                _unknownTaggedFields = new ArrayList<>(0);
+            }
+            return _unknownTaggedFields;
+        }
+        
+        public TopicInfo setName(String v) {
+            this.name = v;
+            return this;
+        }
+        
+        public TopicInfo setPartitions(int v) {
+            this.partitions = v;
+            return this;
+        }
+        
+        public TopicInfo setReplicationFactor(short v) {
+            this.replicationFactor = v;
+            return this;
+        }
+        
+        public TopicInfo setTopicConfigs(List<KeyValue> v) {
+            this.topicConfigs = v;
+            return this;
+        }
+    }
+}

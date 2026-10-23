@@ -2,13 +2,23 @@
 
 **方案日期：2026-09-26；本地整理：2026-09-27。**
 
-**状态：BK T2/T3 的共同 checkpoint+tail、同 Owner 持续 rollover 和当前 run 的 Native create 准入已完成限定范围协调验收；T4 前三批 Object 授权、成功 PUT 证据复用、异步物理 checkpoint、短锁及预算所有权修复已通过限定范围协调验收。§8.5/§8.6 KMS Cell 锁范围与真实新 run key 轮转、M4 局部读取适配也已通过限定范围协调复查。M1–M4 首次提交已发布至 Nereus `4cd7ee89` 和 Kafka fork `020f3390`；首次 Nereus CI 的文档链接检查及当前读控测试失败，修复已进入后续 M5 工作区但尚未重新发布验证。原生 Object Broker 请求兼容及完整 M5 尚未完成；不构成完整 NSIP-1、全局里程碑或生产验收。**
+**M5 当前状态（2026-10-23）：既定实现和同源整体验收已完成，C4 已通过。**
 
-2026-10-23 当前 C4：`3aa5c9c1…72df1f` 一跳候选及新 COMPONENTS566 已通过源码绑定检查，但协调复核确认
+[当前 commit-bound Final](../evidence/v2-m5/final/final-source-a0ba94e01af07711abf00533be523b9216616738/m5-final.json) 绑定 Nereus `a0ba94e01af07711abf00533be523b9216616738`、Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`、Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`。五阶段566／1332／39／63／736，共2736项，零失败、错误或跳过；17项义务与五个子项均通过。Native BK replacement／expiry、真实UNKNOWN对账、实际缺失与D／Cell结算、Native DONE及backlog已验证；Object GC有独立证据。14项场景绑定当前Final；3项M6延后场景、READ15及原生Object Broker／生产部署等边界保持。完整NSIP-1及M6/M7/M8不据此宣称完成。
+
+本次限定校验层后继的源码输入为 `700d37b25bcd2c40a42d583d608c0a925c580f2f41fbe39bd0cd783a1b79b7a0`；COMPONENTS 在该根新执行，四个后端原始记录保留 `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` 的根、时间、命令和全部附件，由已复核的 input-only 证明与新的治理补验绑定。原同批后端结果没有重跑或改标。
+
+## 交付前执行历史
+
+以下d9／4059／f541／5ef、局部运行及当时“未完成”的叙述只记录对应时间和输入，当前结论以上述Final为准。原失败、诊断和输入根不改写，也不当作当前通过凭据。
+
+**交付前历史状态：BK T2/T3 的共同 checkpoint+tail、同 Owner 持续 rollover 和当前 run 的 Native create 准入已完成限定范围协调验收；T4 前三批 Object 授权、成功 PUT 证据复用、异步物理 checkpoint、短锁及预算所有权修复已通过限定范围协调验收。§8.5/§8.6 KMS Cell 锁范围与真实新 run key 轮转、M4 局部读取适配也已通过限定范围协调复查。M1–M4 首次提交已发布至 Nereus `4cd7ee89` 和 Kafka fork `020f3390`；首次 Nereus CI 的文档链接检查及当前读控测试失败，修复已进入后续 M5 工作区但尚未重新发布验证。原生 Object Broker 请求兼容及完整 M5 尚未完成；不构成完整 NSIP-1、全局里程碑或生产验收。**
+
+2026-10-23 当时 C4：`3aa5c9c1…72df1f` 一跳候选及新 COMPONENTS566 已通过源码绑定检查，但协调复核确认
 原有 Native Pulsar BK 生命周期组合缺口。当前 development20 已实际走通 replacement／expiry 的 Native completion、
 精确 M4 RELEASED、BK INTENT→原请求丢响应恢复→真实缺失／D 结算与 Cell 释放、冷恢复 backlog 和 Native DONE。
 目录变化负例也命中既有校验；最后一项夹具将直接异常误断言成根因，现仅修正 matcher，原失败 XML 保留。
-这些局部运行尚非通过的完整阶段。当前正式输入 `d9c419aa…3dad7` 已通过 COMPONENTS566、BK/Oxia1332、
+这些局部运行尚非通过的完整阶段。该阶段正式输入 `d9c419aa…3dad7` 已通过 COMPONENTS566、BK/Oxia1332、
 Object39 和完整 Kafka63。Kafka 最初一次内部 topic 的 Produce/rollover 超时仍未解释；保留原失败后，
 孤立诊断及唯一一次完整57+6复验通过，40份只读线程采样覆盖实际启动与后续GC，不声称已修复。
 Native Pulsar 首套32 suites／649项通过；第二套 DELETE SDK 资格的5项中3项因复用第一套bucket名收到409，
@@ -60,7 +70,7 @@ helper的3个实际class均匹配原冻结SHA，原负载／超时／容量不�
 成功后直接集中C4及既授权C5，纯状态更新走既有STATUS_DOCS／evidence-only后继，不再触发产品验证循环。
 未有新实际失败不扩测试／评审，尚无C4／C5、提交或推送。
 
-当前正式输入 `5ef7ed2e…18c147da` 的 COMPONENTS566 通过；BK/Oxia 四项实际运行完成，但外层闭包校验因
+该阶段正式输入 `5ef7ed2e…18c147da` 的 COMPONENTS566 通过；BK/Oxia 四项实际运行完成，但外层闭包校验因
 5 份 JavaCompile 增量状态变化退出1，尚无该阶段成功记录。三库源码、其他产物与1227个实际运行输入均匹配。
 已按协调决定将这类精确来源、全图无外部消费者的可变编译状态保留为不可变审计对象，完整保留源码、class/JAR、
 工具和运行依赖校验；当时54项证据合约通过。该分类已用于上述d9实际冻结，原失败材料不改写。

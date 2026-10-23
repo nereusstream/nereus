@@ -1,0 +1,83 @@
+{
+  "bookKeeperImage": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+  "endpoint": "http://127.0.0.1:58280",
+  "heads": {
+    "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus": "4cd7ee8917a351bf73ca90775a557f6d398d0b82",
+    "/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/nereusstream/pulsar": "a14e0e6f4e49be0677318b4ceefc7b85b445823b"
+  },
+  "minioImage": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+  "nativeOwnedPaths": [
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/ManagedLedgerConfig.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/SourceSafeLedgerOffloader.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/DualSourceReadHandle.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/EntryImpl.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/ManagedCursorImpl.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/ManagedLedgerImpl.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/MetaStore.java",
+    "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/impl/MetaStoreImpl.java",
+    "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/DualSourceReadHandleTest.java",
+    "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/EntryImplTest.java",
+    "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/ManagedCursorTest.java",
+    "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/ManagedLedgerTest.java",
+    "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/OffloadLedgerDeleteTest.java"
+  ],
+  "originalContainers": {
+    "6af01328793553b662946396829d700f0568f500f0a2307f22df613c8e882cfa": [
+      "/charming_shannon",
+      "exited"
+    ],
+    "6b8cfe4e53a839b45bc02854980f48bc8e17815faf4e7af28750fcbffb488100": [
+      "/gracious_lichterman",
+      "exited"
+    ],
+    "b57d3894d2c061fc2d8d145c675ddf74fc1ca7d1011273f7100e2dc3e112a72f": [
+      "/Dell_iDRAC_fan_controller",
+      "exited"
+    ],
+    "fc5ee64701cde4427c46ad709a2d34d9f2761dd478f96f87ed9a188a698205c5": [
+      "/connector",
+      "running"
+    ]
+  },
+  "ownedContainers": [
+    {
+      "id": "833453907f4c3d9e68cb9df0eac57310c3984a0aedbe456a7ad1ca1402c22c8e",
+      "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-bookie-0-1",
+      "startedAt": "2026-10-23T11:27:24.829972843Z"
+    },
+    {
+      "id": "8f85ecce8dd62114f66e40b1bffb4a8204611cbf0b73939efdd1bc2fd0d4f5a2",
+      "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-bookie-1-1",
+      "startedAt": "2026-10-23T11:27:24.827835177Z"
+    },
+    {
+      "id": "63f8408dcac5d617792dd24a2595fb7fce94d24a3c13405fc576da192fbb008e",
+      "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-bookie-2-1",
+      "startedAt": "2026-10-23T11:27:24.829263635Z"
+    },
+    {
+      "id": "f9f76158a077d34490d2ddb561afba4ed93ece46692b7733961e77f110fcb576",
+      "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-metadata-service-1",
+      "startedAt": "2026-10-23T11:27:20.219570383Z"
+    },
+    {
+      "id": "c1917e59868ebd1596494c4fe71f2310eb0428f63300c72e5e25525c73264a26",
+      "imageId": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-minio",
+      "startedAt": "2026-10-23T11:27:41.58085867Z"
+    },
+    {
+      "id": "ddf61d3968af59ffca8d75a16e557497029cb1326821146871dec4106362a797",
+      "imageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+      "name": "/nereus-m5-native-pulsar-green-complete-2049-oxia",
+      "startedAt": "2026-10-23T11:27:42.757717171Z"
+    }
+  ],
+  "oxiaAddress": "127.0.0.1:58285",
+  "oxiaImage": "nereus/oxia-m3-allocator:37a17bef1720",
+  "zk": "127.0.0.1:2181"
+}

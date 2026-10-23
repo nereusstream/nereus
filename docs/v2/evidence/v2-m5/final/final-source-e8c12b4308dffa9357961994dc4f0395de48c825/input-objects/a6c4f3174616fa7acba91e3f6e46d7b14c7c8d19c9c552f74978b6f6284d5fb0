@@ -1,0 +1,13 @@
+{
+  "schema": "NEREUS_M5R1_V1_HISTORY_MIGRATION_FIXTURE",
+  "encoderSourceCommit": "b17c0a03ad0543171bb50856e10ef87045521aca",
+  "historicalSourceSha256": {
+    "M5BindingAuthorityRecordsV1.java": "2119ee06a86e73e667b849dd63f7d2d805044e0ad0cfb6c316bd6ef3a5d7cf9f",
+    "M5BindingAuthorityCodecV1.java": "8215ccb36bbeccda8be59da16f2f88e72d0f1ea71440a21f32678a0e63309047"
+  },
+  "fixtureSha256": "5cd63ab14744698e182697640e1ab296b3412047cb31614976e7bfaef086ab02",
+  "fixtureBytes": 1216,
+  "sourceAuthority": "SYNTHETIC_FULL_AND_RETIRED_BATCH_FIXTURE",
+  "m5Receipt": false,
+  "productionAuthority": false
+}

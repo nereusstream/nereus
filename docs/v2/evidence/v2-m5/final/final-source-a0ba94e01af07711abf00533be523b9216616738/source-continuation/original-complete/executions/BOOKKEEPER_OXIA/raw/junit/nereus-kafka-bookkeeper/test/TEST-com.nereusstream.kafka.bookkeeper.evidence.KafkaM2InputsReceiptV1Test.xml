@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:34:15.531Z" hostname="liusinandeMacBook-Pro.local" time="0.013">
+  <properties/>
+  <testcase name="rejectsPromotionAndUnknownSchemaKindOrResult()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.003"/>
+  <testcase name="canonicalFileParserRejectsSymlinkAndOversizedRoot()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.004"/>
+  <testcase name="rejectsMalformedCommitShaAndImageDigestSourceFields()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.001"/>
+  <testcase name="requiresFiveSortedNonZeroZeroSkipPassingChildGates()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.001"/>
+  <testcase name="rejectsWhitespaceTrailingBytesUnknownOrderAndMalformedUtf8()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.002"/>
+  <testcase name="canonicalRoundTripPreservesTheExactNonPromotableReceipt()" classname="com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

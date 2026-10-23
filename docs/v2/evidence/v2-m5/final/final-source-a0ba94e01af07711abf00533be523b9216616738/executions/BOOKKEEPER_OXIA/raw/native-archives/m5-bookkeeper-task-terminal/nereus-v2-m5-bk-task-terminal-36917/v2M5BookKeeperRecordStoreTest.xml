@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:28:44.353Z" hostname="liusinandeMacBook-Pro.local" time="0.061">
+  <properties/>
+  <testcase name="sameRelativeRecordInAnotherCellCannotBeObservedOrOverwritten()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.037"/>
+  <testcase name="nativeFactRequiresTheExactPhysicalVersionAndRoute()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.006"/>
+  <testcase name="exactNativeKeyMaximumAndClosedFamiliesRejectBeforeIo()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.002"/>
+  <testcase name="taskAndDescriptorContentAddressesAndCandidateWidthsAreRequiredBeforeCreate()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.002"/>
+  <testcase name="lostCreateResponseReconcilesExactBytesAndConflictNeverOverwrites()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.002"/>
+  <testcase name="missingDeliveryAndCorruptNativeValuesNeverBecomeAuthoritativeAbsence()" classname="com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

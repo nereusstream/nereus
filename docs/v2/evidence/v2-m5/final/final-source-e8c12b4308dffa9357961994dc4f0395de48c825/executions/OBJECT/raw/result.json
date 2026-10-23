@@ -1,0 +1,13 @@
+{
+  "actualGradleExit": 0,
+  "capturedInputsUnchanged": true,
+  "counts": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 5
+  },
+  "inputRootSha256": "c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9",
+  "m5Receipt": false,
+  "wholeM5Authority": false
+}

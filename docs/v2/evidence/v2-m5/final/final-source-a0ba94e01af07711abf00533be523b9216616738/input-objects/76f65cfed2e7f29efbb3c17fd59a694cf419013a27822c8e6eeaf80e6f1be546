@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="13.3.0">
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5ZooKeeperReadReplyFixtureV1.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5BookKeeperDeleteAdapterV1Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/CellSessionOperationRegistryTest.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/BookKeeperV3Crc32cAddPayloadLimitV1Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5PulsarNativeCreateSpecV1Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/RealBookKeeperClientConfigurationV1Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5BookKeeperNativeCreateSpecV2Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/RealBookKeeperCellSessionV1Test.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5BookKeeperDeleteFaultFixtureV2.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/M5PulsarGenerationReplyFixtureV1.java">
+</file>
+<file name="/Users/liusinan/apps/ideaproject/nereusstream/nereus-m5-fresh-20261023/native-bk-inputs-attempt-6/workspace/GITHUB/nereus/nereus-storage-bookkeeper/src/test/java/com/nereusstream/storage/bookkeeper/BookKeeperDependencyBoundaryTest.java">
+</file>
+</checkstyle>

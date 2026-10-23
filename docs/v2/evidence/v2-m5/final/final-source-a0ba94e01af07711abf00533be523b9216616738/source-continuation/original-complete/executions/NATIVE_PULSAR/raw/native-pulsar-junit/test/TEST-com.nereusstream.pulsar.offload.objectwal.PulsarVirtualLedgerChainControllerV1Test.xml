@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:48:37.791Z" hostname="liusinandeMacBook-Pro.local" time="0.006">
+  <properties/>
+  <testcase name="productionNvAdapterRejectsEvidenceOnlyCoordinatorAsRuntimeAuthority()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.003"/>
+  <testcase name="rejectsAllocatorValueOutsideTheImmutableSlice()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.001"/>
+  <testcase name="failsClosedWhenAllocatorExhaustsInsteadOfSearchingAnotherSlice()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.0"/>
+  <testcase name="rejectsUnknownMutationWhoseRereadIsAnotherWinner()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.001"/>
+  <testcase name="reconcilesUnknownMutationOnlyByExactReread()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.0"/>
+  <testcase name="redrivesTheSameCandidateWhenUnknownRereadStillShowsExactPredecessor()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.0"/>
+  <testcase name="opensFirstLedgerAndPublishesExplicitSuccessorLink()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1Test" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

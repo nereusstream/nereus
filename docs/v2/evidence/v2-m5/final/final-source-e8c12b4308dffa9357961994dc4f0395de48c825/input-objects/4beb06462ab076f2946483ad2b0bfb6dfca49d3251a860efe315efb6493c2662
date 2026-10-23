@@ -1,0 +1,105 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-storage-bookkeeper",
+    "version": "0.2.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-api",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "size": 239693,
+          "sha512": "1a32ad760c057fec4ae4752bf96175a2d73c05c5dff0a7f2ce6a848fb5c13b7d454f397fd56c52884530019ba7442daf724c6825177cad7b5d80b7bf544df24f",
+          "sha256": "b0c948fc65f3075c3b06605f7a37de9a00789d75327189dfeeb8ed42fa147a14",
+          "sha1": "81a7f963d10cd8822f242fef3be32d576f4a21a2",
+          "md5": "c65408dbe600ccb991dc493df8c8f97f"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.apache.bookkeeper",
+          "module": "bookkeeper-server",
+          "version": {
+            "requires": "4.18.0"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-api",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "size": 239693,
+          "sha512": "1a32ad760c057fec4ae4752bf96175a2d73c05c5dff0a7f2ce6a848fb5c13b7d454f397fd56c52884530019ba7442daf724c6825177cad7b5d80b7bf544df24f",
+          "sha256": "b0c948fc65f3075c3b06605f7a37de9a00789d75327189dfeeb8ed42fa147a14",
+          "sha1": "81a7f963d10cd8822f242fef3be32d576f4a21a2",
+          "md5": "c65408dbe600ccb991dc493df8c8f97f"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT-sources.jar",
+          "url": "nereus-storage-bookkeeper-0.2.0-SNAPSHOT-sources.jar",
+          "size": 83363,
+          "sha512": "93b2ea05b71d36064fd2ed7244b881ed7b93880b45b131842023f322e68014374f7e9abcfb0a6a15a941ccbd77f93a42df7d4f09defae212c14ad96fb85c262c",
+          "sha256": "bcf58cc9e76e5b66735ae20a7dc395b2b4f607575068c4f1aadb0435b1d3f7a1",
+          "sha1": "de4801e528a92d201e1bf9374946de437bfe8b90",
+          "md5": "575fdbd023c83bcdc357d0fe2d32e7e4"
+        }
+      ]
+    }
+  ]
+}

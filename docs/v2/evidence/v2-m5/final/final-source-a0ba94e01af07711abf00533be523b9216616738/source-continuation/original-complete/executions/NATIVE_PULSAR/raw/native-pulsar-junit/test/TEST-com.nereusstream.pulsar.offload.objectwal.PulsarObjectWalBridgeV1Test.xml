@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" tests="43" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:48:37.585Z" hostname="liusinandeMacBook-Pro.local" time="0.206">
+  <properties/>
+  <testcase name="m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.026"/>
+  <testcase name="combinedTrackerAndLocatorReservationFailsBeforeAnySharedPositionOrTicket()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="successorLocalSealFailureRetainsExactEntryZeroForOldPlanRetry()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.003"/>
+  <testcase name="publishesSharedExtentWithExactPositionsAndIndependentBindingFrontiers()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="entryBoundRequiresExplicitRolloverBeforeAnotherPositionIsAllocated()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="pulsarOwnerFenceRejectsMonotonicRollbackBeforeRecoveryCallback()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.009"/>
+  <testcase name="rawNativeResultRejectsAnyFailureErrorOrSkipCounter()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.005"/>
+  <testcase name="recoveredActiveTailAlsoConsumesTheLiveLocatorCap()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="durableTakeoverFenceDiscardsOldOwnerReservationsAndTickets()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.002"/>
+  <testcase name="manifestHandoffWaitsForActiveReadPinsBeforeReleasingCoveredLocator()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.002"/>
+  <testcase name="sharedFailedPlanTakeoverMustFenceAndDiscardEverySiblingAtomically()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.003"/>
+  <testcase name="pulsarOwnerFenceReleasesAuthorityAfterRecoveryCallbackFailure()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="pulsarOwnerFenceCoversRecoveryAndRejectsOldOwnerLatePut()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="rawNativeResultRoundTripsWithExactSourceJunitCountersAndM6Exclusion()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.008"/>
+  <testcase name="recoveredActiveTailMustBeBoundedAndExactlyContiguous()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="exceptionalPublishRetainsTheExactPositionAndTicketForSameEntryRecovery()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="manifestAuthorityMismatchRetainsEveryActiveLocator()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="checkedTicketCounterCrossesSignedBoundaryAndUsesUnsignedMaxOnceThenFailsBeforeAnotherPosition()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="installsActiveTailBeforeAckAndReadsEachSharedMemberWithoutCrossBindingPoisoning()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="localSealFailureReleasesTheExactPostPositionTicketBeforeProviderDispatch()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="recoveredManifestCoverageIsAuthorityVerifiedBeforeActivationAndRead()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="productionObjectWalAdapterOwnsCommonSessionAndExposesNoPlaintextKeyOrListBudget()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.004"/>
+  <testcase name="exceptionalReconcileRetainsUnknownPositionAndTicketForSameEntryRecovery()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="exceptionalManifestVerificationCannotPublishCoverageOrReleaseLocator()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="everyCancellationUnknownRetryAndCompletionReleaseRequiresExactTicketOwnership()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="activeLocatorRejectsSealedOffloadObjectKeys()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="staleTicketCannotReleaseAReusedRingSlot()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="failedRecoveryAuthenticationNeverActivatesBindingOrPublishesFrontier()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="successorAllocationExhaustionLeavesTheCurrentHeadUnchanged()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="perMemberFailureCannotMasqueradeAsSharedOrPreBindingValidation()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="unknownDrainRetainsCommonRecoveryAndKmsUntilReconcileThenTerminalClose()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.045"/>
+  <testcase name="m4PulsarCurrentSourceLatencyAndAllocationAreBounded()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.067"/>
+  <testcase name="m4PulsarPhysicalRouteOrdinalCannotBeReusedAcrossReadCells()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="definitivelyAbsentSingleEntryCanSealAndMoveToSuccessorEntryZero()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="boundedRecoveryValidatesAdjacencyThenReconstructsFreshTickets()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="definitiveAbsenceStopsAdmissionThenResumeUsesTheSameEntry()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="rawNativeResultRejectsCallerStatusTrailingBytesAndReceiptHashTampering()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.002"/>
+  <testcase name="rejectsOutOfOrderLaneResolutionBeforePublishingLocatorOrBindingFrontier()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.001"/>
+  <testcase name="sharedDefinitiveAbsenceCannotPartiallyRolloverHeads()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="bindingLocalAppendFailureRetainsOnlyItsTypedGapWhileSiblingPublishesAndContinues()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.002"/>
+  <testcase name="manifestHandoffSwitchesReadSourceOnlyAfterReadableCoverageExists()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.0"/>
+  <testcase name="productionAtomicProjectionIgnoresExistingVersionTokenUnderRootNoneAndPublishesClosure()" classname="com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test" time="0.005"/>
+  <system-out><![CDATA[M4_METRIC PULSAR_CURRENT_SOURCE operations=1000 elapsedNanos=40191625 p50Nanos=36500 p99Nanos=91959 maxNanos=142166 throughputOpsPerSecond=24880 callerAllocatedBytes=472000 callerAllocatedBytesPerOperation=472 ownerAllocatedBytes=8635520 ownerAllocatedBytesPerOperation=8635 measuredAllocatedBytes=9107520 measuredAllocatedBytesPerOperation=9107 hazardCapacity=8 outerHazardCasPerRead=2 perCallbackSlotCas=0 reusablePlanCapacity=1
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

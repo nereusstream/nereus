@@ -1,0 +1,71 @@
+[90mOct 23 10:36:54.924368[0m [32mINF[0m [1mStarting Oxia standalone[0m [36mconfig=[0m{"DataServerOptions":{"featureFlags":{},"observability":{"log":{},"metric":{"bindAddress":"0.0.0.0:8080","enabled":null,"tls":{"enabled":null}}},"replication":{"tls":{"enabled":null}},"scheduler":{"checksum":{}},"server":{"internal":{"auth":{},"bindAddress":"","tls":{"enabled":null}},"public":{"auth":{},"bindAddress":"0.0.0.0:6648","tls":{"enabled":null}}},"storage":{"database":{"dir":"./data/db","readCacheSizeMB":100},"notification":{"retention":"1h0m0s"},"wal":{"dir":"./data/wal","retention":"1h0m0s","sync":true}}},"KeySorting":2,"NotificationsEnabled":true,"NumShards":4}
+[90mOct 23 10:36:54.929302[0m [32mINF[0m [1mFound 0 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m0
+[90mOct 23 10:36:54.932179[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m-1
+[90mOct 23 10:36:54.933524[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"-1","term":"-1"} [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:36:54.933656[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m-1 [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:36:54.933859[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:36:54.933893[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:36:54.938998[0m [32mINF[0m [1mFound 0 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m1
+[90mOct 23 10:36:54.942759[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m-1
+[90mOct 23 10:36:54.944206[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"-1","term":"-1"} [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:36:54.944331[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m-1 [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:36:54.944390[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:36:54.944413[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:36:54.948632[0m [32mINF[0m [1mFound 0 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m2
+[90mOct 23 10:36:54.952338[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m-1
+[90mOct 23 10:36:54.953842[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"-1","term":"-1"} [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:36:54.953951[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m-1 [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:36:54.954034[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:36:54.954054[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:36:54.958519[0m [32mINF[0m [1mFound 0 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m3
+[90mOct 23 10:36:54.961801[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m-1
+[90mOct 23 10:36:54.962961[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"-1","term":"-1"} [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:36:54.963032[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m-1 [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:36:54.963066[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:36:54.963079[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m-1 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:36:54.963112[0m [32mINF[0m [1mUpdate shard assignments.[0m [36mcomponent=[0mshard-assignment-dispatcher
+[90mOct 23 10:36:54.966273[0m [32mINF[0m [1mStarted Grpc server[0m [36mbindAddress=[0m[::]:6648 [36mgrpc-server=[0mpublic
+[90mOct 23 10:36:54.966385[0m [32mINF[0m [1mServing Prometheus metrics at http://localhost:8080/metrics[0m
+[90mOct 23 10:49:54.695465[0m [32mINF[0m [1mReceived signal, exiting[0m [36msignal=[0mterminated
+[90mOct 23 10:49:54.695932[0m [32mINF[0m [1mClosing leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:49:55.065901[0m [32mINF[0m [1mClosing leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:49:55.418128[0m [32mINF[0m [1mClosing leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:49:55.429413[0m [32mINF[0m [1mClosing leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:49:55.755628[0m [32mINF[0m [1mStopped Grpc server[0m [36mbindAddress=[0m[::]:6648 [36mgrpc-server=[0mpublic
+[90mOct 23 10:49:55.755669[0m [32mINF[0m [1mShutdown Completed[0m
+[90mOct 23 10:49:55.996652[0m [32mINF[0m [1mStarting Oxia standalone[0m [36mconfig=[0m{"DataServerOptions":{"featureFlags":{},"observability":{"log":{},"metric":{"bindAddress":"0.0.0.0:8080","enabled":null,"tls":{"enabled":null}}},"replication":{"tls":{"enabled":null}},"scheduler":{"checksum":{}},"server":{"internal":{"auth":{},"bindAddress":"","tls":{"enabled":null}},"public":{"auth":{},"bindAddress":"0.0.0.0:6648","tls":{"enabled":null}}},"storage":{"database":{"dir":"./data/db","readCacheSizeMB":100},"notification":{"retention":"1h0m0s"},"wal":{"dir":"./data/wal","retention":"1h0m0s","sync":true}}},"KeySorting":2,"NotificationsEnabled":true,"NumShards":4}
+[90mOct 23 10:49:56.012015[0m [32mINF[0m [1mFound 1 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m0
+[90mOct 23 10:49:56.012116[0m [32mINF[0m [1m  - 000002: {(data/db/default/shard-0,000)}[0m [36mcomponent=[0mpebble [36mshard=[0m0
+[90mOct 23 10:49:56.012660[0m [32mINF[0m [1m[JOB 1] WAL 000002: {(data/db/default/shard-0,000)} stopped reading at offset: (data/db/default/shard-0/000002.log: 0); replayed 0 keys in 0 batches[0m [36mcomponent=[0mpebble [36mshard=[0m0
+[90mOct 23 10:49:56.017010[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m0
+[90mOct 23 10:49:56.019106[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"71826","term":"0"} [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m1
+[90mOct 23 10:49:56.019237[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m71826 [36mcomponent=[0mleader-controller [36mhead-offset=[0m71826 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m1
+[90mOct 23 10:49:56.019276[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m1
+[90mOct 23 10:49:56.019296[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m71826 [36mnamespace=[0mdefault [36mshard=[0m0 [36mterm=[0m1
+[90mOct 23 10:49:56.032690[0m [32mINF[0m [1mFound 1 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m1
+[90mOct 23 10:49:56.032741[0m [32mINF[0m [1m  - 000002: {(data/db/default/shard-1,000)}[0m [36mcomponent=[0mpebble [36mshard=[0m1
+[90mOct 23 10:49:56.032856[0m [32mINF[0m [1m[JOB 1] WAL 000002: {(data/db/default/shard-1,000)} stopped reading at offset: (data/db/default/shard-1/000002.log: 0); replayed 0 keys in 0 batches[0m [36mcomponent=[0mpebble [36mshard=[0m1
+[90mOct 23 10:49:56.036994[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m0
+[90mOct 23 10:49:56.038988[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"72592","term":"0"} [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m1
+[90mOct 23 10:49:56.039094[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m72592 [36mcomponent=[0mleader-controller [36mhead-offset=[0m72592 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m1
+[90mOct 23 10:49:56.039137[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m1
+[90mOct 23 10:49:56.039157[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m72592 [36mnamespace=[0mdefault [36mshard=[0m1 [36mterm=[0m1
+[90mOct 23 10:49:56.054299[0m [32mINF[0m [1mFound 1 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m2
+[90mOct 23 10:49:56.054350[0m [32mINF[0m [1m  - 000002: {(data/db/default/shard-2,000)}[0m [36mcomponent=[0mpebble [36mshard=[0m2
+[90mOct 23 10:49:56.054474[0m [32mINF[0m [1m[JOB 1] WAL 000002: {(data/db/default/shard-2,000)} stopped reading at offset: (data/db/default/shard-2/000002.log: 0); replayed 0 keys in 0 batches[0m [36mcomponent=[0mpebble [36mshard=[0m2
+[90mOct 23 10:49:56.058595[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m0
+[90mOct 23 10:49:56.059981[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"78763","term":"0"} [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m1
+[90mOct 23 10:49:56.060075[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m78763 [36mcomponent=[0mleader-controller [36mhead-offset=[0m78763 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m1
+[90mOct 23 10:49:56.060108[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m1
+[90mOct 23 10:49:56.060124[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m78763 [36mnamespace=[0mdefault [36mshard=[0m2 [36mterm=[0m1
+[90mOct 23 10:49:56.074743[0m [32mINF[0m [1mFound 1 WALs[0m [36mcomponent=[0mpebble [36mshard=[0m3
+[90mOct 23 10:49:56.074804[0m [32mINF[0m [1m  - 000002: {(data/db/default/shard-3,000)}[0m [36mcomponent=[0mpebble [36mshard=[0m3
+[90mOct 23 10:49:56.074912[0m [32mINF[0m [1m[JOB 1] WAL 000002: {(data/db/default/shard-3,000)} stopped reading at offset: (data/db/default/shard-3/000002.log: 0); replayed 0 keys in 0 batches[0m [36mcomponent=[0mpebble [36mshard=[0m3
+[90mOct 23 10:49:56.078335[0m [32mINF[0m [1mCreated leader controller[0m [36mcomponent=[0mleader-controller [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m0
+[90mOct 23 10:49:56.079706[0m [32mINF[0m [1mLeader successfully initialized in new term[0m [36mcomponent=[0mleader-controller [36mlast-entry=[0m{"offset":"71675","term":"0"} [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m1
+[90mOct 23 10:49:56.079821[0m [32mINF[0m [1mApplying all pending entries to database[0m [36mcommit-offset=[0m71675 [36mcomponent=[0mleader-controller [36mhead-offset=[0m71675 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m1
+[90mOct 23 10:49:56.079871[0m [32mINF[0m [1mAll sessions[0m [36mcomponent=[0msession-manager [36mcount=[0m0 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m1
+[90mOct 23 10:49:56.079893[0m [32mINF[0m [1mStarted leading the shard[0m [36mcomponent=[0mleader-controller [36mhead-offset=[0m71675 [36mnamespace=[0mdefault [36mshard=[0m3 [36mterm=[0m1
+[90mOct 23 10:49:56.079926[0m [32mINF[0m [1mUpdate shard assignments.[0m [36mcomponent=[0mshard-assignment-dispatcher
+[90mOct 23 10:49:56.083338[0m [32mINF[0m [1mStarted Grpc server[0m [36mbindAddress=[0m[::]:6648 [36mgrpc-server=[0mpublic
+[90mOct 23 10:49:56.083471[0m [32mINF[0m [1mServing Prometheus metrics at http://localhost:8080/metrics[0m

@@ -1,0 +1,720 @@
+{
+  "exitCode": 0,
+  "junit": [
+    {
+      "path": "junit/nereus-storage-api/v2M5PhysicalResourceIdentityTest/TEST-com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2Test.xml",
+      "producedAtMicros": 1792752611988885,
+      "task": ":nereus-storage-api:v2M5PhysicalResourceIdentityTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M4ControlPlaneTest/TEST-com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1Test.xml",
+      "producedAtMicros": 1792751310624994,
+      "task": ":nereus-storage-object:v2M4ControlPlaneTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M4ReadKernelTest/TEST-com.nereusstream.storage.object.read.BindingReadM4KernelV1Test.xml",
+      "producedAtMicros": 1792751311199746,
+      "task": ":nereus-storage-object:v2M4ReadKernelTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5DeleteEligibilityTest/TEST-com.nereusstream.storage.object.gc.M5DeleteEligibilityV2Test.xml",
+      "producedAtMicros": 1792752622978267,
+      "task": ":nereus-storage-object:v2M5DeleteEligibilityTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5GcQuotaTest/TEST-com.nereusstream.storage.object.gc.M5GcQuotaV2Test.xml",
+      "producedAtMicros": 1792752626961289,
+      "task": ":nereus-storage-object:v2M5GcQuotaTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5MaterializationTest/TEST-com.nereusstream.storage.object.materialization.M5MaterializationV1Test.xml",
+      "producedAtMicros": 1792751831917070,
+      "task": ":nereus-storage-object:v2M5MaterializationTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5MaterializationWorkerTest/TEST-com.nereusstream.storage.object.retention.M5MaterializationWorkerV1Test.xml",
+      "producedAtMicros": 1792751347025281,
+      "task": ":nereus-storage-object:v2M5MaterializationWorkerTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5MultiWriterTicketTest/TEST-com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test.xml",
+      "producedAtMicros": 1792751548384122,
+      "task": ":nereus-storage-object:v2M5MultiWriterTicketTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5PermanentDoneTest/TEST-com.nereusstream.storage.object.gc.M5PermanentDoneV2Test.xml",
+      "producedAtMicros": 1792752625696216,
+      "task": ":nereus-storage-object:v2M5PermanentDoneTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5RetentionCoreTest/TEST-com.nereusstream.storage.object.retention.M5RetentionEvidenceAssemblerV1Test.xml",
+      "producedAtMicros": 1792752624408691,
+      "task": ":nereus-storage-object:v2M5RetentionCoreTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5RetentionCoreTest/TEST-com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test.xml",
+      "producedAtMicros": 1792752624410223,
+      "task": ":nereus-storage-object:v2M5RetentionCoreTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5RetiredHistoryTest/TEST-com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test.xml",
+      "producedAtMicros": 1792751845551173,
+      "task": ":nereus-storage-object:v2M5RetiredHistoryTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5TargetDeleteAuthorityCoordinatorTest/TEST-com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test.xml",
+      "producedAtMicros": 1792752622252011,
+      "task": ":nereus-storage-object:v2M5TargetDeleteAuthorityCoordinatorTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5TargetDeleteAuthorityFoundationTest/TEST-com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityV1Test.xml",
+      "producedAtMicros": 1792752620192427,
+      "task": ":nereus-storage-object:v2M5TargetDeleteAuthorityFoundationTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5TaskSelectionTest/TEST-com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test.xml",
+      "producedAtMicros": 1792751353955556,
+      "task": ":nereus-storage-object:v2M5TaskSelectionTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/realBookKeeperTest/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest.xml",
+      "producedAtMicros": 1792751292327321,
+      "task": ":nereus-storage-bookkeeper:realBookKeeperTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperDependencyBoundaryTest.xml",
+      "producedAtMicros": 1792751302759782,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.BookKeeperV3Crc32cAddPayloadLimitV1Test.xml",
+      "producedAtMicros": 1792751302759899,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.CellSessionOperationRegistryTest.xml",
+      "producedAtMicros": 1792751302759937,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1Test.xml",
+      "producedAtMicros": 1792751302760039,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2Test.xml",
+      "producedAtMicros": 1792751302760060,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1Test.xml",
+      "producedAtMicros": 1792751302760162,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1Test.xml",
+      "producedAtMicros": 1792751302760244,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/test/TEST-com.nereusstream.storage.bookkeeper.RealBookKeeperClientConfigurationV1Test.xml",
+      "producedAtMicros": 1792751302760268,
+      "task": ":nereus-storage-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeCreateRealTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateV2RealTest.xml",
+      "producedAtMicros": 1792751335894026,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeCreateRealTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeCreateTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2Test.xml",
+      "producedAtMicros": 1792751336355482,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeCreateTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteCellBudgetRealTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RealTest.xml",
+      "producedAtMicros": 1792751755307096,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteCellBudgetRealTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteCellRestartReadTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RestartTest.xml",
+      "producedAtMicros": 1792751779500616,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteCellRestartRecoverTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RestartTest.xml",
+      "producedAtMicros": 1792751785551089,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartRecoverTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteCellRestartWriteTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2RestartTest.xml",
+      "producedAtMicros": 1792751758733393,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteCellRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteQuotaRealTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteQuotaV2RealTest.xml",
+      "producedAtMicros": 1792751443690572,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteQuotaRealTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteRealTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteV2RealTest.xml",
+      "producedAtMicros": 1792751367369857,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteRealTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteRestartReadTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteV2RestartTest.xml",
+      "producedAtMicros": 1792751406971754,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-storage-bookkeeper/v2M5NativeDeleteRestartWriteTest/TEST-com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteV2RestartTest.xml",
+      "producedAtMicros": 1792751368875038,
+      "task": ":nereus-storage-bookkeeper:v2M5NativeDeleteRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.KafkaBookKeeperModuleGraphTest.xml",
+      "producedAtMicros": 1792751656570727,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.adapter.KafkaAssignedRecordBatchGroupAdapterV1Test.xml",
+      "producedAtMicros": 1792751656570889,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1Test.xml",
+      "producedAtMicros": 1792751656571024,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.adapter.KafkaNbke2AssignedAppendGroupV1Test.xml",
+      "producedAtMicros": 1792751656571132,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperDataAdmissionV1Test.xml",
+      "producedAtMicros": 1792751656571244,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperNumericProjectionV1Test.xml",
+      "producedAtMicros": 1792751656571341,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1Test.xml",
+      "producedAtMicros": 1792751656571481,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperM4BrokerReadOwnerV2Test.xml",
+      "producedAtMicros": 1792751656571485,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperNativeReadSourcesTest.xml",
+      "producedAtMicros": 1792751656571749,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.checkpoint.BookKeeperKafkaProtocolCheckpointStoreV1Test.xml",
+      "producedAtMicros": 1792751656571731,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.checkpoint.KafkaCompactionRecoveryStateV1Test.xml",
+      "producedAtMicros": 1792751656571891,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointCodecV1Test.xml",
+      "producedAtMicros": 1792751656572016,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test.xml",
+      "producedAtMicros": 1792751656572086,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test.xml",
+      "producedAtMicros": 1792751656572179,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test.xml",
+      "producedAtMicros": 1792751656572237,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadOwnerV2Test.xml",
+      "producedAtMicros": 1792751656572325,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRecoveryArtifactV3Test.xml",
+      "producedAtMicros": 1792751656572419,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test.xml",
+      "producedAtMicros": 1792751656572500,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test.xml",
+      "producedAtMicros": 1792751656572625,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test.xml",
+      "producedAtMicros": 1792751656572671,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test.xml",
+      "producedAtMicros": 1792751656572852,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test.xml",
+      "producedAtMicros": 1792751656572940,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalResolverV1Test.xml",
+      "producedAtMicros": 1792751656573039,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptV1Test.xml",
+      "producedAtMicros": 1792751656573087,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1Test.xml",
+      "producedAtMicros": 1792751656573215,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CorruptionMatrixV1Test.xml",
+      "producedAtMicros": 1792751656573330,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.nbke2.Nbke2GoldenVectorV1Test.xml",
+      "producedAtMicros": 1792751656573349,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.nbke2.Nbke2WireProjectionV1Test.xml",
+      "producedAtMicros": 1792751656573559,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.evidence.KafkaObjectWalNativeResultV1Test.xml",
+      "producedAtMicros": 1792751656573562,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1CodecV1Test.xml",
+      "producedAtMicros": 1792751656573756,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1ProtocolFixtureV1Test.xml",
+      "producedAtMicros": 1792751656573739,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.nwkcp1.ObjectKafkaProtocolCheckpointStoreV1Test.xml",
+      "producedAtMicros": 1792751656573874,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.nwkcp1.StorageObjectNwkcp1BackendV1Test.xml",
+      "producedAtMicros": 1792751656574006,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectPublicationBridgeV1Test.xml",
+      "producedAtMicros": 1792751656574150,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectRunRetirementCertificateV1Test.xml",
+      "producedAtMicros": 1792751656574173,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendCapacityControllerV1Test.xml",
+      "producedAtMicros": 1792751656574272,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.pipeline.KafkaBookKeeperOrderedCompletionV1Test.xml",
+      "producedAtMicros": 1792751656574296,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.pipeline.KafkaBookKeeperPipelineAdmissionV1Test.xml",
+      "producedAtMicros": 1792751656574442,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.pipeline.KafkaCoherentCommitCoordinatorV1Test.xml",
+      "producedAtMicros": 1792751656574440,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceTransitionV1Test.xml",
+      "producedAtMicros": 1792751656574560,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFrontiersV1Test.xml",
+      "producedAtMicros": 1792751656574561,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1Test.xml",
+      "producedAtMicros": 1792751656574655,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationCellV1Test.xml",
+      "producedAtMicros": 1792751656574691,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionPublicationInterleavingTest.xml",
+      "producedAtMicros": 1792751656575073,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionSpeculativePublicationV1Test.xml",
+      "producedAtMicros": 1792751656574820,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.protocol.KafkaProducerTransactionStateV1Test.xml",
+      "producedAtMicros": 1792751656575014,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReaderV1Test.xml",
+      "producedAtMicros": 1792751656575157,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1Test.xml",
+      "producedAtMicros": 1792751656575375,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.read.KafkaPackedLocatorLookupV1Test.xml",
+      "producedAtMicros": 1792751656575291,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRunBirthRecoveryV1Test.xml",
+      "producedAtMicros": 1792751656575644,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperTakeoverRecoveryV1Test.xml",
+      "producedAtMicros": 1792751656575778,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperEntrySequencerV1Test.xml",
+      "producedAtMicros": 1792751656575773,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunFailureCutsV1Test.xml",
+      "producedAtMicros": 1792751656575871,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/test/TEST-com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1Test.xml",
+      "producedAtMicros": 1792751656575917,
+      "task": ":nereus-kafka-bookkeeper:test"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperCompactionInventoryTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test.xml",
+      "producedAtMicros": 1792751287308317,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperCompactionInventoryTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperCompactionRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperCompactionWriterV2RealTest.xml",
+      "producedAtMicros": 1792751289636407,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperCompactionRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperControlStoreTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test.xml",
+      "producedAtMicros": 1792751312068134,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperControlStoreTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperDescriptorRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2RealTest.xml",
+      "producedAtMicros": 1792751305327020,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperDescriptorRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperDescriptorTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test.xml",
+      "producedAtMicros": 1792751523254361,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperDescriptorTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperM4RecoveryRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2RealTest.xml",
+      "producedAtMicros": 1792751308404013,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperM4RecoveryRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperM4RecoveryTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test.xml",
+      "producedAtMicros": 1792751591357357,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperM4RecoveryTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperNativeCreateRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperNativeCreateV2RealTest.xml",
+      "producedAtMicros": 1792751331297931,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperNativeCreateRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperNativeCreateV2RestartTest.xml",
+      "producedAtMicros": 1792751403489259,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperNativeCreateRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperNativeCreateV2RestartTest.xml",
+      "producedAtMicros": 1792751360640060,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperNativeDeleteAuthorityRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperNativeDeleteAuthorityV2RealTest.xml",
+      "producedAtMicros": 1792751379357581,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperNativeDeleteAuthorityRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperOxiaControlRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2RealTest.xml",
+      "producedAtMicros": 1792751319838066,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperOxiaControlRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperOxiaRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2RestartTest.xml",
+      "producedAtMicros": 1792751400982635,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperOxiaRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperOxiaRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperOxiaControlV2RestartTest.xml",
+      "producedAtMicros": 1792751357693828,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperOxiaRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperTaskTerminalTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test.xml",
+      "producedAtMicros": 1792751337107580,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminalTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperTaskTerminationRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminationV2RealTest.xml",
+      "producedAtMicros": 1792751345784965,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperTaskTerminationRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminationV2RestartTest.xml",
+      "producedAtMicros": 1792751405786585,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BookKeeperTaskTerminationRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminationV2RestartTest.xml",
+      "producedAtMicros": 1792751363767871,
+      "task": ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BoundDeleteRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperBoundDeleteV2RealTest.xml",
+      "producedAtMicros": 1792751701152990,
+      "task": ":nereus-kafka-bookkeeper:v2M5BoundDeleteRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BoundDeleteRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperBoundDeleteV2RealTest.xml",
+      "producedAtMicros": 1792751751466983,
+      "task": ":nereus-kafka-bookkeeper:v2M5BoundDeleteRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5BoundDeleteRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperBoundDeleteV2RealTest.xml",
+      "producedAtMicros": 1792751704570713,
+      "task": ":nereus-kafka-bookkeeper:v2M5BoundDeleteRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5EpochGraceRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperBoundDeleteV2RealTest.xml",
+      "producedAtMicros": 1792751209046226,
+      "task": ":nereus-kafka-bookkeeper:v2M5EpochGraceRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaCompactionTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test.xml",
+      "producedAtMicros": 1792751836354407,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaCompactionTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaReadOwnerTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadOwnerV2Test.xml",
+      "producedAtMicros": 1792751593598433,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaReadOwnerTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRecordBatchBudgetTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchBudgetV2Test.xml",
+      "producedAtMicros": 1792751594263486,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRecordBatchBudgetTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunRootsRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunRootsV2RealTest.xml",
+      "producedAtMicros": 1792751581924041,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunRootsRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunRootsRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunRootsV2RealTest.xml",
+      "producedAtMicros": 1792751731278752,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunRootsRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunRootsV2RealTest.xml",
+      "producedAtMicros": 1792751666786547,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunRootsRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunSourceRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2RealTest.xml",
+      "producedAtMicros": 1792751651022927,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunSourceRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2RealTest.xml",
+      "producedAtMicros": 1792751745842705,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaRunSourceRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2RealTest.xml",
+      "producedAtMicros": 1792751696470935,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaRunSourceRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5KafkaSelectedSourceTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperSelectedSourceV2Test.xml",
+      "producedAtMicros": 1792751652062665,
+      "task": ":nereus-kafka-bookkeeper:v2M5KafkaSelectedSourceTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5PublicationTicketsRealTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperPublicationTicketsV2RealTest.xml",
+      "producedAtMicros": 1792751546562346,
+      "task": ":nereus-kafka-bookkeeper:v2M5PublicationTicketsRealTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5PublicationTicketsRestartReadTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperPublicationTicketsV2RealTest.xml",
+      "producedAtMicros": 1792751727118222,
+      "task": ":nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-kafka-bookkeeper/v2M5PublicationTicketsRestartWriteTest/TEST-com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperPublicationTicketsV2RealTest.xml",
+      "producedAtMicros": 1792751661207830,
+      "task": ":nereus-kafka-bookkeeper:v2M5PublicationTicketsRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5BindingLifecycleRouteTest/TEST-com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStoreTest.xml",
+      "producedAtMicros": 1792751324001471,
+      "task": ":nereus-metadata-oxia:v2M5BindingLifecycleRouteTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5BindingLifecycleRouteTest/TEST-com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2Test.xml",
+      "producedAtMicros": 1792751324001543,
+      "task": ":nereus-metadata-oxia:v2M5BindingLifecycleRouteTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5BookKeeperRecordStoreTest/TEST-com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test.xml",
+      "producedAtMicros": 1792751324440121,
+      "task": ":nereus-metadata-oxia:v2M5BookKeeperRecordStoreTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5GcQuotaRealOxiaTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaIntegrationTest.xml",
+      "producedAtMicros": 1792752655860106,
+      "task": ":nereus-metadata-oxia:v2M5GcQuotaRealOxiaTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5KafkaRunRootTest/TEST-com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaRunRootAuthorityV2Test.xml",
+      "producedAtMicros": 1792751582830921,
+      "task": ":nereus-metadata-oxia:v2M5KafkaRunRootTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5PermanentDoneRealOxiaTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5PermanentDoneOxiaIntegrationTest.xml",
+      "producedAtMicros": 1792752633509571,
+      "task": ":nereus-metadata-oxia:v2M5PermanentDoneRealOxiaTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5TargetDeleteRouteTest/TEST-com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2Test.xml",
+      "producedAtMicros": 1792752634123383,
+      "task": ":nereus-metadata-oxia:v2M5TargetDeleteRouteTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5TaskSelectionRouteTest/TEST-com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test.xml",
+      "producedAtMicros": 1792751346427700,
+      "task": ":nereus-metadata-oxia:v2M5TaskSelectionRouteTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5BindingAuthorityTest/TEST-com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1Test.xml",
+      "producedAtMicros": 1792751839832837,
+      "task": ":nereus-storage-object:v2M5BindingAuthorityTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5BindingAuthorityTest/TEST-com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test.xml",
+      "producedAtMicros": 1792751839833227,
+      "task": ":nereus-storage-object:v2M5BindingAuthorityTest"
+    },
+    {
+      "path": "junit/nereus-storage-object/v2M5ClosedWriterIntegrationTest/TEST-com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test.xml",
+      "producedAtMicros": 1792751840743446,
+      "task": ":nereus-storage-object:v2M5ClosedWriterIntegrationTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5PulsarAggregateAuthorityTest/TEST-com.nereusstream.metadata.oxia.v2.capability.OxiaCapabilityAdaptersTest.xml",
+      "producedAtMicros": 1792751834345822,
+      "task": ":nereus-metadata-oxia:v2M5PulsarAggregateAuthorityTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5PulsarAggregateAuthorityTest/TEST-com.nereusstream.metadata.oxia.v2.codec.Nta1AggregateAuthorityCodecTest.xml",
+      "producedAtMicros": 1792751834345989,
+      "task": ":nereus-metadata-oxia:v2M5PulsarAggregateAuthorityTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5RetentionOxiaCapabilityTest/TEST-com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1Test.xml",
+      "producedAtMicros": 1792751832455876,
+      "task": ":nereus-metadata-oxia:v2M5RetentionOxiaCapabilityTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5RetentionRealOxiaTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5RetentionOxiaIntegrationTest.xml",
+      "producedAtMicros": 1792751841127757,
+      "task": ":nereus-metadata-oxia:v2M5RetentionRealOxiaTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5RetiredHistoryOxiaRestartReadTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaRestartTest.xml",
+      "producedAtMicros": 1792752604021437,
+      "task": ":nereus-metadata-oxia:v2M5RetiredHistoryOxiaRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5RetiredHistoryOxiaRestartWriteTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaRestartTest.xml",
+      "producedAtMicros": 1792752594359318,
+      "task": ":nereus-metadata-oxia:v2M5RetiredHistoryOxiaRestartWriteTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5RetiredHistoryRealOxiaTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaIntegrationTest.xml",
+      "producedAtMicros": 1792752590542982,
+      "task": ":nereus-metadata-oxia:v2M5RetiredHistoryRealOxiaTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5GcQuotaOxiaRestartReadTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaRestartTest.xml",
+      "producedAtMicros": 1792752665341051,
+      "task": ":nereus-metadata-oxia:v2M5GcQuotaOxiaRestartReadTest"
+    },
+    {
+      "path": "junit/nereus-metadata-oxia/v2M5GcQuotaOxiaRestartWriteTest/TEST-com.nereusstream.metadata.oxia.v2.retention.M5GcQuotaOxiaRestartTest.xml",
+      "producedAtMicros": 1792752658796540,
+      "task": ":nereus-metadata-oxia:v2M5GcQuotaOxiaRestartWriteTest"
+    }
+  ]
+}

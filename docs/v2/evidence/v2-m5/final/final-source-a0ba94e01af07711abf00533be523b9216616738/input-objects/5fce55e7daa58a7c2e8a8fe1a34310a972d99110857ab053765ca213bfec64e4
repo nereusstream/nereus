@@ -1,0 +1,224 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// THIS CODE IS AUTOMATICALLY GENERATED.  DO NOT EDIT.
+
+package org.apache.kafka.coordinator.group.generated;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import java.util.ArrayList;
+import org.apache.kafka.common.protocol.MessageUtil;
+
+import static org.apache.kafka.coordinator.group.generated.StreamsGroupMemberMetadataValue.*;
+
+public class StreamsGroupMemberMetadataValueJsonConverter {
+    public static StreamsGroupMemberMetadataValue read(JsonNode _node, short _version) {
+        StreamsGroupMemberMetadataValue _object = new StreamsGroupMemberMetadataValue();
+        JsonNode _instanceIdNode = _node.get("instanceId");
+        if (_instanceIdNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'instanceId', which is mandatory in version " + _version);
+        } else {
+            if (_instanceIdNode.isNull()) {
+                _object.instanceId = null;
+            } else {
+                if (!_instanceIdNode.isTextual()) {
+                    throw new RuntimeException("StreamsGroupMemberMetadataValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.instanceId = _instanceIdNode.asText();
+            }
+        }
+        JsonNode _rackIdNode = _node.get("rackId");
+        if (_rackIdNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'rackId', which is mandatory in version " + _version);
+        } else {
+            if (_rackIdNode.isNull()) {
+                _object.rackId = null;
+            } else {
+                if (!_rackIdNode.isTextual()) {
+                    throw new RuntimeException("StreamsGroupMemberMetadataValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.rackId = _rackIdNode.asText();
+            }
+        }
+        JsonNode _clientIdNode = _node.get("clientId");
+        if (_clientIdNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'clientId', which is mandatory in version " + _version);
+        } else {
+            if (!_clientIdNode.isTextual()) {
+                throw new RuntimeException("StreamsGroupMemberMetadataValue expected a string type, but got " + _node.getNodeType());
+            }
+            _object.clientId = _clientIdNode.asText();
+        }
+        JsonNode _clientHostNode = _node.get("clientHost");
+        if (_clientHostNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'clientHost', which is mandatory in version " + _version);
+        } else {
+            if (!_clientHostNode.isTextual()) {
+                throw new RuntimeException("StreamsGroupMemberMetadataValue expected a string type, but got " + _node.getNodeType());
+            }
+            _object.clientHost = _clientHostNode.asText();
+        }
+        JsonNode _rebalanceTimeoutMsNode = _node.get("rebalanceTimeoutMs");
+        if (_rebalanceTimeoutMsNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'rebalanceTimeoutMs', which is mandatory in version " + _version);
+        } else {
+            _object.rebalanceTimeoutMs = MessageUtil.jsonNodeToInt(_rebalanceTimeoutMsNode, "StreamsGroupMemberMetadataValue");
+        }
+        JsonNode _topologyEpochNode = _node.get("topologyEpoch");
+        if (_topologyEpochNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'topologyEpoch', which is mandatory in version " + _version);
+        } else {
+            _object.topologyEpoch = MessageUtil.jsonNodeToInt(_topologyEpochNode, "StreamsGroupMemberMetadataValue");
+        }
+        JsonNode _processIdNode = _node.get("processId");
+        if (_processIdNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'processId', which is mandatory in version " + _version);
+        } else {
+            if (!_processIdNode.isTextual()) {
+                throw new RuntimeException("StreamsGroupMemberMetadataValue expected a string type, but got " + _node.getNodeType());
+            }
+            _object.processId = _processIdNode.asText();
+        }
+        JsonNode _userEndpointNode = _node.get("userEndpoint");
+        if (_userEndpointNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'userEndpoint', which is mandatory in version " + _version);
+        } else {
+            if (_userEndpointNode.isNull()) {
+                _object.userEndpoint = null;
+            } else {
+                _object.userEndpoint = EndpointJsonConverter.read(_userEndpointNode, _version);
+            }
+        }
+        JsonNode _clientTagsNode = _node.get("clientTags");
+        if (_clientTagsNode == null) {
+            throw new RuntimeException("StreamsGroupMemberMetadataValue: unable to locate field 'clientTags', which is mandatory in version " + _version);
+        } else {
+            if (!_clientTagsNode.isArray()) {
+                throw new RuntimeException("StreamsGroupMemberMetadataValue expected a JSON array, but got " + _node.getNodeType());
+            }
+            ArrayList<KeyValue> _collection = new ArrayList<KeyValue>(_clientTagsNode.size());
+            _object.clientTags = _collection;
+            for (JsonNode _element : _clientTagsNode) {
+                _collection.add(KeyValueJsonConverter.read(_element, _version));
+            }
+        }
+        return _object;
+    }
+    public static JsonNode write(StreamsGroupMemberMetadataValue _object, short _version, boolean _serializeRecords) {
+        ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+        if (_object.instanceId == null) {
+            _node.set("instanceId", NullNode.instance);
+        } else {
+            _node.set("instanceId", new TextNode(_object.instanceId));
+        }
+        if (_object.rackId == null) {
+            _node.set("rackId", NullNode.instance);
+        } else {
+            _node.set("rackId", new TextNode(_object.rackId));
+        }
+        _node.set("clientId", new TextNode(_object.clientId));
+        _node.set("clientHost", new TextNode(_object.clientHost));
+        _node.set("rebalanceTimeoutMs", new IntNode(_object.rebalanceTimeoutMs));
+        _node.set("topologyEpoch", new IntNode(_object.topologyEpoch));
+        _node.set("processId", new TextNode(_object.processId));
+        if (_object.userEndpoint == null) {
+            _node.set("userEndpoint", NullNode.instance);
+        } else {
+            _node.set("userEndpoint", EndpointJsonConverter.write(_object.userEndpoint, _version, _serializeRecords));
+        }
+        ArrayNode _clientTagsArray = new ArrayNode(JsonNodeFactory.instance);
+        for (KeyValue _element : _object.clientTags) {
+            _clientTagsArray.add(KeyValueJsonConverter.write(_element, _version, _serializeRecords));
+        }
+        _node.set("clientTags", _clientTagsArray);
+        return _node;
+    }
+    public static JsonNode write(StreamsGroupMemberMetadataValue _object, short _version) {
+        return write(_object, _version, true);
+    }
+    
+    public static class EndpointJsonConverter {
+        public static Endpoint read(JsonNode _node, short _version) {
+            Endpoint _object = new Endpoint();
+            JsonNode _hostNode = _node.get("host");
+            if (_hostNode == null) {
+                throw new RuntimeException("Endpoint: unable to locate field 'host', which is mandatory in version " + _version);
+            } else {
+                if (!_hostNode.isTextual()) {
+                    throw new RuntimeException("Endpoint expected a string type, but got " + _node.getNodeType());
+                }
+                _object.host = _hostNode.asText();
+            }
+            JsonNode _portNode = _node.get("port");
+            if (_portNode == null) {
+                throw new RuntimeException("Endpoint: unable to locate field 'port', which is mandatory in version " + _version);
+            } else {
+                _object.port = MessageUtil.jsonNodeToUnsignedShort(_portNode, "Endpoint");
+            }
+            return _object;
+        }
+        public static JsonNode write(Endpoint _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("host", new TextNode(_object.host));
+            _node.set("port", new IntNode(_object.port));
+            return _node;
+        }
+        public static JsonNode write(Endpoint _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+    
+    public static class KeyValueJsonConverter {
+        public static KeyValue read(JsonNode _node, short _version) {
+            KeyValue _object = new KeyValue();
+            JsonNode _keyNode = _node.get("key");
+            if (_keyNode == null) {
+                throw new RuntimeException("KeyValue: unable to locate field 'key', which is mandatory in version " + _version);
+            } else {
+                if (!_keyNode.isTextual()) {
+                    throw new RuntimeException("KeyValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.key = _keyNode.asText();
+            }
+            JsonNode _valueNode = _node.get("value");
+            if (_valueNode == null) {
+                throw new RuntimeException("KeyValue: unable to locate field 'value', which is mandatory in version " + _version);
+            } else {
+                if (!_valueNode.isTextual()) {
+                    throw new RuntimeException("KeyValue expected a string type, but got " + _node.getNodeType());
+                }
+                _object.value = _valueNode.asText();
+            }
+            return _object;
+        }
+        public static JsonNode write(KeyValue _object, short _version, boolean _serializeRecords) {
+            ObjectNode _node = new ObjectNode(JsonNodeFactory.instance);
+            _node.set("key", new TextNode(_object.key));
+            _node.set("value", new TextNode(_object.value));
+            return _node;
+        }
+        public static JsonNode write(KeyValue _object, short _version) {
+            return write(_object, _version, true);
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+  "actualGradleExit": 0,
+  "counts": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 57
+  },
+  "freshBrokerXml": true,
+  "kafkaInputsUnchanged": true,
+  "physicalDeleteAuthority": false,
+  "wholeM5Authority": false
+}

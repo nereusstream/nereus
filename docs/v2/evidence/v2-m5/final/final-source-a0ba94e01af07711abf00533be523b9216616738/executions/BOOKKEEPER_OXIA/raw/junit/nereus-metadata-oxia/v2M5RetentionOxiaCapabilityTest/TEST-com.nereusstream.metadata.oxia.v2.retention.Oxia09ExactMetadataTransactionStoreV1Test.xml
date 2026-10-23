@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1Test" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-23T10:37:12.216Z" hostname="liusinandeMacBook-Pro.local" time="0.162">
+  <properties/>
+  <testcase name="singleKeyCasUsesExactVersionAndConvergesAfterResponseLoss()" classname="com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1Test" time="0.124"/>
+  <testcase name="multiKeyTransactionIsExplicitlyUnsupportedWithoutAnyBackendMutation()" classname="com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1Test" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

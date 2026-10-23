@@ -1,0 +1,247 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.kafka.server.config;
+
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigException;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class NereusKafkaStorageConfigTest {
+    @Test
+    void sealedTargetProfileRequiresExplicitSelectionGraceAndAuditWithoutChangingLegacyGc() {
+        var properties = enabledProperties();
+        var legacy = parse(properties).bookKeeper().orElseThrow().ledgerGc();
+        assertTrue(legacy.m5SealedTargetProfile().isEmpty());
+        assertFalse(legacy.enabled());
+        assertTrue(legacy.dryRun());
+
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_M5_GC_PROFILE_CONFIG,
+                NereusKafkaBookKeeperConfig.M5SealedTargetProfile.NAME);
+        assertConfigFailure(properties, NereusKafkaConfigs.BOOKKEEPER_M5_GC_GRACE_MS_CONFIG);
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_M5_GC_GRACE_MS_CONFIG, 25L);
+        assertConfigFailure(properties, NereusKafkaConfigs.BOOKKEEPER_M5_GC_AUDIT_POLICY_FILE_CONFIG);
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_M5_GC_AUDIT_POLICY_FILE_CONFIG, "build/m5-audit-policy.json");
+        var selected = parse(properties).bookKeeper().orElseThrow().ledgerGc();
+        assertEquals(Duration.ofMillis(25), selected.m5SealedTargetProfile().orElseThrow().grace());
+        assertEquals(Path.of("build/m5-audit-policy.json").toAbsolutePath().normalize(),
+                selected.m5SealedTargetProfile().orElseThrow().auditPolicyFile());
+        assertFalse(selected.enabled());
+        assertTrue(selected.dryRun());
+        assertEquals(legacy.drainGrace(), selected.drainGrace());
+        assertEquals(legacy.lateCreateAuditGrace(), selected.lateCreateAuditGrace());
+
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_M5_GC_PROFILE_CONFIG, "UNKNOWN");
+        assertConfigFailure(properties, NereusKafkaConfigs.BOOKKEEPER_M5_GC_PROFILE_CONFIG);
+        properties.remove(NereusKafkaConfigs.BOOKKEEPER_M5_GC_PROFILE_CONFIG);
+        assertConfigFailure(properties, NereusKafkaConfigs.BOOKKEEPER_M5_GC_PROFILE_CONFIG);
+    }
+
+    @Test
+    void disabledDefaultsAreSideEffectFreeAndRegisteredInTheBrokerConfigDef() {
+        NereusKafkaStorageConfig config = parse(Map.of());
+
+        assertFalse(config.enabled());
+        assertTrue(NereusKafkaConfigs.CONFIG_DEF.names().contains(NereusKafkaConfigs.BOOKKEEPER_CAPABILITY_FILE_CONFIG));
+        assertTrue(AbstractKafkaConfig.CONFIG_DEF.names().containsAll(NereusKafkaConfigs.CONFIG_DEF.names()));
+        assertEquals(
+                NereusKafkaStorageConfig.Profile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                config.core().profile());
+        assertEquals(Duration.ofSeconds(30), config.append().timeout());
+        assertEquals(Duration.ofMinutes(15), config.lifecycle().recoveryTimeout());
+        assertEquals(
+                Duration.ofHours(1),
+                config.retentionCompaction().materializationSourceRetirementGrace());
+        assertEquals(
+                Duration.ofHours(6),
+                config.retentionCompaction().materializationAppendReplayGrace());
+        assertEquals(
+                Duration.ofHours(24),
+                config.retentionCompaction().materializationMetadataAuditGrace());
+        assertTrue(config.core().cacheDir().isEmpty());
+        assertTrue(config.retentionCompaction().compactionSpillDir().isEmpty());
+        assertTrue(config.bookKeeper().isEmpty());
+    }
+
+    @Test
+    void enabledSnapshotRequiresExactProfileDependenciesAndDerivesSpillDirectory() {
+        Map<String, Object> properties = enabledProperties();
+        properties.put(
+                NereusKafkaConfigs.MATERIALIZATION_SOURCE_RETIREMENT_GRACE_MS_CONFIG,
+                1_000L);
+        properties.put(
+                NereusKafkaConfigs.MATERIALIZATION_APPEND_REPLAY_GRACE_MS_CONFIG,
+                2_000L);
+        properties.put(
+                NereusKafkaConfigs.MATERIALIZATION_METADATA_AUDIT_GRACE_MS_CONFIG,
+                3_000L);
+
+        NereusKafkaStorageConfig config = parse(properties);
+
+        assertTrue(config.enabled());
+        assertEquals("nereus-prod", config.core().cluster().orElseThrow());
+        assertTrue(config.core().profile().usesBookKeeper());
+        assertTrue(config.core().profile().usesObjectStorage());
+        Path cacheDir = Path.of("build/nereus-cache").toAbsolutePath().normalize();
+        assertEquals(cacheDir, config.core().cacheDir().orElseThrow());
+        assertEquals(
+                cacheDir.resolve("spill"),
+                config.retentionCompaction().compactionSpillDir().orElseThrow());
+        assertEquals(
+                Duration.ofSeconds(1),
+                config.retentionCompaction().materializationSourceRetirementGrace());
+        assertEquals(
+                Duration.ofSeconds(2),
+                config.retentionCompaction().materializationAppendReplayGrace());
+        assertEquals(
+                Duration.ofSeconds(3),
+                config.retentionCompaction().materializationMetadataAuditGrace());
+        assertFalse(config.bookKeeper().orElseThrow().ledgerGc().enabled());
+        assertTrue(config.bookKeeper().orElseThrow().ledgerGc().dryRun());
+    }
+
+    @Test
+    void bookKeeperOnlyProfileDoesNotRequireObjectCheckpointConfiguration() {
+        Map<String, Object> properties = enabledProperties();
+        properties.put(NereusKafkaConfigs.PROFILE_CONFIG, "BOOKKEEPER_WAL_ONLY");
+
+        NereusKafkaStorageConfig config = parse(properties);
+
+        assertFalse(config.core().profile().usesObjectStorage());
+        assertTrue(config.bookKeeper().isPresent());
+
+        properties.remove(NereusKafkaConfigs.OBJECT_BUCKET_CONFIG);
+        properties.remove(NereusKafkaConfigs.OBJECT_PROVIDER_CONFIG);
+        var bookKeeperOnly = parse(properties);
+        assertTrue(bookKeeperOnly.core().objectBucket().isEmpty());
+        assertTrue(bookKeeperOnly.core().objectProvider().isEmpty());
+    }
+
+    @Test
+    void enabledSnapshotRejectsMissingAndInvalidProfileDependencies() {
+        Map<String, Object> missingBookKeeper = enabledProperties();
+        missingBookKeeper.remove(NereusKafkaConfigs.BOOKKEEPER_METADATA_SERVICE_URI_CONFIG);
+        assertConfigFailure(missingBookKeeper, NereusKafkaConfigs.BOOKKEEPER_METADATA_SERVICE_URI_CONFIG);
+
+        Map<String, Object> missingObject = enabledProperties();
+        missingObject.remove(NereusKafkaConfigs.OBJECT_BUCKET_CONFIG);
+        assertConfigFailure(missingObject, NereusKafkaConfigs.OBJECT_BUCKET_CONFIG);
+
+        Map<String, Object> invalidUri = enabledProperties();
+        invalidUri.put(NereusKafkaConfigs.BOOKKEEPER_METADATA_SERVICE_URI_CONFIG, "relative/path");
+        assertConfigFailure(invalidUri, NereusKafkaConfigs.BOOKKEEPER_METADATA_SERVICE_URI_CONFIG);
+    }
+
+    @Test
+    void enabledSnapshotRejectsUnsafeCrossFieldRelationships() {
+        Map<String, Object> session = enabledProperties();
+        session.put(NereusKafkaConfigs.SESSION_TTL_MS_CONFIG, 10_000L);
+        session.put(NereusKafkaConfigs.SESSION_RENEW_INTERVAL_MS_CONFIG, 5_000L);
+        assertConfigFailure(session, NereusKafkaConfigs.SESSION_TTL_MS_CONFIG);
+
+        Map<String, Object> appendBudget = enabledProperties();
+        appendBudget.put(NereusKafkaConfigs.APPEND_INFLIGHT_BYTES_CONFIG, 64L * 1024L * 1024L);
+        appendBudget.put(NereusKafkaConfigs.APPEND_REQUEST_BYTES_CONFIG, 128L * 1024L * 1024L);
+        assertConfigFailure(appendBudget, NereusKafkaConfigs.APPEND_INFLIGHT_BYTES_CONFIG);
+
+        Map<String, Object> capability = enabledProperties();
+        capability.put(NereusKafkaConfigs.CAPABILITY_HEARTBEAT_MS_CONFIG, 10_000L);
+        capability.put(NereusKafkaConfigs.CAPABILITY_EXPIRY_MS_CONFIG, 20_000L);
+        assertConfigFailure(capability, NereusKafkaConfigs.CAPABILITY_EXPIRY_MS_CONFIG);
+
+        Map<String, Object> shutdown = enabledProperties();
+        shutdown.put(NereusKafkaConfigs.SHUTDOWN_DRAIN_TIMEOUT_MS_CONFIG, 10_000L);
+        shutdown.put(NereusKafkaConfigs.SHUTDOWN_CHECKPOINT_TIMEOUT_MS_CONFIG, 20_000L);
+        assertConfigFailure(shutdown, NereusKafkaConfigs.SHUTDOWN_CHECKPOINT_TIMEOUT_MS_CONFIG);
+
+        Map<String, Object> disabledMutation = enabledProperties();
+        disabledMutation.put(NereusKafkaConfigs.BOOKKEEPER_GC_DRY_RUN_CONFIG, false);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> parse(disabledMutation));
+
+        Map<String, Object> shortDrain = enabledProperties();
+        shortDrain.put(NereusKafkaConfigs.BOOKKEEPER_GC_ENABLED_CONFIG, true);
+        shortDrain.put(NereusKafkaConfigs.BOOKKEEPER_GC_DRY_RUN_CONFIG, false);
+        shortDrain.put(NereusKafkaConfigs.BOOKKEEPER_GC_DRAIN_GRACE_MS_CONFIG, 120_000L);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> parse(shortDrain));
+
+        Map<String, Object> shortMetadataAudit = enabledProperties();
+        shortMetadataAudit.put(
+                NereusKafkaConfigs.MATERIALIZATION_SOURCE_RETIREMENT_GRACE_MS_CONFIG,
+                2_000L);
+        shortMetadataAudit.put(
+                NereusKafkaConfigs.MATERIALIZATION_METADATA_AUDIT_GRACE_MS_CONFIG,
+                1_000L);
+        assertConfigFailure(
+                shortMetadataAudit,
+                NereusKafkaConfigs.MATERIALIZATION_METADATA_AUDIT_GRACE_MS_CONFIG);
+    }
+
+    @Test
+    void configDefRejectsReservedLegacyProfileAndHardRangeViolations() {
+        assertThrows(ConfigException.class, () -> parse(Map.of(
+                NereusKafkaConfigs.PROFILE_CONFIG, "OBJECT_WAL")));
+        assertThrows(ConfigException.class, () -> parse(Map.of(
+                NereusKafkaConfigs.FETCH_MAX_ENTRY_BYTES_CONFIG,
+                NereusKafkaConfigs.MAX_KAFKA_ENTRY_BYTES + 1)));
+        assertThrows(ConfigException.class, () -> parse(Map.of(
+                NereusKafkaConfigs.CHECKPOINT_RETAINED_REFERENCES_CONFIG, 4)));
+    }
+
+    private static NereusKafkaStorageConfig parse(Map<String, ?> properties) {
+        return NereusKafkaStorageConfig.from(
+                new AbstractConfig(NereusKafkaConfigs.CONFIG_DEF, properties));
+    }
+
+    private static Map<String, Object> enabledProperties() {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(NereusKafkaConfigs.ENABLED_CONFIG, true);
+        properties.put(NereusKafkaConfigs.CLUSTER_CONFIG, "nereus-prod");
+        properties.put(NereusKafkaConfigs.OXIA_SERVICE_ADDRESS_CONFIG, "oxia://127.0.0.1:6648");
+        properties.put(NereusKafkaConfigs.CACHE_DIR_CONFIG, "build/nereus-cache");
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_METADATA_SERVICE_URI_CONFIG, "bk://127.0.0.1/ledgers");
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_DEPLOYMENT_ID_CONFIG, "kafka-deployment-a");
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_CLUSTER_ALIAS_CONFIG, "nereus-prod");
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_PROVIDER_SCOPE_SHA256_CONFIG, "11".repeat(32));
+        properties.put(
+                NereusKafkaConfigs.BOOKKEEPER_PASSWORD_FILE_CONFIG,
+                "/tmp/nereus-kafka-bookkeeper-password");
+        properties.put(NereusKafkaConfigs.BOOKKEEPER_PASSWORD_VERSION_CONFIG, "v1");
+        properties.put(NereusKafkaConfigs.OBJECT_PROVIDER_CONFIG, "s3");
+        properties.put(NereusKafkaConfigs.OBJECT_BUCKET_CONFIG, "nereus-kafka");
+        return properties;
+    }
+
+    private static void assertConfigFailure(Map<String, ?> properties, String key) {
+        ConfigException failure = assertThrows(ConfigException.class, () -> parse(properties));
+        assertTrue(failure.getMessage().contains(key), failure::getMessage);
+    }
+}
