@@ -3220,13 +3220,17 @@ tasks.register<Exec>("v2M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description = "Run the focused native Kafka BK process checks against owned real BK and Oxia backends."
     workingDir = layout.projectDirectory.asFile
+    val kafkaCheckout = providers.gradleProperty("v2M6KafkaCheckout")
+    val kafkaJavaHome = providers.gradleProperty("v2M6KafkaJavaHome")
+    val developmentRepository = providers.gradleProperty("v2M6KafkaDevelopmentRepository")
+    val processOutput = providers.gradleProperty("v2M6ProcessOutput")
     doFirst {
         commandLine(
             "python3", "scripts/run-v2-m6-kafka-bk-process-check.py",
-            "--kafka-root", providers.gradleProperty("v2M6KafkaCheckout").get(),
-            "--kafka-java-home", providers.gradleProperty("v2M6KafkaJavaHome").get(),
-            "--development-repository", providers.gradleProperty("v2M6KafkaDevelopmentRepository").get(),
-            "--output", providers.gradleProperty("v2M6ProcessOutput").get(),
+            "--kafka-root", kafkaCheckout.get(),
+            "--kafka-java-home", kafkaJavaHome.get(),
+            "--development-repository", developmentRepository.get(),
+            "--output", processOutput.get(),
         )
     }
 }
