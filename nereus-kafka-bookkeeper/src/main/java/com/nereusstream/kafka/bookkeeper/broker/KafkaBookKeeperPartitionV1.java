@@ -285,6 +285,7 @@ public final class KafkaBookKeeperPartitionV1 {
     private boolean rolling;
     private Sha256Digest nativePublicationTask;
     private NativeObjectPublication nativeObjectPublication;
+    private KafkaBookKeeperNativeObjectReadSourcesV1 recoveredObjectReadSources;
     private KafkaBookKeeperReadViewV2 nativePublicationPredecessor;
     private KafkaBookKeeperReadViewV2 nativePreferredCache;
     private final KafkaOwnerAdmissionV1 selectedRecoveryOwner;
@@ -1184,29 +1185,6 @@ public final class KafkaBookKeeperPartitionV1 {
             Semaphore bindingReadSlots,
             HistoricalReads historicalReads,
             NativeSourcePublication nativeSourcePublication) {
-        installM4ReadOwner(
-                coordinator,
-                selector,
-                ownerEventLoop,
-                maximumInFlightReads,
-                cellReadSlots,
-                bindingReadSlots,
-                historicalReads,
-                nativeSourcePublication,
-                Optional.empty());
-    }
-
-    /** Installs a cold Object view only after the recovered Owner has proved the actual BK source set and selector. */
-    public synchronized void installM4ReadOwner(
-            M4ReadControlCoordinatorV1 coordinator,
-            BindingReadSelector selector,
-            Executor ownerEventLoop,
-            int maximumInFlightReads,
-            Semaphore cellReadSlots,
-            Semaphore bindingReadSlots,
-            HistoricalReads historicalReads,
-            NativeSourcePublication nativeSourcePublication,
-            Optional<KafkaBookKeeperNativeObjectReadSourcesV1> recoveredObject) {
         requireWritable();
         if (m4ReadOwner != null) {
             throw new IllegalStateException("native M4 read owner is already installed");
@@ -1217,25 +1195,15 @@ public final class KafkaBookKeeperPartitionV1 {
                 scope.bindingId(),
                 Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(scope.topicIncarnation())),
                 scope.storageEpochId().digest());
-        Object payload;
-        if (recoveredObject.isPresent()) {
-            var selected = recoveredObject.orElseThrow();
-            if (nativePreferredCache != null
-                    || historicalReads == null
-                    || !selected.rawSources().equals(sources)
-                    || !selector.binding().equals(expectedBinding)
-                    || selector.ownerEpoch() != owner.ownerEpoch()
-                    || selector.admissionState() != AdmissionState.ADMITTING) {
-                throw new IllegalStateException("cold Object read sources differ from the native Owner/Binding");
-            }
-            selected.requireSelector(selector);
-            payload = selected;
-        } else {
-            requireNativeReadPublication(sources, selector);
-            payload = nativePreferredCache == null
-                    ? sources
-                    : NativePreferredReadSources.recovered(sources, nativePreferredCache.descriptor());
+        requireNativeReadPublication(sources, selector);
+        if (recoveredObjectReadSources != null && historicalReads == null) {
+            throw new IllegalStateException("cold Object reader lacks its actual owned BK read lifetime");
         }
+        Object payload = recoveredObjectReadSources != null
+                ? recoveredObjectReadSources
+                : nativePreferredCache == null
+                        ? sources
+                        : NativePreferredReadSources.recovered(sources, nativePreferredCache.descriptor());
         var cell = new BindingReadPublicationCellV1(
                 selector.sourceGeneration(),
                 capture().root().frontiers().durableEndOffset(),
@@ -1264,6 +1232,22 @@ public final class KafkaBookKeeperPartitionV1 {
                 bindingReadSlots);
         this.historicalReads = historicalReads;
         this.nativeSourcePublication = nativeSourcePublication;
+        recoveredObjectReadSources = null;
+    }
+
+    /** Keep the validated cold view available while the exact raw-member writer tickets cover its Owner grant. */
+    public synchronized void prepareRecoveredObjectReadSources(
+            KafkaBookKeeperNativeObjectReadSourcesV1 selected, BindingReadSelector predecessor) {
+        requireWritable();
+        if (m4ReadOwner != null
+                || nativePreferredCache != null
+                || recoveredObjectReadSources != null
+                || !selected.rawSources().equals(nativeReadSourcesUnchecked())
+                || predecessor.ownerEpoch() >= owner.ownerEpoch()) {
+            throw new IllegalStateException("cold Object read sources differ from the recovered native Owner");
+        }
+        selected.requireSelector(predecessor);
+        recoveredObjectReadSources = selected;
     }
 
     /** Native membership, coherent protocol state and its resolved checkpoint under one rollover boundary. */
@@ -1509,7 +1493,12 @@ public final class KafkaBookKeeperPartitionV1 {
             throw new IllegalStateException("native source publication differs from its exact admitted selector");
         }
         if (m4ReadOwner == null) {
-            if (nativePreferredCache == null) {
+            if (recoveredObjectReadSources != null) {
+                if (!recoveredObjectReadSources.rawSources().equals(sources)) {
+                    throw new IllegalStateException("native Object Owner grant changed its exact BK sources");
+                }
+                recoveredObjectReadSources.requireSelector(selector);
+            } else if (nativePreferredCache == null) {
                 if (selector.mode() != SelectorMode.PREFERRED_ONLY
                         || !selector.selectedViewSha256().equals(sources.selectedViewSha256())) {
                     throw new IllegalStateException("initial native source publication is outside its raw selector");
