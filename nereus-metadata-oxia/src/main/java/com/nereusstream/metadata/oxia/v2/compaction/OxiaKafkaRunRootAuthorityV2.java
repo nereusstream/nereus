@@ -472,6 +472,15 @@ public final class OxiaKafkaRunRootAuthorityV2
     }
 
     public CompletionStage<Optional<RunRootFact>> readSelectedRootFact(String nativeKey) {
+        return readSelectedRootFact(nativeKey, false);
+    }
+
+    /** Cleanup can identify an exact already-DONE member without granting native read or open authority. */
+    public CompletionStage<Optional<RunRootFact>> readSelectedRootCleanupFact(String nativeKey) {
+        return readSelectedRootFact(nativeKey, true);
+    }
+
+    private CompletionStage<Optional<RunRootFact>> readSelectedRootFact(String nativeKey, boolean includeDone) {
         Objects.requireNonNull(nativeKey, "nativeKey");
         String start = prefix + "/";
         if (nativeKey.length() != start.length() + 32 + "/root-v2".length()
@@ -490,17 +499,21 @@ public final class OxiaKafkaRunRootAuthorityV2
                 return CompletableFuture.completedFuture(Optional.empty());
             }
             var value = current.orElseThrow().value();
-            if (value.retired()) {
+            if (value.retired() && !includeDone) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
-            return guard.isRootMetadataReadable(value.resource())
-                    .thenCompose(readable -> readable
-                            ? admissionFactFor(value.root().creatorOwnerEpoch()).thenApply(owner -> owner.filter(
-                                            admitted ->
-                                                    admitted.admission().runs().contains(value.initialLink()))
-                                    .map(admitted -> new RunRootFact(
-                                            value, fact(current.orElseThrow().nativeValue()), admitted)))
-                            : CompletableFuture.completedFuture(Optional.empty()));
+            var eligible = value.retired()
+                    ? guard.isPermanentlyDeleted(value.resource())
+                    : guard.isRootMetadataReadable(value.resource())
+                            .thenCompose(readable -> readable || !includeDone
+                                    ? CompletableFuture.completedFuture(readable)
+                                    : guard.isPermanentlyDeleted(value.resource()));
+            return eligible.thenCompose(readable -> readable
+                    ? admissionFactFor(value.root().creatorOwnerEpoch()).thenApply(owner -> owner.filter(
+                                    admitted -> admitted.admission().runs().contains(value.initialLink()))
+                            .map(admitted -> new RunRootFact(
+                                    value, fact(current.orElseThrow().nativeValue()), admitted)))
+                    : CompletableFuture.completedFuture(Optional.empty()));
         });
     }
 
