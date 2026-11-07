@@ -125,6 +125,12 @@ public final class OxiaPhysicalMetadataNamespaceV2 {
 
     /** The physical backend selects the root; callers cannot supply another root or metadata client. */
     public CompletionStage<OxiaQuotaTargetDeleteStoreV2> openAuthorityRoute(
+            NativePhysicalNamespaceAuthorityV2 backend) {
+        return openAuthorityRoute(backend, new Oxia09ExactMetadataTransactionStoreV1(client));
+    }
+
+    /** Opens the physical route with the caller's qualified reference reader. */
+    public CompletionStage<OxiaQuotaTargetDeleteStoreV2> openAuthorityRoute(
             NativePhysicalNamespaceAuthorityV2 backend, ExactMetadataTransactionStoreV1 authoritativeFacts) {
         Objects.requireNonNull(backend, "backend");
         Objects.requireNonNull(authoritativeFacts, "authoritativeFacts");
