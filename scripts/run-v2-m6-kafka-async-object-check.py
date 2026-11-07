@@ -64,7 +64,7 @@ def minio(out):
                 if attempt == 19:
                     raise
                 time.sleep(1)
-        yield endpoint
+        yield endpoint, container
     finally:
         try:
             with (out / "minio.log").open("xb") as log:
@@ -117,13 +117,21 @@ def process_logs(out, started):
     return result
 
 
-def record_minio_failure_health(out, endpoint):
+def record_minio_failure_health(out, endpoint, container):
     observation = {"observedAtNs": time.time_ns()}
     try:
         with urllib.request.urlopen(endpoint + "/minio/health/live", timeout=3) as response:
             observation["httpStatus"] = response.status
     except OSError as failure:
         observation["failure"] = type(failure).__name__ + ": " + str(failure)
+    try:
+        probe = subprocess.run(["docker", "exec", container, "curl", "--silent", "--show-error", "--fail",
+                                "--max-time", "3", "--output", "/dev/null", "--write-out", "%{http_code}",
+                                "http://127.0.0.1:9000/minio/health/live"], text=True, capture_output=True,
+                               timeout=5, check=False)
+        observation["inContainer"] = {"exitCode": probe.returncode, "status": probe.stdout, "error": probe.stderr}
+    except (OSError, subprocess.TimeoutExpired) as failure:
+        observation["inContainer"] = {"failure": type(failure).__name__ + ": " + str(failure)}
     (out / "minio-failure-health.json").write_bytes(M6.INPUTS.canonical(observation))
 
 
@@ -156,7 +164,7 @@ def run(kafka, java, out):
                       for name, sha in locked.items()})
     domain = M4.only_jar(N1_REPOSITORY / "com/nereusstream", "nereus-domain")
     artifacts[domain.name] = M6.file_identity(domain, tracked[domain.relative_to(ROOT).as_posix()])["sha256"]
-    with minio(out) as endpoint, BK.bookkeeper_oxia(out) as oxia, PROXY.fault_proxy(endpoint) as fault:
+    with minio(out) as (endpoint, container), BK.bookkeeper_oxia(out) as oxia, PROXY.fault_proxy(endpoint) as fault:
         relay, control, token = fault
         (out / "minio-fault-relay.json").write_bytes(M6.INPUTS.canonical({
             "relay": relay, "control": control, "upstream": endpoint,
@@ -181,7 +189,7 @@ def run(kafka, java, out):
             try:
                 subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
             except subprocess.CalledProcessError:
-                record_minio_failure_health(out, endpoint)
+                record_minio_failure_health(out, endpoint, container)
                 raise
         tests = {task: read_test(kafka, java, out, started, task, name, expected, artifacts)
                  for task, (name, expected) in CASES.items()}
