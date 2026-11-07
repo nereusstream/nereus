@@ -1972,6 +1972,28 @@ public final class KafkaBookKeeperPartitionV1 {
     }
 
     public CompletionStage<KafkaBookKeeperReadResultV1> read(KafkaBookKeeperSequentialReadRequestV1 request) {
+        return read(request, ignored -> {});
+    }
+
+    public record PlannedRead(
+            CompletionStage<KafkaCoherentProtocolSnapshotV1> pinned,
+            CompletionStage<KafkaBookKeeperReadResultV1> result) {}
+
+    /** Signals that this Fetch has pinned its actual selector and coherent protocol state, before any Provider read. */
+    public PlannedRead planRead(KafkaBookKeeperSequentialReadRequestV1 request) {
+        var pinned = new CompletableFuture<KafkaCoherentProtocolSnapshotV1>();
+        var result = read(request, snapshot -> pinned.complete(snapshot));
+        result.whenComplete((value, failure) -> {
+            if (failure != null) {
+                pinned.completeExceptionally(failure);
+            }
+        });
+        return new PlannedRead(pinned, result);
+    }
+
+    private CompletionStage<KafkaBookKeeperReadResultV1> read(
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            java.util.function.Consumer<KafkaCoherentProtocolSnapshotV1> onPinned) {
         KafkaBookKeeperM4BrokerReadOwnerV2 guarded;
         synchronized (this) {
             guarded = m4ReadOwner;
@@ -1982,7 +2004,7 @@ public final class KafkaBookKeeperPartitionV1 {
                     var scope = new HistoricalFetchScope();
                     CompletionStage<KafkaBookKeeperReadResultV1> result;
                     try {
-                        result = readNative(request, Optional.of(captured), scope);
+                        result = readNative(request, Optional.of(captured), scope, onPinned);
                     } catch (Throwable failure) {
                         scope.workFinished();
                         result = CompletableFuture.failedFuture(failure);
@@ -1990,20 +2012,17 @@ public final class KafkaBookKeeperPartitionV1 {
                     return new KafkaBookKeeperM4BrokerReadOwnerV2.ReadLifetime<>(result, scope.drained, scope.unknown);
                 });
             }
-            return guarded.read(captured -> readNative(request, Optional.of(captured)));
+            return guarded.read(captured -> readNative(request, Optional.of(captured), null, onPinned));
         }
-        return readNative(request, Optional.empty(), historicalReads == null ? null : new HistoricalFetchScope());
-    }
-
-    private CompletionStage<KafkaBookKeeperReadResultV1> readNative(
-            KafkaBookKeeperSequentialReadRequestV1 request, Optional<BindingReadAuthorityV1> capturedView) {
-        return readNative(request, capturedView, null);
+        return readNative(
+                request, Optional.empty(), historicalReads == null ? null : new HistoricalFetchScope(), onPinned);
     }
 
     private CompletionStage<KafkaBookKeeperReadResultV1> readNative(
             KafkaBookKeeperSequentialReadRequestV1 request,
             Optional<BindingReadAuthorityV1> capturedView,
-            HistoricalFetchScope scope) {
+            HistoricalFetchScope scope,
+            java.util.function.Consumer<KafkaCoherentProtocolSnapshotV1> onPinned) {
         final KafkaCoherentProtocolSnapshotV1 snapshot;
         final List<KafkaBookKeeperReadRunV1> history;
         final KafkaBookKeeperReadViewV2 preferred;
@@ -2032,6 +2051,7 @@ public final class KafkaBookKeeperPartitionV1 {
             });
         }
         try {
+            onPinned.accept(snapshot);
             var active = KafkaBookKeeperReadSnapshotV1.fromActive(snapshot);
             long generation = snapshot.root().references().activeTail().generation();
             var runs = new ArrayList<KafkaBookKeeperReadRunV1>();
