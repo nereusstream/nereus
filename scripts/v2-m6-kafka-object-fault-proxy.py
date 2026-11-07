@@ -5,6 +5,7 @@ import http.client
 import http.server
 import json
 import os
+import queue
 import secrets
 import socket
 import socketserver
@@ -57,7 +58,10 @@ def minio_loopback(container):
                         process.terminate()
                     upstream.join()
 
-    with socketserver.ThreadingTCPServer(("127.0.0.1", 0), Forward) as server:
+    class ForwardServer(socketserver.ThreadingTCPServer):
+        daemon_threads = True
+
+    with ForwardServer(("127.0.0.1", 0), Forward) as server:
         thread = threading.Thread(target=server.serve_forever, name="nereus-m6-minio-loopback", daemon=True)
         thread.start()
         try:
@@ -75,6 +79,8 @@ def fault_proxy(upstream):
     token = secrets.token_hex(16)
     lock = threading.Lock()
     rule = None
+    closing = False
+    idle = queue.LifoQueue(maxsize=8)
 
     class Handler(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -158,7 +164,11 @@ def fault_proxy(upstream):
                 return self.reply(413)
             body = self.rfile.read(size) if size else None
             headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_HEADERS}
-            conn = http.client.HTTPConnection(address.hostname, address.port, timeout=30)
+            try:
+                conn = idle.get_nowait()
+            except queue.Empty:
+                conn = http.client.HTTPConnection(address.hostname, address.port, timeout=30)
+            reusable = False
             try:
                 conn.request(self.command, self.path, body=body, headers=headers)
                 response = conn.getresponse()
@@ -166,23 +176,32 @@ def fault_proxy(upstream):
                 if len(content) > MAX_BYTES:
                     return self.reply(502)
                 response_headers = response.getheaders()
-                if mode == "put-response-lost":
-                    if response.status == 200:
-                        with lock:
-                            fault["appliedVersion"] = response.getheader("x-amz-version-id")
-                        fault["release"].wait(30)
-                    # Lose the original response and every conditional retry response for this exact key.
-                    self.close_connection = True
-                    return
-                if mode == "held" and not fault["release"].wait(30):
-                    return self.reply(504)
-                if mode == "corrupt" and response.status == 200 and content:
-                    content = bytes([content[0] ^ 1]) + content[1:]
-                    response_headers = [(k, v) for k, v in response_headers
-                                        if not k.lower().startswith("x-amz-checksum-") and k.lower() != "content-md5"]
-                return self.reply(response.status, content, response_headers)
+                reusable = conn.sock is not None and response.isclosed()
             finally:
-                conn.close()
+                with lock:
+                    if reusable and not closing:
+                        try:
+                            idle.put_nowait(conn)
+                            conn = None
+                        except queue.Full:
+                            pass
+                if conn is not None:
+                    conn.close()
+            if mode == "put-response-lost":
+                if response.status == 200:
+                    with lock:
+                        fault["appliedVersion"] = response.getheader("x-amz-version-id")
+                    fault["release"].wait(30)
+                # Lose the original response and every conditional retry response for this exact key.
+                self.close_connection = True
+                return
+            if mode == "held" and not fault["release"].wait(30):
+                return self.reply(504)
+            if mode == "corrupt" and response.status == 200 and content:
+                content = bytes([content[0] ^ 1]) + content[1:]
+                response_headers = [(k, v) for k, v in response_headers
+                                    if not k.lower().startswith("x-amz-checksum-") and k.lower() != "content-md5"]
+            return self.reply(response.status, content, response_headers)
 
         do_GET = do_HEAD = do_PUT = do_POST = do_DELETE = relay
 
@@ -199,7 +218,10 @@ def fault_proxy(upstream):
             yield endpoint, endpoint + CONTROL, token
         finally:
             with lock:
+                closing = True
                 if rule is not None:
                     rule["release"].set()
             server.shutdown()
             thread.join()
+            while not idle.empty():
+                idle.get_nowait().close()
