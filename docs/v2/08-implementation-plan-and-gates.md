@@ -334,10 +334,14 @@ automatic rerun of all historical campaigns is required. Current M5 still promot
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.
 It runs the real BK/Oxia read-root cases and the reader capacity cases, and checks the tested classes against the
-freshly published JARs. It grants no scenario promotion. The Kafka async Object fixture separately checks that
-insufficient physical metadata quota prevents any PUT, and that the same task can write, verify and register the
-original immutable Object versions after an explicit capacity increase. Selector activation and cold Fetch are
-separate M6-2 exit requirements.
+freshly published JARs. It grants no scenario promotion.
+
+Run the focused Kafka async Object fixture with `python3 scripts/run-v2-m6-kafka-async-object-check.py
+--kafka-root <checkout> --kafka-java-home <jdk17> --output <new-absolute-path-outside-checkouts>`. It builds
+the current M4 prerequisite and runs the actual Kafka TestKit Broker and Controller with BK, Oxia and MinIO. The
+fixture covers quota rejection before PUT, original version reuse, background scheduling, hot and cold recovery
+after response loss, and protected BK fallback when an Object version is missing. It records the exact source
+trees and loaded test runtime and does not promote scenarios or replace the separate process and retirement gates.
 
 ### Planned aggregate boundaries
 

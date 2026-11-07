@@ -8,6 +8,7 @@ import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 
 def output = Path.of(System.getProperty('nereus.m6.kafkaRuntimeCapture'))
+def objectFixture = Boolean.getBoolean('nereus.m6.kafkaObjectRuntimeCapture')
 
 def identify = { Path path ->
     if (path.toRealPath() != path || !Files.isRegularFile(path)) {
@@ -34,54 +35,62 @@ gradle.projectsEvaluated {
         throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
     }
     def core = gradle.rootProject.project(':core')
-    core.tasks.named('nereusBookKeeperOwnerRelocationRealTest', Test).configure { test ->
-        test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
-        def main = core.extensions.getByType(SourceSetContainer).main
-        def process = main.runtimeClasspath + core.configurations.releaseOnly
-        def log = gradle.rootProject.file('config/log4j2.yaml')
-        def capture = {
-            def inputs = new TreeMap()
-            def remember = { Path path ->
-                if (!inputs.containsKey(path.toString())) inputs[path.toString()] = identify(path)
+    def testTasks = objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest']
+        : ['nereusBookKeeperOwnerRelocationRealTest']
+    testTasks.each { task ->
+        core.tasks.named(task, Test).configure { test ->
+            def target = objectFixture ? output.resolveSibling(task + '-runtime.json') : output
+            if (!objectFixture) {
+                test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
             }
-            def classpath = { files ->
-                files.files.collect { file ->
-                    Path path = file.toPath().toAbsolutePath()
-                    if (Files.isSymbolicLink(path)) throw new GradleException("Redirected classpath: " + path)
-                    if (!Files.exists(path)) {
-                        inputs[path.toString()] = [absent: true]
-                    } else if (Files.isDirectory(path)) {
-                        if (path.toRealPath() != path) throw new GradleException("Redirected classpath: " + path)
-                        Files.walk(path).withCloseable { entries ->
-                            entries.sorted().forEach { entry ->
-                                if (!Files.isDirectory(entry) || Files.isSymbolicLink(entry)) {
-                                    remember(entry)
+            def main = core.extensions.getByType(SourceSetContainer).main
+            def process = objectFixture ? core.files() : main.runtimeClasspath + core.configurations.releaseOnly
+            def log = objectFixture ? null : gradle.rootProject.file('config/log4j2.yaml')
+            def capture = {
+                def inputs = new TreeMap()
+                def remember = { Path path ->
+                    if (!inputs.containsKey(path.toString())) inputs[path.toString()] = identify(path)
+                }
+                def classpath = { files ->
+                    files.files.collect { file ->
+                        Path path = file.toPath().toAbsolutePath()
+                        if (Files.isSymbolicLink(path)) throw new GradleException("Redirected classpath: " + path)
+                        if (!Files.exists(path)) {
+                            inputs[path.toString()] = [absent: true]
+                        } else if (Files.isDirectory(path)) {
+                            if (path.toRealPath() != path) throw new GradleException("Redirected classpath: " + path)
+                            Files.walk(path).withCloseable { entries ->
+                                entries.sorted().forEach { entry ->
+                                    if (!Files.isDirectory(entry) || Files.isSymbolicLink(entry)) {
+                                        remember(entry)
+                                    }
                                 }
                             }
+                        } else {
+                            remember(path)
                         }
-                    } else {
-                        remember(path)
+                        path.toString()
                     }
-                    path.toString()
                 }
+                def java = test.javaLauncher.get().executablePath.asFile.toPath().toAbsolutePath()
+                def installation = test.javaLauncher.get().metadata.installationPath.asFile.toPath().toAbsolutePath()
+                def javaFiles = [java, installation.resolve('release'), installation.resolve('lib/modules')]
+                if (log != null) javaFiles.add(log.toPath())
+                javaFiles.each { path -> remember(path) }
+                [schema: 'NEREUS_V2_M6_KAFKA_RUNTIME_V1',
+                    testClasspath: classpath(test.classpath), processClasspath: classpath(process),
+                    java: java.toString(), processLogConfig: log?.absolutePath,
+                    files: inputs]
             }
-            def java = test.javaLauncher.get().executablePath.asFile.toPath().toAbsolutePath()
-            def installation = test.javaLauncher.get().metadata.installationPath.asFile.toPath().toAbsolutePath()
-            [java, installation.resolve('release'), installation.resolve('lib/modules'), log.toPath()]
-                .each { path -> remember(path) }
-            [schema: 'NEREUS_V2_M6_KAFKA_RUNTIME_V1',
-                testClasspath: classpath(test.classpath), processClasspath: classpath(process),
-                java: java.toString(), processLogConfig: log.absolutePath,
-                files: inputs]
-        }
-        test.doFirst {
-            Files.writeString(output, JsonOutput.toJson(capture()) + '\n', StandardOpenOption.CREATE_NEW)
-        }
-        test.doLast {
-            if (test.systemProperties['nereus.nsip.processClasspath'] != process.asPath
-                    || test.systemProperties['nereus.nsip.processLogConfig'] != log.absolutePath
-                    || Files.readString(output) != JsonOutput.toJson(capture()) + '\n') {
-                throw new GradleException('Kafka runtime inputs changed during native execution')
+            test.doFirst {
+                Files.writeString(target, JsonOutput.toJson(capture()) + '\n', StandardOpenOption.CREATE_NEW)
+            }
+            test.doLast {
+                if ((!objectFixture && (test.systemProperties['nereus.nsip.processClasspath'] != process.asPath
+                        || test.systemProperties['nereus.nsip.processLogConfig'] != log.absolutePath))
+                        || Files.readString(target) != JsonOutput.toJson(capture()) + '\n') {
+                    throw new GradleException('Kafka runtime inputs changed during native execution')
+                }
             }
         }
     }
