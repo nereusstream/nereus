@@ -22,6 +22,7 @@ import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryProgre
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaActiveTailStateV1;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperCompactionPublicationV2;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperObjectReadScopeV1;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadViewV2;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorCodecV2;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2;
@@ -48,10 +49,8 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
-import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
-import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -297,7 +296,10 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 historyStartOffset,
                 envelope,
                 Optional.of(new CoveredPrefix(
-                        state.coveredThrough(), descriptor.sourceCut().sources(), Optional.of(checkpoint))));
+                        state.coveredThrough(),
+                        descriptor.sourceCut().sources(),
+                        Optional.of(checkpoint),
+                        Optional.empty())));
     }
 
     /**
@@ -311,21 +313,17 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
             long historyStartOffset,
             KafkaBookKeeperRecoveryEnvelopeV1 envelope,
             BindingReadSelector selector,
-            KafkaObjectMaterializedPrefixV1 prefix) {
+            KafkaObjectMaterializedPrefixV1 prefix,
+            KafkaBookKeeperObjectReadScopeV1 scope) {
+        scope.requireSelection(prefix, selector);
         var binding = new BindingIdentity(
                 newFence.bindingId(),
                 Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(newFence.topicIncarnation())),
                 newFence.storageEpochId().digest());
         var cut = prefix.sourceCut();
         if (!cut.identity().binding().equals(binding)
-                || !selector.binding().equals(binding)
                 || selector.ownerEpoch() > closed.owner().ownerEpoch()
-                || selector.ownerEpoch() < cut.identity().ownerEpoch()
-                || !selector.selectedViewSha256().equals(prefix.manifestSha256())
                 || selector.sourceGeneration() < prefix.sourceGeneration()
-                || selector.admissionState() != AdmissionState.ADMITTING
-                || selector.mode() != SelectorMode.PREFERRED_ONLY
-                || !selector.capability().equals(cut.identity().capability())
                 || prefix.coverage().inclusiveStart() != historyStartOffset
                 || cut.sources().stream().anyMatch(source -> source.kind() != SourceKind.BOOKKEEPER_LEDGER)) {
             throw new IllegalArgumentException(
@@ -336,11 +334,25 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 newFence,
                 historyStartOffset,
                 envelope,
-                Optional.of(new CoveredPrefix(prefix.coverage().exclusiveEnd(), cut.sources(), Optional.empty())));
+                Optional.of(new CoveredPrefix(
+                        prefix.coverage().exclusiveEnd(), cut.sources(), Optional.empty(), Optional.of(scope))));
+    }
+
+    /** Exact selected manifest and its qualified durable native recovery scope. */
+    public record ObjectPrefix(
+            BindingReadSelector selector,
+            KafkaObjectMaterializedPrefixV1 prefix,
+            KafkaBookKeeperObjectReadScopeV1 scope) {
+        public ObjectPrefix {
+            scope.requireSelection(prefix, selector);
+        }
     }
 
     private record CoveredPrefix(
-            long exclusiveEnd, List<SourceExtent> sources, Optional<KafkaProtocolCheckpointStateV1> state) {}
+            long exclusiveEnd,
+            List<SourceExtent> sources,
+            Optional<KafkaProtocolCheckpointStateV1> state,
+            Optional<KafkaBookKeeperObjectReadScopeV1> objectScope) {}
 
     private CompletionStage<Result> recover(
             KafkaOwnerAdmissionV1 closed,
@@ -388,6 +400,9 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                         "selected recovery cut lacks its exact sealed raw prefix boundary"))
                 .thenCompose(ignored -> fenceAll(context, 0))
                 .thenCompose(ignored -> discoverFooters(context, 0))
+                .thenCompose(ignored -> selected.flatMap(CoveredPrefix::objectScope)
+                        .map(objectScope -> verifyRetainedObjectCheckpoint(context, objectScope))
+                        .orElseGet(() -> CompletableFuture.completedFuture(null)))
                 // The selected generation supplies the compacted prefix. A later native checkpoint may
                 // cover the raw suffix; replaying that entire suffix would discard its bounded recovery cut.
                 .thenCompose(ignored -> selectCheckpoint(context, context.runs.size() - 1))
@@ -706,6 +721,50 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
             return Nbke2CodecV1.decode(
                     entry.payload().toByteArray(), run.handle.ledgerIdentity().ledgerId(), entryId);
         });
+    }
+
+    private CompletionStage<Void> verifyRetainedObjectCheckpoint(
+            Context context, KafkaBookKeeperObjectReadScopeV1 scope) {
+        int position = -1;
+        for (int index = 0; index < context.runs.size(); index++) {
+            if (scope.namesRetainedCarrier(context.runs.get(index).record.root())) {
+                position = index;
+                break;
+            }
+        }
+        require(position >= 0, "selected Object recovery lacks its admitted retained BK carrier");
+        var run = context.runs.get(position);
+        var footer = context.footers.get(position);
+        long footerEntry = context.proofs.get(position).lastAddConfirmed();
+        require(
+                footer != null
+                        && Objects.equals(context.checkpointEntries.get(position), scope.checkpointEntry())
+                        && Sha256Digest.hash(CanonicalBytes.copyOf(
+                                        Nbke2CodecV1.encode(scope.retainedLedger(), footerEntry, footer)))
+                                .equals(scope.footerFrame()),
+                "selected Object recovery has a different retained BK footer");
+        return readOwner
+                .read(run.record, ReadPhase.CHECKPOINT, owned -> openSelectedRun(owned, run)
+                        .thenCompose(ignored -> exactFrame(owned, context, run, scope.checkpointEntry())))
+                .thenAccept(frame -> {
+                    require(
+                            frame instanceof Nbke2ProtocolCheckpointV1,
+                            "selected Object recovery carrier does not contain a protocol checkpoint");
+                    var checkpoint = (Nbke2ProtocolCheckpointV1) frame;
+                    var state = KafkaProtocolCheckpointStateV1.fromNbke2(checkpoint);
+                    require(
+                            checkpoint.runBinding().equals(run.binding)
+                                    && state.vector().isAlignedCompoundCheckpoint()
+                                    && state.vector().recoveryCoveredThrough()
+                                            == run.record
+                                                    .root()
+                                                    .kafkaEndOffsetExclusive()
+                                                    .orElseThrow()
+                                    && Sha256Digest.hash(CanonicalBytes.copyOf(Nbke2CodecV1.encode(
+                                                    scope.retainedLedger(), scope.checkpointEntry(), checkpoint)))
+                                            .equals(scope.checkpointFrame()),
+                            "selected Object recovery has another retained BK protocol checkpoint");
+                });
     }
 
     private CompletionStage<Void> selectCheckpoint(Context context, int index) {

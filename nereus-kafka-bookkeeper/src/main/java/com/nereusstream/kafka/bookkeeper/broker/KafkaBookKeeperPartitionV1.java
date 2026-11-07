@@ -571,12 +571,59 @@ public final class KafkaBookKeeperPartitionV1 {
             KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner historyReads,
             Optional<KafkaBookKeeperClosedHistoryRecoveryV1.SelectedPrefix> selectedPrefix,
             boolean consumerOffsets) {
+        return openSelected(
+                session,
+                roots,
+                owners,
+                owner,
+                binding,
+                fence,
+                closed,
+                partitionCapacity,
+                globalCapacity,
+                envelope,
+                maximumBatchBytes,
+                observer,
+                isCurrent,
+                controlExecutor,
+                unselectedFence,
+                historyReads,
+                selectedPrefix,
+                consumerOffsets,
+                Optional.empty());
+    }
+
+    /** Native callers can recover a released Object prefix using its independently retained BK checkpoint. */
+    public static CompletionStage<KafkaBookKeeperPartitionV1> openSelected(
+            BookKeeperCellSession session,
+            KafkaRunRootAuthority roots,
+            KafkaBookKeeperOwnerAuthorityV1 owners,
+            KafkaOwnerIdentityV1 owner,
+            Nbke2RunBindingV1 binding,
+            KafkaPartitionFenceV1 fence,
+            Optional<KafkaOwnerAdmissionV1> closed,
+            KafkaAppendCapacityControllerV1 partitionCapacity,
+            KafkaAppendCapacityControllerV1 globalCapacity,
+            KafkaBookKeeperRecoveryEnvelopeV1 envelope,
+            int maximumBatchBytes,
+            KafkaPartitionPublicationObserver observer,
+            BooleanSupplier isCurrent,
+            Executor controlExecutor,
+            KafkaBookKeeperRunBirthRecoveryV1.UnselectedFence unselectedFence,
+            KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner historyReads,
+            Optional<KafkaBookKeeperClosedHistoryRecoveryV1.SelectedPrefix> selectedPrefix,
+            boolean consumerOffsets,
+            Optional<KafkaBookKeeperClosedHistoryRecoveryV1.ObjectPrefix> objectPrefix) {
         Objects.requireNonNull(isCurrent, "isCurrent");
         Objects.requireNonNull(controlExecutor, "controlExecutor");
         Objects.requireNonNull(unselectedFence, "unselectedFence");
         Objects.requireNonNull(historyReads, "historyReads");
         Objects.requireNonNull(selectedPrefix, "selectedPrefix");
-        if (selectedPrefix.isPresent() && closed.isEmpty()) {
+        Objects.requireNonNull(objectPrefix, "objectPrefix");
+        if (selectedPrefix.isPresent() && objectPrefix.isPresent()) {
+            throw new IllegalArgumentException("native recovery cannot select two prefix sources");
+        }
+        if ((selectedPrefix.isPresent() || objectPrefix.isPresent()) && closed.isEmpty()) {
             throw new IllegalArgumentException("selected native recovery lacks a closed predecessor owner");
         }
         if (!fence.bindingId().equals(binding.bindingId())
@@ -596,13 +643,29 @@ public final class KafkaBookKeeperPartitionV1 {
                 : new KafkaNativeProtocolBatchAdapterV1();
         var recoveryReader = new KafkaBookKeeperClosedHistoryRecoveryV1(
                 session, owners, protocolAdapter, System::nanoTime, unselectedFence, historyReads);
-        CompletionStage<Optional<KafkaBookKeeperClosedHistoryRecoveryV1.Result>> recovery = closed.isEmpty()
-                ? CompletableFuture.completedFuture(Optional.empty())
-                : (selectedPrefix.isPresent()
-                                ? recoveryReader.recoverSelected(
-                                        closed.orElseThrow(), fence, 0, envelope, selectedPrefix.orElseThrow())
-                                : recoveryReader.recover(closed.orElseThrow(), fence, 0, envelope))
-                        .thenApply(Optional::of);
+        CompletionStage<Optional<KafkaBookKeeperClosedHistoryRecoveryV1.Result>> recovery = closed.<CompletionStage<
+                                Optional<KafkaBookKeeperClosedHistoryRecoveryV1.Result>>>
+                        map(previous -> {
+                    if (objectPrefix.isPresent()) {
+                        var object = objectPrefix.orElseThrow();
+                        return recoveryReader
+                                .recoverObjectPrefix(
+                                        previous,
+                                        fence,
+                                        0,
+                                        envelope,
+                                        object.selector(),
+                                        object.prefix(),
+                                        object.scope())
+                                .thenApply(Optional::of);
+                    }
+                    return (selectedPrefix.isPresent()
+                                    ? recoveryReader.recoverSelected(
+                                            previous, fence, 0, envelope, selectedPrefix.orElseThrow())
+                                    : recoveryReader.recover(previous, fence, 0, envelope))
+                            .thenApply(Optional::of);
+                })
+                .orElseGet(() -> CompletableFuture.completedFuture(Optional.empty()));
         return recovery.thenCompose(
                 history -> sealRecoveredHistory(owners, history, isCurrent).thenCompose(sealedRoots -> {
                     requireCurrent(isCurrent);

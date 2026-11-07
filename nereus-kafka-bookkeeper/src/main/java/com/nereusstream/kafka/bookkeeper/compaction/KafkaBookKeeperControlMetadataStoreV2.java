@@ -40,6 +40,7 @@ public final class KafkaBookKeeperControlMetadataStoreV2 implements CanonicalCon
     private static final Pattern RECORD = Pattern.compile(PREFIX
             + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/cache-budget|/part/(?:0|[1-9][0-9]{0,2}))?"
             + "|views/[0-9a-f]{64}/(?:descriptor|publication-targets|replacement-semantics"
+            + "|native-object-read-scope"
             + "|native-read-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}"
             + "|native-recovery-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}))");
     private final CanonicalControlMetadataStore records;
@@ -214,6 +215,12 @@ public final class KafkaBookKeeperControlMetadataStoreV2 implements CanonicalCon
             }
             records.get(KafkaBookKeeperCompactionPublicationV2.descriptorKey(comparison.descriptorId()))
                     .ifPresent(value -> comparison.requireDescriptor(descriptor(value)));
+        } else if (key.endsWith("/native-object-read-scope")) {
+            var scope = KafkaBookKeeperObjectReadScopeV1.decode(bytes);
+            if (!scope.binding().equals(binding) || !scope.key().equals(key)) {
+                throw new IllegalArgumentException(
+                        "Kafka Object native read scope has another Binding or manifest key");
+            }
         } else if (key.contains("/native-read-scope/")) {
             verifyReadScope(key, bytes);
         } else if (key.contains("/native-recovery-scope/")) {

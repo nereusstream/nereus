@@ -44,6 +44,7 @@ public final class OxiaKafkaBookKeeperRecordStoreV2 implements CanonicalControlM
     private static final Pattern KEY = Pattern.compile(PREFIX
             + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/cache-budget|/part/(?:0|[1-9][0-9]{0,2}))?"
             + "|views/[0-9a-f]{64}/(?:descriptor|publication-targets|replacement-semantics"
+            + "|native-object-read-scope"
             + "|native-read-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}"
             + "|native-recovery-scope/[1-9][0-9]{0,18}/[1-9][0-9]{0,18}))");
     private final OxiaConditionalClient client;
