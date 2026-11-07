@@ -2619,6 +2619,7 @@ public final class KafkaBookKeeperPartitionV1 {
                     if (cause instanceof KafkaObjectMaterializedPrefixV1.UnresolvedRead unresolved) {
                         scope.retainObjectResponse(unresolved.originalDrain());
                     } else if (sources.fallback()
+                            && sources.prefix().rawFallbackEquivalent()
                             && cause instanceof KafkaObjectMaterializedPrefixV1.ReadFailure object
                             && object.failureClass() != FailureClass.NOT_ELIGIBLE) {
                         // No response was observable. Restart the entire requested range on its captured protected BK

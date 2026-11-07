@@ -19,6 +19,7 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionIndexV1;
 import com.nereusstream.storage.object.materialization.M5LookupIndexV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.GenerationObject;
@@ -29,8 +30,10 @@ import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.RepresentationMode;
+import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.ValidatedGeneration;
 import com.nereusstream.storage.object.materialization.Nms1CodecV1;
+import com.nereusstream.storage.object.materialization.Nms1ObjectV1;
 import com.nereusstream.storage.object.read.BindingReadRouteV1.FailureClass;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
@@ -42,7 +45,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 
-/** Reads a single validated, byte-preserving Kafka prefix; the caller owns its captured selector and IO lifetime. */
+/** Reads a single validated Kafka Object prefix; the caller owns its captured selector and IO lifetime. */
 public final class KafkaObjectMaterializedPrefixV1 {
     @FunctionalInterface
     public interface ExactVersionRead {
@@ -100,8 +103,9 @@ public final class KafkaObjectMaterializedPrefixV1 {
         var cut = plan.sourceCut();
         var generation = validated.generation();
         var manifest = validated.manifestView();
+        boolean semantic = plan.payloadKind() == PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1;
         if (cut.coverage().domain() != PositionDomain.KAFKA_OFFSET
-                || plan.payloadKind() != PayloadKind.KAFKA_BATCH_PRESERVING_V1
+                || !semantic && plan.payloadKind() != PayloadKind.KAFKA_BATCH_PRESERVING_V1
                 || generation.payloadKind() != plan.payloadKind()
                 || generation.representationMode() != RepresentationMode.REWRITE_GENERATION
                 || !generation.taskIdSha256().equals(plan.taskIdSha256())
@@ -117,13 +121,25 @@ public final class KafkaObjectMaterializedPrefixV1 {
                 || !manifest.coverage().equals(cut.coverage())
                 || !manifest.exactPredecessorSelectorValueSha256().equals(cut.predecessorSelectorValueSha256())
                 || !manifest.exactPredecessorViewSha256().equals(cut.predecessorViewSha256())
-                || generation.payloadObjects().size() != cut.sources().size()) {
+                || generation.payloadObjects().size()
+                        != (semantic ? 1 : cut.sources().size())
+                || manifest.compactionSuppressionRootSha256().isPresent() != semantic
+                || semantic
+                        && !generation
+                                .semanticProofRootSha256()
+                                .equals(java.util.Optional.of(
+                                        validated.validationRoot().payloadEqualityOrSemanticRootSha256()))) {
             throw new IllegalArgumentException("Kafka Object generation differs from its validated plan/manifest");
         }
         offsets = generation.indexObjects().stream()
                 .filter(value -> value.indexKind() == IndexKind.OFFSET_OR_POSITION)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Kafka Object generation has no offset index"));
+    }
+
+    /** A raw BK replay is a valid substitute only when the selected representation did not suppress records. */
+    public boolean rawFallbackEquivalent() {
+        return plan.payloadKind() == PayloadKind.KAFKA_BATCH_PRESERVING_V1;
     }
 
     public ProtocolCoverage coverage() {
@@ -187,6 +203,19 @@ public final class KafkaObjectMaterializedPrefixV1 {
         if (generation.indexObjects().size() != plan.indexes().size()) {
             throw corrupt("Kafka Object prefix lacks its complete side indexes", null);
         }
+        if (!rawFallbackEquivalent()) {
+            readSemanticPart();
+            var indexes =
+                    new ArrayList<CanonicalBytes>(generation.indexObjects().size());
+            for (var object : generation.indexObjects()) {
+                indexes.add(readSemanticIndex(object));
+            }
+            if (!M5MaterializationValidatorV1.semanticIndexBodiesRoot(indexes)
+                    .equals(validated.validationRoot().lookupBoundaryRootSha256())) {
+                throw corrupt("Kafka Object indexes differ from the validated compaction", null);
+            }
+            return;
+        }
         for (int ordinal = 0; ordinal < sources.size(); ordinal++) {
             readPart(ordinal);
         }
@@ -220,6 +249,10 @@ public final class KafkaObjectMaterializedPrefixV1 {
     public Selection read(long offset, long isolationEnd, long byteBudget) throws IOException {
         if (offset < coverage().inclusiveStart() || offset >= coverage().exclusiveEnd() || byteBudget <= 0) {
             throw new IllegalArgumentException("Kafka Object Fetch is outside the captured prefix");
+        }
+        if (!rawFallbackEquivalent()) {
+            readSemanticIndex(offsets);
+            return selectSemanticBatches(readSemanticPart(), offset, isolationEnd, byteBudget);
         }
         var indexBytes = readExact(offsets);
         final M5LookupIndexV1 index;
@@ -275,6 +308,96 @@ public final class KafkaObjectMaterializedPrefixV1 {
             }
         }
         return new Selection(result, isolationEnd > coverage().exclusiveEnd());
+    }
+
+    private Selection selectSemanticBatches(List<SelectedBatch> batches, long offset, long upperBound, long budget) {
+        var selected = new ArrayList<SelectedBatch>();
+        long used = 0;
+        for (var batch : batches) {
+            if (batch.endOffsetExclusive() <= offset) {
+                continue;
+            }
+            int length = batch.rawAssignedRecordBatch().length();
+            if (batch.endOffsetExclusive() > upperBound || !selected.isEmpty() && length > budget - used) {
+                return new Selection(selected, false);
+            }
+            selected.add(batch);
+            used = Math.addExact(used, length);
+            if (used >= budget) {
+                return new Selection(selected, false);
+            }
+        }
+        return new Selection(selected, upperBound > coverage().exclusiveEnd());
+    }
+
+    private CanonicalBytes readSemanticIndex(GenerationObject object) throws IOException {
+        var encoded = readExact(object);
+        try {
+            var expected = plan.indexes().get(object.ordinal());
+            var index = KafkaCompactionIndexV1.decode(encoded);
+            if (index.kind() != object.indexKind()
+                    || index.kind() != expected.kind()
+                    || !index.coverage().equals(coverage())
+                    || !object.coverage().equals(coverage())
+                    || !object.identity().key().equals(expected.objectKey())
+                    || !index.materializationTaskIdSha256().equals(plan.taskIdSha256())
+                    || !index.outputIdentitySha256().equals(plan.outputIdentitySha256())) {
+                throw corrupt("Kafka Object index differs from its compacted generation", null);
+            }
+            return encoded;
+        } catch (IndexOutOfBoundsException | IllegalArgumentException | IllegalStateException failure) {
+            throw corrupt("Kafka Object compacted index failed validation", failure);
+        }
+    }
+
+    private List<SelectedBatch> readSemanticPart() throws IOException {
+        var descriptor = validated.generation().payloadObjects().get(0);
+        var encoded = readExact(descriptor);
+        try {
+            var part = Nms1CodecV1.decode(encoded);
+            var sources = sourceCut().sources().stream()
+                    .sorted(Comparator.comparing(
+                            value -> value.sourceIdentitySha256().toHex()))
+                    .map(source -> new Nms1ObjectV1.SourceContribution(
+                            source.sourceIdentitySha256(), source.coverage(), source.bodySha256()))
+                    .toList();
+            if (descriptor.ordinal() != 0
+                    || !descriptor.coverage().equals(coverage())
+                    || !descriptor
+                            .identity()
+                            .key()
+                            .equals(plan.outputParts().get(0).objectKey())
+                    || part.partOrdinal() != 0
+                    || part.partCount() != 1
+                    || part.payloadKind() != plan.payloadKind()
+                    || !part.coverage().equals(coverage())
+                    || !part.identity().equals(sourceCut().identity())
+                    || !part.taskIdSha256().equals(plan.taskIdSha256())
+                    || !part.outputIdentitySha256().equals(plan.outputIdentitySha256())
+                    || !part.sources().equals(sources)) {
+                throw corrupt("Kafka Object compacted payload differs from its exact selected cut", null);
+            }
+            var batches = new ArrayList<SelectedBatch>();
+            var payload = ByteBuffer.wrap(part.payload().toByteArray());
+            for (var extent : part.extents()) {
+                if (extent.payloadLength() == 0) {
+                    continue;
+                }
+                var raw = new byte[extent.payloadLength()];
+                payload.get(extent.payloadOffset(), raw);
+                var body = CanonicalBytes.copyOf(raw);
+                var batch = KafkaNativeAssignedRecordBatchV1.validate(KafkaRawAssignedRecordBatchFactsV1.parse(body));
+                if (!Sha256Digest.hash(body).equals(extent.payloadSha256())
+                        || batch.baseOffset() != extent.coverage().inclusiveStart()
+                        || batch.endOffsetExclusive() != extent.coverage().exclusiveEnd()) {
+                    throw corrupt("Kafka Object compacted batch differs from its exact extent", null);
+                }
+                batches.add(new SelectedBatch(batch.baseOffset(), batch.endOffsetExclusive(), body));
+            }
+            return batches;
+        } catch (IndexOutOfBoundsException | IllegalArgumentException | IllegalStateException failure) {
+            throw corrupt("Kafka Object compacted payload failed validation", failure);
+        }
     }
 
     private List<SelectedBatch> readPart(int ordinal) throws IOException {

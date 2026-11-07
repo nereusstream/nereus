@@ -138,6 +138,22 @@ public final class KafkaSemanticCompactorV1 {
             List<ParsedBatch> inputs, List<BatchOutput> outputs, List<DispositionRow> dispositions, List<Gap> gaps) {}
 
     public Result compact(CompactionPlan plan) {
+        return compact(plan, "m5/kafka-compaction", plan.sourceCut().identity().providerScopeSha256());
+    }
+
+    /** Uses the admitted Object namespace and encryption generation of the actual native output writer. */
+    public Result compactForObjectCell(
+            CompactionPlan plan, String exclusiveCellNamespace, Sha256Digest encryptionGeneration) {
+        if (exclusiveCellNamespace == null
+                || exclusiveCellNamespace.isBlank()
+                || exclusiveCellNamespace.endsWith("/")) {
+            throw new IllegalArgumentException("Kafka compaction has no admitted Object namespace prefix");
+        }
+        KafkaCompactionRecordsV1.requireDigest(encryptionGeneration, "encryptionGeneration");
+        return compact(plan, exclusiveCellNamespace + "/m5/kafka-compaction", encryptionGeneration);
+    }
+
+    private Result compact(CompactionPlan plan, String objectPrefix, Sha256Digest encryptionGeneration) {
         if (plan.sourceCut().sources().stream()
                 .anyMatch(source -> source.kind()
                         == com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind
@@ -145,7 +161,7 @@ public final class KafkaSemanticCompactorV1 {
             throw new IllegalArgumentException("compacted BK generation input requires the BookKeeper output path");
         }
         CompiledRecords records = compileRecords(plan);
-        MaterializationPlan materialization = materializationPlan(plan);
+        MaterializationPlan materialization = materializationPlan(plan, objectPrefix, encryptionGeneration);
         List<KafkaCompactionIndexV1> indexes = indexes(
                 plan,
                 materialization.taskIdSha256(),
@@ -291,11 +307,12 @@ public final class KafkaSemanticCompactorV1 {
         return new CompiledRecords(inputs, List.copyOf(outputs), dispositions, gaps);
     }
 
-    private static MaterializationPlan materializationPlan(CompactionPlan plan) {
+    private static MaterializationPlan materializationPlan(
+            CompactionPlan plan, String objectPrefix, Sha256Digest encryptionGeneration) {
         Sha256Digest planRoot = KafkaCompactionCanonicalV1.planRoot(plan);
         Sha256Digest taskId = M5MaterializationCodecV1.calculateTaskId(plan.sourceCut());
         Sha256Digest compactionTask = KafkaCompactionCanonicalV1.compactionTaskId(taskId, planRoot);
-        String prefix = "m5/kafka-compaction/" + compactionTask.toHex();
+        String prefix = objectPrefix + "/" + compactionTask.toHex();
         ProtocolCoverage coverage = plan.sourceCut().coverage();
         List<OutputPartPlan> parts = List.of(new OutputPartPlan(
                 0,
@@ -316,7 +333,7 @@ public final class KafkaSemanticCompactorV1 {
                 RepresentationMode.REWRITE_GENERATION,
                 PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1,
                 taskId,
-                plan.sourceCut().identity().providerScopeSha256(),
+                encryptionGeneration,
                 hash(
                         "M5-B-COMPRESSION-POLICY-V1",
                         plan.policy().compressionPolicy().name()),
@@ -329,7 +346,7 @@ public final class KafkaSemanticCompactorV1 {
                 PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1,
                 taskId,
                 outputIdentity,
-                plan.sourceCut().identity().providerScopeSha256(),
+                encryptionGeneration,
                 hash(
                         "M5-B-COMPRESSION-POLICY-V1",
                         plan.policy().compressionPolicy().name()),
