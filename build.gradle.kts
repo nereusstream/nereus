@@ -3215,3 +3215,18 @@ tasks.register<Exec>("v2M6ExecutionInputsContractTest") {
     workingDir = layout.projectDirectory.asFile
     commandLine("python3", "scripts/check-v2-m6-execution-inputs-tests.py")
 }
+
+tasks.register<Exec>("v2M6KafkaBookKeeperProcessCheck") {
+    group = "verification"
+    description = "Run the focused native Kafka BK process checks against owned real BK and Oxia backends."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        commandLine(
+            "python3", "scripts/run-v2-m6-kafka-bk-process-check.py",
+            "--kafka-root", providers.gradleProperty("v2M6KafkaCheckout").get(),
+            "--kafka-java-home", providers.gradleProperty("v2M6KafkaJavaHome").get(),
+            "--development-repository", providers.gradleProperty("v2M6KafkaDevelopmentRepository").get(),
+            "--output", providers.gradleProperty("v2M6ProcessOutput").get(),
+        )
+    }
+}
