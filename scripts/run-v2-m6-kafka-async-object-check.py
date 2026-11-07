@@ -18,6 +18,8 @@ M4 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M4)
 BK, M6, JUNIT = M4.BK, M4.M6, M4.JUNIT
 MINIO_ID = "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
+DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
+N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2"
 CASES = {
     "nereusBookKeeperObjectMaterializationRealTest": (
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
@@ -111,15 +113,18 @@ def run(kafka, java, out):
     repository = m4 / "development-repository"
     repository_inputs = BK.repository_files(repository)
     _, jars, locked = M4.runtime(repository)
-    artifacts = {M4.only_jar(repository / "com/nereusstream", name).name: sha for name, sha in jars.items()}
+    # Gradle exposes the base snapshot name even when Maven publishes a timestamped file.
+    artifacts = {f"{name}-{DEVELOPMENT_VERSION}.jar": sha for name, sha in jars.items()}
     artifacts.update({M4.only_jar(BK.OXIA_CLIENT / "io/github/oxia-db", name).name: sha
                       for name, sha in locked.items()})
+    domain = M4.only_jar(N1_REPOSITORY / "com/nereusstream", "nereus-domain")
+    artifacts[domain.name] = M6.file_identity(domain, tracked[domain.relative_to(ROOT).as_posix()])["sha256"]
     with minio(out) as endpoint, BK.bookkeeper_oxia(out) as oxia:
         command = [
             "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
             "--init-script", str(BK.RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={out / 'runtime.json'}",
             "-Dnereus.m6.kafkaObjectRuntimeCapture=true",
-            f"-PnereusDevelopmentRepository={repository}", "-PnereusDevelopmentVersion=0.2.0-SNAPSHOT",
+            f"-PnereusDevelopmentRepository={repository}", f"-PnereusDevelopmentVersion={DEVELOPMENT_VERSION}",
             f"-PnereusLockedOxiaRepository={BK.OXIA_CLIENT}",
             f"-Pv2M5KafkaRunSourceRoot={ROOT}", f"-Pv2M5KafkaRunSourceSummary={receipt}",
             "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
