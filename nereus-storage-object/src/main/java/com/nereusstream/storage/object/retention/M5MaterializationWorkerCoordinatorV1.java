@@ -96,6 +96,26 @@ public final class M5MaterializationWorkerCoordinatorV1 {
         }
     }
 
+    /** Reopens the original grant after an uncertain registration without allocating another worker epoch. */
+    public Optional<Admission> resumePlan(
+            MaterializationPlan plan, Sha256Digest nativeWorkerIdentity, Sha256Digest nativeNamespaceBinding) {
+        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(nativeWorkerIdentity, "nativeWorkerIdentity");
+        Objects.requireNonNull(nativeNamespaceBinding, "nativeNamespaceBinding");
+        var worker = current()
+                .materializationWorker()
+                .filter(value -> value.identity().equals(plan.sourceCut().identity())
+                        && value.taskIdSha256().equals(plan.taskIdSha256())
+                        && value.nativeWorkerIdentitySha256().equals(nativeWorkerIdentity)
+                        && value.nativeNamespaceBindingSha256().equals(nativeNamespaceBinding));
+        if (worker.isEmpty()) {
+            return Optional.empty();
+        }
+        var admission = new Admission(worker.orElseThrow());
+        admission.requireCurrentPlan(plan);
+        return Optional.of(admission);
+    }
+
     private boolean isCurrent(M5MaterializationWorkerV1 worker) {
         var current = current();
         return current.state() == BindingAuthorityStateV1.OPEN_V1

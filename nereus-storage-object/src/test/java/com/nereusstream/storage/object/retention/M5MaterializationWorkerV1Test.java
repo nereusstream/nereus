@@ -154,6 +154,13 @@ class M5MaterializationWorkerV1Test {
         store.loseResponse = true;
         var token = proposal.admitPlan(plan).orElseThrow();
         token.requireCurrentPlan(plan);
+        var restarted = coordinator(store);
+        assertThat(restarted.resumePlan(plan, digest("native-worker"), digest("native-namespace")))
+                .get()
+                .extracting(M5MaterializationWorkerCoordinatorV1.Admission::worker)
+                .isEqualTo(token.worker());
+        assertThat(restarted.resumePlan(plan, digest("other-worker"), digest("native-namespace")))
+                .isEmpty();
         assertThat(token.worker().planRootSha256())
                 .isEqualTo(Sha256Digest.hash(M5MaterializationCodecV1.encodePlan(plan)));
         var verified = new M5MaterializationRecordsV1.MaterializationTask(
@@ -171,6 +178,8 @@ class M5MaterializationWorkerV1Test {
         assertThatThrownBy(() -> proposal.admitPlan(plan)).hasMessageContaining("task differs");
         admission.release(plan.taskIdSha256());
         assertThatThrownBy(() -> token.requireCurrentPlan(plan)).hasMessageContaining("shared Cell charge");
+        assertThatThrownBy(() -> restarted.resumePlan(plan, digest("native-worker"), digest("native-namespace")))
+                .hasMessageContaining("shared Cell charge");
     }
 
     @Test
