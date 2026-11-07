@@ -32,7 +32,8 @@ CASES = {
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
         {f'"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome={case}"'
          for case in ("known", "hot", "cold", "automatic", "stale-registration", "retirement",
-                      "background-retirement", "cold-retirement", "shutdown-retirement", "faults", "put-unknown", "semantic")},
+                      "background-retirement", "cold-retirement", "shutdown-retirement", "faults", "put-unknown", "semantic")}
+        | {"selectsCompactedSuccessorFromExactObjectAndBookKeeperTail(Path)"},
     ),
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",
