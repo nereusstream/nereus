@@ -365,7 +365,7 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             } else if (encryptionScope != null && encryptionScope.startsWith("AWS_KMS:")) {
                 request.serverSideEncryption("aws:kms").ssekmsKeyId(encryptionScope.substring("AWS_KMS:".length()));
             }
-            var response = client.putObject(request.build(), RequestBody.fromInputStream(body, identity.bodyLength()));
+            var response = client.putObject(request.build(), conditionalPutBody(body, identity.bodyLength()));
             if (!matchesEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId())) {
                 throw new S3C1ProviderException(
                         S3C1ProviderException.Kind.OUTCOME_UNKNOWN,
@@ -389,6 +389,29 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             throw new S3C1ProviderException(
                     S3C1ProviderException.Kind.OUTCOME_UNKNOWN, "conditional PUT was cancelled", failure);
         }
+    }
+
+    private static RequestBody conditionalPutBody(InputStream body, long length) {
+        if (body.markSupported()) {
+            return RequestBody.fromInputStream(body, length);
+        }
+        var opened = new AtomicBoolean();
+        return RequestBody.fromContentProvider(
+                () -> {
+                    if (!opened.compareAndSet(false, true)) {
+                        // C1 owns the original operation. A retry that cannot replay this stream
+                        // must return UNKNOWN so the caller reconciles the exact key and body.
+                        throw SdkClientException.create("Conditional PUT cannot replay its original input stream");
+                    }
+                    return new FilterInputStream(body) {
+                        @Override
+                        public void close() {
+                            // The C1 caller still owns the original verification stream.
+                        }
+                    };
+                },
+                length,
+                "application/octet-stream");
     }
 
     @Override
