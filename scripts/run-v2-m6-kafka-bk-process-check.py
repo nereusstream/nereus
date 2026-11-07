@@ -2,6 +2,7 @@
 """Run focused native Kafka BookKeeper checks against owned real backends."""
 
 import argparse
+from contextlib import contextmanager
 import importlib.util
 import json
 import os
@@ -111,24 +112,10 @@ def process_logs(out, started):
     return files
 
 
-def run_checks(kafka, java, repository, out):
-    root_commit = M6.clean_commit(ROOT)
-    kafka_commit = M6.clean_commit(kafka)
-    trees = {"nereus": M6.revision(ROOT, f"{root_commit}^{{tree}}"),
-             "kafka": M6.revision(kafka, f"{kafka_commit}^{{tree}}")}
-    inputs = [ROOT, kafka] + ([] if repository is None else [repository])
-    M6.require(out == out.resolve() and M6.outside(out, inputs),
-               "process evidence output overlaps inputs or contains a symlink")
+@contextmanager
+def bookkeeper_oxia(out):
     observe_image(BOOKKEEPER, BOOKKEEPER_ID, ("linux", "amd64"))
     observe_image(OXIA_ID, OXIA_ID, ("linux", "arm64"))
-    out.mkdir(parents=True, exist_ok=False)
-    publication = None
-    if repository is None:
-        repository = out / "development-repository"
-        publication = publish_development_repository(out, repository)
-    files = repository_files(repository)
-    inventory = M6.INPUTS.canonical({"path": str(repository), "publicationCommand": publication, "files": files})
-    (out / "development-repository.json").write_bytes(inventory)
     project = "nereus-m6-kafka-bk-" + uuid.uuid4().hex[:12]
     compose = ("docker", "compose", "-p", project, "-f", str(COMPOSE))
     oxia = None
@@ -156,6 +143,40 @@ def run_checks(kafka, java, repository, out):
                 if attempt == 29:
                     raise
                 time.sleep(1)
+        yield address
+    finally:
+        try:
+            if oxia is not None:
+                try:
+                    with (out / "oxia.log").open("xb") as log:
+                        subprocess.run(["docker", "logs", oxia], stdout=log, stderr=subprocess.STDOUT, check=True)
+                finally:
+                    subprocess.run(["docker", "rm", "-f", oxia], check=True, stdout=subprocess.DEVNULL)
+        finally:
+            try:
+                with (out / "bookkeeper.log").open("xb") as log:
+                    subprocess.run([*compose, "logs"], stdout=log, stderr=subprocess.STDOUT)
+            finally:
+                subprocess.run([*compose, "down", "-v", "--remove-orphans"], check=True)
+
+
+def run_checks(kafka, java, repository, out):
+    root_commit = M6.clean_commit(ROOT)
+    kafka_commit = M6.clean_commit(kafka)
+    trees = {"nereus": M6.revision(ROOT, f"{root_commit}^{{tree}}"),
+             "kafka": M6.revision(kafka, f"{kafka_commit}^{{tree}}")}
+    inputs = [ROOT, kafka] + ([] if repository is None else [repository])
+    M6.require(out == out.resolve() and M6.outside(out, inputs),
+               "process evidence output overlaps inputs or contains a symlink")
+    out.mkdir(parents=True, exist_ok=False)
+    publication = None
+    if repository is None:
+        repository = out / "development-repository"
+        publication = publish_development_repository(out, repository)
+    files = repository_files(repository)
+    inventory = M6.INPUTS.canonical({"path": str(repository), "publicationCommand": publication, "files": files})
+    (out / "development-repository.json").write_bytes(inventory)
+    with bookkeeper_oxia(out) as address:
         runtime_manifest = out / "kafka-runtime.json"
         command = [
             "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
@@ -194,20 +215,6 @@ def run_checks(kafka, java, repository, out):
                    "source changed during native process checks")
         M6.require(repository_files(repository) == files, "Nereus runtime Maven repository changed during Kafka checks")
         process = process_logs(out, started)
-    finally:
-        try:
-            if oxia is not None:
-                try:
-                    with (out / "oxia.log").open("xb") as log:
-                        subprocess.run(["docker", "logs", oxia], stdout=log, stderr=subprocess.STDOUT, check=True)
-                finally:
-                    subprocess.run(["docker", "rm", "-f", oxia], check=True, stdout=subprocess.DEVNULL)
-        finally:
-            try:
-                with (out / "bookkeeper.log").open("xb") as log:
-                    subprocess.run([*compose, "logs"], stdout=log, stderr=subprocess.STDOUT)
-            finally:
-                subprocess.run([*compose, "down", "-v", "--remove-orphans"], check=True)
     (out / "process-result.json").write_bytes(M6.INPUTS.canonical({
         "kind": "FOCUSED_KAFKA_BK_PROCESS_CHECK", "promotionEligible": False,
         "sourceCheckout": {"nereus": root_commit, "kafka": kafka_commit}, "command": command,
