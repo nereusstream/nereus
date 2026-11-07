@@ -378,13 +378,20 @@ apply a blanket `docs/v2/evidence` exclusion to make the current capture pass.
    be its own input. Publication binds results to the source commit and exact inventories; evidence-only descendants
    cannot relabel old execution as new execution or certify a source change.
 
-This is the M6 input design, not an exception to existing M5 validators. Its implementation must prove closure and
-reject source/dependency drift, missing or mutated historical objects, undeclared inputs and self-reference before
-formal execution. Historical M1–M5 frozen sources, raw failures, Finals, source locks and original provenance remain
-byte-for-byte unchanged. Batch 0 runs `v2M0Check`, the affected input/evidence contracts, the active-graph check and
-documentation consistency checks; it creates no new receipt or input-capture machinery. Finish each later batch after
-its mandatory checks and relevant blockers are resolved;
-do not automatically start the next batch.
+[`m6-execution-inputs.py`](../../scripts/m6-execution-inputs.py) implements the inventory and byte verification.
+It inventories every Git path with its mode and blob, and checks the tracked M0–M5 archive against the immutable
+Batch 0 tree at `704dc5a7134425d15bb8a7fdeb9cda757a01711b`. That tree identifies the published archive files; the
+original execution origins remain in their respective receipts. Each gate declares its historical paths (or the
+full archive if it reads across the archive) and supplies its actual external dependency paths and expected SHA-256
+hashes. The tool checks checkout bytes and dependencies, binds the three complete Git identities, applies separate
+source, historical and runtime budgets, and writes the input record outside the source and runtime paths. The
+`verify` operation recomputes the record for comparison after execution. `v2M6ExecutionInputsContractTest` exercises
+rejection cases without running Brokers or promoting scenarios.
+
+Formal execution still requires the runner to account for the actual build, gate and runtime file graph, including
+generated artifacts consumed by later stages, and to enforce the stage and aggregate coverage described above.
+Capturing an inventory alone establishes no process or scenario result. Historical M1–M5 frozen sources, raw failures,
+Finals, source locks and original provenance remain byte-for-byte unchanged.
 
 ## Historical design-frozen milestone: M5
 

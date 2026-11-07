@@ -34,6 +34,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: V2 documentation baseline
         run: ./gradlew v2M0Check
+      - name: V2 M6 execution input contracts
+        run: ./gradlew v2M6ExecutionInputsContractTest
 
   m1-fast-source:
     runs-on: ubuntu-latest

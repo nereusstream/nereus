@@ -3208,3 +3208,10 @@ tasks.register("v2M5Check") {
         "v2M5FinalSourceCheck", "v2M5CurrentSourceIsolationCheck",
     )
 }
+
+tasks.register<Exec>("v2M6ExecutionInputsContractTest") {
+    group = "verification"
+    description = "Exercise M6 source, runtime dependency and historical archive identity checks."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m6-execution-inputs-tests.py")
+}
