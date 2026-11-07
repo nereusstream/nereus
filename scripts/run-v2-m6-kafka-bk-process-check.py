@@ -16,6 +16,7 @@ import uuid
 ROOT = Path(__file__).resolve().parent.parent
 TASK = ":core:nereusBookKeeperOwnerRelocationRealTest"
 XML_DIR = Path("core/build/test-results/nereusBookKeeperOwnerRelocationRealTest")
+RUNTIME_INIT = ROOT / "config/v2/m6/capture-kafka-runtime.init.gradle"
 COMPOSE = ROOT / "config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml"
 BOOKKEEPER = "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d"
 BOOKKEEPER_ID = "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605"
@@ -90,6 +91,8 @@ def repository_files(repository):
 def run_checks(kafka, java, repository, out):
     root_commit = M6.clean_commit(ROOT)
     kafka_commit = M6.clean_commit(kafka)
+    trees = {"nereus": M6.revision(ROOT, f"{root_commit}^{{tree}}"),
+             "kafka": M6.revision(kafka, f"{kafka_commit}^{{tree}}")}
     inputs = [ROOT, kafka] + ([] if repository is None else [repository])
     M6.require(out == out.resolve() and M6.outside(out, inputs),
                "process evidence output overlaps inputs or contains a symlink")
@@ -130,8 +133,10 @@ def run_checks(kafka, java, repository, out):
                 if attempt == 29:
                     raise
                 time.sleep(1)
+        runtime_manifest = out / "kafka-runtime.json"
         command = [
             "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
+            "--init-script", str(RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={runtime_manifest}",
             f"-PnereusDevelopmentRepository={repository}", "-PnereusDevelopmentVersion=0.2.0-SNAPSHOT",
             f"-PnereusLockedOxiaRepository={OXIA_CLIENT}",
             "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
@@ -156,6 +161,12 @@ def run_checks(kafka, java, repository, out):
             M6.require(len(suite["cases"]) == len(CASES[name]), f"unexpected case count: {name}")
         M6.require(completed.returncode == 0 and cases == CASES,
                    f"native BK process suite failed, skipped a case or produced incomplete XML: {out}")
+        M6.require(runtime_manifest.stat().st_mtime_ns >= started, "stale Kafka runtime capture")
+        runtime = json.loads(runtime_manifest.read_bytes())
+        M6.require(runtime["schema"] == "NEREUS_V2_M6_KAFKA_RUNTIME_V1"
+                   and Path(runtime["java"]).resolve(strict=True) == (java / "bin/java").resolve(strict=True),
+                   "Kafka runtime capture did not use the declared Java executable")
+        runtime_identity = M6.file_identity(runtime_manifest)
         M6.require(M6.clean_commit(ROOT) == root_commit and M6.clean_commit(kafka) == kafka_commit,
                    "source changed during native process checks")
         M6.require(repository_files(repository) == files, "Nereus runtime Maven repository changed during Kafka checks")
@@ -176,6 +187,7 @@ def run_checks(kafka, java, repository, out):
     (out / "process-result.json").write_bytes(M6.INPUTS.canonical({
         "kind": "FOCUSED_KAFKA_BK_PROCESS_CHECK", "promotionEligible": False,
         "sourceCheckout": {"nereus": root_commit, "kafka": kafka_commit}, "command": command,
+        "sourceTrees": trees, "kafkaRuntime": {"path": runtime_manifest.name, **runtime_identity},
         "developmentRepositorySha256": M6.INPUTS.digest(inventory),
         "junit": attachments, "cases": {key: sorted(value) for key, value in cases.items()},
     }))
@@ -194,7 +206,7 @@ def main():
         repository = args.development_repository.resolve(strict=True) if args.development_repository else None
         run_checks(args.kafka_root.resolve(strict=True), args.kafka_java_home.resolve(strict=True),
                    repository, args.output.absolute())
-    except (M6.InputError, JUNIT.JUnitEvidenceError, OSError, subprocess.CalledProcessError) as error:
+    except (M6.InputError, JUNIT.JUnitEvidenceError, OSError, subprocess.CalledProcessError, ValueError) as error:
         parser.exit(1, f"Kafka BK process check: {error}\n")
 
 

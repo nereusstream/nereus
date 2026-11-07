@@ -357,7 +357,8 @@ until the committed suite plan and all required drivers exist. The process suite
 
 `v2M6KafkaBookKeeperProcessCheck` is the focused Kafka BK process check. It uses the existing fork Gradle suite
 with a clean Kafka checkout and Java 17. It builds a fresh Nereus development Maven repository from the current
-checkout and checks its artifact bytes before and after Kafka runs. It starts and removes its
+checkout with Java 21. It checks the repository bytes and captures the ordered test and process classpaths, including
+their files, Kafka's Java launcher and Log4j configuration, before and after Kafka runs. It starts and removes its
 own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for all five native
 cases. These include a Fetch v12 request that wakes on transaction commit and Produce with `acks=1`, `acks=all`
 and `acks=0` against real BookKeeper. Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`

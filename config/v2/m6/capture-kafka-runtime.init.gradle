@@ -1,0 +1,87 @@
+// Capture the classpaths on the actual Kafka Test task, before it starts its JVM.
+import groovy.json.JsonOutput
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.testing.Test
+
+def output = Path.of(System.getProperty('nereus.m6.kafkaRuntimeCapture'))
+
+def identify = { Path path ->
+    if (path.toRealPath() != path || !Files.isRegularFile(path)) {
+        throw new GradleException("Kafka runtime input is not a regular local file: " + path)
+    }
+    def digest = MessageDigest.getInstance('SHA-256')
+    long size = Files.size(path)
+    long count = 0
+    Files.newInputStream(path).withCloseable { stream ->
+        byte[] block = new byte[65536]
+        for (int length; (length = stream.read(block)) >= 0;) {
+            digest.update(block, 0, length)
+            count += length
+        }
+    }
+    if (count != size || Files.size(path) != size) {
+        throw new GradleException("Kafka runtime input changed during capture: " + path)
+    }
+    [bytes: size, sha256: digest.digest().encodeHex().toString()]
+}
+
+gradle.projectsEvaluated {
+    if (gradle.rootProject.name != 'kafka') {
+        throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
+    }
+    def core = gradle.rootProject.project(':core')
+    core.tasks.named('nereusBookKeeperOwnerRelocationRealTest', Test).configure { test ->
+        def main = core.extensions.getByType(SourceSetContainer).main
+        def process = main.runtimeClasspath + core.configurations.releaseOnly
+        def log = gradle.rootProject.file('config/log4j2.yaml')
+        def capture = {
+            def inputs = new TreeMap()
+            def remember = { Path path ->
+                if (!inputs.containsKey(path.toString())) inputs[path.toString()] = identify(path)
+            }
+            def classpath = { files ->
+                files.files.collect { file ->
+                    Path path = file.toPath().toAbsolutePath()
+                    if (Files.isSymbolicLink(path)) throw new GradleException("Redirected classpath: " + path)
+                    if (!Files.exists(path)) {
+                        inputs[path.toString()] = [absent: true]
+                    } else if (Files.isDirectory(path)) {
+                        if (path.toRealPath() != path) throw new GradleException("Redirected classpath: " + path)
+                        Files.walk(path).withCloseable { entries ->
+                            entries.sorted().forEach { entry ->
+                                if (!Files.isDirectory(entry) || Files.isSymbolicLink(entry)) {
+                                    remember(entry)
+                                }
+                            }
+                        }
+                    } else {
+                        remember(path)
+                    }
+                    path.toString()
+                }
+            }
+            def java = test.javaLauncher.get().executablePath.asFile.toPath().toAbsolutePath()
+            def installation = test.javaLauncher.get().metadata.installationPath.asFile.toPath().toAbsolutePath()
+            [java, installation.resolve('release'), installation.resolve('lib/modules'), log.toPath()]
+                .each { path -> remember(path) }
+            [schema: 'NEREUS_V2_M6_KAFKA_RUNTIME_V1',
+                testClasspath: classpath(test.classpath), processClasspath: classpath(process),
+                java: java.toString(), processLogConfig: log.absolutePath,
+                files: inputs]
+        }
+        test.doFirst {
+            Files.writeString(output, JsonOutput.toJson(capture()) + '\n', StandardOpenOption.CREATE_NEW)
+        }
+        test.doLast {
+            if (test.systemProperties['nereus.nsip.processClasspath'] != process.asPath
+                    || test.systemProperties['nereus.nsip.processLogConfig'] != log.absolutePath
+                    || Files.readString(output) != JsonOutput.toJson(capture()) + '\n') {
+                throw new GradleException('Kafka runtime inputs changed during native execution')
+            }
+        }
+    }
+}
