@@ -9,7 +9,7 @@ import threading
 import urllib.parse
 
 CONTROL = "/__nereus_m6_object_fault"
-MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"}
+MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable", "put-response-lost"}
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
@@ -58,20 +58,28 @@ def fault_proxy(upstream):
                             or data["mode"] not in MODES or not data["path"].startswith("/") or not data["version"]):
                         return self.reply(400)
                     whole_bucket = data["mode"] == "bucket-unavailable"
+                    lost_put = data["mode"] == "put-response-lost"
                     if (whole_bucket and (data["version"] != "*" or not data["path"].endswith("/")
                                           or data["path"].count("/") != 2 or data["path"] == "//")
-                            or not whole_bucket and data["version"] == "*"):
+                            or lost_put and (data["version"] != "*" or data["path"].count("/") < 2
+                                             or data["path"].endswith("/"))
+                            or not whole_bucket and not lost_put and data["version"] == "*"):
                         return self.reply(400)
                     if rule is not None:
                         rule["release"].set()
-                    rule = dict(data, hits=0, release=threading.Event())
+                    rule = dict(data, hits=0, appliedVersion=None, release=threading.Event())
+                elif self.command == "PATCH":
+                    if rule is None or rule["mode"] != "put-response-lost" or rule["appliedVersion"] is None:
+                        return self.reply(409)
+                    rule["release"].set()
                 elif self.command == "DELETE":
                     if rule is not None:
                         rule["release"].set()
                     rule = None
                 elif self.command != "GET":
                     return self.reply(405)
-                state = {"hits": rule["hits"] if rule else 0}
+                state = {"hits": rule["hits"] if rule else 0,
+                         "appliedVersion": rule["appliedVersion"] if rule else None}
             return self.reply(200, json.dumps(state).encode("ascii"), [("Content-Type", "application/json")])
 
         def relay(self):
@@ -84,6 +92,7 @@ def fault_proxy(upstream):
                 fault = None
                 if rule and (rule["mode"] == "bucket-unavailable" and
                              (path == rule["path"][:-1] or path.startswith(rule["path"]))
+                             or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]
                              or self.command == "GET" and version == [rule["version"]] and path == rule["path"]):
                     fault = rule
                     fault["hits"] += 1
@@ -105,6 +114,14 @@ def fault_proxy(upstream):
                 if len(content) > MAX_BYTES:
                     return self.reply(502)
                 response_headers = response.getheaders()
+                if mode == "put-response-lost":
+                    if response.status == 200:
+                        with lock:
+                            fault["appliedVersion"] = response.getheader("x-amz-version-id")
+                        fault["release"].wait(30)
+                    # Lose the original response and every conditional retry response for this exact key.
+                    self.close_connection = True
+                    return
                 if mode == "held" and not fault["release"].wait(30):
                     return self.reply(504)
                 if mode == "corrupt" and response.status == 200 and content:
@@ -116,6 +133,11 @@ def fault_proxy(upstream):
                 conn.close()
 
         do_GET = do_HEAD = do_PUT = do_POST = do_DELETE = relay
+
+        def do_PATCH(self):
+            if self.path == CONTROL:
+                return self.control()
+            return self.reply(405)
 
     with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
         thread = threading.Thread(target=server.serve_forever, name="nereus-m6-minio-fault-relay", daemon=True)
