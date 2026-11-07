@@ -340,8 +340,12 @@ Run the focused Kafka async Object fixture with `python3 scripts/run-v2-m6-kafka
 --kafka-root <checkout> --kafka-java-home <jdk17> --output <new-absolute-path-outside-checkouts>`. It builds
 the current M4 prerequisite and runs the actual Kafka TestKit Broker and Controller with BK, Oxia and MinIO. The
 fixture covers quota rejection before PUT, original version reuse, background scheduling, hot and cold recovery
-after response loss, and protected BK fallback when an Object version is missing. It records the exact source
-trees and loaded test runtime and does not promote scenarios or replace the separate process and retirement gates.
+after response loss, and protected BK fallback when an Object version is missing. Its retirement case keeps an
+admitted Object Fetch pinned through BK rollover, verifies the exact fallback release after drain, then records
+the independently sealed BK checkpoint for the retained tail. On cold takeover the Broker reads that checkpoint
+and the client reads the complete history without reopening the retired prefix ledgers. Those ledgers are kept in
+the fixture: it does not exercise physical GC. The runner records the exact source trees and loaded test runtime
+without promoting scenarios or replacing the separate process gate.
 
 ### Planned aggregate boundaries
 
