@@ -678,6 +678,37 @@ public final class OxiaBindingLifecycleMetadataStoreV2
         });
     }
 
+    /** An exact persisted pending inventory proves only its own original conditional write is terminal. */
+    CompletionStage<Void> reconcileAppliedPendingOutput(M5PendingOutputInventoryV2 inventory) {
+        String key = materializationKeys.pendingOutputs(inventory.worker().taskIdSha256());
+        var candidate = inventory.encode();
+        verifyValue(key, candidate);
+        return read(key).thenCompose(value -> {
+            var exact = value.filter(found -> found.canonicalStoredBytes().equals(candidate))
+                    .orElseThrow(() -> new IllegalStateException("original pending output is not exact"));
+            return read(keys.selector()).thenCompose(selector -> {
+                var authority = M5BindingAuthorityCodecV1.decodeAuthority(
+                        selector.orElseThrow().canonicalStoredBytes());
+                var tickets = authority.trimMutationTickets().stream()
+                        .filter(ticket -> ticket.key().equals(key)
+                                && ticket.candidateSha256().equals(exact.canonicalStoredSha256())
+                                && ticket.predecessorVersion()
+                                        .filter(exact.metadataVersion()::equals)
+                                        .isEmpty())
+                        .toList();
+                CompletionStage<Void> settled = CompletableFuture.completedFuture(null);
+                for (var ticket : tickets) {
+                    settled = settled.thenCompose(
+                            ignored -> clearTrimWrite(ticket).thenAccept(cleared -> {
+                                if (!cleared)
+                                    throw new IllegalStateException("original pending output write remains unresolved");
+                            }));
+                }
+                return settled;
+            });
+        });
+    }
+
     private CompletionStage<Boolean> reconcileTrimWrite(LogicalTrimMutationV2 ticket) {
         final TrimWrite actor;
         synchronized (pendingTrimWrites) {

@@ -243,9 +243,18 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
 
     /** Keeps the native Binding and admits only its canonical M5 task keys and exact Cell admission key. */
     public CanonicalControlMetadataStore materializationMetadata(Sha256Digest protocolCellSha256) {
+        return materializationLifecycle(protocolCellSha256).rawControlMetadata();
+    }
+
+    public CompletionStage<Void> reconcileMaterializationPendingOutput(
+            Sha256Digest protocolCellSha256,
+            com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2 original) {
+        return materializationLifecycle(protocolCellSha256).reconcileAppliedPendingOutput(original);
+    }
+
+    private OxiaBindingLifecycleMetadataStoreV2 materializationLifecycle(Sha256Digest protocolCellSha256) {
         return new OxiaBindingLifecycleMetadataStoreV2(
-                        client, cellAuthorityRoot, partition, binding, protocolCellSha256, namespace)
-                .rawControlMetadata();
+                client, cellAuthorityRoot, partition, binding, protocolCellSha256, namespace);
     }
 
     public com.nereusstream.storage.object.retention.M5BindingLogicalTrimCoordinatorV2 logicalTrimCoordinator() {
