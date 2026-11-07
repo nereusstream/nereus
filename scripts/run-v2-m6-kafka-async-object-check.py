@@ -117,6 +117,16 @@ def process_logs(out, started):
     return result
 
 
+def record_minio_failure_health(out, endpoint):
+    observation = {"observedAtNs": time.time_ns()}
+    try:
+        with urllib.request.urlopen(endpoint + "/minio/health/live", timeout=3) as response:
+            observation["httpStatus"] = response.status
+    except OSError as failure:
+        observation["failure"] = type(failure).__name__ + ": " + str(failure)
+    (out / "minio-failure-health.json").write_bytes(M6.INPUTS.canonical(observation))
+
+
 def run(kafka, java, out):
     commits = {"nereus": M6.clean_commit(ROOT), "kafka": M6.clean_commit(kafka)}
     trees = {"nereus": M6.revision(ROOT, f"{commits['nereus']}^{{tree}}"),
@@ -168,7 +178,11 @@ def run(kafka, java, out):
                    NEREUS_M6_TEST_FAULT_TOKEN=token)
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
-            subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            try:
+                subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            except subprocess.CalledProcessError:
+                record_minio_failure_health(out, endpoint)
+                raise
         tests = {task: read_test(kafka, java, out, started, task, name, expected, artifacts)
                  for task, (name, expected) in CASES.items()}
         processes = process_logs(out, started)
