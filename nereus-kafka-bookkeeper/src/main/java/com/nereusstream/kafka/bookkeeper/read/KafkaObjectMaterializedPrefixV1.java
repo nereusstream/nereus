@@ -19,7 +19,9 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2.Bounds;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionIndexV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaRecordBatchCodecV1;
 import com.nereusstream.storage.object.materialization.M5LookupIndexV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.GenerationObject;
@@ -205,15 +207,7 @@ public final class KafkaObjectMaterializedPrefixV1 {
         }
         if (!rawFallbackEquivalent()) {
             readSemanticPart();
-            var indexes =
-                    new ArrayList<CanonicalBytes>(generation.indexObjects().size());
-            for (var object : generation.indexObjects()) {
-                indexes.add(readSemanticIndex(object));
-            }
-            if (!M5MaterializationValidatorV1.semanticIndexBodiesRoot(indexes)
-                    .equals(validated.validationRoot().lookupBoundaryRootSha256())) {
-                throw corrupt("Kafka Object indexes differ from the validated compaction", null);
-            }
+            verifySemanticIndexes();
             return;
         }
         for (int ordinal = 0; ordinal < sources.size(); ordinal++) {
@@ -243,6 +237,82 @@ public final class KafkaObjectMaterializedPrefixV1 {
                     || !readExact(object).equals(index.encode())) {
                 throw corrupt("Kafka Object side index differs from its exact source cut", null);
             }
+        }
+    }
+
+    public record SemanticInput(
+            GenerationObject object,
+            List<GenerationObject> indexes,
+            CanonicalBytes encoded,
+            List<SelectedBatch> batches,
+            int extentCount,
+            int recordCount,
+            long nativeBytes,
+            long decodedBytes,
+            long minimumTimestamp,
+            long maximumTimestamp) {
+        public SemanticInput {
+            indexes = List.copyOf(indexes);
+            batches = List.copyOf(batches);
+        }
+    }
+
+    /** Reads the actual selected compacted generation as input, including its immutable Object version and gaps. */
+    public SemanticInput readSemanticInput(Bounds bounds) throws IOException {
+        if (rawFallbackEquivalent()) {
+            throw new IllegalStateException("Kafka semantic input requires a selected compacted generation");
+        }
+        var generation = validated.generation();
+        var object = generation.payloadObjects().get(0);
+        long nativeBytes = object.identity().bodyLength();
+        for (var index : generation.indexObjects()) {
+            nativeBytes = Math.addExact(nativeBytes, index.identity().bodyLength());
+        }
+        if (nativeBytes > bounds.nativeBytes() || object.identity().bodyLength() > bounds.payloadBytes()) {
+            throw new IllegalArgumentException("Kafka Object input exceeds the reserved source bytes");
+        }
+        var encoded = readExact(object);
+        var part = parseSemanticPart(object, encoded, bounds.entries(), bounds.batches());
+        int count = 0;
+        long decoded = 0;
+        long minimum = Long.MAX_VALUE;
+        long maximum = -1;
+        for (var batch : part.batches()) {
+            var parsed = KafkaRecordBatchCodecV1.parseBounded(
+                    batch.rawAssignedRecordBatch(), bounds.records() - count, bounds.decodedBytes() - decoded);
+            count = Math.addExact(count, parsed.batch().records().size());
+            decoded = Math.addExact(decoded, parsed.decodedBytes());
+            for (var record : parsed.batch().records()) {
+                minimum = Math.min(minimum, record.timestamp());
+                maximum = Math.max(maximum, record.timestamp());
+            }
+        }
+        verifySemanticIndexes();
+        return new SemanticInput(
+                object,
+                generation.indexObjects(),
+                encoded,
+                part.batches(),
+                part.extentCount(),
+                count,
+                nativeBytes,
+                decoded,
+                count == 0 ? -1 : minimum,
+                maximum);
+    }
+
+    private void verifySemanticIndexes() throws IOException {
+        var selected = validated.generation().indexObjects();
+        if (selected.size() != plan.indexes().size()) {
+            throw corrupt("Kafka Object prefix lacks its complete side indexes", null);
+        }
+        var indexes = new ArrayList<CanonicalBytes>(selected.size());
+        for (var object : selected) {
+            indexes.add(readSemanticIndex(object));
+        }
+        if (!M5MaterializationValidatorV1.semanticIndexBodiesRoot(indexes)
+                .equals(validated.validationRoot().lookupBoundaryRootSha256())) {
+            throw corrupt("Kafka Object indexes differ from the validated compaction", null);
         }
     }
 
@@ -352,9 +422,20 @@ public final class KafkaObjectMaterializedPrefixV1 {
 
     private List<SelectedBatch> readSemanticPart() throws IOException {
         var descriptor = validated.generation().payloadObjects().get(0);
-        var encoded = readExact(descriptor);
+        return parseSemanticPart(descriptor, readExact(descriptor), Integer.MAX_VALUE, Integer.MAX_VALUE)
+                .batches();
+    }
+
+    private record SemanticPart(int extentCount, List<SelectedBatch> batches) {}
+
+    private SemanticPart parseSemanticPart(
+            GenerationObject descriptor, CanonicalBytes encoded, int maximumExtents, int maximumBatches)
+            throws IOException {
         try {
             var part = Nms1CodecV1.decode(encoded);
+            if (part.extents().size() > maximumExtents) {
+                throw new IllegalArgumentException("Kafka Object input exceeds the reserved extent count");
+            }
             var sources = sourceCut().sources().stream()
                     .sorted(Comparator.comparing(
                             value -> value.sourceIdentitySha256().toHex()))
@@ -383,6 +464,9 @@ public final class KafkaObjectMaterializedPrefixV1 {
                 if (extent.payloadLength() == 0) {
                     continue;
                 }
+                if (batches.size() == maximumBatches) {
+                    throw new IllegalArgumentException("Kafka Object input exceeds the reserved batch count");
+                }
                 var raw = new byte[extent.payloadLength()];
                 payload.get(extent.payloadOffset(), raw);
                 var body = CanonicalBytes.copyOf(raw);
@@ -394,7 +478,7 @@ public final class KafkaObjectMaterializedPrefixV1 {
                 }
                 batches.add(new SelectedBatch(batch.baseOffset(), batch.endOffsetExclusive(), body));
             }
-            return batches;
+            return new SemanticPart(part.extents().size(), List.copyOf(batches));
         } catch (IndexOutOfBoundsException | IllegalArgumentException | IllegalStateException failure) {
             throw corrupt("Kafka Object compacted payload failed validation", failure);
         }

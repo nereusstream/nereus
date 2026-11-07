@@ -284,7 +284,8 @@ public final class M5MaterializationObjectSessionV1 {
         if (plan.representationMode() == RepresentationMode.REWRITE_GENERATION
                 || plan.sourceCut().sources().stream()
                         .anyMatch(source -> source.kind() == SourceKind.BOOKKEEPER_LEDGER
-                                || source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2)) {
+                                || source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2
+                                || source.kind() == SourceKind.KAFKA_NMS1_DATA_V2)) {
             throw new IllegalArgumentException(
                     "M5 native Object reuse reader requires an Object-backed reference plan");
         }

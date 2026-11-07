@@ -48,7 +48,8 @@ public final class M5MaterializationRecordsV1 {
         PULSAR_NPD1_DATA,
         PULSAR_NPO1_ROOT,
         KAFKA_BK_COMPACTED_GENERATION_V2,
-        PULSAR_NMS1_DATA_V2
+        PULSAR_NMS1_DATA_V2,
+        KAFKA_NMS1_DATA_V2
     }
 
     public enum RepresentationMode {
@@ -348,6 +349,14 @@ public final class M5MaterializationRecordsV1 {
                             || !requiredIndexesPresent
                             || memberBindingIds.size() != 1)) {
                 throw new IllegalArgumentException("compacted BK generation requires complete single-Binding indexes");
+            }
+            if (kind == SourceKind.KAFKA_NMS1_DATA_V2
+                    && (coverage.domain() != PositionDomain.KAFKA_OFFSET
+                            || immutableProviderVersionToken.isEmpty()
+                            || !payloadLongLivedReadable
+                            || !requiredIndexesPresent
+                            || memberBindingIds.size() != 1)) {
+                throw new IllegalArgumentException("Kafka NMS1 input requires a versioned single-Binding generation");
             }
         }
 

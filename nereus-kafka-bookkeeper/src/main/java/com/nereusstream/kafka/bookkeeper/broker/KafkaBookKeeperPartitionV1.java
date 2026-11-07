@@ -31,6 +31,7 @@ import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolAppendPlanV1;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperObjectReadScopeV1;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadViewV2;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperRunSourceV2.Bounds;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2BatchLocatorV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
@@ -73,6 +74,8 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootAuthority;
 import com.nereusstream.storage.api.kafka.KafkaRunRootRecordV2;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
 import com.nereusstream.storage.object.read.BindingReadAuthorityV1;
 import com.nereusstream.storage.object.read.BindingReadProtocolV1;
 import com.nereusstream.storage.object.read.BindingReadPublicationCellV1;
@@ -1650,18 +1653,27 @@ public final class KafkaBookKeeperPartitionV1 {
                 || nativePublicationTask != null
                 || nativeObjectRetirement != null
                 || nativeObjectPublication != null) {
-            throw new IllegalStateException("native Object publication requires its original raw BK reader");
+            throw new IllegalStateException("native Object publication requires its exact stable predecessor");
         }
         var raw = nativeReadSourcesUnchecked();
         var current = m4ReadOwner.selectorRuntime().currentAuthority().get();
         var expected = prefix.sourceCut().predecessorSelector();
+        var first = prefix.sourceCut().sources().get(0);
+        var selectedObject = capturedObject(current);
+        boolean matchesInput = first.kind() == SourceKind.KAFKA_NMS1_DATA_V2
+                ? selectedObject != null
+                        && !selectedObject.fallback()
+                        && selectedObject.rawSources().equals(raw)
+                        && selectedObject.prefix().coverage().equals(first.coverage())
+                        && selectedObject.prefix().manifestSha256().equals(first.formatRootSha256())
+                : current.selectedViewSha256().equals(raw.selectedViewSha256());
         if (!current.admitting()
-                || !current.selectedViewSha256().equals(raw.selectedViewSha256())
+                || !matchesInput
                 || !current.selectedViewSha256().equals(expected.selectedViewSha256())
                 || current.ownerEpoch() != expected.ownerEpoch()
                 || current.readAdmissionEpoch() != expected.readAdmissionEpoch()
                 || current.sourceGeneration() != expected.sourceGeneration()) {
-            throw new IllegalStateException("native Object publication has another raw BK predecessor");
+            throw new IllegalStateException("native Object publication has another predecessor");
         }
         var selected =
                 new KafkaBookKeeperNativeObjectReadSourcesV1(raw, prefix, bookKeeperNamespace, true, providerReads);
@@ -2576,6 +2588,41 @@ public final class KafkaBookKeeperPartitionV1 {
 
     /** Check immutable preferred bytes under the actual M4 generation pin without BK fallback. */
     public CompletionStage<Void> verifySelectedObjectPrefix(Sha256Digest manifest) {
+        return readSelectedObjectPrefix(manifest, prefix -> {
+            prefix.verifyComplete();
+            return null;
+        });
+    }
+
+    /** Captures exact compacted bytes without replanning from their raw BK predecessor. */
+    public CompletionStage<KafkaObjectMaterializedPrefixV1.SemanticInput> captureSelectedObjectInput(
+            Sha256Digest manifest, Bounds bounds) {
+        return readSelectedObjectPrefix(manifest, prefix -> prefix.readSemanticInput(bounds));
+    }
+
+    /** Identifies a stable selected Object prefix whose prior fallback admission has been closed. */
+    public synchronized Optional<ProtocolCoverage> nativeSelectedObjectInput(
+            NativeReadSources expected, BindingReadSelector selector) {
+        requireWritable();
+        requireNativeReadPublication(expected, selector);
+        if (m4ReadOwner == null || selector.mode() != SelectorMode.PREFERRED_ONLY || rolling) {
+            return Optional.empty();
+        }
+        var selected =
+                capturedObject(m4ReadOwner.selectorRuntime().currentAuthority().get());
+        if (selected == null || selected.fallback() || selected.prefix().rawFallbackEquivalent()) {
+            return Optional.empty();
+        }
+        selected.requireSelector(selector);
+        return Optional.of(selected.prefix().coverage());
+    }
+
+    @FunctionalInterface
+    private interface SelectedObjectRead<T> {
+        T read(KafkaObjectMaterializedPrefixV1 prefix) throws IOException;
+    }
+
+    private <T> CompletionStage<T> readSelectedObjectPrefix(Sha256Digest manifest, SelectedObjectRead<T> operation) {
         final KafkaBookKeeperM4BrokerReadOwnerV2 readOwner;
         synchronized (this) {
             requireWritable();
@@ -2587,14 +2634,14 @@ public final class KafkaBookKeeperPartitionV1 {
                 throw new IllegalStateException("native Object verification has another selected manifest");
             }
             var lifetime = new HistoricalFetchScope();
-            var verification = CompletableFuture.runAsync(
+            var verification = CompletableFuture.supplyAsync(
                     () -> {
                         try {
-                            object.prefix().verifyComplete();
+                            return operation.read(object.prefix());
                         } catch (KafkaObjectMaterializedPrefixV1.UnresolvedRead unresolved) {
                             lifetime.retainObjectResponse(unresolved.originalDrain());
                             throw new CompletionException(unresolved);
-                        } catch (java.io.IOException failure) {
+                        } catch (IOException failure) {
                             throw new CompletionException(failure);
                         }
                     },

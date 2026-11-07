@@ -113,18 +113,27 @@ public record KafkaBookKeeperNativeObjectReadSourcesV1(
             NativeReadSources raw, KafkaObjectMaterializedPrefixV1 prefix, Namespace namespace) {
         var cut = prefix.sourceCut();
         var cover = cut.coverage();
+        var inputs = cut.sources();
+        var first = inputs.get(0);
+        boolean replacesSelectedObject = first.kind() == SourceKind.KAFKA_NMS1_DATA_V2;
+        if (replacesSelectedObject
+                && (prefix.rawFallbackEquivalent() || !first.formatRootSha256().equals(cut.predecessorViewSha256()))) {
+            throw new IllegalStateException("Kafka Object successor has another selected input");
+        }
+        long rawStart = replacesSelectedObject ? first.coverage().exclusiveEnd() : cover.inclusiveStart();
+        var rawInputs = replacesSelectedObject ? inputs.subList(1, inputs.size()) : inputs;
         var roots = raw.sealedRoots().stream()
-                .filter(root -> root.kafkaEndOffsetExclusive().orElseThrow() > cover.inclusiveStart()
+                .filter(root -> root.kafkaEndOffsetExclusive().orElseThrow() > rawStart
                         && root.kafkaStartOffset() < cover.exclusiveEnd()
                         && root.kafkaStartOffset()
                                 < root.kafkaEndOffsetExclusive().orElseThrow())
                 .toList();
-        if (roots.size() != cut.sources().size()) {
+        if (roots.size() != rawInputs.size()) {
             throw new IllegalStateException("Kafka Object fallback lacks its complete original BK membership");
         }
         for (int i = 0; i < roots.size(); i++) {
             var root = roots.get(i);
-            var source = cut.sources().get(i);
+            var source = rawInputs.get(i);
             var resource = new PhysicalResourceIdV2.BookKeeperLedger(
                     namespace, root.ledgerIdentity().ledgerId());
             if (source.kind() != SourceKind.BOOKKEEPER_LEDGER
