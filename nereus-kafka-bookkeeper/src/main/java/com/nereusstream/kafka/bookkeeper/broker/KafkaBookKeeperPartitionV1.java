@@ -53,6 +53,7 @@ import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperRunTableV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperSequentialReadRequestV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperTargetedReaderV1;
+import com.nereusstream.kafka.bookkeeper.read.KafkaObjectMaterializedPrefixV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaPackedIndexDirectoryV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperClosedHistoryRecoveryV1;
 import com.nereusstream.kafka.bookkeeper.recovery.KafkaBookKeeperRecoveryOutcomeV1;
@@ -281,6 +282,7 @@ public final class KafkaBookKeeperPartitionV1 {
     private int admissions;
     private boolean rolling;
     private Sha256Digest nativePublicationTask;
+    private NativeObjectPublication nativeObjectPublication;
     private KafkaBookKeeperReadViewV2 nativePublicationPredecessor;
     private KafkaBookKeeperReadViewV2 nativePreferredCache;
     private final KafkaOwnerAdmissionV1 selectedRecoveryOwner;
@@ -746,6 +748,10 @@ public final class KafkaBookKeeperPartitionV1 {
                     || bytes > envelope.maximumEncodedBytes() / 2 - runBytes
                     || entries > envelope.maximumEntries() - 3 - admittedEntries
                     || !fitsControlReserve(entries, bytes)) {
+                if (nativeObjectPublication != null) {
+                    throw new IllegalStateException(
+                            "native Object selector transition has not settled before BK rollover");
+                }
                 if (admissions != 0
                         || !commit.capture().speculativeQueue().commits().isEmpty()) {
                     throw new IllegalStateException("BK run must finish its admitted groups before rollover");
@@ -1417,7 +1423,7 @@ public final class KafkaBookKeeperPartitionV1 {
                     .toList();
         }
 
-        private static void requireSourceExtension(NativeReadSources previous, NativeReadSources successor) {
+        static void requireSourceExtension(NativeReadSources previous, NativeReadSources successor) {
             // Hashing validates the complete scope, root lineage and one exact read index per non-empty sealed run.
             successor.selectedViewSha256();
             int sealed = previous.sealedRoots().size();
@@ -1487,7 +1493,9 @@ public final class KafkaBookKeeperPartitionV1 {
         }
         var local = m4ReadOwner.selectorRuntime().currentAuthority().get();
         var payload = local.publicationCell().protocolStateReference();
-        var raw = payload instanceof NativePreferredReadSources preferred ? preferred.rawSources() : payload;
+        var raw = payload instanceof KafkaBookKeeperNativeObjectReadSourcesV1 object
+                ? object.rawSources()
+                : payload instanceof NativePreferredReadSources preferred ? preferred.rawSources() : payload;
         if (!raw.equals(sources)
                 || !local.admitting() && !retainedPublication
                 || !local.selectedViewSha256().equals(selector.selectedViewSha256())
@@ -1507,6 +1515,7 @@ public final class KafkaBookKeeperPartitionV1 {
         requireWritable();
         if (m4ReadOwner == null
                 || rolling
+                || nativeObjectPublication != null
                 || admissions != 0
                 || !commit.capture().speculativeQueue().commits().isEmpty()) {
             throw new IllegalStateException("native preferred publication lacks a quiescent qualified owner");
@@ -1530,6 +1539,72 @@ public final class KafkaBookKeeperPartitionV1 {
         // Replacing the only selected cache requires actual accepted SDK/hazard drain before the CAS.
         // The initial raw publication keeps its existing finite fallback protection for accepted reads.
         return nativePreferredCache == null ? CompletableFuture.completedFuture(null) : m4ReadOwner.drain();
+    }
+
+    /** Begin only after Object IO and physical-reference admission; existing BK DATA can continue in this run. */
+    public synchronized NativeObjectPublication beginNativeObjectPublication(
+            KafkaObjectMaterializedPrefixV1 prefix,
+            com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace bookKeeperNamespace,
+            java.util.concurrent.Executor providerReads) {
+        requireWritable();
+        if (m4ReadOwner == null
+                || nativePreferredCache != null
+                || rolling
+                || nativePublicationTask != null
+                || nativeObjectPublication != null) {
+            throw new IllegalStateException("native Object publication requires its original raw BK reader");
+        }
+        var raw = nativeReadSourcesUnchecked();
+        var current = m4ReadOwner.selectorRuntime().currentAuthority().get();
+        var expected = prefix.sourceCut().predecessorSelector();
+        if (!current.admitting()
+                || !current.selectedViewSha256().equals(raw.selectedViewSha256())
+                || !current.selectedViewSha256().equals(expected.selectedViewSha256())
+                || current.ownerEpoch() != expected.ownerEpoch()
+                || current.readAdmissionEpoch() != expected.readAdmissionEpoch()
+                || current.sourceGeneration() != expected.sourceGeneration()) {
+            throw new IllegalStateException("native Object publication has another raw BK predecessor");
+        }
+        var selected =
+                new KafkaBookKeeperNativeObjectReadSourcesV1(raw, prefix, bookKeeperNamespace, true, providerReads);
+        m4ReadOwner.stopNativeRolloverAdmission();
+        nativeObjectPublication = new NativeObjectPublication(m4ReadOwner, selected);
+        return nativeObjectPublication;
+    }
+
+    public final class NativeObjectPublication {
+        private final KafkaBookKeeperM4BrokerReadOwnerV2 readOwner;
+        private final KafkaBookKeeperNativeObjectReadSourcesV1 sources;
+
+        private NativeObjectPublication(
+                KafkaBookKeeperM4BrokerReadOwnerV2 readOwner, KafkaBookKeeperNativeObjectReadSourcesV1 sources) {
+            this.readOwner = readOwner;
+            this.sources = sources;
+        }
+
+        /** An unresolved transition keeps its original read fence and does not select another generation. */
+        public void installSelected() {
+            final long upper;
+            synchronized (KafkaBookKeeperPartitionV1.this) {
+                requireCurrent();
+                upper = capture().root().frontiers().durableEndOffset();
+            }
+            readOwner.installNativeObjectPreferred(sources, upper);
+            synchronized (KafkaBookKeeperPartitionV1.this) {
+                requireCurrent();
+                nativeObjectPublication = null;
+            }
+        }
+
+        private void requireCurrent() {
+            requireWritable();
+            if (nativeObjectPublication != this
+                    || m4ReadOwner != readOwner
+                    || rolling
+                    || !nativeSourceViewSha256.equals(sources.rawSources().selectedViewSha256())) {
+                throw new IllegalStateException("native Object publication lost its exact original owner/source map");
+            }
+        }
     }
 
     private NativePreferredReadSources nativePublicationSources(KafkaSealedBookKeeperDescriptorV2 descriptor) {
@@ -2026,9 +2101,12 @@ public final class KafkaBookKeeperPartitionV1 {
         final KafkaCoherentProtocolSnapshotV1 snapshot;
         final List<KafkaBookKeeperReadRunV1> history;
         final KafkaBookKeeperReadViewV2 preferred;
+        final KafkaBookKeeperNativeObjectReadSourcesV1 object;
         synchronized (this) {
             requireWritable();
             preferred = capturedView.map(this::capturedPreferred).orElse(null);
+            object =
+                    capturedView.map(KafkaBookKeeperPartitionV1::capturedObject).orElse(null);
             var expectedRawView = capturedView.map(this::capturedRawView);
             if (expectedRawView.isPresent() && !expectedRawView.orElseThrow().equals(nativeSourceViewSha256)) {
                 throw new IllegalStateException("native BK read sources differ from captured M4 selector");
@@ -2069,7 +2147,13 @@ public final class KafkaBookKeeperPartitionV1 {
             var readSnapshot = new KafkaBookKeeperReadSnapshotV1(
                     snapshot.root(), new KafkaBookKeeperRunTableV1(runs), snapshot.transactionState());
             CompletionStage<KafkaBookKeeperReadResultV1> accepted;
-            if (preferred != null) {
+            if (object != null) {
+                if (scope == null) {
+                    throw new IllegalStateException("native Object Fetch lacks its owned source lifetime");
+                }
+                accepted = reader.readObjectPreferred(
+                        readSnapshot, request, object.prefix(), object.providerReads(), scope::readExact);
+            } else if (preferred != null) {
                 accepted = scope == null
                         ? reader.readSequential(readSnapshot, request, preferred)
                         : reader.readSequential(readSnapshot, request, preferred, scope::readExact);
@@ -2116,12 +2200,27 @@ public final class KafkaBookKeeperPartitionV1 {
     }
 
     private Sha256Digest capturedRawView(BindingReadAuthorityV1 authority) {
+        var object = capturedObject(authority);
+        if (object != null) {
+            return object.rawSources().selectedViewSha256();
+        }
         if (capturedPreferred(authority) != null) {
             return ((NativePreferredReadSources) authority.publicationCell().protocolStateReference())
                     .rawSources()
                     .selectedViewSha256();
         }
         return authority.selectedViewSha256();
+    }
+
+    private static KafkaBookKeeperNativeObjectReadSourcesV1 capturedObject(BindingReadAuthorityV1 authority) {
+        if (!(authority.publicationCell().protocolStateReference()
+                instanceof KafkaBookKeeperNativeObjectReadSourcesV1 object)) {
+            return null;
+        }
+        if (!authority.selectedViewSha256().equals(object.prefix().manifestSha256())) {
+            throw new IllegalStateException("native Object prefix differs from its captured M4 selector");
+        }
+        return object;
     }
 
     /** A serial Fetch retains at most one historical SDK handle, including a held/unknown close. */

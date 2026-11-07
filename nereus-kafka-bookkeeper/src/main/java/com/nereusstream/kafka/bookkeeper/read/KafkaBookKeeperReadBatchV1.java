@@ -16,14 +16,32 @@ package com.nereusstream.kafka.bookkeeper.read;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import java.util.Objects;
+import java.util.OptionalLong;
 
-/** One validated complete RecordBatch; entryId is the actual first carrier entry (including KBSC entry zero). */
+/** One validated complete RecordBatch. An Object part has no BookKeeper entry ID. */
 public record KafkaBookKeeperReadBatchV1(
-        long startOffset, long endOffsetExclusive, long entryId, CanonicalBytes rawAssignedRecordBatch) {
+        long startOffset,
+        long endOffsetExclusive,
+        OptionalLong bookKeeperEntryId,
+        CanonicalBytes rawAssignedRecordBatch) {
+    public KafkaBookKeeperReadBatchV1(
+            long startOffset, long endOffsetExclusive, long entryId, CanonicalBytes rawAssignedRecordBatch) {
+        this(startOffset, endOffsetExclusive, OptionalLong.of(entryId), rawAssignedRecordBatch);
+    }
+
     public KafkaBookKeeperReadBatchV1 {
+        Objects.requireNonNull(bookKeeperEntryId, "bookKeeperEntryId");
         Objects.requireNonNull(rawAssignedRecordBatch, "rawAssignedRecordBatch");
-        if (startOffset < 0 || endOffsetExclusive <= startOffset || entryId < 0 || rawAssignedRecordBatch.isEmpty()) {
+        if (startOffset < 0
+                || endOffsetExclusive <= startOffset
+                || bookKeeperEntryId.orElse(0) < 0
+                || rawAssignedRecordBatch.isEmpty()) {
             throw new IllegalArgumentException("read batch is outside its domain");
         }
+    }
+
+    /** Actual first BookKeeper carrier entry, including KBSC entry zero. */
+    public long entryId() {
+        return bookKeeperEntryId.orElseThrow();
     }
 }

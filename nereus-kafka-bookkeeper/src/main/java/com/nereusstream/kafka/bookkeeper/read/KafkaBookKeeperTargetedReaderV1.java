@@ -28,14 +28,18 @@ import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 
 /** K6 exact-entry reader with bounded validated index-block cache and disposable sequential cursors. */
@@ -181,7 +185,69 @@ public final class KafkaBookKeeperTargetedReaderV1 {
                 || !preferred.selectBatches(nextOffset, upperBound, 1).isEmpty()) {
             return completed(preferredResult(snapshot, request, batches, Optional.empty()));
         }
-        long remaining = request.byteBudget() - usedBytes;
+        return readRawTail(snapshot, request, batches, cutEnd, request.byteBudget() - usedBytes);
+    }
+
+    /** Reads one selected immutable Object prefix followed by its captured BK tail, without changing views. */
+    public CompletionStage<KafkaBookKeeperReadResultV1> readObjectPreferred(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            KafkaObjectMaterializedPrefixV1 prefix,
+            Executor providerReads,
+            BiFunction<RunLedgerHandleV1, Long, CompletionStage<RunLedgerReadResultV1>> exactReads) {
+        return new KafkaBookKeeperTargetedReaderV1(this, exactReads)
+                .readObjectPreferred(snapshot, request, prefix, providerReads);
+    }
+
+    private CompletionStage<KafkaBookKeeperReadResultV1> readObjectPreferred(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            KafkaObjectMaterializedPrefixV1 prefix,
+            Executor providerReads) {
+        prefix.requireSnapshot(snapshot);
+        var boundFailure = initialBoundResult(snapshot, request.requestedOffset(), request.isolation());
+        if (boundFailure.isPresent()) {
+            return completed(boundFailure.orElseThrow());
+        }
+        long cutEnd = prefix.coverage().exclusiveEnd();
+        if (request.requestedOffset() >= cutEnd) {
+            return readSequential(snapshot, request);
+        }
+        long upperBound = snapshot.root().readUpperBound(request.isolation());
+        return CompletableFuture.supplyAsync(
+                        () -> {
+                            try {
+                                return prefix.read(request.requestedOffset(), upperBound, request.byteBudget());
+                            } catch (IOException failure) {
+                                throw new CompletionException(failure);
+                            }
+                        },
+                        providerReads)
+                .thenCompose(selected -> {
+                    var batches = new ArrayList<KafkaBookKeeperReadBatchV1>();
+                    long used = 0;
+                    for (var batch : selected.batches()) {
+                        batches.add(new KafkaBookKeeperReadBatchV1(
+                                batch.startOffset(),
+                                batch.endOffsetExclusive(),
+                                OptionalLong.empty(),
+                                batch.rawAssignedRecordBatch()));
+                        used = Math.addExact(
+                                used, batch.rawAssignedRecordBatch().length());
+                    }
+                    if (!selected.canReadTail()) {
+                        return completed(preferredResult(snapshot, request, batches, Optional.empty()));
+                    }
+                    return readRawTail(snapshot, request, batches, cutEnd, request.byteBudget() - used);
+                });
+    }
+
+    private CompletionStage<KafkaBookKeeperReadResultV1> readRawTail(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            List<KafkaBookKeeperReadBatchV1> batches,
+            long cutEnd,
+            long remaining) {
         var tailRequest =
                 new KafkaBookKeeperSequentialReadRequestV1(cutEnd, request.isolation(), remaining, Optional.empty());
         return readSequential(snapshot, tailRequest).thenApply(tail -> {

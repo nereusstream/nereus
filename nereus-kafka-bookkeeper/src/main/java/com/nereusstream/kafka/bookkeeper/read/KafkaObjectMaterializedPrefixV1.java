@@ -16,6 +16,7 @@ package com.nereusstream.kafka.bookkeeper.read;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1;
 import com.nereusstream.storage.object.materialization.M5LookupIndexV1;
@@ -23,15 +24,19 @@ import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.GenerationObject;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IndexKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationPlan;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationSourceCut;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PayloadKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.RepresentationMode;
 import com.nereusstream.storage.object.materialization.M5MaterializationValidatorV1.ValidatedGeneration;
 import com.nereusstream.storage.object.materialization.Nms1CodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -91,6 +96,56 @@ public final class KafkaObjectMaterializedPrefixV1 {
 
     public ProtocolCoverage coverage() {
         return validated.manifestView().coverage();
+    }
+
+    public Sha256Digest manifestSha256() {
+        return M5MaterializationCodecV1.manifestSha256(validated.manifestView());
+    }
+
+    public long sourceGeneration() {
+        return validated.generation().sourceGeneration();
+    }
+
+    public MaterializationSourceCut sourceCut() {
+        return plan.sourceCut();
+    }
+
+    public List<SourceProtectionIdentity> originalFallbackSources() {
+        var predecessor = sourceCut().predecessorSelector();
+        long generation = Math.addExact(predecessor.sourceGeneration(), 1);
+        long epoch = Math.addExact(predecessor.readAdmissionEpoch(), 1);
+        var protectedSources = sourceCut().sources().stream()
+                .map(source -> new SourceProtectionIdentity(
+                        source.sourceIdentitySha256(), generation, epoch, generation, predecessor.capability()))
+                .sorted(Comparator.comparing(
+                        source -> source.sourceIdentitySha256().toHex()))
+                .toList();
+        if (sourceGeneration() != generation
+                || !validated
+                        .generation()
+                        .fallbackSetSha256()
+                        .orElseThrow()
+                        .equals(M4ReadControlCodecV1.calculateFallbackSetSha256(protectedSources))) {
+            throw new IllegalStateException("Kafka Object prefix does not name its exact original BK fallback");
+        }
+        return protectedSources;
+    }
+
+    void requireSnapshot(KafkaBookKeeperReadSnapshotV1 snapshot) {
+        var identity = plan.sourceCut().identity();
+        var fence = snapshot.root().fence();
+        if (!identity.binding().bindingId().equals(fence.bindingId())
+                || !identity.binding()
+                        .incarnationSha256()
+                        .equals(Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(fence.topicIncarnation())))
+                || !identity.binding()
+                        .storageEpochSha256()
+                        .equals(fence.storageEpochId().digest())
+                || identity.ownerEpoch() > fence.ownerEpoch()
+                || coverage().inclusiveStart() > snapshot.root().frontiers().trimStartOffset()
+                || coverage().exclusiveEnd() > snapshot.root().frontiers().durableEndOffset()) {
+            throw new IllegalStateException("Kafka Object prefix differs from the captured Binding and frontiers");
+        }
     }
 
     public Selection read(long offset, long isolationEnd, long byteBudget) throws IOException {

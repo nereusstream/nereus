@@ -283,6 +283,43 @@ public final class KafkaBookKeeperM4BrokerReadOwnerV2 {
         return resumeNativeSources(sources, sources.descriptor().descriptorSha256(), upperBound);
     }
 
+    void installNativeObjectPreferred(KafkaBookKeeperNativeObjectReadSourcesV1 sources, long upperBound) {
+        var durable = coordinator.readSelector().orElseThrow();
+        sources.requireSelector(durable);
+        var previous = selector.currentAuthority().get();
+        var predecessor = sources.prefix().sourceCut().predecessorSelector();
+        if (previous.admitting()
+                || previous.ownerEpoch() != durable.ownerEpoch()
+                || previous.ownerEpoch() != predecessor.ownerEpoch()
+                || previous.readAdmissionEpoch() != predecessor.readAdmissionEpoch()
+                || !previous.selectedViewSha256().equals(predecessor.selectedViewSha256())
+                || durable.readAdmissionEpoch() != Math.addExact(predecessor.readAdmissionEpoch(), 1)
+                || durable.sourceGeneration() != sources.prefix().sourceGeneration()) {
+            throw new IllegalStateException(
+                    "native Object activation does not follow the stopped exact BK predecessor");
+        }
+        var cell = new BindingReadPublicationCellV1(
+                durable.sourceGeneration(), upperBound, 0, new BindingReadRouteTableV1(List.of()), sources);
+        var authority = new BindingReadAuthorityV1(
+                previous.bindingId(),
+                previous.topicIncarnationIdentity(),
+                previous.storageEpochId(),
+                previous.protocol(),
+                durable.selectedViewSha256(),
+                durable.ownerEpoch(),
+                durable.readAdmissionEpoch(),
+                true,
+                durable.capability().generation(),
+                durable.capability().evidenceSha256(),
+                cell);
+        synchronized (this) {
+            if (closed) {
+                throw new IllegalStateException("native Object activation was fenced");
+            }
+            selector.installExactDurable(authority);
+        }
+    }
+
     private KafkaBookKeeperM4BrokerReadOwnerV2 resumeNativeSources(Object sources, Sha256Digest view, long upperBound) {
         var durable = coordinator.readSelector().orElseThrow();
         var previous = selector.currentAuthority().get();
@@ -333,7 +370,10 @@ public final class KafkaBookKeeperM4BrokerReadOwnerV2 {
             var payload = predecessor.publicationCell().protocolStateReference();
             var preferred =
                     payload instanceof KafkaBookKeeperPartitionV1.NativePreferredReadSources selected ? selected : null;
-            if (preferred == null) {
+            var object = payload instanceof KafkaBookKeeperNativeObjectReadSourcesV1 selected ? selected : null;
+            if (object != null) {
+                object.requireSelector(durable);
+            } else if (preferred == null) {
                 if (durable.mode() != SelectorMode.PREFERRED_ONLY
                         || durable.fallbackSetSha256().isPresent()) {
                     throw new IllegalStateException("raw native BK rollover requires its preferred-only M4 selector");
@@ -351,12 +391,17 @@ public final class KafkaBookKeeperM4BrokerReadOwnerV2 {
                 throw new IllegalArgumentException("native BK rollover source map belongs to another M4 Binding");
             }
             long successorGeneration = Math.addExact(durable.sourceGeneration(), 1);
-            Object successorPayload = preferred == null ? successorSources : preferred.withRawSources(successorSources);
-            Sha256Digest successorView = preferred == null
-                    ? successorSources.selectedViewSha256()
-                    : preferred.descriptor().descriptorSha256();
-            var fallbackSources =
-                    preferred != null && durable.fallbackSetSha256().isPresent()
+            Object successorPayload = object != null
+                    ? object.withRawSources(successorSources)
+                    : preferred == null ? successorSources : preferred.withRawSources(successorSources);
+            Sha256Digest successorView = object != null
+                    ? object.prefix().manifestSha256()
+                    : preferred == null
+                            ? successorSources.selectedViewSha256()
+                            : preferred.descriptor().descriptorSha256();
+            var fallbackSources = object != null
+                    ? object.fallbackSources()
+                    : preferred != null && durable.fallbackSetSha256().isPresent()
                             ? preferred.fallbackSources()
                             : List
                                     .<com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1
