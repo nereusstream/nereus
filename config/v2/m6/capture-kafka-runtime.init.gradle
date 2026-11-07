@@ -35,6 +35,7 @@ gradle.projectsEvaluated {
     }
     def core = gradle.rootProject.project(':core')
     core.tasks.named('nereusBookKeeperOwnerRelocationRealTest', Test).configure { test ->
+        test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
         def main = core.extensions.getByType(SourceSetContainer).main
         def process = main.runtimeClasspath + core.configurations.releaseOnly
         def log = gradle.rootProject.file('config/log4j2.yaml')

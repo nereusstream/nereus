@@ -90,6 +90,24 @@ def repository_files(repository):
     return result
 
 
+def process_logs(out, started):
+    directory = out / "kafka-process-logs"
+    required = {f"node-{node}/{name}" for node in range(5)
+                for name in ("server.log", "format.log", "server.properties")}
+    required.add("node-2/implicit-format.log")
+    files = {}
+    for path in sorted(directory.rglob("*")):
+        M6.require(not path.is_symlink() and path.resolve() == path, f"redirected Kafka process evidence: {path}")
+        if not path.is_dir():
+            M6.require(path.stat().st_mtime_ns >= started, f"stale Kafka process evidence: {path}")
+            files[path.relative_to(directory).as_posix()] = M6.file_identity(path)
+    rejections = {name for name in files if name.endswith("/disabled-restart.log")}
+    M6.require(required <= files.keys() and len(rejections) == 1
+               and (next(iter(rejections)).removesuffix("disabled-restart.log") + "disabled.properties") in files,
+               f"incomplete Kafka process logs: {directory}")
+    return files
+
+
 def run_checks(kafka, java, repository, out):
     root_commit = M6.clean_commit(ROOT)
     kafka_commit = M6.clean_commit(kafka)
@@ -172,6 +190,7 @@ def run_checks(kafka, java, repository, out):
         M6.require(M6.clean_commit(ROOT) == root_commit and M6.clean_commit(kafka) == kafka_commit,
                    "source changed during native process checks")
         M6.require(repository_files(repository) == files, "Nereus runtime Maven repository changed during Kafka checks")
+        process = process_logs(out, started)
     finally:
         try:
             if oxia is not None:
@@ -192,6 +211,8 @@ def run_checks(kafka, java, repository, out):
         "sourceTrees": trees, "kafkaRuntime": {"path": runtime_manifest.name, **runtime_identity},
         "developmentRepositorySha256": M6.INPUTS.digest(inventory),
         "junit": attachments, "cases": {key: sorted(value) for key, value in cases.items()},
+        "processLogs": process,
+        "backendFiles": {name: M6.file_identity(out / name) for name in ("backend.json", "bookkeeper.log", "oxia.log")},
     }))
     print(f"{sum(map(len, CASES.values()))} native Kafka BK process checks passed: {out}")
 
