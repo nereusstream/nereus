@@ -355,10 +355,13 @@ verifies that the old Broker drains the scan before Controller handoff and that 
 records. A Task superseded by BK rollover is cancelled only while its original live actor can prove it never entered
 the Object output phase. The semantic case checks a rewritten sparse Kafka batch, a Fetch beginning at a compacted gap,
 a retained tombstone, timestamp lookup, transaction markers and transaction filtering on both the original and cold Owner.
-A missing compacted Object version fails closed because the original BK bytes contain suppressed records. The conditional
-PUT case loses the response after MinIO accepts the write, then verifies that reconciliation and replay retain the same
-immutable version and birth credit. The runner records both source trees, the actual test and process runtimes, and
-separate process configurations and logs. This is focused evidence and does not promote M6 scenarios.
+The successor case takes its prefix from the first compacted Object version and its suffix from sealed BK runs. It
+checks the selected input identities and the exact visible values on both Owners, and rereads the successor's side
+indexes on the cold Broker. A missing compacted Object version fails closed because the original BK bytes contain
+suppressed records. The conditional PUT case loses the response after MinIO accepts the write, then verifies that
+reconciliation and replay retain the same immutable version and birth credit. The runner records both source trees, the
+actual test and process runtimes, and separate process configurations and logs. This is focused evidence and does not
+promote M6 scenarios.
 
 ### Planned aggregate boundaries
 
