@@ -58,6 +58,7 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
     private final BindingIdentity binding;
     private final M5MaterializationWorkerCoordinatorV1 workers;
     private final AsyncOxiaClient client;
+    private final MetadataNamespaceIdentityV2 namespace;
     private final String cellAuthorityRoot;
     private final CanonicalControlMetadataStore rawBindingControl;
     private final OxiaBindingLifecycleMetadataStoreV2 bindingRoute;
@@ -67,7 +68,7 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
 
     public OxiaKafkaBookKeeperM4ReadRouteV2(
             AsyncOxiaClient client, MetadataNamespaceIdentityV2 namespace, KafkaRunRootRecordV2.Scope scope) {
-        Objects.requireNonNull(namespace, "namespace");
+        this.namespace = Objects.requireNonNull(namespace, "namespace");
         Objects.requireNonNull(scope, "scope");
         this.client = Objects.requireNonNull(client, "client");
         partition = scope.partition();
@@ -243,7 +244,7 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
     /** Keeps the native Binding and admits only its canonical M5 task keys and exact Cell admission key. */
     public CanonicalControlMetadataStore materializationMetadata(Sha256Digest protocolCellSha256) {
         return new OxiaBindingLifecycleMetadataStoreV2(
-                        client, cellAuthorityRoot, partition, binding, protocolCellSha256)
+                        client, cellAuthorityRoot, partition, binding, protocolCellSha256, namespace)
                 .rawControlMetadata();
     }
 

@@ -22,6 +22,7 @@ import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
+import com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.materialization.M5MaterializationAdmissionV1;
@@ -29,6 +30,8 @@ import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationKeysV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationPlan;
+import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
+import com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
@@ -80,6 +83,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2
     private final M5RetentionKeysV1 retentionKeys;
     private final String retentionPrefix;
     private final Optional<Sha256Digest> materializationCell;
+    private final Optional<MetadataNamespaceIdentityV2> kafkaMaterializationNamespace;
     private final M5MaterializationKeysV1 materializationKeys;
     private final String materializationPrefix;
     private final String cellAdmissionKey;
@@ -97,13 +101,29 @@ public final class OxiaBindingLifecycleMetadataStoreV2
 
     public OxiaBindingLifecycleMetadataStoreV2(
             OxiaConditionalClient client, String cellRoot, int shardId, BindingIdentity binding) {
-        this(client, cellRoot, shardId, binding, Optional.empty());
+        this(client, cellRoot, shardId, binding, Optional.empty(), Optional.empty());
     }
 
     /** The actual Protocol Cell adds only its canonical M5 values and one shared Cell admission key. */
     public OxiaBindingLifecycleMetadataStoreV2(
             AsyncOxiaClient client, String cellRoot, int shardId, BindingIdentity binding, Sha256Digest protocolCell) {
-        this(new AsyncOxiaConditionalClient(client), cellRoot, shardId, binding, Optional.of(protocolCell));
+        this(new AsyncOxiaConditionalClient(client), cellRoot, shardId, binding, protocolCell);
+    }
+
+    OxiaBindingLifecycleMetadataStoreV2(
+            AsyncOxiaClient client,
+            String cellRoot,
+            int shardId,
+            BindingIdentity binding,
+            Sha256Digest protocolCell,
+            MetadataNamespaceIdentityV2 kafkaNamespace) {
+        this(
+                new AsyncOxiaConditionalClient(client),
+                cellRoot,
+                shardId,
+                binding,
+                Optional.of(protocolCell),
+                Optional.of(kafkaNamespace));
     }
 
     public OxiaBindingLifecycleMetadataStoreV2(
@@ -112,7 +132,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2
             int shardId,
             BindingIdentity binding,
             Sha256Digest protocolCell) {
-        this(client, cellRoot, shardId, binding, Optional.of(protocolCell));
+        this(client, cellRoot, shardId, binding, Optional.of(protocolCell), Optional.empty());
     }
 
     private OxiaBindingLifecycleMetadataStoreV2(
@@ -120,11 +140,13 @@ public final class OxiaBindingLifecycleMetadataStoreV2
             String cellRoot,
             int shardId,
             BindingIdentity binding,
-            Optional<Sha256Digest> protocolCell) {
+            Optional<Sha256Digest> protocolCell,
+            Optional<MetadataNamespaceIdentityV2> kafkaNamespace) {
         Objects.requireNonNull(client, "client");
         this.cellRoot = Objects.requireNonNull(cellRoot, "cellRoot");
         this.binding = Objects.requireNonNull(binding, "binding");
         materializationCell = protocolCell;
+        kafkaMaterializationNamespace = kafkaNamespace;
         protocolCell.ifPresent(value -> {
             if (value.isZero()) {
                 throw new IllegalArgumentException("materialization Cell identity is zero");
@@ -154,13 +176,16 @@ public final class OxiaBindingLifecycleMetadataStoreV2
         String sampleDecision = M5TaskSelectionDecisionV2.key(binding, parseSha("1".repeat(64)));
         decisionPrefix = sampleDecision.substring(0, sampleDecision.length() - 64);
         String m4Prefix = keys.selector().substring(0, keys.selector().length() - "/selector".length());
+        String nativeInput = kafkaNamespace.isEmpty() ? "native-inputs|" : "";
+        String retention = kafkaNamespace.isEmpty()
+                ? "|" + Pattern.quote(retentionPrefix)
+                        + "/(?:trim-frontier|(?:floor-snapshots|reference-free-proofs)/[0-9a-f]{64})"
+                : "";
         String materialization = protocolCell.isPresent()
                 ? "|" + Pattern.quote(materializationPrefix)
-                        + "/(?:source-cuts|native-inputs|pending-outputs|plans|tasks|"
+                        + "/(?:" + nativeInput + "source-cuts|pending-outputs|plans|tasks|"
                         + "validations|generations|manifests)/[0-9a-f]{64}|"
-                        + Pattern.quote(cellAdmissionKey)
-                        + "|" + Pattern.quote(retentionPrefix)
-                        + "/(?:trim-frontier|(?:floor-snapshots|reference-free-proofs)/[0-9a-f]{64})"
+                        + Pattern.quote(cellAdmissionKey) + retention
                 : "";
         acceptedKey = Pattern.compile("(?:" + Pattern.quote(m4Prefix)
                 + "(?:/selector|/proof-head|/(?:capabilities|terminals|proofs)/[0-9]{20}"
@@ -957,36 +982,65 @@ public final class OxiaBindingLifecycleMetadataStoreV2
                     .canonicalStoredBytes());
             requirePlanCandidate(plan, key, candidate);
             if (key.contains("/pending-outputs/")) {
-                var inventory =
-                        com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2.decode(candidate);
-                var profile = inventory.profile();
-                return read(materializationKeys.nativeInput(plan.sourceCut().protocolStateRootSha256()))
-                        .thenCompose(input -> {
-                            var nativeInput = OxiaPulsarMaterializationInputV2.decode(
-                                    input.orElseThrow(() -> new IllegalArgumentException(
-                                                    "pending outputs lack their complete Native input"))
-                                            .canonicalStoredBytes());
-                            if (!profile.physicalBinding()
-                                    .metadataNamespace()
-                                    .equals(nativeInput.metadataNamespace())) {
-                                throw new IllegalArgumentException("pending output profile metadata namespace differs");
-                            }
-                            return nativeReferences.read(
-                                    profile.physicalBinding().authorityRoot() + "/cell-provider-scopes-v2");
-                        })
-                        .thenAccept(catalogue -> {
-                            if (!OxiaCellProviderScopeRegistryV2.Catalogue.decode(catalogue
-                                            .orElseThrow(() -> new IllegalArgumentException(
-                                                    "pending outputs lack their admitted profile"))
-                                            .canonicalStoredBytes())
-                                    .profiles()
-                                    .contains(profile)) {
-                                throw new IllegalArgumentException("pending output profile is not actually admitted");
-                            }
-                        });
+                return requirePendingOutputProfile(plan, M5PendingOutputInventoryV2.decode(candidate));
             }
             return CompletableFuture.completedFuture(null);
         });
+    }
+
+    private CompletionStage<Void> requirePendingOutputProfile(
+            MaterializationPlan plan, M5PendingOutputInventoryV2 inventory) {
+        var profile = inventory.profile();
+        var namespace = profile.physicalBinding().metadataNamespace();
+        CompletionStage<Void> exactInput;
+        if (kafkaMaterializationNamespace.isPresent()) {
+            if (plan.sourceCut().coverage().domain() != PositionDomain.KAFKA_OFFSET
+                    || !kafkaMaterializationNamespace.orElseThrow().equals(namespace)
+                    || !inventory
+                            .worker()
+                            .nativeNamespaceBindingSha256()
+                            .equals(Sha256Digest.hash(profile.physicalBinding().encode()))) {
+                throw new IllegalArgumentException("Kafka pending output differs from its native Binding or namespace");
+            }
+            exactInput = inventory.state() == M5PendingOutputInventoryV2.State.PREPARED
+                    ? read(keys.selector()).thenAccept(stored -> {
+                        var authority = M5BindingAuthorityCodecV1.decodeAuthority(stored.orElseThrow(() ->
+                                        new IllegalArgumentException("Kafka pending output lacks its worker authority"))
+                                .canonicalStoredBytes());
+                        if (authority.state() != BindingAuthorityStateV1.OPEN_V1
+                                || !authority
+                                        .selectorProjection()
+                                        .equals(plan.sourceCut().predecessorSelector())
+                                || !authority.materializationWorker().equals(Optional.of(inventory.worker()))) {
+                            throw new IllegalArgumentException("Kafka pending output worker is stale");
+                        }
+                    })
+                    : CompletableFuture.completedFuture(null);
+        } else {
+            exactInput = read(materializationKeys.nativeInput(plan.sourceCut().protocolStateRootSha256()))
+                    .thenAccept(input -> {
+                        var nativeInput = OxiaPulsarMaterializationInputV2.decode(
+                                input.orElseThrow(() -> new IllegalArgumentException(
+                                                "pending outputs lack their complete Native input"))
+                                        .canonicalStoredBytes());
+                        if (!namespace.equals(nativeInput.metadataNamespace())) {
+                            throw new IllegalArgumentException("pending output profile metadata namespace differs");
+                        }
+                    });
+        }
+        return exactInput
+                .thenCompose(ignored ->
+                        nativeReferences.read(profile.physicalBinding().authorityRoot() + "/cell-provider-scopes-v2"))
+                .thenAccept(catalogue -> {
+                    if (!OxiaCellProviderScopeRegistryV2.Catalogue.decode(catalogue
+                                    .orElseThrow(() ->
+                                            new IllegalArgumentException("pending outputs lack their admitted profile"))
+                                    .canonicalStoredBytes())
+                            .profiles()
+                            .contains(profile)) {
+                        throw new IllegalArgumentException("pending output profile is not actually admitted");
+                    }
+                });
     }
 
     private static void requirePendingOutputTransition(Optional<VersionedValue> before, CanonicalBytes candidate) {
