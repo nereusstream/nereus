@@ -33,7 +33,7 @@ SUITES = {
 }
 
 
-def inputs():
+def inputs(source):
     modules = ("nereus-domain", *BK.ARTIFACT_MODULES)
     paths = subprocess.check_output([
         "git", "ls-files", "-z", "--", "build.gradle.kts", "settings.gradle.kts", "gradle",
@@ -41,7 +41,8 @@ def inputs():
         "scripts/run-v2-m6-kafka-bk-process-check.py", "scripts/v2-m6-execution-inputs.py",
         "scripts/m5-evidence-junit.py", *modules,
     ], cwd=ROOT).decode().split("\0")
-    return {name: M6.file_identity(ROOT / name)["sha256"] for name in paths if name}
+    tracked = M6.tree(ROOT, source)
+    return {name: M6.file_identity(ROOT / name, tracked[name])["sha256"] for name in paths if name}
 
 
 def only_jar(path, module):
@@ -73,7 +74,7 @@ def run(out):
     M6.require(out == out.resolve() and M6.outside(out, [ROOT]),
                "M4 qualification output overlaps the execution source")
     out.mkdir(parents=True, exist_ok=False)
-    source_inputs = inputs()
+    source_inputs = inputs(source)
     source_bytes = M6.INPUTS.canonical(source_inputs)
     (out / "tested-inputs.json").write_bytes(source_bytes)
     repository = out / "development-repository"
@@ -104,7 +105,7 @@ def run(out):
             suites.append({"task": task, "tests": count, "xmlSha256": M6.INPUTS.digest(raw)})
         M6.require(completed.returncode == 0, f"current M4 read checks failed: {out}")
     classes, artifacts, locked = runtime(repository)
-    M6.require(source_inputs == inputs() and source == M6.clean_commit(ROOT)
+    M6.require(source == M6.clean_commit(ROOT) and source_inputs == inputs(source)
                and repository_inventory == BK.repository_files(repository),
                "M4 qualification source or runtime repository changed")
     (out / "m4-read-result.json").write_bytes(M6.INPUTS.canonical({

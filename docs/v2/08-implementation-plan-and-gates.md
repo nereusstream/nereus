@@ -331,6 +331,14 @@ the Pulsar new-output boundary. BK completion does not promote a mixed-profile r
 Shared M2/M3/M4/M5 prerequisites use their immutable receipts plus checks for the actual affected current paths; no
 automatic rerun of all historical campaigns is required. Current M5 still promotes only its original 14 rows.
 
+The focused Kafka M4 prerequisite for M6 can be rerun with
+`python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.
+It runs the real BK/Oxia read-root cases and the reader capacity cases, and checks the tested classes against the
+freshly published JARs. It grants no scenario promotion. The Kafka async Object fixture separately checks that
+insufficient physical metadata quota prevents any PUT, and that the same task can write, verify and register the
+original immutable Object versions after an explicit capacity increase. Selector activation and cold Fetch are
+separate M6-2 exit requirements.
+
 ### Planned aggregate boundaries
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
