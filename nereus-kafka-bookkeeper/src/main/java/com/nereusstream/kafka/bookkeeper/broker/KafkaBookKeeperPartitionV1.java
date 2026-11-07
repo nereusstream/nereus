@@ -2623,10 +2623,41 @@ public final class KafkaBookKeeperPartitionV1 {
                             && object.failureClass() != FailureClass.NOT_ELIGIBLE) {
                         // No response was observable. Restart the entire requested range on its captured protected BK
                         // view.
-                        return reader.readSequential(snapshot, request, scope::readExact);
+                        return readProtectedBookKeeperFallback(snapshot, request, scope, object);
                     }
                     return CompletableFuture.failedFuture(cause);
                 });
+    }
+
+    private CompletionStage<KafkaBookKeeperReadResultV1> readProtectedBookKeeperFallback(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            HistoricalFetchScope scope,
+            KafkaObjectMaterializedPrefixV1.ReadFailure primary) {
+        final CompletionStage<KafkaBookKeeperReadResultV1> fallback;
+        try {
+            fallback = reader.readSequential(snapshot, request, scope::readExact);
+        } catch (RuntimeException failure) {
+            primary.addSuppressed(failure);
+            return CompletableFuture.failedFuture(primary);
+        }
+        return fallback.handle((result, failure) -> {
+            if (failure != null) {
+                primary.addSuppressed(
+                        failure instanceof CompletionException && failure.getCause() != null
+                                ? failure.getCause()
+                                : failure);
+                throw new CompletionException(primary);
+            }
+            return switch (result.outcome()) {
+                case FOUND, END_OF_SNAPSHOT -> result;
+                default -> {
+                    primary.addSuppressed(new java.io.IOException(
+                            "captured BK fallback failed: " + result.outcome() + " (" + result.detail() + ")"));
+                    throw new CompletionException(primary);
+                }
+            };
+        });
     }
 
     private KafkaBookKeeperReadViewV2 capturedPreferred(BindingReadAuthorityV1 captured) {

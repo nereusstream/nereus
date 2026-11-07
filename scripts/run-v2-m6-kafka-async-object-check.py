@@ -17,6 +17,8 @@ spec = importlib.util.spec_from_file_location("m6_m4", ROOT / "scripts/run-v2-m6
 M4 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M4)
 BK, M6, JUNIT = M4.BK, M4.M6, M4.JUNIT
+FAULT_PROXY = ROOT / "scripts/m6-kafka-object-fault-proxy.py"
+PROXY = BK.module("m6_kafka_object_fault_proxy", FAULT_PROXY)
 MINIO_ID = "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
 DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
 N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2"
@@ -24,7 +26,7 @@ CASES = {
     "nereusBookKeeperObjectMaterializationRealTest": (
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
         {f'"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome={case}"'
-         for case in ("known", "hot", "cold", "automatic", "retirement")},
+         for case in ("known", "hot", "cold", "automatic", "retirement", "faults")},
     ),
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",
@@ -97,7 +99,7 @@ def run(kafka, java, out):
     M6.require(out == out.resolve() and M6.outside(out, [ROOT, kafka]), "output overlaps the source inputs")
     tracked = M6.tree(ROOT, commits["nereus"])
     executor_paths = (
-        Path(__file__), BK.RUNTIME_INIT, BK.COMPOSE,
+        Path(__file__), BK.RUNTIME_INIT, BK.COMPOSE, FAULT_PROXY,
         ROOT / "scripts/run-v2-m6-kafka-m4-read-check.py",
         ROOT / "scripts/run-v2-m6-kafka-bk-process-check.py",
         ROOT / "scripts/v2-m6-execution-inputs.py", ROOT / "scripts/m5-evidence-junit.py",
@@ -119,7 +121,12 @@ def run(kafka, java, out):
                       for name, sha in locked.items()})
     domain = M4.only_jar(N1_REPOSITORY / "com/nereusstream", "nereus-domain")
     artifacts[domain.name] = M6.file_identity(domain, tracked[domain.relative_to(ROOT).as_posix()])["sha256"]
-    with minio(out) as endpoint, BK.bookkeeper_oxia(out) as oxia:
+    with minio(out) as endpoint, BK.bookkeeper_oxia(out) as oxia, PROXY.fault_proxy(endpoint) as fault:
+        relay, control, token = fault
+        (out / "minio-fault-relay.json").write_bytes(M6.INPUTS.canonical({
+            "relay": relay, "control": control, "upstream": endpoint,
+            "controlTokenSha256": M6.INPUTS.digest(token.encode("ascii")),
+        }))
         command = [
             "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
             "--init-script", str(BK.RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={out / 'runtime.json'}",
@@ -131,7 +138,9 @@ def run(kafka, java, out):
             f"-Pv2M5RetentionOxiaServiceAddress={oxia}", f"-Pv2M6MinioEndpoint={endpoint}",
             *[":core:" + task for task in CASES],
         ]
-        env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
+        env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"],
+                   NEREUS_M6_TEST_FAULT_PROXY=relay, NEREUS_M6_TEST_FAULT_CONTROL=control,
+                   NEREUS_M6_TEST_FAULT_TOKEN=token)
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
             subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -147,7 +156,7 @@ def run(kafka, java, out):
         "executorInputs": executor_inputs,
         "m4Qualification": {"path": str(receipt.relative_to(out)), **receipt_identity},
         "backendFiles": {name: M6.file_identity(out / name)
-                         for name in ("backend.json", "bookkeeper.log", "oxia.log", "minio.json", "minio.log")},
+                         for name in ("backend.json", "bookkeeper.log", "oxia.log", "minio.json", "minio.log", "minio-fault-relay.json")},
     }))
     print(f"{sum(len(expected) for _, expected in CASES.values())} native Kafka async Object checks passed: {out}")
 
