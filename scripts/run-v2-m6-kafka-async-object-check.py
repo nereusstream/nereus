@@ -22,6 +22,7 @@ PROXY = BK.module("m6_kafka_object_fault_proxy", FAULT_PROXY)
 MINIO_ID = "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
 DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
 N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2"
+PROCESS_TASK = "nereusKafkaAsyncObjectProcessRealTest"
 CASES = {
     "nereusBookKeeperObjectMaterializationRealTest": (
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
@@ -32,6 +33,10 @@ CASES = {
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",
         {"reopensExactRegisteredScopeAndRejectsForeignBucket(Path)"},
+    ),
+    PROCESS_TASK: (
+        "kafka.server.nereus.KafkaAsyncObjectProcessRealTest",
+        {"keepsBookKeeperAcksDuringObjectOutageAndRecoversSelectedGeneration(Path)"},
     ),
 }
 
@@ -80,17 +85,36 @@ def read_test(kafka, java, out, started, task, name, expected, artifacts):
     capture = out / f"{task}-runtime.json"
     M6.require(capture.stat().st_mtime_ns >= started, f"stale Kafka runtime capture for {task}")
     runtime = json.loads(capture.read_bytes())
+    launches_process = task == PROCESS_TASK
+    log = str(kafka / "config/log4j2.yaml") if launches_process else None
     M6.require(runtime["schema"] == "NEREUS_V2_M6_KAFKA_RUNTIME_V1"
-               and not runtime["processClasspath"] and runtime["processLogConfig"] is None
+               and bool(runtime["processClasspath"]) == launches_process and runtime["processLogConfig"] == log
                and Path(runtime["java"]).resolve(strict=True) == (java / "bin/java").resolve(strict=True),
-               f"Kafka test did not use its declared TestKit runtime for {task}")
-    runtime_jars = [(Path(path).name, runtime["files"][path].get("sha256"))
-                    for path in runtime["testClasspath"] if path.endswith(".jar")]
-    for filename, expected_sha in artifacts.items():
-        M6.require([sha for name, sha in runtime_jars if name == filename] == [expected_sha],
-                   f"Kafka test did not load the exact artifact for {filename}: {task}")
+               f"Kafka did not use its declared runtime for {task}")
+    for classpath in ("testClasspath", "processClasspath") if launches_process else ("testClasspath",):
+        runtime_jars = [(Path(path).name, runtime["files"][path].get("sha256"))
+                        for path in runtime[classpath] if path.endswith(".jar")]
+        for filename, expected_sha in artifacts.items():
+            M6.require([sha for name, sha in runtime_jars if name == filename] == [expected_sha],
+                       f"Kafka did not load the exact artifact for {filename}: {task}/{classpath}")
     return {"xml": {"name": xml.name, "bytes": len(raw), "sha256": M6.INPUTS.digest(raw)},
             "runtime": {"name": capture.name, **M6.file_identity(capture)}, "cases": sorted(expected)}
+
+
+def process_logs(out, started):
+    directory = out / "kafka-process-logs"
+    required = {f"node-{node}/{name}" for node in range(3)
+                for name in ("server.log", "launcher.log", "format.log", "server.properties")}
+    required.update({"node-2/controller.log", "node-1/foreign-object.log", "node-1/foreign-object.properties",
+                     "capability.properties", "object-capability", "m5-audit-policy.properties"})
+    result = {}
+    for path in sorted(directory.rglob("*")):
+        M6.require(not path.is_symlink() and path.resolve() == path, f"redirected Kafka process evidence: {path}")
+        if not path.is_dir():
+            M6.require(path.stat().st_mtime_ns >= started, f"stale Kafka process evidence: {path}")
+            result[path.relative_to(directory).as_posix()] = M6.file_identity(path)
+    M6.require(required <= result.keys(), f"incomplete Kafka async Object process logs: {directory}")
+    return result
 
 
 def run(kafka, java, out):
@@ -147,14 +171,16 @@ def run(kafka, java, out):
             subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
         tests = {task: read_test(kafka, java, out, started, task, name, expected, artifacts)
                  for task, (name, expected) in CASES.items()}
+        processes = process_logs(out, started)
         M6.require(M6.clean_commit(ROOT) == commits["nereus"] and M6.clean_commit(kafka) == commits["kafka"],
                    "source changed during the native Kafka Object run")
         M6.require(M6.file_identity(receipt) == receipt_identity and BK.repository_files(repository) == repository_inputs,
                    "M4 receipt or development repository changed during the native Kafka Object run")
     (out / "object-fixture-result.json").write_bytes(M6.INPUTS.canonical({
-        "kind": "FOCUSED_KAFKA_ASYNC_OBJECT_TESTKIT_CHECK", "promotionEligible": False,
+        "kind": "FOCUSED_KAFKA_ASYNC_OBJECT_CHECK", "promotionEligible": False,
         "sourceCheckout": commits, "sourceTrees": trees, "command": command, "tests": tests,
         "executorInputs": executor_inputs,
+        "processLogs": processes,
         "m4Qualification": {"path": str(receipt.relative_to(out)), **receipt_identity},
         "backendFiles": {name: M6.file_identity(out / name)
                          for name in ("backend.json", "bookkeeper.log", "oxia.log", "minio.json", "minio.log", "minio-fault-relay.json")},

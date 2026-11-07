@@ -1,4 +1,4 @@
-"""An owned, loopback HTTP relay for exact-version MinIO failure tests."""
+"""An owned, loopback HTTP relay for isolated MinIO failure tests."""
 
 import contextlib
 import http.client
@@ -9,7 +9,7 @@ import threading
 import urllib.parse
 
 CONTROL = "/__nereus_m6_object_fault"
-MODES = {"denied", "unavailable", "corrupt", "held"}
+MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"}
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
@@ -57,6 +57,11 @@ def fault_proxy(upstream):
                             or any(not isinstance(value, str) for value in data.values())
                             or data["mode"] not in MODES or not data["path"].startswith("/") or not data["version"]):
                         return self.reply(400)
+                    whole_bucket = data["mode"] == "bucket-unavailable"
+                    if (whole_bucket and (data["version"] != "*" or not data["path"].endswith("/")
+                                          or data["path"].count("/") != 2 or data["path"] == "//")
+                            or not whole_bucket and data["version"] == "*"):
+                        return self.reply(400)
                     if rule is not None:
                         rule["release"].set()
                     rule = dict(data, hits=0, release=threading.Event())
@@ -74,13 +79,16 @@ def fault_proxy(upstream):
                 return self.control()
             url = urllib.parse.urlsplit(self.path)
             version = urllib.parse.parse_qs(url.query).get("versionId")
+            path = urllib.parse.unquote(url.path)
             with lock:
-                exact = (rule if rule and self.command == "GET" and version == [rule["version"]]
-                         and urllib.parse.unquote(url.path) == rule["path"] else None)
-                if exact is not None:
-                    exact["hits"] += 1
-            mode = exact["mode"] if exact else None
-            if mode in {"denied", "unavailable"}:
+                fault = None
+                if rule and (rule["mode"] == "bucket-unavailable" and
+                             (path == rule["path"][:-1] or path.startswith(rule["path"]))
+                             or self.command == "GET" and version == [rule["version"]] and path == rule["path"]):
+                    fault = rule
+                    fault["hits"] += 1
+            mode = fault["mode"] if fault else None
+            if mode in {"denied", "unavailable", "bucket-unavailable"}:
                 status, code = (403, "AccessDenied") if mode == "denied" else (503, "SlowDown")
                 return self.reply(status, f"<Error><Code>{code}</Code></Error>".encode("ascii"),
                                   [("Content-Type", "application/xml")])
@@ -97,7 +105,7 @@ def fault_proxy(upstream):
                 if len(content) > MAX_BYTES:
                     return self.reply(502)
                 response_headers = response.getheaders()
-                if mode == "held" and not exact["release"].wait(30):
+                if mode == "held" and not fault["release"].wait(30):
                     return self.reply(504)
                 if mode == "corrupt" and response.status == 200 and content:
                     content = bytes([content[0] ^ 1]) + content[1:]

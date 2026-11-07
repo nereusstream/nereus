@@ -35,17 +35,19 @@ gradle.projectsEvaluated {
         throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
     }
     def core = gradle.rootProject.project(':core')
-    def testTasks = objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest']
+    def objectProcessTask = 'nereusKafkaAsyncObjectProcessRealTest'
+    def testTasks = objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', objectProcessTask]
         : ['nereusBookKeeperOwnerRelocationRealTest']
     testTasks.each { task ->
         core.tasks.named(task, Test).configure { test ->
             def target = objectFixture ? output.resolveSibling(task + '-runtime.json') : output
-            if (!objectFixture) {
+            def launchesProcess = !objectFixture || task == objectProcessTask
+            if (launchesProcess) {
                 test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
             }
             def main = core.extensions.getByType(SourceSetContainer).main
-            def process = objectFixture ? core.files() : main.runtimeClasspath + core.configurations.releaseOnly
-            def log = objectFixture ? null : gradle.rootProject.file('config/log4j2.yaml')
+            def process = launchesProcess ? main.runtimeClasspath + core.configurations.releaseOnly : core.files()
+            def log = launchesProcess ? gradle.rootProject.file('config/log4j2.yaml') : null
             def capture = {
                 def inputs = new TreeMap()
                 def remember = { Path path ->
@@ -86,7 +88,7 @@ gradle.projectsEvaluated {
                 Files.writeString(target, JsonOutput.toJson(capture()) + '\n', StandardOpenOption.CREATE_NEW)
             }
             test.doLast {
-                if ((!objectFixture && (test.systemProperties['nereus.nsip.processClasspath'] != process.asPath
+                if ((launchesProcess && (test.systemProperties['nereus.nsip.processClasspath'] != process.asPath
                         || test.systemProperties['nereus.nsip.processLogConfig'] != log.absolutePath))
                         || Files.readString(target) != JsonOutput.toJson(capture()) + '\n') {
                     throw new GradleException('Kafka runtime inputs changed during native execution')
