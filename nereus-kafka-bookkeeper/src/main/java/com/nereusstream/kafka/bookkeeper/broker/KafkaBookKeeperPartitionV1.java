@@ -1601,6 +1601,32 @@ public final class KafkaBookKeeperPartitionV1 {
         return nativeObjectPublication;
     }
 
+    /** Reuses only the local fence for the original Object manifest after its exact durable selection is observed. */
+    public void finishSelectedNativeObjectPublication(Sha256Digest manifest) {
+        final NativeObjectPublication original;
+        synchronized (this) {
+            requireWritable();
+            original = nativeObjectPublication;
+            if (original == null) {
+                if (m4ReadOwner != null) {
+                    var current =
+                            m4ReadOwner.selectorRuntime().currentAuthority().get();
+                    if (current.admitting()
+                            && current.publicationCell().protocolStateReference()
+                                    instanceof KafkaBookKeeperNativeObjectReadSourcesV1 selected
+                            && selected.prefix().manifestSha256().equals(manifest)) {
+                        return;
+                    }
+                }
+                throw new IllegalStateException("native Object recovery lacks its original local publication");
+            }
+            if (!original.sources.prefix().manifestSha256().equals(manifest)) {
+                throw new IllegalStateException("native Object recovery cannot install another manifest");
+            }
+        }
+        original.installSelected();
+    }
+
     public final class NativeObjectPublication {
         private final KafkaBookKeeperM4BrokerReadOwnerV2 readOwner;
         private final KafkaBookKeeperNativeObjectReadSourcesV1 sources;
