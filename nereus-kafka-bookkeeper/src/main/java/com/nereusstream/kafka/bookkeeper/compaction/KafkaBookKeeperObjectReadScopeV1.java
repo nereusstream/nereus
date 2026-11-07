@@ -21,7 +21,16 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2CodecV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2ProtocolCheckpointV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaObjectMaterializedPrefixV1;
+import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerOpenOutcomeV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.StorageRunId;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
@@ -32,6 +41,8 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Selec
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 /** Immutable native read scope after Object fallback release and a real retained BK compound checkpoint. */
 public record KafkaBookKeeperObjectReadScopeV1(
@@ -97,6 +108,83 @@ public record KafkaBookKeeperObjectReadScopeV1(
                 && root.kafkaStartOffset() >= prefixEnd
                 && root.kafkaEndOffsetExclusive().isPresent()
                 && root.creatorOwnerEpoch() == ownerEpoch;
+    }
+
+    /** Re-read the retained carrier under the caller's actual native SDK handle and physical reader ticket. */
+    public CompletionStage<CarrierProof> readRetainedCarrier(
+            BookKeeperCellSession owned, KafkaRunRootSnapshotV1 root, long sealedLastEntry) {
+        if (!namesRetainedCarrier(root) || sealedLastEntry <= checkpointEntry) {
+            throw new IllegalStateException("Kafka Object proof does not name this sealed checkpoint carrier");
+        }
+        var handle = new RunLedgerHandleV1(
+                root.providerScopeId(),
+                root.runId(),
+                root.ledgerIdentity(),
+                owned.capabilitySnapshot().configurationDigest());
+        var expected = new Nbke2RunBindingV1(
+                root.bindingId(),
+                root.topicIncarnation(),
+                root.partitionId(),
+                root.storageEpochId(),
+                root.creatorOwnerEpoch(),
+                root.kafkaLeaderEpoch(),
+                root.providerScopeId(),
+                root.runId());
+        return owned.openRunLedger(handle)
+                .thenCompose(open -> {
+                    if (open.outcome() != RunLedgerOpenOutcomeV1.OPENED_EXACT
+                            || !open.exactHandle().equals(Optional.of(handle))) {
+                        throw new IllegalStateException("Kafka Object retained carrier is not physically available");
+                    }
+                    return readExact(owned, handle, sealedLastEntry);
+                })
+                .thenCompose(footer -> {
+                    var footerHash = Sha256Digest.hash(footer);
+                    if (!footerHash.equals(footerFrame)
+                            || !(Nbke2CodecV1.decode(footer.toByteArray(), retainedLedger, sealedLastEntry)
+                                    instanceof Nbke2RunFooterV1 decoded)
+                            || !decoded.runBinding().equals(expected)
+                            || decoded.protocolCheckpointEntryId() != checkpointEntry
+                            || decoded.kafkaEndOffsetExclusive()
+                                    != root.kafkaEndOffsetExclusive().orElseThrow()
+                            || decoded.lastPhysicalEntryIdExclusive() != sealedLastEntry + 1) {
+                        throw new IllegalStateException("Kafka Object retained carrier has another exact footer");
+                    }
+                    return readExact(owned, handle, checkpointEntry).thenApply(frame -> {
+                        var checkpointHash = Sha256Digest.hash(frame);
+                        if (!checkpointHash.equals(checkpointFrame)
+                                || !(Nbke2CodecV1.decode(frame.toByteArray(), retainedLedger, checkpointEntry)
+                                        instanceof Nbke2ProtocolCheckpointV1 checkpoint)
+                                || !checkpoint.runBinding().equals(expected)) {
+                            throw new IllegalStateException(
+                                    "Kafka Object retained carrier has another exact checkpoint");
+                        }
+                        var vector = KafkaProtocolCheckpointStateV1.fromNbke2(checkpoint)
+                                .vector();
+                        if (!vector.isAlignedCompoundCheckpoint()
+                                || vector.recoveryCoveredThrough()
+                                        != root.kafkaEndOffsetExclusive().orElseThrow()) {
+                            throw new IllegalStateException(
+                                    "Kafka Object retained checkpoint has another coherent cut");
+                        }
+                        return new CarrierProof(checkpointHash, footerHash);
+                    });
+                });
+    }
+
+    public record CarrierProof(Sha256Digest checkpointFrame, Sha256Digest footerFrame) {}
+
+    private static CompletionStage<CanonicalBytes> readExact(
+            BookKeeperCellSession owned, RunLedgerHandleV1 handle, long entry) {
+        return owned.readExactEntry(handle, entry).thenApply(observed -> {
+            var value = observed.exactEntry().orElseThrow();
+            if (observed.outcome() != RunLedgerReadOutcomeV1.FOUND_EXACT
+                    || !value.handle().equals(handle)
+                    || value.entryId() != entry) {
+                throw new IllegalStateException("Kafka Object retained carrier returned another BK entry");
+            }
+            return value.payload();
+        });
     }
 
     public CanonicalBytes encode() {

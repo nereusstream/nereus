@@ -246,6 +246,16 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
         return materializationLifecycle(protocolCellSha256).rawControlMetadata();
     }
 
+    /** Exact backend key and revision for an admitted Object task or immutable manifest fact. */
+    public CompletionStage<Optional<VersionedValue>> readNativeMaterializationFact(
+            Sha256Digest protocolCellSha256, String key) {
+        var route = materializationLifecycle(protocolCellSha256);
+        return route.read(key)
+                .thenCompose(value -> value.isEmpty()
+                        ? java.util.concurrent.CompletableFuture.completedFuture(Optional.empty())
+                        : route.nativeFact(value.orElseThrow()).thenApply(Optional::of));
+    }
+
     public CompletionStage<Void> reconcileMaterializationPendingOutput(
             Sha256Digest protocolCellSha256,
             com.nereusstream.storage.object.materialization.M5PendingOutputInventoryV2 original) {
