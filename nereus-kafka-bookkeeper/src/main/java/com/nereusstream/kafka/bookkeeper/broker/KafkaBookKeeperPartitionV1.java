@@ -29,6 +29,7 @@ import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaRecoveryCheckpointVecto
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentCommitCoordinatorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaProtocolAppendPlanV1;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperObjectReadScopeV1;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperReadViewV2;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2BatchLocatorV1;
@@ -2191,6 +2192,45 @@ public final class KafkaBookKeeperPartitionV1 {
         return new NativeInputSources(sources, protocol, checkpoint);
     }
 
+    /** Capture the actual selected Object reader and the retained native protocol cut for physical reference checks. */
+    public synchronized NativeInputSources nativeObjectRetainedInputSources(
+            BindingReadSelector selector, KafkaBookKeeperObjectReadScopeV1 scope) {
+        requireWritable();
+        if (m4ReadOwner == null || nativeObjectPublication != null || nativeObjectRetirement != null || rolling) {
+            throw new IllegalStateException("native Object reference capture lacks a stable reader");
+        }
+        var inputs = nativeInputSources();
+        requireNativeReadPublication(inputs.sources(), selector);
+        var selected = m4ReadOwner
+                .selectorRuntime()
+                .currentAuthority()
+                .get()
+                .publicationCell()
+                .protocolStateReference();
+        if (!(selected instanceof KafkaBookKeeperNativeObjectReadSourcesV1 object) || object.fallback()) {
+            throw new IllegalStateException("native Object reference capture lacks its preferred-only reader");
+        }
+        object.requireSelector(selector);
+        scope.requireSelection(object.prefix(), selector);
+        var roots = inputs.sources().sealedRoots();
+        if (roots.stream().anyMatch(root -> root.kafkaStartOffset() < scope.prefixEnd())
+                || roots.stream().noneMatch(scope::namesRetainedCarrier)
+                || inputs.recoveryCheckpoint().isEmpty()
+                || !inputs.protocol().speculativeQueue().commits().isEmpty()) {
+            throw new IllegalStateException("native Object reference capture lacks its complete retained protocol cut");
+        }
+        var checkpoint = inputs.recoveryCheckpoint().orElseThrow();
+        var retainedRuns = new java.util.HashSet<StorageRunId>();
+        roots.forEach(root -> retainedRuns.add(root.runId()));
+        retainedRuns.add(inputs.sources().activeRoot().runId());
+        if (!retainedRuns.contains(checkpoint.vector().runBinding().runId())
+                || checkpoint.readIndexes().stream().anyMatch(index -> !retainedRuns.contains(index.runId()))) {
+            throw new IllegalStateException(
+                    "native Object reference capture still depends on a nonretained checkpoint run");
+        }
+        return inputs;
+    }
+
     /** Captures the selected input only from this partition's actually installed read actor. */
     public synchronized Optional<NativeSelectedInputSources> nativeSelectedInputSources(
             NativeInputSources expected, BindingReadSelector selector) {
@@ -2532,6 +2572,37 @@ public final class KafkaBookKeeperPartitionV1 {
             }
             throw failure;
         }
+    }
+
+    /** Check immutable preferred bytes under the actual M4 generation pin without BK fallback. */
+    public CompletionStage<Void> verifySelectedObjectPrefix(Sha256Digest manifest) {
+        final KafkaBookKeeperM4BrokerReadOwnerV2 readOwner;
+        synchronized (this) {
+            requireWritable();
+            readOwner = Objects.requireNonNull(m4ReadOwner, "native Object verification has no read owner");
+        }
+        return readOwner.readOwned(authority -> {
+            var object = capturedObject(authority);
+            if (object == null || !manifest.equals(authority.selectedViewSha256())) {
+                throw new IllegalStateException("native Object verification has another selected manifest");
+            }
+            var lifetime = new HistoricalFetchScope();
+            var verification = CompletableFuture.runAsync(
+                    () -> {
+                        try {
+                            object.prefix().verifyComplete();
+                        } catch (KafkaObjectMaterializedPrefixV1.UnresolvedRead unresolved) {
+                            lifetime.retainObjectResponse(unresolved.originalDrain());
+                            throw new CompletionException(unresolved);
+                        } catch (java.io.IOException failure) {
+                            throw new CompletionException(failure);
+                        }
+                    },
+                    object.providerReads());
+            verification.whenComplete((ignored, failure) -> lifetime.workFinished());
+            return new KafkaBookKeeperM4BrokerReadOwnerV2.ReadLifetime<>(
+                    verification, lifetime.drained, lifetime.unknown);
+        });
     }
 
     private CompletionStage<KafkaBookKeeperReadResultV1> readObjectOrProtectedFallback(

@@ -180,6 +180,43 @@ public final class KafkaObjectMaterializedPrefixV1 {
         }
     }
 
+    /** Revalidates every exact payload and side index against the original byte-preserving source cut. */
+    public void verifyComplete() throws IOException {
+        var generation = validated.generation();
+        var sources = sourceCut().sources();
+        if (generation.indexObjects().size() != plan.indexes().size()) {
+            throw corrupt("Kafka Object prefix lacks its complete side indexes", null);
+        }
+        for (int ordinal = 0; ordinal < sources.size(); ordinal++) {
+            readPart(ordinal);
+        }
+        var rows = new ArrayList<M5LookupIndexV1.Row>(sources.size());
+        for (int ordinal = 0; ordinal < sources.size(); ordinal++) {
+            var source = sources.get(ordinal);
+            rows.add(new M5LookupIndexV1.Row(
+                    source.coverage(),
+                    ordinal,
+                    0,
+                    Math.toIntExact(source.canonicalLength()),
+                    source.minimumTimestamp(),
+                    source.maximumTimestamp(),
+                    source.bodySha256()));
+        }
+        for (int ordinal = 0; ordinal < plan.indexes().size(); ordinal++) {
+            var expected = plan.indexes().get(ordinal);
+            var object = generation.indexObjects().get(ordinal);
+            var index = new M5LookupIndexV1(
+                    expected.kind(), expected.coverage(), plan.taskIdSha256(), plan.outputIdentitySha256(), rows);
+            if (object.ordinal() != ordinal
+                    || object.indexKind() != expected.kind()
+                    || !object.coverage().equals(expected.coverage())
+                    || !object.identity().key().equals(expected.objectKey())
+                    || !readExact(object).equals(index.encode())) {
+                throw corrupt("Kafka Object side index differs from its exact source cut", null);
+            }
+        }
+    }
+
     public Selection read(long offset, long isolationEnd, long byteBudget) throws IOException {
         if (offset < coverage().inclusiveStart() || offset >= coverage().exclusiveEnd() || byteBudget <= 0) {
             throw new IllegalArgumentException("Kafka Object Fetch is outside the captured prefix");
