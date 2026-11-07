@@ -328,6 +328,29 @@ public final class KafkaBookKeeperM4BrokerReadOwnerV2 {
         }
     }
 
+    /** Replace only unused BK recovery references; the selected Object/BK Fetch plan and generation are unchanged. */
+    boolean transferRetainedObjectTail(BindingReadAuthorityV1 before, KafkaBookKeeperNativeObjectReadSourcesV1 tail) {
+        var cell = before.publicationCell();
+        var next = new BindingReadAuthorityV1(
+                before.bindingId(),
+                before.topicIncarnationIdentity(),
+                before.storageEpochId(),
+                before.protocol(),
+                before.selectedViewSha256(),
+                before.ownerEpoch(),
+                before.readAdmissionEpoch(),
+                before.admitting(),
+                before.capabilityGeneration(),
+                before.capabilityEvidenceSha256(),
+                new BindingReadPublicationCellV1(
+                        cell.sourceGeneration(),
+                        cell.readableUpperBound(),
+                        cell.activeTailViewVersion(),
+                        cell.routes(),
+                        tail));
+        return selector.currentAuthority().compareAndSet(before, next);
+    }
+
     private KafkaBookKeeperM4BrokerReadOwnerV2 resumeNativeSources(Object sources, Sha256Digest view, long upperBound) {
         var durable = coordinator.readSelector().orElseThrow();
         var previous = selector.currentAuthority().get();

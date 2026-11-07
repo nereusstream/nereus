@@ -79,6 +79,30 @@ public record KafkaBookKeeperNativeObjectReadSourcesV1(
                 rawSources, prefix, bookKeeperNamespace, false, providerReads);
     }
 
+    /** Local recovery-reference transfer, separate from fallback read release and physical delete authorization. */
+    KafkaBookKeeperNativeObjectReadSourcesV1 retainedBookKeeperTail() {
+        if (fallback
+                || rawSources.sealedRoots().isEmpty()
+                || rawSources.sealedRoots().get(0).kafkaStartOffset()
+                        != prefix.coverage().inclusiveStart()) {
+            throw new IllegalStateException("Object generation is not the closed, complete native BK prefix");
+        }
+        requireOriginalFallback(rawSources, prefix, bookKeeperNamespace);
+        long boundary = prefix.coverage().exclusiveEnd();
+        var tailRoots = rawSources.sealedRoots().stream()
+                .filter(root -> root.kafkaStartOffset() >= boundary)
+                .toList();
+        var tailRuns = rawSources.sealedReadRuns().stream()
+                .filter(run -> run.startOffset() >= boundary)
+                .toList();
+        return new KafkaBookKeeperNativeObjectReadSourcesV1(
+                new NativeReadSources(tailRoots, rawSources.activeRoot(), tailRuns, rawSources.configurationSha256()),
+                prefix,
+                bookKeeperNamespace,
+                false,
+                providerReads);
+    }
+
     KafkaBookKeeperNativeObjectReadSourcesV1 withRawSources(NativeReadSources successor) {
         KafkaBookKeeperPartitionV1.NativePreferredReadSources.requireSourceExtension(rawSources, successor);
         return new KafkaBookKeeperNativeObjectReadSourcesV1(

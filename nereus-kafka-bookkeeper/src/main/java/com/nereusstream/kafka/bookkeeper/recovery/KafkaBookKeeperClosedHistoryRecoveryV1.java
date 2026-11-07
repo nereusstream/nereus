@@ -16,6 +16,7 @@ package com.nereusstream.kafka.bookkeeper.recovery;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryEnvelopeV1;
 import com.nereusstream.kafka.bookkeeper.admission.KafkaBookKeeperRecoveryProgressV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
@@ -31,6 +32,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperReadRunV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaBookKeeperRunTableV1;
+import com.nereusstream.kafka.bookkeeper.read.KafkaObjectMaterializedPrefixV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaPackedBatchLocatorIndexV1;
 import com.nereusstream.kafka.bookkeeper.read.KafkaPackedIndexDirectoryV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
@@ -46,6 +48,10 @@ import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceExtent;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.SourceKind;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -235,7 +241,7 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
             KafkaPartitionFenceV1 newFence,
             long historyStartOffset,
             KafkaBookKeeperRecoveryEnvelopeV1 envelope) {
-        return recover(closed, newFence, historyStartOffset, envelope, Optional.empty(), List.of());
+        return recover(closed, newFence, historyStartOffset, envelope, Optional.empty());
     }
 
     /**
@@ -290,17 +296,58 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 newFence,
                 historyStartOffset,
                 envelope,
-                Optional.of(checkpoint),
-                descriptor.sourceCut().sources());
+                Optional.of(new CoveredPrefix(
+                        state.coveredThrough(), descriptor.sourceCut().sources(), Optional.of(checkpoint))));
     }
+
+    /**
+     * Reopens a durable Object-selected prefix after native BK references were transferred. The caller must
+     * qualify the recorded transfer and exact M4 release. The selected Object bytes alone cannot supply Kafka
+     * producer, transaction or leader-epoch state: a real checkpoint on the remaining admitted BK suffix must.
+     */
+    public CompletionStage<Result> recoverObjectPrefix(
+            KafkaOwnerAdmissionV1 closed,
+            KafkaPartitionFenceV1 newFence,
+            long historyStartOffset,
+            KafkaBookKeeperRecoveryEnvelopeV1 envelope,
+            BindingReadSelector selector,
+            KafkaObjectMaterializedPrefixV1 prefix) {
+        var binding = new BindingIdentity(
+                newFence.bindingId(),
+                Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(newFence.topicIncarnation())),
+                newFence.storageEpochId().digest());
+        var cut = prefix.sourceCut();
+        if (!cut.identity().binding().equals(binding)
+                || !selector.binding().equals(binding)
+                || selector.ownerEpoch() > closed.owner().ownerEpoch()
+                || selector.ownerEpoch() < cut.identity().ownerEpoch()
+                || !selector.selectedViewSha256().equals(prefix.manifestSha256())
+                || selector.sourceGeneration() < prefix.sourceGeneration()
+                || selector.admissionState() != AdmissionState.ADMITTING
+                || selector.mode() != SelectorMode.PREFERRED_ONLY
+                || !selector.capability().equals(cut.identity().capability())
+                || prefix.coverage().inclusiveStart() != historyStartOffset
+                || cut.sources().stream().anyMatch(source -> source.kind() != SourceKind.BOOKKEEPER_LEDGER)) {
+            throw new IllegalArgumentException(
+                    "Object recovery changed its selected Binding or exact covered BK prefix");
+        }
+        return recover(
+                closed,
+                newFence,
+                historyStartOffset,
+                envelope,
+                Optional.of(new CoveredPrefix(prefix.coverage().exclusiveEnd(), cut.sources(), Optional.empty())));
+    }
+
+    private record CoveredPrefix(
+            long exclusiveEnd, List<SourceExtent> sources, Optional<KafkaProtocolCheckpointStateV1> state) {}
 
     private CompletionStage<Result> recover(
             KafkaOwnerAdmissionV1 closed,
             KafkaPartitionFenceV1 newFence,
             long historyStartOffset,
             KafkaBookKeeperRecoveryEnvelopeV1 envelope,
-            Optional<KafkaProtocolCheckpointStateV1> selectedState,
-            List<SourceExtent> selectedSources) {
+            Optional<CoveredPrefix> selected) {
         Objects.requireNonNull(closed, "closed");
         Objects.requireNonNull(newFence, "newFence");
         Objects.requireNonNull(envelope, "envelope");
@@ -317,8 +364,7 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 || newFence.kafkaLeaderEpoch() <= closed.owner().kafkaLeaderEpoch()) {
             throw new IllegalArgumentException("recovery requires exact closed history and a newer native fence");
         }
-        Context context = new Context(
-                newFence, historyStartOffset, envelope, nanoTime.getAsLong(), selectedState, selectedSources);
+        Context context = new Context(newFence, historyStartOffset, envelope, nanoTime.getAsLong(), selected);
         return authority
                 .readClosedOwner(closed.owner().ownerEpoch())
                 .thenCompose(stored -> {
@@ -331,7 +377,7 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 })
                 .thenCompose(ignored -> discoverRuns(context, 0, 0))
                 .thenRun(() -> require(
-                        selectedState.isEmpty()
+                        selected.isEmpty()
                                 || context.selectedSources.isEmpty()
                                         && context.generationBoundaryChecked
                                         && context.selectedPrefixAnchor
@@ -345,6 +391,9 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 // The selected generation supplies the compacted prefix. A later native checkpoint may
                 // cover the raw suffix; replaying that entire suffix would discard its bounded recovery cut.
                 .thenCompose(ignored -> selectCheckpoint(context, context.runs.size() - 1))
+                .thenRun(() -> require(
+                        selected.isEmpty() || context.state.isPresent(),
+                        "selected Object recovery lacks its durable retained BK protocol checkpoint"))
                 .thenCompose(ignored -> replay(
                         context,
                         context.checkpointRun >= 0
@@ -364,7 +413,7 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                         context.state,
                         context.progress(),
                         context.readRuns,
-                        selectedState.isPresent() || context.checkpointRun >= 0
+                        selected.isPresent() || context.checkpointRun >= 0
                                 ? OptionalLong.of(context.checkpointEnd)
                                 : OptionalLong.empty(),
                         context.catalogTail.map(KafkaRunRootRecordV2::root),
@@ -954,17 +1003,16 @@ public final class KafkaBookKeeperClosedHistoryRecoveryV1 {
                 long startOffset,
                 KafkaBookKeeperRecoveryEnvelopeV1 envelope,
                 long started,
-                Optional<KafkaProtocolCheckpointStateV1> selectedState,
-                List<SourceExtent> selectedSources) {
+                Optional<CoveredPrefix> selected) {
             this.fence = fence;
             this.historyStart = startOffset;
-            this.state = selectedState;
-            this.selectedEnd = selectedState.isPresent()
-                    ? OptionalLong.of(selectedState.orElseThrow().vector().recoveryCoveredThrough())
+            this.state = selected.flatMap(CoveredPrefix::state);
+            this.selectedEnd = selected.isPresent()
+                    ? OptionalLong.of(selected.orElseThrow().exclusiveEnd())
                     : OptionalLong.empty();
             this.end = selectedEnd.orElse(startOffset);
             this.checkpointEnd = end;
-            for (var source : selectedSources) {
+            for (var source : selected.map(CoveredPrefix::sources).orElseGet(List::of)) {
                 if (source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2) {
                     require(
                             this.selectedGeneration.isEmpty()

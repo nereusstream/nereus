@@ -286,6 +286,7 @@ public final class KafkaBookKeeperPartitionV1 {
     private Sha256Digest nativePublicationTask;
     private NativeObjectPublication nativeObjectPublication;
     private KafkaBookKeeperNativeFallbackRetirementV2 nativeObjectRetirement;
+    private ObjectBookKeeperSourceTransfer pendingObjectSourceTransfer;
     private KafkaBookKeeperNativeObjectReadSourcesV1 recoveredObjectReadSources;
     private KafkaBookKeeperReadViewV2 nativePublicationPredecessor;
     private KafkaBookKeeperReadViewV2 nativePreferredCache;
@@ -888,11 +889,9 @@ public final class KafkaBookKeeperPartitionV1 {
                 checkpointEntry,
                 owner.ownerEpoch(),
                 directory);
-        long controlBytes = Nbke2CodecV1.encode(
-                                old.snapshot().handle().ledgerIdentity().ledgerId(),
-                                checkpointEntry,
-                                checkpoint.toNbke2())
-                        .length
+        byte[] encodedCheckpoint = Nbke2CodecV1.encode(
+                old.snapshot().handle().ledgerIdentity().ledgerId(), checkpointEntry, checkpoint.toNbke2());
+        long controlBytes = encodedCheckpoint.length
                 + Nbke2CodecV1.encode(old.snapshot().handle().ledgerIdentity().ledgerId(), footerEntry, footer).length;
         if (block != null) {
             controlBytes += Nbke2CodecV1.encode(
@@ -1026,14 +1025,16 @@ public final class KafkaBookKeeperPartitionV1 {
                                         session, run, partitionCapacity, globalCapacity, commit);
                                 dataAdmission = KafkaBookKeeperDataAdmissionV1.admitProfile(
                                         run.snapshot().runBinding(), session.capabilitySnapshot(), maximumBatchBytes);
-                                checkpointBaseBytes = Nbke2CodecV1.encode(
-                                                old.snapshot()
-                                                        .handle()
-                                                        .ledgerIdentity()
-                                                        .ledgerId(),
+                                checkpointBaseBytes = encodedCheckpoint.length;
+                                if (pendingObjectSourceTransfer != null
+                                        && pendingObjectSourceTransfer.recordCheckpoint(
+                                                old.snapshot().root(),
+                                                checkpoint,
                                                 checkpointEntry,
-                                                checkpoint.toNbke2())
-                                        .length;
+                                                encodedCheckpoint,
+                                                digest)) {
+                                    pendingObjectSourceTransfer = null;
+                                }
                                 admittedEntries = runEntries = 1;
                                 admittedBytes = runBytes = Nbke2CodecV1.encode(
                                                 run.snapshot()
@@ -1885,6 +1886,126 @@ public final class KafkaBookKeeperPartitionV1 {
         }
     }
 
+    /** Actual protocol-source transfer; no persistent retirement or physical delete authority is granted here. */
+    public static final class ObjectBookKeeperSourceTransfer {
+        private final KafkaBookKeeperNativeFallbackRetirementV2.Result release;
+        private final NativeReadSources original;
+        private final NativeReadSources retained;
+        private final KafkaProtocolCheckpointStateV1 checkpoint;
+        private volatile ObjectRetainedCheckpoint durableCheckpoint;
+
+        private ObjectBookKeeperSourceTransfer(
+                KafkaBookKeeperNativeFallbackRetirementV2.Result release,
+                NativeReadSources original,
+                NativeReadSources retained,
+                KafkaProtocolCheckpointStateV1 checkpoint) {
+            this.release = release;
+            this.original = original;
+            this.retained = retained;
+            this.checkpoint = checkpoint;
+        }
+
+        public KafkaBookKeeperNativeFallbackRetirementV2.Result release() {
+            return release;
+        }
+
+        public NativeReadSources original() {
+            return original;
+        }
+
+        public NativeReadSources retained() {
+            return retained;
+        }
+
+        public KafkaProtocolCheckpointStateV1 checkpoint() {
+            return checkpoint;
+        }
+
+        public Optional<ObjectRetainedCheckpoint> durableCheckpoint() {
+            return Optional.ofNullable(durableCheckpoint);
+        }
+
+        private boolean recordCheckpoint(
+                KafkaRunRootSnapshotV1 root,
+                KafkaProtocolCheckpointStateV1 sealed,
+                long entry,
+                byte[] frame,
+                Sha256Digest footer) {
+            var removed = removedBookKeeperRuns(original, retained);
+            if (removed.contains(root.runId())
+                    || !root.runId().equals(sealed.vector().runBinding().runId())
+                    || root.kafkaEndOffsetExclusive().orElse(-1)
+                            != sealed.vector().recoveryCoveredThrough()
+                    || sealed.readIndexes().stream().anyMatch(index -> removed.contains(index.runId()))) {
+                return false;
+            }
+            durableCheckpoint = new ObjectRetainedCheckpoint(
+                    root, entry, Sha256Digest.hash(com.nereusstream.domain.bytes.CanonicalBytes.copyOf(frame)), footer);
+            return true;
+        }
+    }
+
+    public record ObjectRetainedCheckpoint(
+            KafkaRunRootSnapshotV1 sealedCarrier,
+            long checkpointEntry,
+            Sha256Digest checkpointSha256,
+            Sha256Digest footerSha256) {}
+
+    public synchronized ObjectBookKeeperSourceTransfer transferRetiredObjectBookKeeperPrefix(
+            KafkaBookKeeperNativeFallbackRetirementV2.Result release) {
+        requireWritable();
+        if (nativeObjectRetirement != null
+                || release.readOwner() != m4ReadOwner
+                || rolling
+                || admissions != 0
+                || !commit.capture().speculativeQueue().commits().isEmpty()) {
+            throw new IllegalStateException(
+                    "Object BK source transfer requires its actual drained epoch and coherent protocol cut");
+        }
+        var authority = m4ReadOwner.selectorRuntime().currentAuthority().get();
+        if (!authority.admitting()
+                || !(authority.publicationCell().protocolStateReference()
+                        instanceof KafkaBookKeeperNativeObjectReadSourcesV1 object)
+                || object.fallback()
+                || authority.readAdmissionEpoch() != release.selector().readAdmissionEpoch()
+                || !object.prefix().manifestSha256().equals(release.selector().selectedViewSha256())
+                || !object.prefix()
+                        .originalFallbackSources()
+                        .equals(release.batch().sources())) {
+            throw new IllegalStateException("Object BK source transfer differs from its exact released fallback set");
+        }
+        var original = nativeReadSourcesUnchecked();
+        if (!object.rawSources().equals(original)) {
+            throw new IllegalStateException("Object BK source transfer has a different native source map");
+        }
+        var tail = object.retainedBookKeeperTail();
+        var retained = tail.rawSources();
+        var removed = removedBookKeeperRuns(original, retained);
+        var current = commit.captureRecoveryCheckpoint(commit.capture());
+        if (removed.isEmpty() || removed.contains(current.vector().runBinding().runId())) {
+            throw new IllegalStateException(
+                    "Object BK source transfer needs an independent retained checkpoint carrier");
+        }
+        var checkpoint = checkpointWithoutRemovedRuns(current, removed);
+        var digest =
+                Sha256Digest.hash(com.nereusstream.domain.bytes.CanonicalBytes.copyOf(java.nio.ByteBuffer.allocate(64)
+                        .put(authority.selectedViewSha256().bytes().toByteArray())
+                        .put(retained.selectedViewSha256().bytes().toByteArray())
+                        .array()));
+        commit.retireBookKeeperSources(checkpoint, digest);
+        if (!m4ReadOwner.transferRetainedObjectTail(authority, tail)) {
+            fence();
+            throw new IllegalStateException("Object BK source transfer lost its original reader");
+        }
+        historyRuns.clear();
+        historyRuns.addAll(retained.sealedReadRuns());
+        sealedHistoryRoots.clear();
+        sealedHistoryRoots.addAll(retained.sealedRoots());
+        nativeSourceViewSha256 = retained.selectedViewSha256();
+        pendingObjectSourceTransfer = new ObjectBookKeeperSourceTransfer(release, original, retained, checkpoint);
+        return pendingObjectSourceTransfer;
+    }
+
     public synchronized void finishNativeFallbackRetirement(
             KafkaBookKeeperNativeFallbackRetirementV2 retirement,
             KafkaBookKeeperNativeFallbackRetirementV2.Result result) {
@@ -1942,13 +2063,7 @@ public final class KafkaBookKeeperPartitionV1 {
 
     private KafkaProtocolCheckpointStateV1 transferredCheckpoint(NativeReadSources previous, NativeReadSources tail) {
         var checkpoint = commit.captureRecoveryCheckpoint(commit.capture());
-        var retained = tail.sealedRoots().stream()
-                .map(KafkaRunRootSnapshotV1::runId)
-                .collect(java.util.stream.Collectors.toSet());
-        var removed = previous.sealedRoots().stream()
-                .map(KafkaRunRootSnapshotV1::runId)
-                .filter(id -> !retained.contains(id))
-                .collect(java.util.stream.Collectors.toSet());
+        var removed = removedBookKeeperRuns(previous, tail);
         if (removed.contains(checkpoint.vector().runBinding().runId())) {
             var state = nativePreferredCache.recoveryState().orElseThrow();
             if (checkpoint.vector().recoveryCoveredThrough() != state.coveredThrough()
@@ -1969,6 +2084,22 @@ public final class KafkaBookKeeperPartitionV1 {
                     output.providerScopeId(),
                     output.runId()));
         }
+        return checkpointWithoutRemovedRuns(checkpoint, removed);
+    }
+
+    private static java.util.Set<StorageRunId> removedBookKeeperRuns(
+            NativeReadSources previous, NativeReadSources tail) {
+        var retained = tail.sealedRoots().stream()
+                .map(KafkaRunRootSnapshotV1::runId)
+                .collect(java.util.stream.Collectors.toSet());
+        return previous.sealedRoots().stream()
+                .map(KafkaRunRootSnapshotV1::runId)
+                .filter(id -> !retained.contains(id))
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private static KafkaProtocolCheckpointStateV1 checkpointWithoutRemovedRuns(
+            KafkaProtocolCheckpointStateV1 checkpoint, java.util.Set<StorageRunId> removed) {
         return new KafkaProtocolCheckpointStateV1(
                 checkpoint.vector(),
                 checkpoint.producerState(),
@@ -1983,7 +2114,15 @@ public final class KafkaBookKeeperPartitionV1 {
         var sources = nativeReadSources();
         var protocol = capture();
         // A fresh, unsealed run has only the bootstrap checkpoint seed. No checkpoint is manufactured for it.
-        var checkpoint = sources.sealedRoots().isEmpty() && nativePreferredCache == null
+        boolean objectSelected = m4ReadOwner != null
+                && m4ReadOwner
+                                .selectorRuntime()
+                                .currentAuthority()
+                                .get()
+                                .publicationCell()
+                                .protocolStateReference()
+                        instanceof KafkaBookKeeperNativeObjectReadSourcesV1;
+        var checkpoint = sources.sealedRoots().isEmpty() && nativePreferredCache == null && !objectSelected
                 ? Optional.<KafkaProtocolCheckpointStateV1>empty()
                 : Optional.of(commit.captureRecoveryCheckpoint(protocol));
         return new NativeInputSources(sources, protocol, checkpoint);
