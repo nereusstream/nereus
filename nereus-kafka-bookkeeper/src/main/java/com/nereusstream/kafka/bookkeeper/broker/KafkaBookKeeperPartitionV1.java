@@ -76,6 +76,7 @@ import com.nereusstream.storage.object.read.BindingReadAuthorityV1;
 import com.nereusstream.storage.object.read.BindingReadProtocolV1;
 import com.nereusstream.storage.object.read.BindingReadPublicationCellV1;
 import com.nereusstream.storage.object.read.BindingReadRouteTableV1;
+import com.nereusstream.storage.object.read.BindingReadRouteV1.FailureClass;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
@@ -94,6 +95,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
@@ -2151,8 +2153,7 @@ public final class KafkaBookKeeperPartitionV1 {
                 if (scope == null) {
                     throw new IllegalStateException("native Object Fetch lacks its owned source lifetime");
                 }
-                accepted = reader.readObjectPreferred(
-                        readSnapshot, request, object.prefix(), object.providerReads(), scope::readExact);
+                accepted = readObjectOrProtectedFallback(readSnapshot, request, object, scope);
             } else if (preferred != null) {
                 accepted = scope == null
                         ? reader.readSequential(readSnapshot, request, preferred)
@@ -2185,6 +2186,30 @@ public final class KafkaBookKeeperPartitionV1 {
             }
             throw failure;
         }
+    }
+
+    private CompletionStage<KafkaBookKeeperReadResultV1> readObjectOrProtectedFallback(
+            KafkaBookKeeperReadSnapshotV1 snapshot,
+            KafkaBookKeeperSequentialReadRequestV1 request,
+            KafkaBookKeeperNativeObjectReadSourcesV1 sources,
+            HistoricalFetchScope scope) {
+        return reader.readObjectPreferred(
+                        snapshot, request, sources.prefix(), sources.providerReads(), scope::readExact)
+                .exceptionallyCompose(failure -> {
+                    Throwable cause = failure instanceof CompletionException && failure.getCause() != null
+                            ? failure.getCause()
+                            : failure;
+                    if (cause instanceof KafkaObjectMaterializedPrefixV1.UnresolvedRead unresolved) {
+                        scope.retainObjectResponse(unresolved.originalDrain());
+                    } else if (sources.fallback()
+                            && cause instanceof KafkaObjectMaterializedPrefixV1.ReadFailure object
+                            && object.failureClass() != FailureClass.NOT_ELIGIBLE) {
+                        // No response was observable. Restart the entire requested range on its captured protected BK
+                        // view.
+                        return reader.readSequential(snapshot, request, scope::readExact);
+                    }
+                    return CompletableFuture.failedFuture(cause);
+                });
     }
 
     private KafkaBookKeeperReadViewV2 capturedPreferred(BindingReadAuthorityV1 captured) {
@@ -2280,6 +2305,22 @@ public final class KafkaBookKeeperPartitionV1 {
         private synchronized void closedHandle() {
             handles--;
             completeDrain();
+        }
+
+        private void retainObjectResponse(CompletionStage<Void> originalDrain) {
+            synchronized (this) {
+                if (finished || handles != 0) {
+                    throw new IllegalStateException("Object Fetch cannot release its unresolved original response");
+                }
+                handles++;
+            }
+            originalDrain.whenComplete((ignored, failure) -> {
+                if (failure == null) {
+                    closedHandle();
+                } else {
+                    unknown.completeExceptionally(failure);
+                }
+            });
         }
 
         private synchronized void workFinished() {
