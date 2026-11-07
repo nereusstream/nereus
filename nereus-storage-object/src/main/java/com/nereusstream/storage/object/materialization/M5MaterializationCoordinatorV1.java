@@ -170,6 +170,55 @@ public final class M5MaterializationCoordinatorV1 {
         return metadata.get(keys.task(taskId)).map(M5MaterializationCodecV1::decodeTask);
     }
 
+    /** Completes only the audit row for a verified generation that is already authoritatively selected. */
+    public PublicationOutcome finishSelectedTask(
+            MaterializationPlan plan,
+            ValidatedGeneration validated,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            BindingReadSelector selected) {
+        requireBinding(plan);
+        var fallbackSet =
+                M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), exactFallbackSources);
+        requireValidatedIdentity(plan, validated, fallbackSet);
+        var predecessor = plan.sourceCut().predecessorSelector();
+        var manifest = M5MaterializationCodecV1.manifestSha256(validated.manifestView());
+        if (!selected.binding().equals(binding)
+                || !selected.capability().equals(predecessor.capability())
+                || selected.ownerEpoch() < predecessor.ownerEpoch()
+                || selected.sourceGeneration() < validated.generation().sourceGeneration()
+                || selected.admissionState() != AdmissionState.ADMITTING
+                || selected.mode() != SelectorMode.PREFERRED_WITH_FALLBACK
+                || !selected.fallbackSetSha256().equals(Optional.of(fallbackSet))
+                || !selected.selectedViewSha256().equals(manifest)
+                || !m4.readSelector().equals(Optional.of(selected))
+                || !readPlan(plan.taskIdSha256()).equals(Optional.of(plan))) {
+            return PublicationOutcome.CONFLICT;
+        }
+        var verified = new MaterializationTask(
+                plan.taskIdSha256(),
+                TaskState.OUTPUT_VERIFIED,
+                M5MaterializationCodecV1.sourceCutSha256(plan.sourceCut()),
+                plan.outputIdentitySha256(),
+                Optional.of(M5MaterializationCodecV1.validationRootSha256(validated.validationRoot())),
+                Optional.of(M5MaterializationCodecV1.generationSha256(validated.generation())),
+                Optional.of(manifest));
+        var published = new MaterializationTask(
+                verified.taskIdSha256(),
+                TaskState.PUBLISHED,
+                verified.sourceCutSha256(),
+                verified.outputIdentitySha256(),
+                verified.validationRootSha256(),
+                verified.generationSha256(),
+                verified.manifestViewSha256());
+        var current = readTask(plan.taskIdSha256());
+        if (current.equals(Optional.of(published))) {
+            return PublicationOutcome.EXISTING_EXACT;
+        }
+        return current.equals(Optional.of(verified))
+                ? reconcileTaskTransition(verified, published)
+                : PublicationOutcome.CONFLICT;
+    }
+
     public PublicationOutcome registerPendingOutputs(MaterializationPlan plan, M5PendingOutputInventoryV2 original) {
         requirePendingPlan(plan, original);
         if (original.state() != M5PendingOutputInventoryV2.State.PREPARED) {

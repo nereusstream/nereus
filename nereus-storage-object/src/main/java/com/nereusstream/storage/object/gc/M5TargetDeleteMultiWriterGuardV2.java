@@ -224,6 +224,12 @@ public final class M5TargetDeleteMultiWriterGuardV2 {
         return reconcile(resources, context, Optional.empty(), exactNativeTerminalProof);
     }
 
+    /** Reconciles a terminal native decision that originally protected targets across provider scopes. */
+    public CompletionStage<List<PhysicalResourceIdV2>> reconcileTerminalWithContexts(
+            Map<? extends PhysicalResourceIdV2, Context> targetContexts, Sha256Digest exactNativeTerminalProof) {
+        return reconcileWithContexts(Map.copyOf(targetContexts), Optional.empty(), exactNativeTerminalProof);
+    }
+
     /** Reconciles only one confirmed terminal invocation; sibling operations sharing its Context remain protected. */
     public CompletionStage<List<PhysicalResourceIdV2>> reconcileOperation(
             List<? extends PhysicalResourceIdV2> resources,
