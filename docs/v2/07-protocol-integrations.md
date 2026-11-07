@@ -195,10 +195,11 @@ receipt is inherited as V2 parity evidence.
 
 ## M6 process activation matrix
 
-This is the accepted integration target after M5, not an enablement or PASS declaration. The current Kafka deployment
-admits only `BOOKKEEPER_WAL_ONLY` in CreateTopics, including validate-only requests; an explicit unadmitted profile
-does not create a Binding. The Broker also checks the persisted Binding before opening its BK route. Object profiles
-stay rejected until their row is implemented and verified. Resolve each topic from its immutable Binding/Storage Epoch.
+This is the accepted integration target after M5. In the focused native Kafka path, a BK-only deployment admits
+`BOOKKEEPER_WAL_ONLY`; an async Object deployment also admits `BOOKKEEPER_WAL_ASYNC_OBJECT` with a qualified
+Object provider. An explicit unadmitted profile fails CreateTopics, including validate-only, without creating a
+Binding. Each Broker checks the persisted Binding and Storage Epoch before opening its storage route. Kafka
+`OBJECT_WAL` remains rejected. Focused coverage does not promote a row or grant deployment authority.
 Kafka rows require fresh feature-2 bootstrap and RF=1/minISR=1. The existing no-online-migration boundary applies to
 both protocols.
 

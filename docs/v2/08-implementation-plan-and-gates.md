@@ -338,8 +338,10 @@ freshly published JARs. It grants no scenario promotion.
 
 Run the focused Kafka async Object fixture with `python3 scripts/run-v2-m6-kafka-async-object-check.py
 --kafka-root <checkout> --kafka-java-home <jdk17> --output <new-absolute-path-outside-checkouts>`. It builds
-the current M4 prerequisite and runs the actual Kafka TestKit Broker and Controller with BK, Oxia and MinIO. The
-fixture covers quota rejection before PUT, original version reuse, background scheduling, hot and cold recovery
+the current M4 prerequisite and runs Kafka against BK, Oxia and MinIO. The separate Controller and Broker JVMs
+check mixed async Object and BK-only routing, BK ACKs while the Object bucket returns errors, refusal of a foreign
+bucket configuration, and cold takeover of the same selected Object version after the original Broker stops.
+The TestKit fixture covers quota rejection before PUT, original version reuse, background scheduling, hot and cold recovery
 after response loss, and protected BK fallback when an exact Object version is missing, unavailable or corrupt.
 It also rejects BK fallback after Object authorization failure and retains the actual provider read pin after client
 disconnect. Its retirement case keeps an
@@ -347,11 +349,16 @@ admitted Object Fetch pinned through BK rollover, verifies the exact fallback re
 the independently sealed BK checkpoint for the retained tail. On cold takeover the Broker reads that checkpoint
 and the client reads the complete history without reopening the retired prefix ledgers. The retirement case
 enables native GC in its isolated deployment, checks the exact old ledger IDs, observes native DONE, quota settlement
-and physical absence, and then verifies cold recovery. The semantic case checks an actual rewritten sparse Kafka
-batch, a Fetch beginning at a compacted gap, a retained tombstone and timestamp lookup on both the original and
-cold Owner. A missing compacted Object version fails closed because the original BK bytes contain suppressed
-records. The runner records the exact source trees and loaded test runtime without promoting scenarios or replacing
-the separate process gate.
+and physical absence, and then verifies cold recovery. The scheduler case also verifies that those ledgers exist before
+the retained BK checkpoint seals. The controlled shutdown case keeps a native source scan in its grace period, then
+verifies that the old Broker drains the scan before Controller handoff and that the new Owner can serve the acknowledged
+records. A Task superseded by BK rollover is cancelled only while its original live actor can prove it never entered
+the Object output phase. The semantic case checks a rewritten sparse Kafka batch, a Fetch beginning at a compacted gap,
+a retained tombstone, timestamp lookup, transaction markers and transaction filtering on both the original and cold Owner.
+A missing compacted Object version fails closed because the original BK bytes contain suppressed records. The conditional
+PUT case loses the response after MinIO accepts the write, then verifies that reconciliation and replay retain the same
+immutable version and birth credit. The runner records both source trees, the actual test and process runtimes, and
+separate process configurations and logs. This is focused evidence and does not promote M6 scenarios.
 
 ### Planned aggregate boundaries
 
