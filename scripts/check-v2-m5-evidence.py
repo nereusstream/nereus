@@ -1065,8 +1065,8 @@ def current_final_path(root):
     return path
 
 
-def ci_pulsar_commit(root):
-    """Select the SDK from the published Final; this does not replace complete Git/input verification."""
+def historical_source_commits(root):
+    """Verify the published M5 dependency's source tuple without certifying the current checkout."""
     path = current_final_path(root)
     value = load(read(root, str(path), MAX_JSON))
     require(value.get("schema") == "NEREUS_V2_M5_FINAL_V1" and value.get("kind") == "V2_M5_FINAL"
@@ -1093,9 +1093,22 @@ def ci_pulsar_commit(root):
                 if node != {"deleted": True}}
     require(INPUTS.committed_tree(root, commits["nereus"]) == expected,
             "CI Final Root commit differs from its complete input tree")
-    validate_descendants(root, commits["nereus"])
+    subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", commits["nereus"], "HEAD"],
+                   check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     validate_scenarios(root, path)
     validate_package(package, value, inputs, commits)
+    return commits
+
+
+def historical_pulsar_commit(root):
+    """Select only the SDK from the verified historical source tuple."""
+    return historical_source_commits(root)["pulsar"]
+
+
+def ci_pulsar_commit(root):
+    """Retain the original selector's strict current-source successor requirement."""
+    commits = historical_source_commits(root)
+    validate_descendants(root, commits["nereus"])
     return commits["pulsar"]
 
 
@@ -1148,7 +1161,7 @@ def validate_final(root, final_path, roots, check_current=True):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("candidate", "final", "ci-pulsar-commit"))
+    parser.add_argument("operation", choices=("candidate", "final", "ci-pulsar-commit", "historical-pulsar-commit"))
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--package", type=Path)
     parser.add_argument("--input-closure", type=Path)
@@ -1165,6 +1178,9 @@ def main(argv=None):
             label = "COMPLETE_PRECOMMIT_CANDIDATE_AWAITING_BINDING"
         elif args.operation == "ci-pulsar-commit":
             print(ci_pulsar_commit(root))
+            return 0
+        elif args.operation == "historical-pulsar-commit":
+            print(historical_pulsar_commit(root))
             return 0
         else:
             require(args.kafka_root is not None and args.pulsar_root is not None, "Final source check requires native roots")

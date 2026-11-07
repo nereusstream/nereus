@@ -201,17 +201,20 @@ M5-A selects deterministic `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, or `REWRI
 semantic rewrite and every rebuilt index; M5-C owns typed retention, reference-free proof, the selector-key
 single-Binding authority envelope with ticket/fence serialization and exact single-key CAS, both permanent
 metadata-retirement families, and admission; M5-D alone owns target-scoped physical
-delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries. This is design-only authority with
-the base result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; amendment-2 implementation remains `NotStarted`, and no
-M5-D intent, dispatch, evidence, scenario PASS, or physical-delete authority exists at this cut.
+delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries. The frozen base result
+`DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` describes its original design cut. The
+[current M5 contracts and Final](detailed_design/m5/m5-current-contracts.md) now verify all 17 obligations and five
+children, including real M4 RELEASED, deletion/UNKNOWN and settlement. That evidence is scoped to its exact sources
+and admitted fixtures; it grants no production deployment or new native offload-output admission.
 
 The later [M5 implementation log](detailed_design/m5/m5-implementation-log.md) records the current implementation
 descendants. M5-A has canonical source-cut/task/output identities, deterministic reuse/index-only/rewrite planning,
 NMS1 and lookup-index projections, independent full validation, persisted Cell admission, and exact selector
 publication. M5-B adds real magic-v2 RecordBatch parsing/sparse rewriting, seven exact dispositions, all eight rebuilt
 index families, independent semantic roots, predecessor suppression, compaction-specific Cell admission, and a final
-policy/root/frontier fence. Their focused gates are non-promotable; retention/retirement, deletion, source-bound
-evidence, scenario promotion, and production authority remain absent.
+policy/root/frontier fence. Those earlier focused gates remain non-promotable; current lifecycle acceptance comes
+from the M5 Final. `V2-KAF-DATA-012/013/022` still require M6 Broker-path evidence. Permanent compact tombstones and
+allocator orphan records remain retained; neither their deletion nor production authority follows from M5.
 
 ## Logical trim and physical GC
 

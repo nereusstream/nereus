@@ -81,7 +81,8 @@ jobs:
       - name: Check out source-locked Pulsar composite for current modules
         run: |
           pulsar_source="$RUNNER_TEMP/nsip-pulsar-source"
-          pulsar_commit="$(python3 scripts/check-v2-m5-evidence.py ci-pulsar-commit)"
+          # M5 pins the SDK dependency; the following module checks validate current NSIP source separately.
+          pulsar_commit="$(python3 scripts/check-v2-m5-evidence.py historical-pulsar-commit)"
           git init --quiet "$pulsar_source"
           git -C "$pulsar_source" remote add origin https://github.com/nereusstream/pulsar.git
           git -C "$pulsar_source" fetch --quiet --depth=1 --no-tags origin "$pulsar_commit"

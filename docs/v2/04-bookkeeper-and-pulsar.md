@@ -72,21 +72,21 @@ extent-wide `rangeChecksum` path is not retained or dual-written. Exact implemen
 
 ADR 0087 separates `Allocated`, profile-`Durable`, `Readable/LEO`, Kafka HW, and Kafka LSO. The required order is
 `LogStart <= LSO <= HW <= LEO <= Durable <= Allocated`. A BookKeeper quorum result proves physical durability; it does
-not by itself become Kafka HW. `acks=1` waits for the coherent locator/producer/transaction/leader-epoch publication
-that advances LEO. That publication checks exact Binding/Storage/Owner/Kafka-leader/state fences under the same cut as
-leadership transition; a stale durability callback cannot publish then fail a later check. `acks=all` retains native
-ISR/minISR admission and waits for HW.
+not by itself become Kafka HW. Under NSIP-1 RF=1/minISR=1, `acks=1` and `acks=all` both wait for the complete legal
+shared commit and coherent locator/producer/transaction/leader-epoch publication. That publication checks exact
+Binding/Storage/Owner/Kafka-leader/state fences under the same cut as leadership transition; a stale durability
+callback cannot publish then fail a later check.
 
-The default shared-storage replica path writes payload bytes once. Compact commit descriptors flow through native
-replica Fetch/fetcher, and followers validate/journal them before Observed progress. Payload/source read and producer /
-transaction/leader-state replay advance Applied later. Kafka derives HW over eligible Observed progress; leader
-admission requires Applied through the native election-adoptable frontier. No follower performs a second WAL payload
-append merely to preserve Kafka replication semantics.
+One Controller-selected Owner writes payload bytes and runs the Kafka state machine. HW advances only with a
+continuous legal shared commit; LSO derives from HW and the first unstable transaction. The former Follower descriptor,
+Observed/Applied journal, ISR-lag and election-adoption obligations are superseded. Their historical M2 receipts remain
+bound to their tested source and do not define an optional current mode.
 
 Producer-state, transaction-index, leader-epoch, and range-index checkpoints form one compatible recovery vector. A
 takeover scans only their bounded suffix to derive a physical candidate and producer/transaction/first-unstable /
-leader-epoch state. Native election caps adopted LEO; native recovery supplies HW; LSO is then derived. Physical bytes
-beyond the elected boundary remain inert. Component checkpoint cadence is asynchronous, but aggregate uncovered
+leader-epoch state after old admission is closed and every legal ledger is fenced. Only complete authorized history
+can supply recovered LEO/HW/LSO; unadmitted or incomplete physical residue remains inert. The new Owner serves writes
+and coordinators only after recovery and current-generation activation. Component checkpoint cadence is asynchronous, but aggregate uncovered
 entries/bytes/age/time and sealed-run completeness are mandatory. Each BK run is bound to one Kafka leader epoch.
 
 Random Fetch performs floor plus coverage check plus successor so a compacted-away batch does not make the previous
@@ -133,14 +133,15 @@ topics or ledgers. After 256 lifetime Cells, only a new `ledgerIdCompatibilityNa
 disjoint numeric namespace, or an independent deployment/cluster, may allocate again; a second logical reservation
 domain in the same namespace cannot reuse the interval. ADR 0091 now fixes the production Cell/Head/node wire, Oxia
 keys, STRICT four-write path, RANGE takeover/install/clear path, allowed range-size domain, and receipt-only activation.
-The exact selected RANGE size and allocator mode remain open pending current-source real/native evidence.
+The [closed M3 Final](detailed_design/m3/README.md#hard-frozen-closure) selects `RANGE` with candidate `RANGE_64`.
+M6 reuses this choice and verifies packaged-source admission and process integration; it does not reopen selection.
 
 ADR 0055 freezes the evidence protocol but selects neither allocator mode. ADR 0094 freezes its exact executor,
 workload, independent telemetry, numeric absolute/native-relative SLOs, four RANGE candidates, and closed at-most-one
 selection rule before formal execution. It measures maximum sustainable rollover RPS while every bound holds, covers
 real rollover distributions/jitter/storms and all crash cuts, including broker-wide takeover of 10,000/100,000
 ManagedLedgers, and compares native Pulsar
-rollover/append-stall behavior. STRICT and RANGE correctness work proceed in parallel. Allocator identity may persist
+rollover/append-stall behavior. These are the historical selection inputs now closed by M3. Allocator identity may persist
 only mode, protocol version, and recovery/fencing identity; performance budgets remain versioned Cell policy/evidence
 and host capacity remains a runtime ceiling. ADR 0061 constrains any RANGE candidate without selecting it: a grant
 belongs to the ManagedLedger incarnation, takeover changes only head owner epoch, a new owner may finish an unchanged
@@ -173,10 +174,9 @@ a 51,016-byte largest legal canonical Registry/Oxia value and leaves 14,520 byte
 envelope. Row 15 and byte 51,017 fail with stable count/byte errors. There is no separate writer-set-byte cap.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
 V1 allocator is removed or isolated rather than renamed. M1's STRICT/RANGE candidate SPI and cut injection remain
-test/evidence-only and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`. M3 now has the
-ADR-0091 production allocator SPI/state transitions and 27 zero-failure/error/skip local allocator tests, but
-production activation has no default/public construction path and no mode is selected. M3 still owns real 10k/100k
-multi-broker/native evidence, exact RANGE size, and any eventual single mode selection.
+test/evidence-only and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`. M3's production
+allocator and selected-source evidence are closed at the exact Final above. Activation still requires the real
+selection receipt and matching packaged artifacts; M6 process activation and M8 native parity remain separate gates.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.

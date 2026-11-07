@@ -15,6 +15,19 @@ ADR0148 and the [current contract view](detailed_design/m5/m5-current-contracts.
 
 Native activation remains M6, operational handoff M7 and scale/parity M8. The three M6-deferred Kafka rows, V2-OPEN-READ-15 and production-deployment exclusions remain unchanged; historical M3/M4 evidence is not reinterpreted.
 
+## Post-M5 design frontier (2026-10-28)
+
+The accepted [batch-0 revision](08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance) fixes M6 profile
+activation, scenario ownership and source/input/output separation. It creates no runtime authority. M3's exact-source
+Final already closes allocator selection at `RANGE_64`; neither that choice nor completed M5 lifecycle work is an open
+implementation prerequisite. Historical deliberations below retain their original dates and do not reopen them.
+
+The remaining pre-execution inputs are concrete M7 recovery SLOs/topology/cut budgets and M8 exact AutoMQ/Pulsar
+baselines plus numeric thresholds. They must be fixed before their campaigns; the current baseline locks remain
+`NOT_PINNED`. `__share_group_state` stays rejected. A later request to enable it needs its own internal-topic policy;
+it is not an undecided blocker for the accepted M6 scope. Compact tombstone deletion, allocator orphan GC, online
+migration and KoP remain excluded.
+
 This file records proposals that have not been accepted as runtime contracts and retains resolved gate IDs for
 traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
 alone cannot close a gate.
@@ -131,13 +144,14 @@ The pure-document M0 decision frontier for this branch is exhausted. M4 Final cl
 
 | Gate | Evidence required before another design decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-15` | M4/M5 tombstone lifetime/capacity plus a concrete backend's gap-free activation history, monotonic conditional authority, lineage, stale-create, and recovery receipt before any deletion authority is reconsidered |
+| `V2-OPEN-READ-15` | M5 already supplies retirement/lifetime/capacity evidence; only a demonstrated capacity need plus a concrete backend's gap-free activation history, monotonic conditional authority, lineage, stale-create and recovery evidence may reopen tombstone deletion |
 
 The adjusted response is preserved in
 [round 18](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md); the no-question evidence
 handoff is recorded in [round 19](grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md). The grill must not
-invent another prose-only authority while these facts are absent. `V2-OPEN-OBJ-22/24`, remaining
-`V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are likewise evidence-blocked.
+invent another prose-only authority while these facts are absent. The original Object/allocator evidence frontier
+below is historical: M3 closes its own exact-source claims, including `V2-OPEN-PUL-OBJ-09`; M7 operational integration
+still owns the shared Object rows. Neither closure authorizes tombstone deletion.
 
 ## Configuration scope
 
@@ -499,7 +513,7 @@ envelope. Terminal correctness comes from the exact immutable candidate and one 
 non-transactional owner check; eligible anchors prune asynchronously in batches. M4 Final selects
 `K=8`, a 32-KiB selector cap, and a dedicated 2-KiB emergency `STOPPED` reserve.
 
-### `V2-OPEN-READ-15`: compact batch metadata retirement
+### `V2-OPEN-READ-15`: retirement verified; tombstone deletion remains open
 
 Partially resolved by [ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md). 0.2 permits
 only exact-version same-key `FULL_V1 -> RETIRED_V1`; matching BatchId/fullBatchSha converges delayed create/unknown
@@ -507,12 +521,14 @@ replacement, reverse transition is forbidden, and the tombstone grants no source
 The compact tombstone remains permanent under Binding/Cell lifetime budgets; exhaustion stops new fallback/handoff
 admission and never deletes by age.
 
-The accepted [M5-C detailed design](detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md)
-freezes the current inline-M4 physical seam: after every exact member is `RELEASED` and all references are absent, one
-Oxia conditional transaction externalizes the canonical full batch at its deterministic BatchId key while removing
-only the inline selector member; an exact-version same-key CAS then replaces that `FULL_V1` with `RETIRED_V1`.
-Response loss, split-state quarantine, permanent retention, and admission are closed design inputs only. No runtime
-or evidence exists yet.
+The base [M5-C design](detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md) remains frozen,
+but its unavailable multi-key transaction was superseded by the
+[single-Binding authority amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md).
+The current selector-owned envelope serializes publication/reference writers and exact retirement with single-key
+CAS. Every exact member must be `RELEASED` and all references absent before irreversible retirement. The
+[M5 Final](detailed_design/m5/m5-current-contracts.md) now supplies the declared response-loss, permanent retention,
+capacity and lifecycle evidence. `V2-READ-015` is verified within that scope; this open-question ID retains only the
+separate tombstone-deletion question.
 
 Tombstone deletion remains evidence-blocked. Only unacceptable M4/M5 lifetime capacity plus a concrete backend's gap-
 free ordered activation history, monotonic conditional authority, exact incarnation/selector-lineage binding, never-
@@ -735,10 +751,11 @@ Resolved by [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geom
 allocation requires a new immutable compatibility namespace backed by a disjoint ledger-ID space, or an independent
 deployment/cluster.
 
-### `V2-OPEN-PUL-OBJ-09`: resolved virtual-ledger allocator selection; freshness remains
+### `V2-OPEN-PUL-OBJ-09`: resolved virtual-ledger allocator selection and M3 closure
 
 The product choice is resolved by ADR 0140 and canonical V5 selection; ADR 0141 records selected-source
-recertification, while common-tested-source Final freshness remains open. ADR 0091
+recertification, and the [closed M3 Final](detailed_design/m3/README.md#hard-frozen-closure) binds the common tested
+source and `RANGE_64` selection. Only M6 process integration and M8 parity remain outside that closure. ADR 0091
 fixes exact 384-byte `NVAC1`, 192-byte
 `NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
 allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,

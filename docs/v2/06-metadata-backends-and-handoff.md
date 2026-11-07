@@ -203,14 +203,15 @@ change ownership or consume another assignment. 0.2 never resizes, relocates, ex
 exhaustion fails closed and additional capacity uses a new Protocol Cell. A registry-exhausted domain can be replaced
 only by a bootstrap-proven disjoint ledger-ID namespace or an independent deployment/cluster, not a new logical label.
 
-Allocator mode remains open. ADR 0055 requires a source-qualified native-relative workload/latency/failure receipt
-before selection and starts RANGE_LEASED correctness design in parallel with STRICT evidence, including mass broker
-takeover. A future allocator record may persist only mode, protocol version, and recovery/fencing identities; observed
+Allocator selection is closed by the [M3 Final](detailed_design/m3/README.md#hard-frozen-closure): `RANGE_64` is the
+selected production candidate. ADR 0055's native-relative workload/latency/failure evidence, including mass broker
+takeover, remains bound to that source. An allocator record persists only mode, protocol version, and recovery/fencing identities; observed
 rate/queue/latency/recovery budgets belong to versioned Cell policy/evidence and never to host-selected durable
 identity. ADR 0061 requires any RANGE grant to bind ManagedLedger incarnation rather than owner. Owner-only head CAS
 preserves an installed range; a new owner may finish the same unchanged RESERVED grant, and exact response-unknown
 reread differs from definitive conflict fencing. At most one stale candidate burns. Allocator clear runs through a
-high-priority reconciler and blocks the next grant, not current installed-range use. Exact wire/size/mode remain open.
+high-priority reconciler and blocks the next grant, not current installed-range use. M6 must verify the exact packaged
+allocator and its receipt; no default mode or new selection follows from this integration.
 
 ## Object WalRun control records
 
@@ -219,8 +220,8 @@ separate immutable `WalRunSealRecord` records the terminal provider-resolved lan
 head/key/SHA plus minimum aggregate count/body-byte completeness facts. It records no binding/read frontier, ACK, gap,
 or per-binding coverage. Sealing never mutates the Root. A successor Root binds predecessor Root+Seal identities, and
 one exact-version CAS advances `CurrentWalRunPointer` only after the successor exists. Lost create/CAS responses
-converge by exact reread equality. These are rollover/recovery cuts; normal admitted append performs no metadata read or
-mutation.
+converge by exact reread equality. These Root/Seal/pointer writes are rollover/recovery cuts. They are separate from
+Kafka Object per-Binding authorization, whose required Head CAS and reconciliation remain in the ACK path.
 
 Up to three packing lanes instantiate lazily beneath that one Root/pointer and share aggregate hard budgets. One
 publisher-epoch-fenced asynchronous combiner covers at most 256 provider-resolved descriptors/64 KiB per page through
@@ -307,9 +308,19 @@ is cleanup, not correctness.
 
 ## Metadata hot-path metric
 
-For admitted normal append, both remote metadata read and mutation counters must remain zero. Ownership renewal,
-topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
-hide in an aggregate append metric.
+Count I/O over the complete request-to-ACK path, classified by protocol and profile:
+
+| Path | Normal append control-metadata requirement | Separate work |
+| --- | --- | --- |
+| Kafka/Pulsar BookKeeper-primary profiles | zero per-append remote control-metadata reads/mutations after admission; full WAL and protocol publication requirements still apply | ownership/open, rollover, async offload and lifecycle |
+| Kafka `OBJECT_WAL` | include the durable Binding/Owner grant, required Head CAS and any exact reconciliation reads before publication/ACK | physical checkpoint pages/Head and later materialization |
+| Pulsar `OBJECT_WAL` | admitted entry completion checks its local ACTIVE fence and uses the existing typed chain; zero ordinary ownership/selector/allocator metadata I/O | chain/ledger allocation, rollover and lifecycle |
+
+Report Object PUT/verification, authorization, local publication and physical checkpoint costs separately, plus the
+end-to-end ACK latency and total request count. A grant is not an asynchronous checkpoint and cannot be moved outside
+the measured ACK interval. UNKNOWN retains the original candidate and charges; failed reconciliation never counts as
+successful authorization. Physical checkpoint completion does not prove any member's logical commit. M6 must measure
+these counters at the actual Broker entry points; no universal zero-I/O claim applies to Kafka Object ACK.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
 `V2-META-001..007`, `V2-KAF-META-001..005`, `V2-OBJ-015/020..024`, `V2-READ-003..015`, `V2-HO-001`, `V2-FABRIC-001`,
@@ -321,4 +332,5 @@ fence and complete continuous source descriptors. An immutable CLOSED snapshot i
 a successor preserves its SHA lineage. Checkpoint selection persists the existing NWKCP1 common state in an immutable
 control record and releases only the exact covered debt. Recovery reads selected references rather than granting from
 LIST; member closure does not close the shared physical WalRun. See [NSIP-1 §6.4](NSIP/nsip-1.md#64-object-启用前必须定稿的唯一协议)
-for fault ordering and first-batch limits. Native Object Broker compatibility and M4/M5 retirement remain separate gates.
+for fault ordering and first-batch limits. The [M5 Final](detailed_design/m5/m5-current-contracts.md) now covers its
+declared lifecycle scope; native Object Broker compatibility and the M6-deferred scenarios remain separate gates.

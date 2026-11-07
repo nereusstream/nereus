@@ -129,16 +129,14 @@ resize/second-slice
 path and fails closed at exhaustion. The profile accepts its cost-first
 latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
-remain Physical Extents. STRICT_SERIALIZED and RANGE_LEASED remain unselected; ADR 0055 requires actual rollover
-distribution/storm/crash evidence and native Pulsar rollover/append-stall comparison while RANGE fencing/recovery is
-designed in parallel. Broker-wide takeover is an explicit scale cut. Any RANGE candidate preserves an installed
-ManagedLedger-incarnation grant across owner-only head fencing, permits takeover completion of the same RESERVED grant,
-and burns at most one stale candidate; this correctness structure still does not select that mode.
+remain Physical Extents. The [closed M3 Final](detailed_design/m3/README.md#hard-frozen-closure) selects `RANGE_64`;
+M6 consumes its exact packaged-source admission and does not reopen allocator selection. An installed
+ManagedLedger-incarnation grant survives owner-only head fencing, takeover may finish the same RESERVED grant,
+and at most one stale candidate burns. M3's source-bound scale evidence does not replace M6 Broker integration or M8 parity.
 
 Pulsar V2 ownership admission requires a collision-resistant acquisition identity and authoritative witness A/B around
-the exact selector/aggregate read. The first candidate is the Oxia 0.9.0-backed MetadataStore ELM, but M1 must build and
-prove the adapter: current source supplies direct GET/Stat/CAS primitives, not the acquisition transitions or qualified
-session/gap hook. MetadataStore ELM with syncer disabled and all ownership writers upgraded is the initial capability
+the exact selector/aggregate read. The Oxia-backed MetadataStore ELM integration must consume the qualified P1 acquisition transitions and
+session/gap invalidation hook; direct GET/Stat/CAS primitives alone do not establish ownership qualification. MetadataStore ELM with syncer disabled and all ownership writers upgraded is the initial capability
 gate. A gap-safe invalidation sequence and CAS install one atomic ACTIVE fence word;
 position admission captures it and every success completion/ACK rechecks equality. Endpoint, boolean ownership,
 resettable version, eventual TableView, or best-effort watch is insufficient. Unsupported ownership backends fail V2
@@ -192,7 +190,51 @@ The parity matrix covers at least:
   runtime contract;
 - admin and client compatibility against the pinned native Pulsar baseline.
 
-The native baseline and thresholds are not pinned at M0. No V1 Pulsar receipt is inherited as V2 parity evidence.
+The native acceptance baseline and thresholds are still unpinned; M8 must pin them before execution. No V1 Pulsar
+receipt is inherited as V2 parity evidence.
+
+## M6 process activation matrix
+
+This is the accepted integration target after M5, not an enablement or PASS declaration. Current Kafka Controller
+construction admits only `BOOKKEEPER_WAL_ONLY`; Object profiles stay rejected until their row is implemented and
+verified. Resolve each topic from its immutable Binding/Storage Epoch, never by removing a global profile guard alone.
+Kafka rows require fresh feature-2 bootstrap and RF=1/minISR=1. The existing no-online-migration boundary applies to
+both protocols.
+
+| Protocol/profile | Startup and routing authority | Recovery and lifecycle gate | Mandatory M6 exit |
+| --- | --- | --- | --- |
+| Kafka `BOOKKEEPER_WAL_ONLY` | native Controller assignment and exact feature-2 aggregate; admitted BK capability, Cell and internal-topic policy | close old run admission, fence all legal ledgers, recover common checkpoint plus tail, install stock protocol state and activate only current generation | `V2-KAF-META-004/005`, `V2-KAF-PROC-001` and applicable `V2-KAF-DATA` rows |
+| Kafka `BOOKKEEPER_WAL_ASYNC_OBJECT` | Binding selects BK primary plus admitted Object materializer and read/retention owners | same BK ACK contract with Object unavailable within admitted BK/capacity limits; recover published Object/BK generation and exact fallback protection before retiring sources | `V2-KAF-PROC-002`, `V2-KAF-DATA-012/013/022` plus applicable Kafka semantics |
+| Kafka `OBJECT_WAL` | Binding selects qualified Object provider/KMS, run authority and per-partition authorization Head | exact PUT proof plus durable grant precede publication; close grants and recover selected NWKCP1 plus authorized tail; UNKNOWN cannot reopen admission | `V2-KAF-PROC-002`, `V2-KAF-DATA-021` and applicable Kafka semantics, including 012/013/022 where the route uses them |
+| Pulsar `BOOKKEEPER_WAL_ONLY` | native Broker ownership and ManagedLedger factory with exact namespace, Cell and source scope | preserve native Position/MessageId, cursor and ledger recovery; qualified M5 enrollment and terminal drain | `V2-PUL-PROC-001/004` |
+| Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT` | same native authority plus SourceSafe offloader, actual retention policy and enrolled writer/reference owners | sealed-source lifecycle reuses M5; newly produced NPD1/NPO1 must separately acquire birth/quota/member admission before publication | `V2-PUL-PROC-001/002/004` |
+| Pulsar `OBJECT_WAL` | Broker-selected ObjectManagedLedger bridge, qualified ownership backend, namespace Registry and exact `RANGE_64` artifacts/receipt | typed chain and entry bytes survive rollover/crash/takeover without ID reuse; preserve source pins and exact original UNKNOWN candidates | `V2-PUL-PROC-003/004` |
+
+All rows reject a missing or mismatched Binding/profile/Cell/namespace/capability, incompatible persisted state,
+unqualified ownership backend, or superseded recovery generation before write admission. Internal Kafka
+`__consumer_offsets` and `__transaction_state` stay `BOOKKEEPER_WAL_ONLY`; `__share_group_state` stays rejected.
+No Cell shares another Cell's session, credentials, GC capability or close authority. Mixed profiles must prove this
+through actual requests and recovery, not configuration parsing alone. An Object outage may eventually exhaust
+existing retention/capacity budgets and stop new admission; asynchronous offload never adds Object durability to an
+already admitted BK append's ACK conditions.
+
+M6 Kafka evidence uses real Broker/Controller processes and clients for Produce, Fetch, PID retry, transaction
+COMMIT/ABORT, transactional offset commit, group operations, Admin and snapshot/catch-up/restart. An ACKed record must
+survive cold recovery; a timed-out idempotent request must retain its original offset; stale ready/coordinator callbacks
+cannot activate. M6 Pulsar evidence uses an official client through the Broker for write/read, ACK, seek/reset,
+backlog, rollover, unload and restart. Cancellation/close completion is not proof of physical I/O drain.
+
+For new native offload output, the existing first sealed/offloaded-source qualification in M5 is only a dependency.
+An already enrolled factory must reserve the actual output birth/quota and register complete member/reference facts
+for NPD1/NPO1, publish through the native lifecycle, and retain the original candidate and charges across UNKNOWN.
+Success and failure must both converge through actual terminal I/O and settlement. `RETAIN_BK` remains the default;
+explicit `DELETE_AFTER_VERIFIED`, exact M4 release, native INTENT/DONE and physical absence are still required for
+deletion. Cold backlog must remain readable after source replacement/deletion. M5's pre-enrollment offload fixture
+cannot certify this new production path, and an NMS1 plan cannot be substituted for native NPD1/NPO1 identity.
+
+The [implementation plan](08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance) assigns batch exits.
+The [scenario matrix](09-scenario-evidence-matrix.md) and JSON own scenario status; all new process rows are
+`PLANNED` with no receipt. M8's complete parity matrix does not replace these M6 process checks.
 
 ## Kafka/Pulsar secondary access and authority migration
 

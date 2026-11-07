@@ -14,7 +14,9 @@ grant. The same key orders grants, common checkpoint selection and Owner closure
 loss, shared-member closure, physical rollover and repeated cold partition-state recovery. This amends the earlier
 cached-Owner-only completion assumption below; the historical M3 receipts retain their original source/contract.
 Native Object Broker profiles remain fail-closed. The current NSIP-1 M4 read adaptation has limited-scope coordination acceptance;
-complete M5 retirement and performance qualification remain pending. The historical M4 Final is unchanged.
+the [M5 Final](detailed_design/m5/m5-current-contracts.md) now closes its declared retirement/lifecycle obligations.
+Native Object process activation, the three M6-deferred Kafka scenarios and performance qualification remain pending.
+The historical M3/M4 Finals are unchanged.
 
 ## Cost model and group commit
 

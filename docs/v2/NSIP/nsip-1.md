@@ -8,6 +8,33 @@
 
 本次限定校验层后继的源码输入为 `8598b8d2c76dca9fb2aed08f2585c95b88bd01f2cfc58ad5c46fd9a148572339`；COMPONENTS 在该根新执行，四个后端原始记录保留 `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` 的根、时间、命令和全部附件，由已复核的 input-only 证明与新的治理补验绑定。原同批后端结果没有重跑或改标。 CI 校验后继保留原 700d 完整候选及 c06 证明，三个 job 固定实际 Python 3.14.7，M1 仅接纳八个精确治理脚本路径；原 AST 等价／指纹、完整源码树与输入上限保持。新的治理补验通过，远端 CI 按实际交付提交单独报告。
 
+## M5 后第 0 批设计修订（2026-10-28）
+
+本批修订当前规范、计划与场景归属，并完成必要的文档/CI 历史凭据读取接线，不启动 M6 产品实现。
+当前基线为已交付的 M5 Final；M3 的 allocator
+选型已关闭为 `RANGE_64`。以下正文中的早期局部状态和未完成项应按各自时间理解，不能覆盖当前 Final，
+也不自动成为下一批任务。
+
+- Kafka 当前唯一提交主线为 RF=1/minISR=1、有效共享提交、一致发布及关闭合法历史后的冷恢复。
+  场景 006/009/018/019 改按此模型验收；旧 Follower/Observation/Applied 凭据保留原来源，不改标通过。
+- ACK 成本按协议/profile 统计。Kafka Object 的持久授权与必要对账属于 ACK 路径，不能归入异步物理
+  checkpoint 后声称元数据 I/O 为零；BK-primary 的零 per-append control I/O 契约保留。
+- M6 明确分为 Kafka BK、Kafka 两个 Object profile、Pulsar BK/offload、Pulsar Object WAL 四批。
+  [启用矩阵](../07-protocol-integrations.md#m6-process-activation-matrix)规定每条路径的启动、路由、恢复、
+  拒绝及生命周期条件；新增六项进程场景保持 `PLANNED`/null，012/013/022 仍是独立的 M6 验收出口。
+- Pulsar M5 已验证已有 sealed/offloaded source 首次准入后的生命周期。已 enrolled factory 产生的新
+  NPD1/NPO1 输出另需实际 birth/quota/member 准入和真实 Broker 验证；默认 `RETAIN_BK` 保留。
+- 后续源码身份、实际执行输入和输出证据分别绑定；历史证据保留、按不可变身份核验，新产物不成为自身
+  输入。现有 M5 的完整源码校验和 1-GiB 上限不因设计修订而放宽。
+- 文档门与 CI 的 SDK 选择通过明确的历史入口校验原 M5 完整来源和归档，不把当前设计修改视为 M5
+  执行证据。原 `ci-pulsar-commit` 及 `v2M5Check` 的当前源码严格校验保留，原证据后继白名单不扩展。
+
+完整实施顺序、每批出口、未来 `v2M6Check/M7Check/M8Check` 的聚合范围和输入规则统一位于
+[实施计划](../08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance)，状态统一位于
+[场景矩阵](../09-scenario-evidence-matrix.md#nsip-1-scenario-ownership-after-m5)及其 JSON。这些未来聚合入口
+尚未实现。M7 的数值恢复目标、M8 的精确基线与阈值须在相应执行前固定；share groups、tombstone 删除、
+allocator orphan GC 和生产部署不因本批修订获得准入。
+
 ## 交付前执行历史
 
 以下d9／4059／f541／5ef、局部运行及当时“未完成”的叙述只记录对应时间和输入，当前结论以上述Final为准。原失败、诊断和输入根不改写，也不当作当前通过凭据。
@@ -916,6 +943,9 @@ Ursa 的 EntryIndexCache 使用异步加载缓存，ReadCache 保存的是 `Comp
 
 ## 10. M5：完成真实生命周期，并消除重复工作
 
+本节保留 M5 实施过程中的问题与局部验证记录；既定 A–E 生命周期义务现已由页首 Final 关闭。
+仍属可选的流式处理、缓存或调度优化须有测量依据，不作为第 0 批或 M6 的新增验收条件。
+
 ### 10.1 REFERENCE_REUSE 只生成引用，验证内按物理身份去重
 
 **已确认并局部修复的重复读取。** 此前 M5BytePreservingMaterializerV1.build 对 REFERENCE_REUSE 也先读取完整 source；validator 又分别读取 source 和 payload。底层 reader 可能缓存，因此不能据此直接断言曾发生三次远程 GET。[N21][n21] [N22][n22]
@@ -1236,7 +1266,8 @@ GroupEncodingPlanV1 已支持 NONE，以及只在更小时采用并验证往返�
 
 ## 12. M1–M8 修改范围
 
-下表表示职责归属，不表示每个可选性能优化都是里程碑完成条件；执行优先级以第 1.4 节与第 13.1 节为准。
+下表表示职责归属，不表示每个可选性能优化都是里程碑完成条件；M5 后的执行顺序和出口以
+[当前实施计划](../08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance)为准。
 
 | 里程碑 | 当前需要改的内容 | 保留的基础 | 完成依据 |
 | --- | --- | --- | --- |
@@ -1244,8 +1275,8 @@ GroupEncodingPlanV1 已支持 NONE，以及只在更小时采用并验证往返�
 | M2 | 有效共享提交、HW/LSO、一致发布、在途幂等、冷恢复；移除强制 ISR/Observation/Applied | RecordBatch、NBKE2、完整 commit set、producer/txn 状态、range index | 无 Follower 情况下写入与冷恢复的语义闭环 |
 | M3 | Object 唯一授权协议、历史关闭、多 Binding；成功 PUT 证据复用；checkpoint 异步与短锁 | NWG1、目录/frame/AEAD 基础和物理连续性；可复用的 checkpoint 表达 | 精确持久化与授权分别成立；旧历史有界且不可再扩展 |
 | M4 | 新 HW/LSO 来源及 Owner/source 变化失效；有序 route 查找和同快照统计复用；按实际重复读取证据决定请求内去重 | generation、fallback、pin、真实取消/drain；未测量支持的 committed cache/预取不作为验收前提 | 不暴露未提交或已被语义压缩移除的数据，GC 不越过活跃读取 |
-| M5 | 完成原有未完成义务及 NSIP 变更；去除 Follower 义务；恢复根替换、whole-run 退休与真实发布/释放/删除 | 原生 source/owner/offload 资格、共享成员引用、精确删除、永久身份和有界预算 | 全部 A–E 生命周期、M4 RELEASED 及 publish/release/delete/UNKNOWN 真实组合通过 |
-| M6 | 整个 M5 完成后继续原生 Object Broker 请求/进程启动及请求、group、txn、进程 drain 集成；保留已完成的最小 Controller 接管切片 | Kafka/Pulsar 原生 broker/controller/coordinator | 无预热 Broker 的真实故障接管；过期 ready 不激活 |
+| M5 | 既定 A–E 及 NSIP 变更已由当前 Final 验收；作为后续集成依赖 | 原生 source/owner/offload 资格、共享成员引用、精确删除、永久身份和有界预算 | 当前 Final 的 17 义务、五子项、14 场景；不外推到 M6 |
+| M6 | 按启用矩阵完成 Kafka BK、Kafka Object profiles、Pulsar BK/offload 和 Pulsar Object WAL 四批进程集成 | 已完成的最小 Controller 接管、M5 生命周期及 RANGE_64；Kafka/Pulsar 原生 broker/controller/coordinator | 真实客户端请求、冷恢复及实际 drain；过期 ready 不激活，新 native 输出有出生和引用准入 |
 | M7 | 计划 handoff、非计划故障、Controller/Broker/存储隔离和重启处理 | 已定稿的 Owner 历史及存储恢复接口 | 运维故障时序与资源退出行为明确 |
 | M8 | 完整语义范围、规模恢复、性能、长期空间和元数据增长 | 既有源版本锁定与可重现测量方式 | 相同持久化条件下的结果和明确剩余限制 |
 
@@ -1255,7 +1286,8 @@ GroupEncodingPlanV1 已支持 NONE，以及只在更小时采用并验证往返�
 
 ## 13. 实施批次与依赖
 
-采用现有里程碑，不新增一套平行项目框架。下面编号仅用于拆分本次修改任务。
+采用现有里程碑，不新增一套平行项目框架。下面 T1–T5 保留最初实施拆分；M5 后按页首第 0 批修订所链接的
+M6-1 至 M6-4、M7、M8 顺序推进，不能重放旧批次的提交、清理或整体验收操作。
 
 | 批次 | 具体交付 | 依赖与出口 |
 | --- | --- | --- |

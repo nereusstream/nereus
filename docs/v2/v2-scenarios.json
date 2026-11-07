@@ -13,8 +13,8 @@
     },
     {
       "id": "V2-APP-002",
-      "milestone": "M1",
-      "contract": "normal admitted append performs zero remote control-metadata reads and mutations",
+      "milestone": "M1/M3/M6",
+      "contract": "append metadata accounting is protocol/profile specific: BookKeeper primary has zero per-append control I/O while Kafka Object authorization remains inside ACK",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -721,7 +721,7 @@
     {
       "id": "V2-KAF-DATA-006",
       "milestone": "M2/M6",
-      "contract": "replica Fetch may read to LEO while compact descriptor Observed and payload Applied progress remain distinct",
+      "contract": "RF=1 Fetch uses one coherent legal shared-commit view with LEO/HW/LSO isolation bounds and no Follower progress prerequisite",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -745,7 +745,7 @@
     {
       "id": "V2-KAF-DATA-009",
       "milestone": "M6",
-      "contract": "acks all preserves native ISR minISR and HW semantics after shared storage becomes durable",
+      "contract": "RF=1/minISR=1 acks=1 and acks=all both require complete profile durability, legal shared commit and coherent publication",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -817,7 +817,7 @@
     {
       "id": "V2-KAF-DATA-018",
       "milestone": "M2/M6",
-      "contract": "new leader LEO is capped by native elected replica adoption rather than every recoverable shared byte",
+      "contract": "a current Controller-selected Owner activates only after closed legal history and checkpoint plus tail recover complete Kafka state",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -825,7 +825,7 @@
     {
       "id": "V2-KAF-DATA-019",
       "milestone": "M2/M6",
-      "contract": "compact descriptor transport separates durable replica Observed from payload and state Applied while hard lag source and journal bounds gate ISR and HW eligibility",
+      "contract": "immutable closed Owner history and exact recovery-source protection survive repeated cold takeover without Follower journals or Observed/Applied authority",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -979,6 +979,54 @@
       "milestone": "M2",
       "contract": "KRaft and MetadataStore backends satisfy fencing and monotonic-root conformance",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-PROC-001",
+      "milestone": "M6",
+      "contract": "native Kafka BK processes preserve request and coordinator semantics through bootstrap, snapshot and cold relocation",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-PROC-002",
+      "milestone": "M6",
+      "contract": "Kafka routes all admitted profiles by immutable Binding and Storage Epoch while preserving ACK and Cell authority",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PUL-PROC-001",
+      "milestone": "M6",
+      "contract": "native Pulsar BK profiles serve official client operations through qualified Broker ownership and ManagedLedger factories",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PUL-PROC-002",
+      "milestone": "M6",
+      "contract": "an enrolled Pulsar factory admits new native NPD1/NPO1 output with actual birth quota and complete member references before publication",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PUL-PROC-003",
+      "milestone": "M6",
+      "contract": "Pulsar Object WAL activates in the Broker only with qualified ownership, namespace and exact RANGE_64 artifacts and receipt",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PUL-PROC-004",
+      "milestone": "M6",
+      "contract": "Pulsar unload and shutdown stop admission and wait for actual terminal source use before releasing the owning Cell resources",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },

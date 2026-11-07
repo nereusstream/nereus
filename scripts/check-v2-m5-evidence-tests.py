@@ -443,14 +443,17 @@ class CiPulsarSelectionContracts(unittest.TestCase):
         # This fixture supplies only selector metadata. Existing aggregate contracts cover the real
         # archive reader; the C5 smoke check must use the complete published archive without a stub.
         with patch.object(C, 'validate_package') as archive:
-            self.assertEqual(value['sourceTuple']['commits']['pulsar'], C.ci_pulsar_commit(f.roots['nereus']))
-            self.assertEqual(f.roots['nereus'] / path.parent, archive.call_args.args[0])
-            with patch('sys.stdout', new_callable=io.StringIO) as output:
-                self.assertEqual(0, C.main(['ci-pulsar-commit', '--repo-root', str(f.roots['nereus'])]))
-                self.assertEqual(value['sourceTuple']['commits']['pulsar'] + '\n', output.getvalue())
+            for operation, reader in (('ci-pulsar-commit', C.ci_pulsar_commit),
+                                      ('historical-pulsar-commit', C.historical_pulsar_commit)):
+                self.assertEqual(value['sourceTuple']['commits']['pulsar'], reader(f.roots['nereus']))
+                self.assertEqual(f.roots['nereus'] / path.parent, archive.call_args.args[0])
+                with patch('sys.stdout', new_callable=io.StringIO) as output:
+                    self.assertEqual(0, C.main([operation, '--repo-root', str(f.roots['nereus'])]))
+                    self.assertEqual(value['sourceTuple']['commits']['pulsar'] + '\n', output.getvalue())
         with patch.object(C, 'validate_package', side_effect=C.EvidenceError('incomplete archive')):
-            with self.assertRaisesRegex(C.EvidenceError, 'incomplete archive'):
-                C.ci_pulsar_commit(f.roots['nereus'])
+            for reader in (C.ci_pulsar_commit, C.historical_pulsar_commit):
+                with self.assertRaisesRegex(C.EvidenceError, 'incomplete archive'):
+                    reader(f.roots['nereus'])
 
     def test_missing_nonfinal_malformed_or_unbound_selection_fails(self):
         f, path, value = self.fixture()
@@ -458,8 +461,9 @@ class CiPulsarSelectionContracts(unittest.TestCase):
         target = root / path
         original = target.read_bytes()
         target.unlink()
-        with self.assertRaises(OSError):
-            C.ci_pulsar_commit(root)
+        for reader in (C.ci_pulsar_commit, C.historical_pulsar_commit):
+            with self.assertRaises(OSError):
+                reader(root)
         for key, replacement in [('schema', 'NEREUS_V2_M5_COMPLETE_CANDIDATE_V1'),
                 ('kind', 'V2_M5_COMPLETE_CANDIDATE'), ('result', 'PENDING'),
                 ('promotionEligible', False), ('executionEvidence', False),
@@ -468,18 +472,79 @@ class CiPulsarSelectionContracts(unittest.TestCase):
                 altered = copy.deepcopy(value)
                 altered[key] = replacement
                 target.write_bytes(C.canonical(altered))
-                with self.assertRaises(C.EvidenceError):
-                    C.ci_pulsar_commit(root)
+                for reader in (C.ci_pulsar_commit, C.historical_pulsar_commit):
+                    with self.assertRaises(C.EvidenceError):
+                        reader(root)
         altered = copy.deepcopy(value)
         altered['sourceTuple']['commits']['pulsar'] = 'short-sha'
         target.write_bytes(C.canonical(altered))
-        with self.assertRaisesRegex(C.EvidenceError, 'full commit IDs'):
-            C.ci_pulsar_commit(root)
+        for reader in (C.ci_pulsar_commit, C.historical_pulsar_commit):
+            with self.assertRaisesRegex(C.EvidenceError, 'full commit IDs'):
+                reader(root)
         target.write_bytes(original)
         binding = target.parent / 'commit-binding.json'
         binding.unlink()
-        with self.assertRaises(OSError):
-            C.ci_pulsar_commit(root)
+        for reader in (C.ci_pulsar_commit, C.historical_pulsar_commit):
+            with self.assertRaises(OSError):
+                reader(root)
+
+    def test_historical_dependency_does_not_certify_dirty_staged_or_committed_successor_source(self):
+        f, path, value = self.fixture()
+        root = f.roots['nereus']
+        # Only the archive is synthetic. Git trees, staged/unstaged changes and the source guard are real.
+        with patch.object(C, 'validate_package'), patch.object(C, 'validate_m4'), \
+                patch.object(C, 'validate_committed_inputs'):
+            for name in ('docs/v2/01-correctness-and-append.md', 'source.txt'):
+                target = root / name
+                target.write_text('later design or runtime source, not M5 execution evidence\n')
+                for phase in ('dirty', 'staged', 'committed'):
+                    with self.subTest(path=name, phase=phase):
+                        if phase == 'staged':
+                            INPUT_TESTS.git(root, 'add', '--', name)
+                        elif phase == 'committed':
+                            INPUT_TESTS.git(root, 'commit', '-qm', 'fixture successor source')
+                        self.assertEqual(value['sourceTuple']['commits']['pulsar'], C.historical_pulsar_commit(root))
+                        with self.assertRaisesRegex(C.EvidenceError, 'non-evidence|runtime/source changed'):
+                            C.ci_pulsar_commit(root)
+                        with self.assertRaisesRegex(C.EvidenceError, 'non-evidence|runtime/source changed'):
+                            C.validate_final(root, path, f.roots)
+
+    def test_historical_dependency_rejects_lock_drift_original_tree_substitution_and_nonancestor(self):
+        f, path, value = self.fixture()
+        root = f.roots['nereus']
+        locks = root / 'docs/v2/source-locks.json'
+        original = locks.read_bytes()
+        locks.write_text('unqualified replacement source locks\n')
+        with self.assertRaisesRegex(C.EvidenceError, 'source locks differ'):
+            C.historical_pulsar_commit(root)
+        locks.write_bytes(original)
+        tested = value['sourceTuple']['commits']['nereus']
+        original_tree = INPUT_TESTS.git(root, 'rev-parse', tested + '^{tree}')
+        (root / 'source.txt').write_text('different source tree\n')
+        INPUT_TESTS.git(root, 'add', '--', 'source.txt')
+        INPUT_TESTS.git(root, 'commit', '-qm', 'fixture different source')
+        changed = INPUT_TESTS.git(root, 'rev-parse', 'HEAD')
+        unrelated = INPUT_TESTS.git(root, 'commit-tree', original_tree, '-m', 'fixture unrelated identical tree')
+        for commit, error, message in ((changed, C.EvidenceError, 'differs from its complete input tree'),
+                                       (unrelated, subprocess.CalledProcessError, None)):
+            with self.subTest(commit=commit):
+                candidate = C.EVIDENCE_PREFIX / 'final' / ('final-source-' + commit) / 'm5-final.json'
+                package = root / candidate.parent
+                package.mkdir(parents=True)
+                shutil.copyfile(root / path.parent / 'input-closure.json', package / 'input-closure.json')
+                altered = copy.deepcopy(value)
+                altered['sourceTuple']['commits']['nereus'] = commit
+                (root / candidate).write_bytes(C.canonical(altered))
+                binding = json.loads((root / path.parent / 'commit-binding.json').read_bytes())
+                binding['commits']['nereus'] = commit
+                (package / 'commit-binding.json').write_bytes(C.canonical(binding))
+                registry = json.loads((root / C.SCENARIOS).read_bytes())
+                for row in registry['scenarios']:
+                    if row['id'] in C.PROMOTED:
+                        row['evidenceReceipt'] = str(candidate)
+                (root / C.SCENARIOS).write_bytes(C.canonical(registry))
+                with self.assertRaisesRegex(error, message or 'merge-base'):
+                    C.historical_pulsar_commit(root)
 
     def test_workflow_checks_out_the_selected_commit_after_the_sdk_branch_advances(self):
         f, _, value = self.fixture()
@@ -492,7 +557,7 @@ class CiPulsarSelectionContracts(unittest.TestCase):
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/build.yml').read_text()
         block = workflow.split('      - name: Check out source-locked Pulsar composite for current modules\n', 1)[1]
         block = textwrap.dedent(block.split('        run: |\n', 1)[1].split('      - name:', 1)[0])
-        block = block.replace('pulsar_commit="$(python3 scripts/check-v2-m5-evidence.py ci-pulsar-commit)"',
+        block = block.replace('pulsar_commit="$(python3 scripts/check-v2-m5-evidence.py historical-pulsar-commit)"',
                               'pulsar_commit=' + selected)
         runner = f.base / 'runner'
         runner.mkdir()

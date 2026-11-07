@@ -21,7 +21,9 @@ V2 separates five authorities:
 | manifest authority | one typed logical read view over immutable physical generations | active-tail append linearization |
 | protocol authority | Kafka/Pulsar coordinator, cursor, transaction, and visibility semantics | physical object retirement by itself |
 
-Control metadata selects an owner and stores low-frequency roots. It is not consulted on every normal append.
+Control metadata selects an owner and stores low-frequency roots. BookKeeper-primary append uses the admitted local
+fence without per-append control-metadata I/O. Kafka `OBJECT_WAL` additionally requires a durable per-Binding grant
+before coherent publication, as defined by [NSIP-1](NSIP/nsip-1.md); this authorization I/O is part of ACK cost.
 
 ## Append state machine
 
@@ -36,7 +38,8 @@ For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoc
    Protocol Coverage, commit-set membership where applicable, length, and checksum;
 5. Object WAL first resolves physical extent outcome independently from protocol order; BookKeeper uses its native
    durable ledger outcome;
-6. validated append units enter only their binding's contiguous typed durable frontier;
+6. validated append units enter only their binding's contiguous typed durable frontier; Kafka Object units first
+   obtain the exact persistent authorization ordered against Owner closure on the same Head key;
 7. the protocol response succeeds only when the complete returned Protocol Coverage is durable and readable;
 8. background workers later publish sealed/read-optimized generations.
 
@@ -81,7 +84,8 @@ it does not wait for every member's protocol ACK.
 
 Binding completion uses owner-local, lazy, reconstructible state keyed by Protocol Cell, binding, incarnation, Storage
 Epoch, and Position Domain identity/version. Owner Epoch is an O(1) cached completion fence rather than durable frontier
-identity; admitted completion performs no remote metadata read. One complete Kafka append commit set or Pulsar entry
+identity. The local tracker performs no remote metadata read; Kafka Object authorization precedes tracker publication
+and is accounted separately within the ACK path. One complete Kafka append commit set or Pulsar entry
 receives one checked 64-bit local `CompletionTicket` after capacity and exact coverage allocation. Full ticket equality
 fences ring-slot ABA, while exact typed coverage and Position Domain adjacency remain ordering authority. The ticket is
 not product wire/API/config or persistent state. Normal completion uses a bounded ring/window; recovery defaults to
@@ -110,9 +114,13 @@ TrimFrontier / Log Start <= LastStableOffset <= HighWatermark
 
 `AllocatedFrontier` is speculative owner-local admission. `DurableFrontier` is the greatest contiguous profile proof.
 `ReadableFrontier` becomes Kafka LEO only after locators plus producer/transaction/leader-epoch state publish
-coherently. Kafka ISR owns HW and transaction stability owns LSO. `acks=1` waits for Readable/LEO; `acks=all` obeys
-native ISR/minISR admission and waits for HW. Consumer `read_uncommitted` stops at HW, `read_committed` stops at LSO,
-and replica Fetch may read through LEO. Object materialization and checkpoint coverage never advance those bounds.
+coherently. Under NSIP-1 RF=1/minISR=1, HW comes from the complete continuous legal shared commit and LSO from HW
+and the first unstable transaction. Both `acks=1` and `acks=all` wait for profile durability, legal commit qualification
+and coherent publication; BK quorum or Object PUT alone is insufficient. `acks=0` uses the same admitted path without
+a success reply. Consumer `read_uncommitted` stops at HW, `read_committed` stops at LSO, and replica Fetch, where used,
+is bounded by LEO. There is no mandatory Follower Observed/Applied or election-adoptable frontier. Cold takeover closes
+old admission, fences and recovers the complete legal checkpoint plus tail, and activates only the still-current
+Controller-selected Owner. Object materialization and checkpoint coverage never advance visibility bounds.
 
 Kafka producer identity `(producerId,producerEpoch,baseSequence,lastSequence)` is per RecordBatch and distinct from the
 storage attempt identity; a multi-batch commit set binds the ordered identity vector. Native Kafka duplicate lookup is
@@ -140,7 +148,8 @@ indexes. A generic `ProtocolCoverage` TreeMap is forbidden on the normal append/
 Binding/unit is required.
 
 Each shared Object's digest/header/directory/AEAD validation produces one reusable `VerifiedExtent`; member publication
-adds no HEAD/GET, KMS, metadata call, whole-Object verification, or repeated directory decryption. Locator budget is
+reuses those bytes without another HEAD/GET, KMS call, whole-Object verification, or directory decryption. Kafka Object
+members still require the exact durable grant before publication; sharing verification never substitutes for it. Locator budget is
 part of the pre-position reservation. A serialized binding cut installs the next contiguous range locators hidden and,
 for Kafka, checks exact Binding/incarnation/Storage/Owner/Kafka-leader/predecessor-state fences before one coherent
 state-root replacement publishes protocol state plus Readable/Durable/LEO. Leadership and ownership transitions

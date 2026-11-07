@@ -17,8 +17,9 @@ disconnected-response retry, persistent group offsets, superseded recovery and t
 normal native real-cluster task passes. The first native slice supports only BOOKKEEPER_WAL_ONLY. NSIP-1 T4's Object
 core now separates exact upload from a per-partition Binding/Owner Head CAS grant, closes legal history on that same
 key, and restores common checkpoint plus the explicitly authorized tail. Real MinIO/Oxia covers shared-member closure,
-response loss and two fresh partition-state takeovers. Native Object Broker profiles remain fail-closed; full M4/M5
-retirement, Kafka compatibility and performance qualification are separate work.
+response loss and two fresh partition-state takeovers. Native Object Broker profiles remain fail-closed. The
+[M5 Final](detailed_design/m5/m5-current-contracts.md) covers its lifecycle scope; native process integration, complete
+Kafka compatibility and performance qualification remain M6–M8 work.
 
 ## 1. Product objective
 
@@ -140,8 +141,11 @@ Owns durable bytes and the binding-scoped typed durable frontier:
 - `BOOKKEEPER_WAL_ONLY` acknowledges at BookKeeper quorum and has no Object dependency;
 - `BOOKKEEPER_WAL_ASYNC_OBJECT` acknowledges at BookKeeper quorum and offloads sealed Protocol Coverage later.
 
-Normal admitted append performs no remote control-metadata read or mutation. An ACK proves the complete returned Kafka
-Offset Range or Pulsar Coverage, not an untyped global range.
+BookKeeper-primary append performs no per-append remote control-metadata I/O after admission, but quorum alone cannot
+ACK before legal protocol publication. Kafka `OBJECT_WAL` requires both exact persistence and durable Binding/Owner
+authorization before publication/ACK. Count that authorization in the
+[profile-specific ACK cost](06-metadata-backends-and-handoff.md#metadata-hot-path-metric). An ACK proves the complete
+returned Kafka Offset Range or Pulsar Coverage, not an untyped global range.
 
 ### Segment and manifest
 
@@ -226,7 +230,8 @@ One shared `VerifiedExtent` feeds compact, range-aggregated Kafka/Pulsar locator
 active-tail index. A binding installs the next contiguous locators hidden and publishes Readable/Durable frontiers
 before ACK; Kafka first wins its exact fenced state-root cut. Gap-behind locators remain invisible. A generic Protocol Coverage TreeMap is forbidden on the append/ACK hot
 path, while no heavy index object per Binding/unit is frozen. A's typed gap cannot block B or physical checkpoint
-progress, and the ACK path adds no provider/KMS/metadata I/O or repeated directory decryption.
+progress. Local locator publication adds no repeated provider/KMS work or directory decryption; Kafka Object's
+required durable authorization remains a distinct prerequisite inside the ACK path.
 
 `BindingReadViewSnapshot` is a logical capture, not one object per ACK/read. Append only installs hidden locators,
 publishes Readable/Durable frontiers (fence-protected for Kafka), and ACKs. Low-frequency manifest handoff publishes source-selection

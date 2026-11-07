@@ -2045,8 +2045,9 @@ passed_m5 = passed_current & promotable_m5
 if passed_m5 not in (set(), promotable_m5):
     fail(f"M5 Final must promote either none or the exact M5 scenario set, found {sorted(passed_m5)}")
 if passed_m5:
-    # The published-Final reader checks the exact scenario group, complete archive and source binding.
-    m5_contract.ci_pulsar_commit(root)
+    # Verify the historical dependency's complete archive and original source, not current-source M5 acceptance.
+    # v2M5FinalSourceCheck separately retains the strict current-source successor gate.
+    m5_contract.historical_pulsar_commit(root)
 
 recognized_current = (promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2
                       | promotable_m3 | promotable_m4 | promotable_m5)
