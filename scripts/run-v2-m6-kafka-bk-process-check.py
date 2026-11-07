@@ -29,6 +29,7 @@ ARTIFACT_MODULES = (
 CASES = {
     "kafka.server.nereus.KafkaBookKeeperAckRealTest": {
         "bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)",
+        "staleQuorumCallbackCannotPublishAfterNativeOwnerChange(Path)",
     },
     "kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest": {
         "liveMetadataDeltaHandoffPreservesGroupAndTransactionCoordinators()",
