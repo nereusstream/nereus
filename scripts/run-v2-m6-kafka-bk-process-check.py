@@ -31,6 +31,7 @@ CASES = {
         "bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)",
         "nativeFetchPreservesCompleteCompressedBatchesAcrossViewChanges(Path)",
         "staleQuorumCallbackCannotPublishAfterNativeOwnerChange(Path)",
+        "unknownBookKeeperResponseFencesOldPublicationAndColdOwnerRecoversExactBatch(Path)",
     },
     "kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest": {
         "liveMetadataDeltaHandoffPreservesGroupAndTransactionCoordinators()",
@@ -93,8 +94,10 @@ def repository_files(repository):
 def process_logs(out, started):
     directory = out / "kafka-process-logs"
     required = {f"node-{node}/{name}" for node in range(5)
-                for name in ("server.log", "format.log", "server.properties")}
-    required.add("node-2/implicit-format.log")
+                for name in ("server.log", "launcher.log", "format.log", "server.properties")}
+    required.update({f"node-{node}/controller.log" for node in (2, 3, 4)})
+    required.update({"node-2/implicit-format.log", "node-0/foreign-scope.log",
+                     "node-0/foreign-scope.properties", "capability.properties"})
     files = {}
     for path in sorted(directory.rglob("*")):
         M6.require(not path.is_symlink() and path.resolve() == path, f"redirected Kafka process evidence: {path}")

@@ -362,10 +362,11 @@ their files, Kafka's Java launcher and Log4j configuration, before and after Kaf
 own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for each declared native
 case. The result binds the backend logs and each separate Kafka JVM's configuration and logs. Coverage includes
 a three-Controller election with the old leader offline, a cold Broker starting from a
-Controller snapshot, and idempotent and non-idempotent retries after a disconnected Produce. Fetch checks include
-a v12 request that wakes on transaction commit and complete compressed batches across successive bounded reads.
+Controller snapshot, rejection of a mismatched BookKeeper scope, and idempotent and non-idempotent retries after a
+disconnected Produce. Fetch checks include a v12 request that wakes on transaction commit, multi-partition waits
+through a deadline or topic deletion, and complete compressed batches across successive bounded reads.
 The suite also exercises Produce with `acks=1`, `acks=all` and `acks=0` against real BookKeeper, including a quorum
-response delivered after Owner replacement.
+response delivered after Owner replacement and an unknown response recovered by the next Owner.
 Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`
 as Gradle properties; the output must be a new directory outside the inputs. For diagnosis, an existing
 repository can be supplied with `v2M6KafkaDevelopmentRepository`. The focused check does not attest the complete
