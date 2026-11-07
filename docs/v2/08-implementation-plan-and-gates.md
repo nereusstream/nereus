@@ -347,8 +347,11 @@ admitted Object Fetch pinned through BK rollover, verifies the exact fallback re
 the independently sealed BK checkpoint for the retained tail. On cold takeover the Broker reads that checkpoint
 and the client reads the complete history without reopening the retired prefix ledgers. The retirement case
 enables native GC in its isolated deployment, checks the exact old ledger IDs, observes native DONE, quota settlement
-and physical absence, and then verifies cold recovery. The runner records the exact source trees and loaded test
-runtime without promoting scenarios or replacing the separate process gate.
+and physical absence, and then verifies cold recovery. The semantic case checks an actual rewritten sparse Kafka
+batch, a Fetch beginning at a compacted gap, a retained tombstone and timestamp lookup on both the original and
+cold Owner. A missing compacted Object version fails closed because the original BK bytes contain suppressed
+records. The runner records the exact source trees and loaded test runtime without promoting scenarios or replacing
+the separate process gate.
 
 ### Planned aggregate boundaries
 
