@@ -23,7 +23,7 @@ BOOKKEEPER_ID = "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595a
 OXIA_ID = "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da"
 OXIA_CLIENT = ROOT / "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2"
 ARTIFACT_MODULES = (
-    "nereus-storage-api", "nereus-metadata-spi", "nereus-storage-object",
+    "nereus-storage-api", "nereus-metadata-spi", "nereus-storage-object", "nereus-storage-object-s3",
     "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-metadata-oxia",
 )
 CASES = {

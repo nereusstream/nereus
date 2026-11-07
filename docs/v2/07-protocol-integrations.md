@@ -219,6 +219,11 @@ through actual requests and recovery, not configuration parsing alone. An Object
 existing retention/capacity budgets and stop new admission; asynchronous offload never adds Object durability to an
 already admitted BK append's ACK conditions.
 
+The focused Kafka Object provider check reopens the configured S3 bucket incarnation through its original Oxia
+namespace and the exact registered Cell profile. It uses the named credentials in the Cell's configured file and
+verifies an immutable conditional write and full read on real MinIO. This qualifies only the provider adapter;
+Kafka Object profiles still require native materialization, read and recovery wiring before Controller admission.
+
 The Kafka BK adapter for `__consumer_offsets` keeps each native coordinator RecordBatch intact and
 tracks its producer epoch and transaction range. The group coordinator starts each internal write at
 sequence zero; the adapter does not treat that sequence as a client retry identity. Append and cold
