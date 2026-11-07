@@ -195,9 +195,10 @@ receipt is inherited as V2 parity evidence.
 
 ## M6 process activation matrix
 
-This is the accepted integration target after M5, not an enablement or PASS declaration. Current Kafka Controller
-construction admits only `BOOKKEEPER_WAL_ONLY`; Object profiles stay rejected until their row is implemented and
-verified. Resolve each topic from its immutable Binding/Storage Epoch, never by removing a global profile guard alone.
+This is the accepted integration target after M5, not an enablement or PASS declaration. The current Kafka deployment
+admits only `BOOKKEEPER_WAL_ONLY` in CreateTopics, including validate-only requests; an explicit unadmitted profile
+does not create a Binding. The Broker also checks the persisted Binding before opening its BK route. Object profiles
+stay rejected until their row is implemented and verified. Resolve each topic from its immutable Binding/Storage Epoch.
 Kafka rows require fresh feature-2 bootstrap and RF=1/minISR=1. The existing no-online-migration boundary applies to
 both protocols.
 
