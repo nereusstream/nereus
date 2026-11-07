@@ -17,7 +17,7 @@ spec = importlib.util.spec_from_file_location("m6_m4", ROOT / "scripts/run-v2-m6
 M4 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M4)
 BK, M6, JUNIT = M4.BK, M4.M6, M4.JUNIT
-FAULT_PROXY = ROOT / "scripts/m6-kafka-object-fault-proxy.py"
+FAULT_PROXY = ROOT / "scripts/v2-m6-kafka-object-fault-proxy.py"
 PROXY = BK.module("m6_kafka_object_fault_proxy", FAULT_PROXY)
 MINIO_ID = "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
 DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
