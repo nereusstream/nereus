@@ -343,9 +343,10 @@ fixture covers quota rejection before PUT, original version reuse, background sc
 after response loss, and protected BK fallback when an Object version is missing. Its retirement case keeps an
 admitted Object Fetch pinned through BK rollover, verifies the exact fallback release after drain, then records
 the independently sealed BK checkpoint for the retained tail. On cold takeover the Broker reads that checkpoint
-and the client reads the complete history without reopening the retired prefix ledgers. Those ledgers are kept in
-the fixture: it does not exercise physical GC. The runner records the exact source trees and loaded test runtime
-without promoting scenarios or replacing the separate process gate.
+and the client reads the complete history without reopening the retired prefix ledgers. The retirement case
+enables native GC in its isolated deployment, checks the exact old ledger IDs, observes native DONE, quota settlement
+and physical absence, and then verifies cold recovery. The runner records the exact source trees and loaded test
+runtime without promoting scenarios or replacing the separate process gate.
 
 ### Planned aggregate boundaries
 
