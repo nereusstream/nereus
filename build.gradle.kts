@@ -3216,6 +3216,13 @@ tasks.register<Exec>("v2M6ExecutionInputsContractTest") {
     commandLine("python3", "scripts/check-v2-m6-execution-inputs-tests.py")
 }
 
+tasks.register<Exec>("v2M6CoverageContractTest") {
+    group = "verification"
+    description = "Reject incomplete M6 profile coverage and invalid native result inputs."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m6-coverage-tests.py")
+}
+
 tasks.register<Exec>("v2M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description = "Run the focused native Kafka BK process checks against owned real BK and Oxia backends."
@@ -3231,6 +3238,26 @@ tasks.register<Exec>("v2M6KafkaBookKeeperProcessCheck") {
             "--kafka-java-home", kafkaJavaHome.get(),
             "--development-repository", developmentRepository.get(),
             "--output", processOutput.get(),
+        )
+    }
+}
+
+tasks.register<Exec>("v2M6Check") {
+    group = "verification"
+    description = "Execute the mandatory native suites and verify all M6 profiles on one source tuple."
+    workingDir = layout.projectDirectory.asFile
+    val options = listOf(
+        "--nereus" to providers.gradleProperty("v2M6NereusCheckout"),
+        "--kafka" to providers.gradleProperty("v2M6KafkaCheckout"),
+        "--pulsar" to providers.gradleProperty("v2M6PulsarCheckout"),
+        "--runtime-manifest" to providers.gradleProperty("v2M6RuntimeManifest"),
+        "--runtime-byte-budget" to providers.gradleProperty("v2M6RuntimeByteBudget"),
+        "--output" to providers.gradleProperty("v2M6Output"),
+    )
+    doFirst {
+        commandLine(
+            listOf("python3", "scripts/run-v2-m6-check.py") +
+                options.flatMap { (flag, value) -> value.orNull?.let { listOf(flag, it) } ?: emptyList() },
         )
     }
 }

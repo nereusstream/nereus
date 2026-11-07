@@ -203,6 +203,17 @@ def capture(roots, output, historical_paths, runtime, runtime_budget):
     return {**content, "inputRootSha256": INPUTS.digest(INPUTS.canonical(content))}
 
 
+def runtime_manifest(manifest):
+    raw = INPUTS.load(INPUTS.regular(manifest, INPUTS.MAX_MANIFEST_BYTES))
+    require(raw and all(isinstance(node, dict) and set(node) == {"path", "sha256"}
+                        and isinstance(node["path"], str) and isinstance(node["sha256"], str)
+                        and INPUTS.SHA.fullmatch(node["sha256"]) for node in raw.values()),
+            "runtime declaration must bind dependency files by path and SHA-256")
+    require("runtime-declaration" not in raw, "reserved runtime dependency label")
+    runtime = {**{label: Path(node["path"]) for label, node in raw.items()}, "runtime-declaration": manifest}
+    return runtime, {label: node["sha256"] for label, node in raw.items()}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("capture", "verify"))
@@ -220,18 +231,12 @@ def main(argv=None):
         manifest = args.runtime_manifest.absolute()
         require(outside(manifest.resolve(strict=True), [output.resolve()]),
                 "the runtime declaration cannot be an output of its own stage")
-        raw = INPUTS.load(INPUTS.regular(manifest, INPUTS.MAX_MANIFEST_BYTES))
-        require(raw and all(isinstance(node, dict) and set(node) == {"path", "sha256"}
-                            and isinstance(node["path"], str) and isinstance(node["sha256"], str)
-                            and INPUTS.SHA.fullmatch(node["sha256"]) for node in raw.values()),
-                "runtime declaration must bind dependency files by path and SHA-256")
-        require("runtime-declaration" not in raw, "reserved runtime dependency label")
-        runtime = {**{label: Path(node["path"]) for label, node in raw.items()}, "runtime-declaration": manifest}
+        runtime, hashes = runtime_manifest(manifest)
         require(not args.full_historical_archive or not args.historical_path,
                 "choose exact historical paths or the full archive")
         captured = capture(roots, output, None if args.full_historical_archive else args.historical_path,
                            runtime, args.runtime_byte_budget)
-        require(all(captured["runtimeInputs"][label]["sha256"] == node["sha256"] for label, node in raw.items()),
+        require(all(captured["runtimeInputs"][label]["sha256"] == expected for label, expected in hashes.items()),
                 "runtime dependency differs from its declared SHA-256")
         data = INPUTS.canonical(captured)
         record = output / "execution-inputs.json"

@@ -333,8 +333,10 @@ automatic rerun of all historical campaigns is required. Current M5 still promot
 
 ### Planned aggregate boundaries
 
-`v2M6Check`, `v2M7Check`, `v2M8Check` and `v2FinalCheck` are design targets, not commands available in the current build.
-Each must be wired to ordinary executable suites and exact-source validation before it can certify its milestone:
+`v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
+the affected regression gates from the declared source and runtime inputs. It refuses to run formal acceptance
+until the committed suite plan and all required drivers exist. The process suite plan is still incomplete.
+`v2M7Check`, `v2M8Check` and `v2FinalCheck` remain design targets. The mandatory boundaries are:
 
 - **M6:** all JSON rows whose milestone includes M6, every applicable cell of the six-row activation matrix, the
   four batch exits above, source/profile rejection and original UNKNOWN/drain behavior. Record per-profile applicability
