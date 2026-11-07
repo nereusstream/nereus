@@ -23,6 +23,8 @@ BOOKKEEPER = "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659
 BOOKKEEPER_ID = "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605"
 OXIA_ID = "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da"
 OXIA_CLIENT = ROOT / "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2"
+N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2"
+DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
 ARTIFACT_MODULES = (
     "nereus-storage-api", "nereus-metadata-spi", "nereus-storage-object", "nereus-storage-object-s3",
     "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-metadata-oxia",
@@ -90,6 +92,31 @@ def repository_files(repository):
                        and not path.endswith("-sources.jar") for path in result)
                    for module in ARTIFACT_MODULES), "incomplete Nereus Kafka runtime artifact set")
     return result
+
+
+def require_loaded_artifacts(runtime, repository_files, root_commit):
+    expected = {}
+    for module in ARTIFACT_MODULES:
+        candidates = [identity["sha256"] for path, identity in repository_files.items()
+                      if path.startswith(f"com/nereusstream/{module}/")
+                      and path.endswith(".jar") and not path.endswith(("-sources.jar", "-javadoc.jar"))]
+        M6.require(len(candidates) == 1, f"missing or ambiguous BK runtime artifact: {module}")
+        expected[f"{module}-{DEVELOPMENT_VERSION}.jar"] = candidates[0]
+    tracked = M6.tree(ROOT, root_commit)
+    for group, module in ((OXIA_CLIENT / "io/github/oxia-db", "oxia-client"),
+                          (OXIA_CLIENT / "io/github/oxia-db", "oxia-client-api"),
+                          (N1_REPOSITORY / "com/nereusstream", "nereus-domain")):
+        candidates = [path for path in (group / module).rglob("*.jar")
+                      if not path.name.endswith(("-sources.jar", "-javadoc.jar"))]
+        M6.require(len(candidates) == 1, f"missing or ambiguous locked BK runtime artifact: {module}")
+        path = candidates[0]
+        expected[path.name] = M6.file_identity(path, tracked[path.relative_to(ROOT).as_posix()])["sha256"]
+    for classpath in ("testClasspath", "processClasspath"):
+        jars = [(Path(path).name, runtime["files"][path].get("sha256"))
+                for path in runtime[classpath] if path.endswith(".jar")]
+        for filename, sha in expected.items():
+            M6.require([value for name, value in jars if name == filename] == [sha],
+                       f"Kafka BK runtime did not load the exact artifact for {filename}: {classpath}")
 
 
 def process_logs(out, started):
@@ -181,7 +208,7 @@ def run_checks(kafka, java, repository, out):
         command = [
             "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
             "--init-script", str(RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={runtime_manifest}",
-            f"-PnereusDevelopmentRepository={repository}", "-PnereusDevelopmentVersion=0.2.0-SNAPSHOT",
+            f"-PnereusDevelopmentRepository={repository}", f"-PnereusDevelopmentVersion={DEVELOPMENT_VERSION}",
             f"-PnereusLockedOxiaRepository={OXIA_CLIENT}",
             "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
             f"-Pv2M5RetentionOxiaServiceAddress={address}", TASK,
@@ -208,8 +235,10 @@ def run_checks(kafka, java, repository, out):
         M6.require(runtime_manifest.stat().st_mtime_ns >= started, "stale Kafka runtime capture")
         runtime = json.loads(runtime_manifest.read_bytes())
         M6.require(runtime["schema"] == "NEREUS_V2_M6_KAFKA_RUNTIME_V1"
+                   and runtime["processLogConfig"] == str(kafka / "config/log4j2.yaml")
                    and Path(runtime["java"]).resolve(strict=True) == (java / "bin/java").resolve(strict=True),
                    "Kafka runtime capture did not use the declared Java executable")
+        require_loaded_artifacts(runtime, files, root_commit)
         runtime_identity = M6.file_identity(runtime_manifest)
         M6.require(M6.clean_commit(ROOT) == root_commit and M6.clean_commit(kafka) == kafka_commit,
                    "source changed during native process checks")
