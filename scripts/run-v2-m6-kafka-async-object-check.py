@@ -45,26 +45,26 @@ CASES = {
 def minio(out):
     BK.observe_image(MINIO_ID, MINIO_ID, ("linux", "arm64"))
     container = BK.output(
-        "docker", "run", "--detach", "--rm", "--pull", "never", "--publish", "127.0.0.1::9000",
+        "docker", "run", "--detach", "--rm", "--pull", "never",
         "-e", "MINIO_ROOT_USER=m6kafka", "-e", "MINIO_ROOT_PASSWORD=m6kafka-test-secret",
         MINIO_ID, "server", "/data",
     )
     try:
         image = BK.output("docker", "inspect", "--format", "{{.Image}}", container)
         M6.require(image == MINIO_ID, "the running MinIO image differs from the pinned input")
-        endpoint = "http://" + BK.output("docker", "port", container, "9000/tcp")
-        (out / "minio.json").write_bytes(M6.INPUTS.canonical(
-            {"container": container, "image": image, "endpoint": endpoint}))
-        for attempt in range(20):
-            try:
-                with urllib.request.urlopen(endpoint + "/minio/health/live", timeout=2) as response:
-                    M6.require(response.status == 200, "MinIO did not start")
-                break
-            except OSError:
-                if attempt == 19:
-                    raise
-                time.sleep(1)
-        yield endpoint, container
+        with PROXY.minio_loopback(container) as endpoint:
+            (out / "minio.json").write_bytes(M6.INPUTS.canonical(
+                {"container": container, "image": image, "endpoint": endpoint, "transport": "docker-exec-tcp"}))
+            for attempt in range(20):
+                try:
+                    with urllib.request.urlopen(endpoint + "/minio/health/live", timeout=2) as response:
+                        M6.require(response.status == 200, "MinIO did not start")
+                    break
+                except OSError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(1)
+            yield endpoint, container
     finally:
         try:
             with (out / "minio.log").open("xb") as log:

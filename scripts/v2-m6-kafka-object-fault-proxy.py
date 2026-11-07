@@ -4,7 +4,11 @@ import contextlib
 import http.client
 import http.server
 import json
+import os
 import secrets
+import socket
+import socketserver
+import subprocess
 import threading
 import urllib.parse
 
@@ -13,6 +17,54 @@ MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavaila
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
+
+
+@contextlib.contextmanager
+def minio_loopback(container):
+    """Copy TCP bytes to the owned container, bypassing Docker Desktop's published-port proxy."""
+    # Preserve the original signed S3 bytes. No TTY and no HTTP handling on this hop.
+    command = ["docker", "exec", "-i", container, "bash", "-c",
+               "exec 3<>/dev/tcp/127.0.0.1/9000 || exit; exec 4<&0; "
+               "cat <&3 & down=$!; cat <&4 >&3 & up=$!; "
+               "wait -n \"$down\" \"$up\"; kill \"$down\" \"$up\" 2>/dev/null || :; wait 2>/dev/null"]
+
+    class Forward(socketserver.BaseRequestHandler):
+        def handle(self):
+            with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL, bufsize=0) as process:
+                def upload():
+                    try:
+                        while data := self.request.recv(65536):
+                            pending = memoryview(data)
+                            while pending:
+                                pending = pending[process.stdin.write(pending):]
+                    except OSError:
+                        pass  # Either peer may close this transport.
+                    finally:
+                        process.stdin.close()
+
+                upstream = threading.Thread(target=upload, daemon=True)
+                upstream.start()
+                try:
+                    while data := os.read(process.stdout.fileno(), 65536):
+                        self.request.sendall(data)
+                except OSError:
+                    pass
+                finally:
+                    with contextlib.suppress(OSError):
+                        self.request.shutdown(socket.SHUT_RDWR)
+                    if process.poll() is None:
+                        process.terminate()
+                    upstream.join()
+
+    with socketserver.ThreadingTCPServer(("127.0.0.1", 0), Forward) as server:
+        thread = threading.Thread(target=server.serve_forever, name="nereus-m6-minio-loopback", daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}"
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 @contextlib.contextmanager
