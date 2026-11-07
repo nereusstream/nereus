@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the four native Kafka BookKeeper process checks against owned real backends."""
+"""Run focused native Kafka BookKeeper checks against owned real backends."""
 
 import argparse
 import importlib.util
@@ -29,6 +29,7 @@ ARTIFACT_MODULES = (
 CASES = {
     "kafka.server.nereus.KafkaBookKeeperAckRealTest": {
         "bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)",
+        "nativeFetchPreservesCompleteCompressedBatchesAcrossViewChanges(Path)",
         "staleQuorumCallbackCannotPublishAfterNativeOwnerChange(Path)",
     },
     "kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest": {

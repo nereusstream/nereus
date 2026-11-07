@@ -359,9 +359,12 @@ until the committed suite plan and all required drivers exist. The process suite
 with a clean Kafka checkout and Java 17. It builds a fresh Nereus development Maven repository from the current
 checkout with Java 21. It checks the repository bytes and captures the ordered test and process classpaths, including
 their files, Kafka's Java launcher and Log4j configuration, before and after Kafka runs. It starts and removes its
-own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for all six native
-cases. These include a Fetch v12 request that wakes on transaction commit and Produce with `acks=1`, `acks=all`
-and `acks=0` against real BookKeeper, including a quorum response delivered after Owner replacement.
+own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for each declared native
+case. Coverage includes a three-Controller election with the old leader offline, a cold Broker starting from a
+Controller snapshot, and idempotent and non-idempotent retries after a disconnected Produce. Fetch checks include
+a v12 request that wakes on transaction commit and complete compressed batches across successive bounded reads.
+The suite also exercises Produce with `acks=1`, `acks=all` and `acks=0` against real BookKeeper, including a quorum
+response delivered after Owner replacement.
 Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`
 as Gradle properties; the output must be a new directory outside the inputs. For diagnosis, an existing
 repository can be supplied with `v2M6KafkaDevelopmentRepository`. The focused check does not attest the complete
