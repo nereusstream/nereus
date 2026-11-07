@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 
 spec = importlib.util.spec_from_file_location(
-    "m6_inputs", Path(__file__).with_name("m6-execution-inputs.py")
+    "m6_inputs", Path(__file__).with_name("v2-m6-execution-inputs.py")
 )
 M6 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M6)

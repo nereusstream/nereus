@@ -378,7 +378,7 @@ apply a blanket `docs/v2/evidence` exclusion to make the current capture pass.
    be its own input. Publication binds results to the source commit and exact inventories; evidence-only descendants
    cannot relabel old execution as new execution or certify a source change.
 
-[`m6-execution-inputs.py`](../../scripts/m6-execution-inputs.py) implements the inventory and byte verification.
+[`v2-m6-execution-inputs.py`](../../scripts/v2-m6-execution-inputs.py) implements the inventory and byte verification.
 It inventories every Git path with its mode and blob, and checks the tracked M0–M5 archive against the immutable
 Batch 0 tree at `704dc5a7134425d15bb8a7fdeb9cda757a01711b`. That tree identifies the published archive files; the
 original execution origins remain in their respective receipts. Each gate declares its historical paths (or the
