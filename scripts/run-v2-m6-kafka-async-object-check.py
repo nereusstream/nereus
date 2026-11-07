@@ -24,6 +24,10 @@ DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
 N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2"
 PROCESS_TASK = "nereusKafkaAsyncObjectProcessRealTest"
 CASES = {
+    PROCESS_TASK: (
+        "kafka.server.nereus.KafkaAsyncObjectProcessRealTest",
+        {"keepsBookKeeperAcksDuringObjectOutageAndRecoversSelectedGeneration(Path)"},
+    ),
     "nereusBookKeeperObjectMaterializationRealTest": (
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
         {f'"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome={case}"'
@@ -33,10 +37,6 @@ CASES = {
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",
         {"reopensExactRegisteredScopeAndRejectsForeignBucket(Path)"},
-    ),
-    PROCESS_TASK: (
-        "kafka.server.nereus.KafkaAsyncObjectProcessRealTest",
-        {"keepsBookKeeperAcksDuringObjectOutageAndRecoversSelectedGeneration(Path)"},
     ),
 }
 
