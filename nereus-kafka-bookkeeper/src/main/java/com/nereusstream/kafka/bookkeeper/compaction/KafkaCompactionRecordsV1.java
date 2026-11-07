@@ -78,7 +78,8 @@ public final class KafkaCompactionRecordsV1 {
     public enum ControlKind {
         NONE,
         COMMIT,
-        ABORT
+        ABORT,
+        EMPTY
     }
 
     public enum Disposition {
@@ -354,7 +355,8 @@ public final class KafkaCompactionRecordsV1 {
                 }
                 previous = record.offset();
             }
-            if (controlKind != ControlKind.NONE && (!transactional || records.size() != 1)) {
+            if (controlKind != ControlKind.NONE
+                    && (!transactional || records.size() != (controlKind == ControlKind.EMPTY ? 0 : 1))) {
                 throw new IllegalArgumentException("M5-B control marker shape is invalid");
             }
         }

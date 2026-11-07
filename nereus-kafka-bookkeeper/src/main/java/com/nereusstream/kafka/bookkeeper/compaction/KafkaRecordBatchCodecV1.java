@@ -31,6 +31,7 @@ import java.util.Optional;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.ControlRecordType;
 import org.apache.kafka.common.record.DefaultRecordBatch;
 import org.apache.kafka.common.record.MemoryRecords;
@@ -332,6 +333,15 @@ public final class KafkaRecordBatchCodecV1 {
     private static ControlKind controlKind(MutableRecordBatch batch, List<RecordValue> values) {
         if (!batch.isControlBatch()) {
             return ControlKind.NONE;
+        }
+        // Kafka's cleaner can retain the header of an expired marker for producer fencing.
+        // Such a header has no record and supplies no transaction outcome.
+        if (values.isEmpty()
+                && batch.hasProducerId()
+                && batch.producerEpoch() >= 0
+                && batch.compressionType() == CompressionType.NONE
+                && batch.sizeInBytes() == DefaultRecordBatch.RECORD_BATCH_OVERHEAD) {
+            return ControlKind.EMPTY;
         }
         if (values.size() != 1 || values.get(0).key().isEmpty()) {
             throw new IllegalArgumentException("Kafka control batch does not contain exactly one marker");

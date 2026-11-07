@@ -22,6 +22,7 @@ import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Caps;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CleanupPolicy;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.CompactionPlan;
+import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.ControlKind;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Disposition;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Frontiers;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.InputBatch;
@@ -67,6 +68,7 @@ import org.apache.kafka.common.record.ControlRecordType;
 import org.apache.kafka.common.record.DefaultRecordBatch;
 import org.apache.kafka.common.record.EndTransactionMarker;
 import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
@@ -413,6 +415,43 @@ class KafkaSemanticCompactorV1Test {
                 .singleElement()
                 .satisfies(row -> assertThat(row.flags() & KafkaCompactionIndexV1.FLAG_GAP)
                         .isNotZero());
+    }
+
+    @Test
+    void acceptsAnEmptyControlHeaderFromKafkaCleanerWithoutInventingAMarker() {
+        var marker = control(70, 11, 123, (short) 4, ControlRecordType.ABORT, 3);
+        var original = MemoryRecords.readableRecords(ByteBuffer.wrap(marker.toByteArray()));
+        var filter = new MemoryRecords.RecordFilter(500, 100) {
+            @Override
+            protected BatchRetentionResult checkBatchRetention(RecordBatch batch) {
+                return new BatchRetentionResult(BatchRetention.RETAIN_EMPTY, false);
+            }
+
+            @Override
+            protected boolean shouldRetainRecord(RecordBatch batch, Record record) {
+                return false;
+            }
+        };
+        var cleaned = original.filterTo(
+                new TopicPartition("empty-control-oracle", 0),
+                filter,
+                ByteBuffer.allocate(DefaultRecordBatch.RECORD_BATCH_OVERHEAD),
+                DefaultRecordBatch.RECORD_BATCH_OVERHEAD,
+                BufferSupplier.NO_CACHING);
+        var header =
+                canonical(MemoryRecords.readableRecords(cleaned.outputBuffer().flip()));
+        var parsed = KafkaRecordBatchCodecV1.parse(header);
+        assertThat(parsed.controlKind()).isEqualTo(ControlKind.EMPTY);
+        assertThat(parsed.records()).isEmpty();
+        assertThat(parsed.producerId()).isEqualTo(123);
+        assertThat(parsed.producerEpoch()).isEqualTo((short) 4);
+
+        var fixture = new Fixture(List.of(header), 70, 71);
+        var plan = fixture.plan(List.of(), List.of(), List.of(), 500, CompressionType.NONE);
+        var result = new KafkaSemanticCompactorV1().compact(plan).candidate();
+        assertThat(result.outputBatches()).isEmpty();
+        assertThat(result.gaps()).containsExactly(new KafkaCompactionRecordsV1.Gap(70, 71));
+        assertThat(result.dispositions()).isEmpty();
     }
 
     @Test
