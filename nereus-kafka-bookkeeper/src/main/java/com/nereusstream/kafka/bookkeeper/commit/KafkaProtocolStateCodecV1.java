@@ -105,7 +105,7 @@ final class KafkaProtocolStateCodecV1 {
                     out.writeByte(delta.transactionKind().ordinal());
                     out.writeLong(delta.transactionalProducerId());
                     out.writeInt(delta.coordinatorEpoch());
-                    out.writeShort(delta.markerProducerEpoch());
+                    out.writeShort(delta.unsequencedProducerEpoch());
                     out.writeLong(delta.maxTimestamp());
                 }
             }

@@ -27,6 +27,20 @@ import org.apache.kafka.common.record.RecordBatch;
 
 /** Native RecordBatch semantics used by both append preparation and closed-history replay. */
 public final class KafkaNativeProtocolBatchAdapterV1 implements KafkaRecoveryBatchProtocolAdapterV1 {
+    private final boolean consumerOffsets;
+
+    public KafkaNativeProtocolBatchAdapterV1() {
+        this(false);
+    }
+
+    private KafkaNativeProtocolBatchAdapterV1(boolean consumerOffsets) {
+        this.consumerOffsets = consumerOffsets;
+    }
+
+    public static KafkaNativeProtocolBatchAdapterV1 consumerOffsets() {
+        return new KafkaNativeProtocolBatchAdapterV1(true);
+    }
+
     @Override
     public KafkaProtocolBatchDeltaV1 protocolDelta(KafkaNativeAssignedRecordBatchV1 assigned) {
         var records = MemoryRecords.readableRecords(
@@ -67,6 +81,15 @@ public final class KafkaNativeProtocolBatchAdapterV1 implements KafkaRecoveryBat
                     marker.coordinatorEpoch(),
                     batch.producerEpoch(),
                     batch.maxTimestamp());
+        }
+        if (consumerOffsets && batch.isTransactional()) {
+            // Kafka's group coordinator starts each internal write at zero. The header
+            // is part of the persisted RecordBatch, but has no client retry identity.
+            if (!batch.hasProducerId() || batch.baseSequence() != 0) {
+                throw new IllegalArgumentException("invalid native transactional consumer offset batch");
+            }
+            return KafkaProtocolBatchDeltaV1.coordinatorData(
+                    count, batch.producerId(), batch.producerEpoch(), batch.maxTimestamp());
         }
         var identity = batch.hasProducerId()
                 ? Optional.of(new KafkaBatchDuplicateIdentityV1(

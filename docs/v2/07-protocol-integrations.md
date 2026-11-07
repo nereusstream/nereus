@@ -218,6 +218,12 @@ through actual requests and recovery, not configuration parsing alone. An Object
 existing retention/capacity budgets and stop new admission; asynchronous offload never adds Object durability to an
 already admitted BK append's ACK conditions.
 
+The Kafka BK adapter for `__consumer_offsets` keeps each native coordinator RecordBatch intact and
+tracks its producer epoch and transaction range. The group coordinator starts each internal write at
+sequence zero; the adapter does not treat that sequence as a client retry identity. Append and cold
+replay select the same interpretation from the exact internal topic binding. A committed offset becomes
+visible after COMMIT, and ABORT preserves the previous committed offset.
+
 M6 Kafka evidence uses real Broker/Controller processes and clients for Produce, Fetch, PID retry, transaction
 COMMIT/ABORT, transactional offset commit, group operations, Admin and snapshot/catch-up/restart. An ACKed record must
 survive cold recovery; a timed-out idempotent request must retain its original offset; stale ready/coordinator callbacks

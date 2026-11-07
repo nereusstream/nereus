@@ -16,6 +16,10 @@ package com.nereusstream.kafka.bookkeeper.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeAssignedRecordBatchV1;
+import com.nereusstream.kafka.bookkeeper.adapter.KafkaNativeProtocolBatchAdapterV1;
+import com.nereusstream.kafka.bookkeeper.adapter.KafkaRawAssignedRecordBatchFactsV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCommittedProducerStateV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaProducerBatchResultV1;
@@ -27,6 +31,9 @@ import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionBatchKindV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionStateV1;
 import java.util.List;
 import java.util.Optional;
+import org.apache.kafka.common.compress.Compression;
+import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.SimpleRecord;
 import org.junit.jupiter.api.Test;
 
 class KafkaProducerTransactionStateV1Test {
@@ -115,6 +122,33 @@ class KafkaProducerTransactionStateV1Test {
             assertThat(completed.markerEndOffsetExclusive()).isEqualTo(12);
             assertThat(completed.aborted()).isFalse();
         });
+    }
+
+    @Test
+    void coordinatorBatchesWithRepeatedNativeSequenceZeroOpenOneTransactionWithoutDuplicateState() {
+        var records = MemoryRecords.withTransactionalRecords(
+                10, Compression.NONE, 9, (short) 2, 0, 1, new SimpleRecord(new byte[] {1}));
+        var raw = CanonicalBytes.copyOf(records.buffer().array());
+        var assigned = KafkaNativeAssignedRecordBatchV1.validate(KafkaRawAssignedRecordBatchFactsV1.parse(raw));
+        var offsetDelta = KafkaNativeProtocolBatchAdapterV1.consumerOffsets().protocolDelta(assigned);
+        assertThat(new KafkaNativeProtocolBatchAdapterV1()
+                        .protocolDelta(assigned)
+                        .duplicateIdentity())
+                .isPresent();
+        assertThat(offsetDelta.duplicateIdentity()).isEmpty();
+
+        var first = commit(10, offsetDelta);
+        var second = commit(11, offsetDelta);
+        var producers = KafkaCommittedProducerStateV1.empty().apply(first).apply(second);
+        assertThat(producers.producers().get(9L).producerEpoch()).isEqualTo((short) 2);
+        assertThat(producers.producers().get(9L).recentBatches()).isEmpty();
+        var transactions = KafkaTransactionStateV1.empty().apply(first).apply(second);
+        assertThat(transactions.firstUnstableOffset(12)).hasValue(10);
+        var abort =
+                commit(12, KafkaProtocolBatchDeltaV1.marker(KafkaTransactionBatchKindV1.ABORT_MARKER, 9, (short) 2, 6));
+        assertThat(transactions.apply(abort).abortedTransactions())
+                .singleElement()
+                .satisfies(range -> assertThat(range.firstOffset()).isEqualTo(10));
     }
 
     @Test

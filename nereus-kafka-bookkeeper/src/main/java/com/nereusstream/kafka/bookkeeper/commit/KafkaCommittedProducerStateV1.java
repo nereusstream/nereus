@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.bookkeeper.commit;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +55,21 @@ public record KafkaCommittedProducerStateV1(NavigableMap<Long, KafkaProducerSess
                                         delta.coordinatorEpoch(),
                                         batch.startOffset(),
                                         delta.maxTimestamp()));
+            } else if (delta.unsequencedProducerEpoch() >= 0) {
+                replacement.compute(
+                        delta.transactionalProducerId(),
+                        (producerId, previous) -> previous == null
+                                ? new KafkaProducerSessionStateV1(
+                                        producerId,
+                                        delta.unsequencedProducerEpoch(),
+                                        -1,
+                                        -1,
+                                        List.of(),
+                                        -1,
+                                        -1,
+                                        delta.maxTimestamp())
+                                : previous.appendCoordinatorData(
+                                        delta.unsequencedProducerEpoch(), batch.startOffset(), delta.maxTimestamp()));
             }
             batch.delta().duplicateIdentity().ifPresent(identity -> {
                 KafkaProducerBatchResultV1 result = new KafkaProducerBatchResultV1(

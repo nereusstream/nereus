@@ -299,6 +299,7 @@ public final class KafkaBookKeeperPartitionV1 {
     private Sha256Digest nativeSourceViewSha256;
     private final KafkaBookKeeperRecoveryEnvelopeV1 envelope;
     private final Executor controlExecutor;
+    private final KafkaNativeProtocolBatchAdapterV1 protocolAdapter;
     private long admittedEntries;
     private long admittedBytes;
     private boolean writable = true;
@@ -321,13 +322,15 @@ public final class KafkaBookKeeperPartitionV1 {
             int maximumBatchBytes,
             Executor controlExecutor,
             Optional<KafkaBookKeeperReadViewV2> selectedPrefix,
-            Optional<KafkaOwnerAdmissionV1> closedOwner) {
+            Optional<KafkaOwnerAdmissionV1> closedOwner,
+            KafkaNativeProtocolBatchAdapterV1 protocolAdapter) {
         this.ownerAuthority = ownerAuthority;
         this.owner = owner;
         this.run = run;
         this.commit = commit;
         this.envelope = envelope;
         this.controlExecutor = Objects.requireNonNull(controlExecutor, "controlExecutor");
+        this.protocolAdapter = protocolAdapter;
         this.session = session;
         this.partitionCapacity = partitionCapacity;
         this.globalCapacity = globalCapacity;
@@ -520,6 +523,47 @@ public final class KafkaBookKeeperPartitionV1 {
             KafkaBookKeeperRunBirthRecoveryV1.UnselectedFence unselectedFence,
             KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner historyReads,
             Optional<KafkaBookKeeperClosedHistoryRecoveryV1.SelectedPrefix> selectedPrefix) {
+        return openSelected(
+                session,
+                roots,
+                owners,
+                owner,
+                binding,
+                fence,
+                closed,
+                partitionCapacity,
+                globalCapacity,
+                envelope,
+                maximumBatchBytes,
+                observer,
+                isCurrent,
+                controlExecutor,
+                unselectedFence,
+                historyReads,
+                selectedPrefix,
+                false);
+    }
+
+    /** Native consumer-offset partitions recover coordinator transactions without client sequences. */
+    public static CompletionStage<KafkaBookKeeperPartitionV1> openSelected(
+            BookKeeperCellSession session,
+            KafkaRunRootAuthority roots,
+            KafkaBookKeeperOwnerAuthorityV1 owners,
+            KafkaOwnerIdentityV1 owner,
+            Nbke2RunBindingV1 binding,
+            KafkaPartitionFenceV1 fence,
+            Optional<KafkaOwnerAdmissionV1> closed,
+            KafkaAppendCapacityControllerV1 partitionCapacity,
+            KafkaAppendCapacityControllerV1 globalCapacity,
+            KafkaBookKeeperRecoveryEnvelopeV1 envelope,
+            int maximumBatchBytes,
+            KafkaPartitionPublicationObserver observer,
+            BooleanSupplier isCurrent,
+            Executor controlExecutor,
+            KafkaBookKeeperRunBirthRecoveryV1.UnselectedFence unselectedFence,
+            KafkaBookKeeperClosedHistoryRecoveryV1.ReadOwner historyReads,
+            Optional<KafkaBookKeeperClosedHistoryRecoveryV1.SelectedPrefix> selectedPrefix,
+            boolean consumerOffsets) {
         Objects.requireNonNull(isCurrent, "isCurrent");
         Objects.requireNonNull(controlExecutor, "controlExecutor");
         Objects.requireNonNull(unselectedFence, "unselectedFence");
@@ -540,13 +584,11 @@ public final class KafkaBookKeeperPartitionV1 {
             throw new IllegalArgumentException("native owner, run and publication identities differ");
         }
         requireCurrent(isCurrent);
+        var protocolAdapter = consumerOffsets
+                ? KafkaNativeProtocolBatchAdapterV1.consumerOffsets()
+                : new KafkaNativeProtocolBatchAdapterV1();
         var recoveryReader = new KafkaBookKeeperClosedHistoryRecoveryV1(
-                session,
-                owners,
-                new KafkaNativeProtocolBatchAdapterV1(),
-                System::nanoTime,
-                unselectedFence,
-                historyReads);
+                session, owners, protocolAdapter, System::nanoTime, unselectedFence, historyReads);
         CompletionStage<Optional<KafkaBookKeeperClosedHistoryRecoveryV1.Result>> recovery = closed.isEmpty()
                 ? CompletableFuture.completedFuture(Optional.empty())
                 : (selectedPrefix.isPresent()
@@ -622,7 +664,8 @@ public final class KafkaBookKeeperPartitionV1 {
                                             controlExecutor,
                                             selectedPrefix.map(
                                                     KafkaBookKeeperClosedHistoryRecoveryV1.SelectedPrefix::view),
-                                            closed);
+                                            closed,
+                                            protocolAdapter);
                                 }));
                     });
                 }));
@@ -1010,10 +1053,9 @@ public final class KafkaBookKeeperPartitionV1 {
                 admitted.handoff(this, batches);
             }
             var snapshot = capture();
-            var adapter = new KafkaNativeProtocolBatchAdapterV1();
             var plan = new KafkaProtocolAppendPlanV1(
                     snapshot.root().fence(),
-                    batches.stream().map(adapter::protocolDelta).toList());
+                    batches.stream().map(protocolAdapter::protocolDelta).toList());
             var groupId = randomId();
             var attemptId = randomId();
             var operation = pipeline.submit(

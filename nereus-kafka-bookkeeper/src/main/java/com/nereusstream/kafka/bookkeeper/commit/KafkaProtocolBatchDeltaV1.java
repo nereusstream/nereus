@@ -24,7 +24,7 @@ public record KafkaProtocolBatchDeltaV1(
         KafkaTransactionBatchKindV1 transactionKind,
         long transactionalProducerId,
         int coordinatorEpoch,
-        short markerProducerEpoch,
+        short unsequencedProducerEpoch,
         long maxTimestamp) {
     public KafkaProtocolBatchDeltaV1 {
         duplicateIdentity = Objects.requireNonNull(duplicateIdentity, "duplicateIdentity");
@@ -34,21 +34,19 @@ public record KafkaProtocolBatchDeltaV1(
         }
         boolean marker = transactionKind == KafkaTransactionBatchKindV1.COMMIT_MARKER
                 || transactionKind == KafkaTransactionBatchKindV1.ABORT_MARKER;
-        if (marker != (markerProducerEpoch >= 0)
-                || !marker && markerProducerEpoch != -1
-                || marker && logicalOffsetCount != 1) {
-            throw new IllegalArgumentException("only a transaction marker carries its producer epoch separately");
+        boolean coordinatorData =
+                transactionKind == KafkaTransactionBatchKindV1.TRANSACTIONAL_DATA && duplicateIdentity.isEmpty();
+        if ((marker || coordinatorData) ? unsequencedProducerEpoch < 0 : unsequencedProducerEpoch != -1) {
+            throw new IllegalArgumentException("only unsequenced transactions carry a separate producer epoch");
         }
         if (transactionKind == KafkaTransactionBatchKindV1.NONE) {
             if (transactionalProducerId != -1 || coordinatorEpoch != -1) {
                 throw new IllegalArgumentException("non-transactional batches cannot carry transaction fields");
             }
         } else {
-            if (transactionalProducerId < 0
-                    || !marker && duplicateIdentity.isEmpty()
-                    || marker && duplicateIdentity.isPresent()) {
+            if (transactionalProducerId < 0 || marker && (duplicateIdentity.isPresent() || logicalOffsetCount != 1)) {
                 throw new IllegalArgumentException(
-                        "transactional DATA has sequences; a marker has only producer/epoch");
+                        "transaction requires a native producer and a marker occupies one unsequenced offset");
             }
             if (duplicateIdentity
                     .filter(identity -> identity.producerId() != transactionalProducerId)
@@ -65,6 +63,13 @@ public record KafkaProtocolBatchDeltaV1(
                 throw new IllegalArgumentException("producer sequence coverage differs from logical offset count");
             }
         });
+    }
+
+    public short markerProducerEpoch() {
+        return transactionKind == KafkaTransactionBatchKindV1.COMMIT_MARKER
+                        || transactionKind == KafkaTransactionBatchKindV1.ABORT_MARKER
+                ? unsequencedProducerEpoch
+                : -1;
     }
 
     public KafkaProtocolBatchDeltaV1(
@@ -100,6 +105,18 @@ public record KafkaProtocolBatchDeltaV1(
             throw new IllegalArgumentException("marker requires COMMIT or ABORT");
         }
         return new KafkaProtocolBatchDeltaV1(1, Optional.empty(), kind, producerId, coordinatorEpoch, producerEpoch);
+    }
+
+    public static KafkaProtocolBatchDeltaV1 coordinatorData(
+            long count, long producerId, short producerEpoch, long timestamp) {
+        return new KafkaProtocolBatchDeltaV1(
+                count,
+                Optional.empty(),
+                KafkaTransactionBatchKindV1.TRANSACTIONAL_DATA,
+                producerId,
+                -1,
+                producerEpoch,
+                timestamp);
     }
 
     public static KafkaProtocolBatchDeltaV1 nonIdempotent(long logicalOffsetCount) {

@@ -148,6 +148,24 @@ public record KafkaProducerSessionStateV1(
         return marker(epoch, coordinator, offset, -1);
     }
 
+    KafkaProducerSessionStateV1 appendCoordinatorData(short epoch, long offset, long timestamp) {
+        if (epoch < producerEpoch || offset <= Math.max(lastOffset, lastMarkerOffset)) {
+            throw new IllegalArgumentException("coordinator DATA producer epoch or offset regresses");
+        }
+        return epoch == producerEpoch
+                ? new KafkaProducerSessionStateV1(
+                        producerId,
+                        epoch,
+                        lastSequence,
+                        lastOffset,
+                        recentBatches,
+                        coordinatorEpoch,
+                        lastMarkerOffset,
+                        timestamp)
+                : new KafkaProducerSessionStateV1(
+                        producerId, epoch, -1, -1, List.of(), coordinatorEpoch, lastMarkerOffset, timestamp);
+    }
+
     public KafkaProducerSessionStateV1 marker(short epoch, int coordinator, long offset, long timestamp) {
         if (epoch < producerEpoch
                 || coordinator < coordinatorEpoch
