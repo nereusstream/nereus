@@ -21,7 +21,14 @@ BOOKKEEPER = "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659
 BOOKKEEPER_ID = "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605"
 OXIA_ID = "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da"
 OXIA_CLIENT = ROOT / "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2"
+ARTIFACT_MODULES = (
+    "nereus-storage-api", "nereus-metadata-spi", "nereus-storage-object",
+    "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-metadata-oxia",
+)
 CASES = {
+    "kafka.server.nereus.KafkaBookKeeperAckRealTest": {
+        "bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)",
+    },
     "kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest": {
         "liveMetadataDeltaHandoffPreservesGroupAndTransactionCoordinators()",
         "coldOwnerContinuesProduceFetchAndTransactionAcrossTwoNativeRelocations()",
@@ -55,14 +62,47 @@ def observe_image(reference, expected_id, platform):
     return info["Id"]
 
 
+def publish_development_repository(out, repository):
+    command = [
+        "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--no-build-cache",
+        "--rerun-tasks", "--max-workers=2", "--project-cache-dir", str(out / "nereus-gradle-cache"),
+        f"-PdevelopmentRepository={repository}",
+        *[f":{name}:publishMavenJavaPublicationToDevelopmentRepository" for name in ARTIFACT_MODULES],
+    ]
+    with (out / "nereus-publication.log").open("xb") as log:
+        subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
+    return command
+
+
+def repository_files(repository):
+    M6.require(repository.is_dir(), "current Nereus development Maven repository is missing")
+    result = {}
+    for path in sorted(repository.rglob("*")):
+        M6.require(not path.is_symlink(), f"redirected Maven repository input: {path}")
+        if not path.is_dir():
+            result[path.relative_to(repository).as_posix()] = M6.file_identity(path)
+    M6.require(all(any(path.startswith(f"com/nereusstream/{module}/") and path.endswith(".jar")
+                       and not path.endswith("-sources.jar") for path in result)
+                   for module in ARTIFACT_MODULES), "incomplete Nereus Kafka runtime artifact set")
+    return result
+
+
 def run_checks(kafka, java, repository, out):
     root_commit = M6.clean_commit(ROOT)
     kafka_commit = M6.clean_commit(kafka)
-    M6.require(M6.outside(out, [ROOT, kafka, repository]), "process evidence output overlaps inputs")
-    M6.require(repository.is_dir(), "current Nereus development Maven repository is missing")
+    inputs = [ROOT, kafka] + ([] if repository is None else [repository])
+    M6.require(out == out.resolve() and M6.outside(out, inputs),
+               "process evidence output overlaps inputs or contains a symlink")
     observe_image(BOOKKEEPER, BOOKKEEPER_ID, ("linux", "amd64"))
     observe_image(OXIA_ID, OXIA_ID, ("linux", "arm64"))
     out.mkdir(parents=True, exist_ok=False)
+    publication = None
+    if repository is None:
+        repository = out / "development-repository"
+        publication = publish_development_repository(out, repository)
+    files = repository_files(repository)
+    inventory = M6.INPUTS.canonical({"path": str(repository), "publicationCommand": publication, "files": files})
+    (out / "development-repository.json").write_bytes(inventory)
     project = "nereus-m6-kafka-bk-" + uuid.uuid4().hex[:12]
     compose = ("docker", "compose", "-p", project, "-f", str(COMPOSE))
     oxia = None
@@ -118,34 +158,42 @@ def run_checks(kafka, java, repository, out):
                    f"native BK process suite failed, skipped a case or produced incomplete XML: {out}")
         M6.require(M6.clean_commit(ROOT) == root_commit and M6.clean_commit(kafka) == kafka_commit,
                    "source changed during native process checks")
+        M6.require(repository_files(repository) == files, "Nereus runtime Maven repository changed during Kafka checks")
     finally:
         try:
             if oxia is not None:
-                with (out / "oxia.log").open("xb") as log:
-                    subprocess.run(["docker", "logs", oxia], stdout=log, stderr=subprocess.STDOUT, check=True)
-                subprocess.run(["docker", "rm", "-f", oxia], check=True, stdout=subprocess.DEVNULL)
+                try:
+                    with (out / "oxia.log").open("xb") as log:
+                        subprocess.run(["docker", "logs", oxia], stdout=log, stderr=subprocess.STDOUT, check=True)
+                finally:
+                    subprocess.run(["docker", "rm", "-f", oxia], check=True, stdout=subprocess.DEVNULL)
         finally:
-            with (out / "bookkeeper.log").open("xb") as log:
-                subprocess.run([*compose, "logs"], stdout=log, stderr=subprocess.STDOUT)
-            subprocess.run([*compose, "down", "-v", "--remove-orphans"], check=True)
+            try:
+                with (out / "bookkeeper.log").open("xb") as log:
+                    subprocess.run([*compose, "logs"], stdout=log, stderr=subprocess.STDOUT)
+            finally:
+                subprocess.run([*compose, "down", "-v", "--remove-orphans"], check=True)
     (out / "process-result.json").write_bytes(M6.INPUTS.canonical({
         "kind": "FOCUSED_KAFKA_BK_PROCESS_CHECK", "promotionEligible": False,
         "sourceCheckout": {"nereus": root_commit, "kafka": kafka_commit}, "command": command,
+        "developmentRepositorySha256": M6.INPUTS.digest(inventory),
         "junit": attachments, "cases": {key: sorted(value) for key, value in cases.items()},
     }))
-    print(f"Four native Kafka BK process checks passed: {out}")
+    print(f"{sum(map(len, CASES.values()))} native Kafka BK process checks passed: {out}")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kafka-root", type=Path, required=True)
     parser.add_argument("--kafka-java-home", type=Path, required=True)
-    parser.add_argument("--development-repository", type=Path, required=True)
+    parser.add_argument("--development-repository", type=Path,
+                        help="reuse an external repository for diagnostics; the default builds from current source")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
+        repository = args.development_repository.resolve(strict=True) if args.development_repository else None
         run_checks(args.kafka_root.resolve(strict=True), args.kafka_java_home.resolve(strict=True),
-                   args.development_repository.resolve(strict=True), args.output.resolve())
+                   repository, args.output.absolute())
     except (M6.InputError, JUNIT.JUnitEvidenceError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Kafka BK process check: {error}\n")
 

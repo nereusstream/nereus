@@ -3232,13 +3232,14 @@ tasks.register<Exec>("v2M6KafkaBookKeeperProcessCheck") {
     val developmentRepository = providers.gradleProperty("v2M6KafkaDevelopmentRepository")
     val processOutput = providers.gradleProperty("v2M6ProcessOutput")
     doFirst {
-        commandLine(
+        val args = mutableListOf(
             "python3", "scripts/run-v2-m6-kafka-bk-process-check.py",
             "--kafka-root", kafkaCheckout.get(),
             "--kafka-java-home", kafkaJavaHome.get(),
-            "--development-repository", developmentRepository.get(),
             "--output", processOutput.get(),
         )
+        developmentRepository.orNull?.let { args.addAll(listOf("--development-repository", it)) }
+        commandLine(args)
     }
 }
 

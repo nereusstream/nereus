@@ -356,11 +356,14 @@ until the committed suite plan and all required drivers exist. The process suite
   authority. An older PASS remains evidence for its original source; it does not automatically certify changed paths.
 
 `v2M6KafkaBookKeeperProcessCheck` is the focused Kafka BK process check. It uses the existing fork Gradle suite
-with a clean Kafka checkout, Java 17 and a supplied Nereus development Maven repository. It starts and removes its
-own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for all four native
-cases. Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome`, `v2M6KafkaDevelopmentRepository` and `v2M6ProcessOutput`
-as Gradle properties; the output must be a new directory outside the inputs. This check does not qualify the
-supplied build artifacts or complete M6-1. No scenario is promoted by its output.
+with a clean Kafka checkout and Java 17. It builds a fresh Nereus development Maven repository from the current
+checkout and checks its artifact bytes before and after Kafka runs. It starts and removes its
+own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for all five native
+cases. These include a Fetch v12 request that wakes on transaction commit and Produce with `acks=1`, `acks=all`
+and `acks=0` against real BookKeeper. Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`
+as Gradle properties; the output must be a new directory outside the inputs. For diagnosis, an existing
+repository can be supplied with `v2M6KafkaDevelopmentRepository`. The focused check does not attest the complete
+build and runtime dependency graph or complete M6-1. No scenario is promoted by its output.
 
 `__share_group_state`, online migration, KoP, cross-protocol write-authority migration, compact tombstone deletion and
 allocator orphan GC remain outside these batches. M7 SLO values and M8 baseline/threshold selection are pre-execution
