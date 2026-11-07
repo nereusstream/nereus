@@ -285,6 +285,7 @@ public final class KafkaBookKeeperPartitionV1 {
     private boolean rolling;
     private Sha256Digest nativePublicationTask;
     private NativeObjectPublication nativeObjectPublication;
+    private KafkaBookKeeperNativeFallbackRetirementV2 nativeObjectRetirement;
     private KafkaBookKeeperNativeObjectReadSourcesV1 recoveredObjectReadSources;
     private KafkaBookKeeperReadViewV2 nativePublicationPredecessor;
     private KafkaBookKeeperReadViewV2 nativePreferredCache;
@@ -751,7 +752,7 @@ public final class KafkaBookKeeperPartitionV1 {
                     || bytes > envelope.maximumEncodedBytes() / 2 - runBytes
                     || entries > envelope.maximumEntries() - 3 - admittedEntries
                     || !fitsControlReserve(entries, bytes)) {
-                if (nativeObjectPublication != null) {
+                if (nativeObjectPublication != null || nativeObjectRetirement != null) {
                     throw new IllegalStateException(
                             "native Object selector transition has not settled before BK rollover");
                 }
@@ -1545,6 +1546,7 @@ public final class KafkaBookKeeperPartitionV1 {
         if (m4ReadOwner == null
                 || rolling
                 || nativeObjectPublication != null
+                || nativeObjectRetirement != null
                 || admissions != 0
                 || !commit.capture().speculativeQueue().commits().isEmpty()) {
             throw new IllegalStateException("native preferred publication lacks a quiescent qualified owner");
@@ -1580,6 +1582,7 @@ public final class KafkaBookKeeperPartitionV1 {
                 || nativePreferredCache != null
                 || rolling
                 || nativePublicationTask != null
+                || nativeObjectRetirement != null
                 || nativeObjectPublication != null) {
             throw new IllegalStateException("native Object publication requires its original raw BK reader");
         }
@@ -1792,6 +1795,50 @@ public final class KafkaBookKeeperPartitionV1 {
         nativeFallbackRetirement = m4ReadOwner.beginNativeFallbackRetirement();
         nativePublicationTask = nativePreferredCache.descriptor().task().taskIdSha256();
         return nativeFallbackRetirement;
+    }
+
+    /** Closes only Object fallback admission; the original BK protocol recovery references remain live. */
+    public synchronized KafkaBookKeeperNativeFallbackRetirementV2 beginNativeObjectFallbackRetirement(
+            Sha256Digest selectedManifest) {
+        requireWritable();
+        if (m4ReadOwner == null || rolling || nativeObjectPublication != null || nativePublicationTask != null) {
+            throw new IllegalStateException("native Object fallback retirement lacks a stable read owner");
+        }
+        if (nativeObjectRetirement != null) {
+            if (!nativeObjectRetirement.descriptorSha256().equals(selectedManifest)) {
+                throw new IllegalStateException("native Object fallback retirement belongs to another manifest");
+            }
+            return nativeObjectRetirement;
+        }
+        var current = m4ReadOwner.selectorRuntime().currentAuthority().get();
+        if (!(current.publicationCell().protocolStateReference()
+                        instanceof KafkaBookKeeperNativeObjectReadSourcesV1 sources)
+                || !sources.fallback()
+                || !sources.prefix().manifestSha256().equals(selectedManifest)) {
+            throw new IllegalStateException("native Object fallback retirement requires its exact protected view");
+        }
+        nativeObjectRetirement = m4ReadOwner.beginNativeFallbackRetirement();
+        return nativeObjectRetirement;
+    }
+
+    public synchronized void finishNativeObjectFallbackRetirement(
+            KafkaBookKeeperNativeFallbackRetirementV2 retirement,
+            KafkaBookKeeperNativeFallbackRetirementV2.Result result) {
+        requireWritable();
+        if (nativeObjectRetirement != retirement
+                || !retirement.owns(result)
+                || m4ReadOwner != retirement.predecessorOwner()) {
+            throw new IllegalStateException("native Object fallback retirement changed its actual read actor");
+        }
+        var authority = result.readOwner().selectorRuntime().currentAuthority().get();
+        if (!(authority.publicationCell().protocolStateReference()
+                        instanceof KafkaBookKeeperNativeObjectReadSourcesV1 preferred)
+                || preferred.fallback()
+                || !preferred.rawSources().equals(nativeReadSourcesUnchecked())) {
+            throw new IllegalStateException("native Object fallback retirement changed its BK recovery references");
+        }
+        m4ReadOwner = result.readOwner();
+        nativeObjectRetirement = null;
     }
 
     public synchronized void finishNativeFallbackRetirement(

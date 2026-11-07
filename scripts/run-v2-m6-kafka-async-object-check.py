@@ -24,7 +24,7 @@ CASES = {
     "nereusBookKeeperObjectMaterializationRealTest": (
         "kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest",
         {f'"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome={case}"'
-         for case in ("known", "hot", "cold", "automatic")},
+         for case in ("known", "hot", "cold", "automatic", "retirement")},
     ),
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",

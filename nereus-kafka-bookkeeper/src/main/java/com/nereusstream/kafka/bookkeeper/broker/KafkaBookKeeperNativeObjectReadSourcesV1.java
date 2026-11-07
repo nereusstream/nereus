@@ -74,6 +74,11 @@ public record KafkaBookKeeperNativeObjectReadSourcesV1(
         return fallback ? prefix.originalFallbackSources() : List.of();
     }
 
+    KafkaBookKeeperNativeObjectReadSourcesV1 withoutFallback() {
+        return new KafkaBookKeeperNativeObjectReadSourcesV1(
+                rawSources, prefix, bookKeeperNamespace, false, providerReads);
+    }
+
     KafkaBookKeeperNativeObjectReadSourcesV1 withRawSources(NativeReadSources successor) {
         KafkaBookKeeperPartitionV1.NativePreferredReadSources.requireSourceExtension(rawSources, successor);
         return new KafkaBookKeeperNativeObjectReadSourcesV1(

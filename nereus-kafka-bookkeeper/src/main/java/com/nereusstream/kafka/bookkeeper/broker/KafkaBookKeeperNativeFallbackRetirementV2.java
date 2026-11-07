@@ -25,9 +25,11 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Closu
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadAdmissionEpochTerminalCut;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ReadQuiescenceProof;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.TerminalKind;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -42,7 +44,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
         private final SourceRetirementBatch batch;
         private final ReadAdmissionEpochTerminalCut terminal;
         private final ReadQuiescenceProof proof;
-        private final KafkaBookKeeperPartitionV1.NativePreferredReadSources originalSources;
+        private final Optional<KafkaBookKeeperPartitionV1.NativePreferredReadSources> originalSources;
         private final BindingReadSelector selector;
         private SourceTransfer transfer;
 
@@ -51,7 +53,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
                 SourceRetirementBatch batch,
                 ReadAdmissionEpochTerminalCut terminal,
                 ReadQuiescenceProof proof,
-                KafkaBookKeeperPartitionV1.NativePreferredReadSources originalSources,
+                Optional<KafkaBookKeeperPartitionV1.NativePreferredReadSources> originalSources,
                 BindingReadSelector selector) {
             this.readOwner = readOwner;
             this.batch = batch;
@@ -95,7 +97,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
             if (transfer != null) {
                 throw new IllegalStateException("native fallback source transfer already captured");
             }
-            transfer = new SourceTransfer(originalSources, before, after);
+            transfer = new SourceTransfer(originalSources.orElseThrow(), before, after);
         }
     }
 
@@ -155,11 +157,37 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
         }
     }
 
+    private record FallbackView(
+            Object preferredOnly,
+            Sha256Digest selectedView,
+            Sha256Digest rawView,
+            List<SourceProtectionIdentity> protections,
+            Optional<KafkaBookKeeperPartitionV1.NativePreferredReadSources> compactedBookKeeper) {
+        private static FallbackView capture(Object actual) {
+            if (actual instanceof KafkaBookKeeperPartitionV1.NativePreferredReadSources preferred) {
+                return new FallbackView(
+                        preferred.retiredTail(),
+                        preferred.descriptor().descriptorSha256(),
+                        preferred.rawSources().selectedViewSha256(),
+                        preferred.fallbackSources(),
+                        Optional.of(preferred));
+            }
+            if (actual instanceof KafkaBookKeeperNativeObjectReadSourcesV1 selected && selected.fallback()) {
+                return new FallbackView(
+                        selected.withoutFallback(),
+                        selected.prefix().manifestSha256(),
+                        selected.rawSources().selectedViewSha256(),
+                        selected.fallbackSources(),
+                        Optional.empty());
+            }
+            throw new IllegalStateException("native fallback retirement lacks its actual selected reader");
+        }
+    }
+
     private final KafkaBookKeeperM4BrokerReadOwnerV2 owner;
     private final M4ReadControlCoordinatorV1 coordinator;
     private final BindingReadAuthorityV1 authority;
-    private final KafkaBookKeeperPartitionV1.NativePreferredReadSources sources;
-    private final KafkaBookKeeperPartitionV1.NativePreferredReadSources tailSources;
+    private final FallbackView sources;
     private BindingReadSelector predecessor;
     private BindingReadSelector successor;
     private BindingReadAuthorityV1 successorAuthority;
@@ -176,13 +204,10 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
         this.owner = Objects.requireNonNull(owner, "owner");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.authority = Objects.requireNonNull(authority, "authority");
-        if (!(authority.publicationCell().protocolStateReference()
-                        instanceof KafkaBookKeeperPartitionV1.NativePreferredReadSources preferred)
-                || !authority.admitting()) {
+        if (!authority.admitting()) {
             throw new IllegalStateException("native fallback retirement lacks its actual admitted selected reader");
         }
-        sources = preferred;
-        tailSources = preferred.retiredTail();
+        sources = FallbackView.capture(authority.publicationCell().protocolStateReference());
         owner.closeAdmission();
         owner.selectorRuntime().stopLocalAdmission();
     }
@@ -200,7 +225,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
     }
 
     public Sha256Digest descriptorSha256() {
-        return sources.descriptor().descriptorSha256();
+        return sources.selectedView();
     }
 
     boolean owns(Result candidate) {
@@ -224,7 +249,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
                     cell.readableUpperBound(),
                     cell.activeTailViewVersion(),
                     cell.routes(),
-                    tailSources);
+                    sources.preferredOnly());
             successorAuthority = new BindingReadAuthorityV1(
                     authority.bindingId(),
                     authority.topicIncarnationIdentity(),
@@ -246,7 +271,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
                             successorAuthority,
                             descriptorSha256(),
                             successorAuthority.sourceGeneration(),
-                            sources.fallbackSources()));
+                            sources.protections()));
             successor = coordinator.readSelector().orElseThrow();
             anchor = successor.pendingAnchors().stream()
                     .filter(value -> value.closedReadAdmissionEpoch() == predecessor.readAdmissionEpoch())
@@ -255,7 +280,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
             batch = successor.activeBatches().stream()
                     .filter(value ->
                             value.sharedLastFallbackCapableReadAdmissionEpoch() == predecessor.readAdmissionEpoch()
-                                    && value.sources().equals(sources.fallbackSources()))
+                                    && value.sources().equals(sources.protections()))
                     .findFirst()
                     .orElseThrow();
             if (!anchor.predecessorSelectorCoreSha256().equals(M4ReadControlCodecV1.selectorCoreSha256(predecessor))
@@ -317,7 +342,12 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
         }
         requireSuccessor();
         result = new Result(
-                owner.successorAfterDrain(successor, successorAuthority), batch, terminal, proof, sources, successor);
+                owner.successorAfterDrain(successor, successorAuthority),
+                batch,
+                terminal,
+                proof,
+                sources.compactedBookKeeper(),
+                successor);
         return result;
     }
 
@@ -329,7 +359,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
                         .toByteArray())
                 .put(M4ReadControlCodecV1.selectorCoreSha256(successor).bytes().toByteArray())
                 .put(M4ReadControlCodecV1.anchorSha256(anchor).bytes().toByteArray())
-                .put(sources.rawSources().selectedViewSha256().bytes().toByteArray())
+                .put(sources.rawView().bytes().toByteArray())
                 .array()));
     }
 
