@@ -700,8 +700,9 @@ public final class OxiaBindingLifecycleMetadataStoreV2
                 for (var ticket : tickets) {
                     settled = settled.thenCompose(
                             ignored -> clearTrimWrite(ticket).thenAccept(cleared -> {
-                                if (!cleared)
+                                if (!cleared) {
                                     throw new IllegalStateException("original pending output write remains unresolved");
+                                }
                             }));
                 }
                 return settled;
