@@ -752,7 +752,8 @@ public final class KafkaBookKeeperPartitionV1 {
                     || bytes > envelope.maximumEncodedBytes() / 2 - runBytes
                     || entries > envelope.maximumEntries() - 3 - admittedEntries
                     || !fitsControlReserve(entries, bytes)) {
-                if (nativeObjectPublication != null || nativeObjectRetirement != null) {
+                if (nativeObjectPublication != null
+                        || nativeObjectRetirement != null && m4ReadOwner == nativeObjectRetirement.predecessorOwner()) {
                     throw new IllegalStateException(
                             "native Object selector transition has not settled before BK rollover");
                 }
@@ -1821,24 +1822,67 @@ public final class KafkaBookKeeperPartitionV1 {
         return nativeObjectRetirement;
     }
 
-    public synchronized void finishNativeObjectFallbackRetirement(
-            KafkaBookKeeperNativeFallbackRetirementV2 retirement,
-            KafkaBookKeeperNativeFallbackRetirementV2.Result result) {
-        requireWritable();
-        if (nativeObjectRetirement != retirement
-                || !retirement.owns(result)
-                || m4ReadOwner != retirement.predecessorOwner()) {
-            throw new IllegalStateException("native Object fallback retirement changed its actual read actor");
+    public CompletionStage<Void> closeNativeObjectFallbackAdmission(
+            KafkaBookKeeperNativeFallbackRetirementV2 retirement, java.util.concurrent.Executor control) {
+        synchronized (this) {
+            requireObjectFallbackRetirement(retirement);
         }
-        var authority = result.readOwner().selectorRuntime().currentAuthority().get();
+        return retirement
+                .closeObjectAdmission(control)
+                .thenAccept(next -> installPreferredObjectOwner(retirement, next))
+                .thenApply(ignored -> null);
+    }
+
+    private synchronized void installPreferredObjectOwner(
+            KafkaBookKeeperNativeFallbackRetirementV2 retirement, KafkaBookKeeperM4BrokerReadOwnerV2 next) {
+        requireObjectFallbackRetirement(retirement);
+        if (m4ReadOwner == next) {
+            return;
+        }
+        if (rolling || m4ReadOwner != retirement.predecessorOwner()) {
+            throw new IllegalStateException("native Object fallback retirement changed its original read actor");
+        }
+        var authority = next.selectorRuntime().currentAuthority().get();
         if (!(authority.publicationCell().protocolStateReference()
                         instanceof KafkaBookKeeperNativeObjectReadSourcesV1 preferred)
                 || preferred.fallback()
                 || !preferred.rawSources().equals(nativeReadSourcesUnchecked())) {
             throw new IllegalStateException("native Object fallback retirement changed its BK recovery references");
         }
-        m4ReadOwner = result.readOwner();
+        m4ReadOwner = next;
+    }
+
+    public CompletionStage<KafkaBookKeeperNativeFallbackRetirementV2.Result> finishNativeObjectFallbackRetirement(
+            KafkaBookKeeperNativeFallbackRetirementV2 retirement, java.util.concurrent.Executor control) {
+        final KafkaBookKeeperM4BrokerReadOwnerV2 installed;
+        synchronized (this) {
+            requireObjectFallbackRetirement(retirement);
+            installed = m4ReadOwner;
+        }
+        return retirement
+                .releaseObjectAfterDrain(control, installed)
+                .thenApply(result -> {
+                    completeNativeObjectFallbackRetirement(retirement, result);
+                    return result;
+                })
+                .thenApply(value -> value);
+    }
+
+    private synchronized void completeNativeObjectFallbackRetirement(
+            KafkaBookKeeperNativeFallbackRetirementV2 retirement,
+            KafkaBookKeeperNativeFallbackRetirementV2.Result result) {
+        requireObjectFallbackRetirement(retirement);
+        if (!retirement.owns(result) || m4ReadOwner != result.readOwner()) {
+            throw new IllegalStateException("native Object fallback retirement changed its actual read actor");
+        }
         nativeObjectRetirement = null;
+    }
+
+    private void requireObjectFallbackRetirement(KafkaBookKeeperNativeFallbackRetirementV2 retirement) {
+        requireWritable();
+        if (nativeObjectRetirement == null || nativeObjectRetirement != retirement) {
+            throw new IllegalStateException("native Object fallback retirement changed its original manifest");
+        }
     }
 
     public synchronized void finishNativeFallbackRetirement(
@@ -2462,8 +2506,7 @@ public final class KafkaBookKeeperPartitionV1 {
             attempt = resignation;
         }
         if (start) {
-            CompletionStage<Void> m4Drained =
-                    m4ReadOwner == null ? CompletableFuture.completedFuture(null) : m4ReadOwner.drain();
+            CompletionStage<Void> m4Drained = drainNativeReadActors();
             readsDrained
                     .thenCombine(m4Drained, (ignored, alsoIgnored) -> null)
                     .thenCompose(ignored -> ownerAuthority.closeOwner(owner))
@@ -2486,6 +2529,15 @@ public final class KafkaBookKeeperPartitionV1 {
                     });
         }
         return attempt.thenApply(ignored -> null);
+    }
+
+    private synchronized CompletionStage<Void> drainNativeReadActors() {
+        CompletionStage<Void> current =
+                m4ReadOwner == null ? CompletableFuture.completedFuture(null) : m4ReadOwner.drain();
+        if (nativeObjectRetirement == null || nativeObjectRetirement.predecessorOwner() == m4ReadOwner) {
+            return current;
+        }
+        return current.thenCombine(nativeObjectRetirement.predecessorOwner().drain(), (ignored, old) -> null);
     }
 
     private void completeRead() {

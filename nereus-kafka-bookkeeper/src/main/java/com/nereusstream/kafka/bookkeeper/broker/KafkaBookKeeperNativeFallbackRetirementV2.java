@@ -195,6 +195,7 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
     private SourceRetirementBatch batch;
     private ReadAdmissionEpochTerminalCut terminal;
     private ReadQuiescenceProof proof;
+    private KafkaBookKeeperM4BrokerReadOwnerV2 preferredObjectOwner;
     private Result result;
 
     KafkaBookKeeperNativeFallbackRetirementV2(
@@ -214,8 +215,37 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
 
     /** The existing control executor serializes exact metadata attempts; cancellation affects only the observer. */
     public CompletionStage<Result> retire(Executor control) {
+        if (sources.compactedBookKeeper().isEmpty()) {
+            throw new IllegalStateException("Object fallback retirement must open its preferred-only read actor first");
+        }
         return CompletableFuture.runAsync(this::closeFallback, control)
                 .thenCompose(ignored -> owner.drain())
+                .thenApplyAsync(ignored -> releaseAfterConfirmedDrain(), control)
+                .thenApply(value -> value);
+    }
+
+    CompletionStage<KafkaBookKeeperM4BrokerReadOwnerV2> closeObjectAdmission(Executor control) {
+        if (sources.compactedBookKeeper().isPresent()) {
+            throw new IllegalStateException(
+                    "native BK compaction still requires a drained predecessor before activation");
+        }
+        return CompletableFuture.supplyAsync(
+                        () -> {
+                            closeFallback();
+                            if (preferredObjectOwner == null) {
+                                preferredObjectOwner = owner.successorAfterFence(successor, successorAuthority);
+                            }
+                            return preferredObjectOwner;
+                        },
+                        control)
+                .thenApply(value -> value);
+    }
+
+    CompletionStage<Result> releaseObjectAfterDrain(Executor control, KafkaBookKeeperM4BrokerReadOwnerV2 installed) {
+        if (installed == null || installed != preferredObjectOwner) {
+            throw new IllegalStateException("Object fallback retirement lacks its active preferred-only read actor");
+        }
+        return owner.drain()
                 .thenApplyAsync(ignored -> releaseAfterConfirmedDrain(), control)
                 .thenApply(value -> value);
     }
@@ -340,14 +370,16 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
         for (var source : batch.sources()) {
             exact(coordinator.releaseProtection(batch, source, owner.hazards()));
         }
-        requireSuccessor();
+        var selected = requireSuccessor();
         result = new Result(
-                owner.successorAfterDrain(successor, successorAuthority),
+                preferredObjectOwner == null
+                        ? owner.successorAfterDrain(selected, successorAuthority)
+                        : preferredObjectOwner,
                 batch,
                 terminal,
                 proof,
                 sources.compactedBookKeeper(),
-                successor);
+                selected);
         return result;
     }
 
@@ -363,10 +395,28 @@ public final class KafkaBookKeeperNativeFallbackRetirementV2 {
                 .array()));
     }
 
-    private void requireSuccessor() {
-        if (!coordinator.readSelector().equals(Optional.of(successor))) {
-            throw new IllegalStateException("native fallback retirement selector changed");
+    private BindingReadSelector requireSuccessor() {
+        var current = coordinator.readSelector().orElseThrow();
+        if (current.equals(successor)) {
+            return current;
         }
+        // A preferred-only Object actor may keep rolling BK tail sources while the old fallback reads drain.
+        // This advances only the source generation; the closed epoch, selected manifest and proof batch remain exact.
+        if (preferredObjectOwner != null
+                && current.binding().equals(successor.binding())
+                && current.selectedViewSha256().equals(successor.selectedViewSha256())
+                && current.ownerEpoch() == successor.ownerEpoch()
+                && current.readAdmissionEpoch() == successor.readAdmissionEpoch()
+                && current.sourceGeneration() > successor.sourceGeneration()
+                && current.mode() == successor.mode()
+                && current.admissionState() == successor.admissionState()
+                && current.capability().equals(successor.capability())
+                && current.fallbackSetSha256().equals(successor.fallbackSetSha256())
+                && current.pendingAnchors().contains(anchor)
+                && current.activeBatches().contains(batch)) {
+            return current;
+        }
+        throw new IllegalStateException("native fallback retirement selector changed");
     }
 
     private static void exact(Outcome outcome) {

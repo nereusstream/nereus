@@ -220,6 +220,14 @@ public final class KafkaBookKeeperM4BrokerReadOwnerV2 {
     synchronized KafkaBookKeeperM4BrokerReadOwnerV2 successorAfterDrain(
             BindingReadSelector durable, BindingReadAuthorityV1 authority) {
         requireConfirmedDrain();
+        return successorAfterFence(durable, authority);
+    }
+
+    synchronized KafkaBookKeeperM4BrokerReadOwnerV2 successorAfterFence(
+            BindingReadSelector durable, BindingReadAuthorityV1 authority) {
+        if (!closed) {
+            throw new IllegalStateException("native predecessor read admission is still open");
+        }
         return new KafkaBookKeeperM4BrokerReadOwnerV2(
                 coordinator, durable, authority, ownerEventLoop, maximumInFlightReads, cellReadSlots, bindingReadSlots);
     }
