@@ -30,14 +30,14 @@ def module(name, path):
 
 
 BK = module("m6_bk_backends", ROOT / "scripts/run-v2-m6-kafka-bk-process-check.py")
-INPUTS = BK.M6.INPUTS
+SOURCE = BK.M6
 
 
 def source_checkout(root):
-    INPUTS.require(not INPUTS.git(root, "status", "--porcelain", "--untracked-files=all"),
+    SOURCE.require(not SOURCE.git(root, "status", "--porcelain", "--untracked-files=all"),
                    f"source checkout must be clean: {root}")
-    return {"commit": INPUTS.git(root, "rev-parse", "HEAD").decode("ascii").strip(),
-            "tree": INPUTS.git(root, "rev-parse", "HEAD^{tree}").decode("ascii").strip()}
+    return {"commit": SOURCE.git(root, "rev-parse", "HEAD").decode("ascii").strip(),
+            "tree": SOURCE.git(root, "rev-parse", "HEAD^{tree}").decode("ascii").strip()}
 
 
 def capture_runtime(source, output, task, java_home, *extra):
@@ -63,12 +63,12 @@ def runtime_paths(pulsar, out, java_home):
         "/nereus-" in str(p) and "/build/libs/" in str(p)
         or "/software.amazon.awssdk/" in str(p) or "/org.apache.commons/commons-collections4/" in str(p))]
     provider = [p for p in sdk if p.is_dir() and "/nereus-pulsar-broker/build/classes/" in str(p)]
-    INPUTS.require(len(provider) == 1, "native provider classes missing from SDK runtime")
+    SOURCE.require(len(provider) == 1, "native provider classes missing from SDK runtime")
     ordered = [p for p in retained + extra + provider if p.exists()]
     for name in ("oxia-client", "oxia-client-api", "nereus-metadata-oxia", "nereus-metadata-spi", "nereus-domain",
                  "nereus-pulsar-offload", "bookkeeper-server"):
         found = [p for p in ordered if re.fullmatch(re.escape(name) + r"-[0-9].*\.jar", p.name)]
-        INPUTS.require(len(found) == 1, f"runtime must contain exactly one {name}: {found}")
+        SOURCE.require(len(found) == 1, f"runtime must contain exactly one {name}: {found}")
     return ordered
 
 
@@ -117,17 +117,17 @@ def start_broker(stack, java, config, log, admin, expect_rejection=False):
                 if strict:
                     raise
         if strict:
-            INPUTS.require("Shut down broker service successfully." in log.read_text(),
+            SOURCE.require("Shut down broker service successfully." in log.read_text(),
                            f"Broker did not complete graceful shutdown: {log}")
 
     stack.callback(stop)
     if expect_rejection:
-        INPUTS.require(proc.wait(35) != 0, "unqualified Broker startup unexpectedly succeeded")
-        INPUTS.require("Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM" in log.read_text(),
+        SOURCE.require(proc.wait(35) != 0, "unqualified Broker startup unexpectedly succeeded")
+        SOURCE.require("Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM" in log.read_text(),
                        "startup did not fail at the native ownership capability check")
         return stop
     for _ in range(50):
-        INPUTS.require(proc.poll() is None, f"Broker exited before health check: {log}")
+        SOURCE.require(proc.poll() is None, f"Broker exited before health check: {log}")
         try:
             with urllib.request.urlopen(f"http://{admin}/admin/v2/brokers/health", timeout=2) as response:
                 if response.status == 200:
@@ -139,7 +139,7 @@ def start_broker(stack, java, config, log, admin, expect_rejection=False):
 
 def run(pulsar, java_home, out):
     sources = {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)}
-    INPUTS.require(not out.is_relative_to(ROOT) and not out.is_relative_to(pulsar),
+    SOURCE.require(not out.is_relative_to(ROOT) and not out.is_relative_to(pulsar),
                    "evidence output must be outside both source trees")
     out.mkdir()
     ordered = runtime_paths(pulsar, out, java_home)
@@ -194,26 +194,26 @@ def run(pulsar, java_home, out):
         state = out / "expected-cold-state.properties"
         args = [CLIENT, origin, *addresses[:4], str(state)]
         run_to_log(java + args, out / "client.log")
-        INPUTS.require("PULSAR_NATIVE_BK_PROTOCOL_SEMANTICS_PASS" in (out / "client.log").read_text(),
+        SOURCE.require("PULSAR_NATIVE_BK_PROTOCOL_SEMANTICS_PASS" in (out / "client.log").read_text(),
                        "native BK protocol checks did not reach their terminal assertions")
-        INPUTS.require("PULSAR_NATIVE_MISSING_BINDING_REJECTED" in (out / "client.log").read_text(),
+        SOURCE.require("PULSAR_NATIVE_MISSING_BINDING_REJECTED" in (out / "client.log").read_text(),
                        "missing Binding was not rejected before native ledger creation")
         for stop in reversed(brokers):
             stop(strict=True)
         restarted = start_broker(stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])
         run_to_log(java + args + ["restart"], out / "restart-client.log")
-        INPUTS.require("PULSAR_NATIVE_BK_RESTART_PASS" in (out / "restart-client.log").read_text(),
+        SOURCE.require("PULSAR_NATIVE_BK_RESTART_PASS" in (out / "restart-client.log").read_text(),
                        "native BK restart did not reach its terminal assertions")
         restarted(strict=True)
         negative = out / "unqualified.conf"
         broker_config(template, negative, {**base, "webServicePort": ports[4], "brokerServicePort": ports[5],
                                           "metadataStoreUrl": f"oxia://{oxia}"})
         start_broker(stack, java, negative, out / "unqualified.log", addresses[4], expect_rejection=True)
-    INPUTS.require(sources == {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)},
+    SOURCE.require(sources == {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)},
                    "source checkout changed during execution")
-    INPUTS.require(inputs == [path_identity(p) for p in ordered], "runtime inputs changed during execution")
+    SOURCE.require(inputs == [path_identity(p) for p in ordered], "runtime inputs changed during execution")
     artifacts = [p for p in sorted(out.iterdir()) if p.is_file()]
-    (out / "process-result.json").write_bytes(INPUTS.canonical({
+    (out / "process-result.json").write_bytes(SOURCE.INPUTS.canonical({
         "schema": "NEREUS_V2_M6_PULSAR_BK_FOCUSED_PROCESS_V1", "promotionEligible": False, "status": "PASS",
         "sources": sources, "runtime": inputs, "launchTools": [path_identity(java_exe), path_identity(javac_exe)],
         "compiledProbe": path_identity(probes), "outputs": {p.name: BK.M6.file_identity(p) for p in artifacts},
