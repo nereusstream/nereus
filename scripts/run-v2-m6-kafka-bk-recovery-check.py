@@ -68,14 +68,19 @@ def run(kafka, java, out):
             f"-PnereusLockedOxiaRepository={BK.OXIA_CLIENT}",
             "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
             f"-Pv2M5RetentionOxiaServiceAddress={oxia}", f"-Pv2M5KafkaRunSourceRoot={ROOT}",
-            f"-Pv2M5KafkaRunSummaryFile={receipt}", f":core:{TASK}",
+            f"-Pv2M5KafkaRunSummaryFile={receipt}", "-Pv2M6KafkaReadQualification=true", f":core:{TASK}",
         ]
         for method in METHODS:
             command.extend(("--tests", f"{SUITE}.{method}"))
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
-            subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            xml = kafka / "core/build/test-results" / TASK / f"TEST-{SUITE}.xml"
+            if xml.is_file() and xml.stat().st_mtime_ns >= started:
+                (out / xml.name).write_bytes(JUNIT.regular(xml))
+            completed.check_returncode()
         test = ASYNC.read_test(kafka, java, out, started, TASK, SUITE,
                                {method + "()" for method in METHODS}, artifacts)
     M6.require(all(M6.clean_commit(root) == commits[name] for name, root in roots.items())
