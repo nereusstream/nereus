@@ -95,7 +95,12 @@ def verify(traces, frozen, roots, output, file_identity, require, repositories=N
                 require(row["event"] in {"gradle", "task"}, f"unexpected Gradle capture event: {trace}")
                 build = Path(row["build"])
                 require(any(build.is_relative_to(root) for root in roots.values()), f"unknown Gradle build: {build}")
-                inputs = row["files"] if row["event"] == "gradle" else row["inputs"]
+                is_task = row["event"] == "task"
+                if is_task and row.get("skip") in {"SKIPPED", "NO-SOURCE"}:
+                    require(not row["produced"], f"skipped Gradle task claimed output: {row['task']}")
+                    tasks += 1
+                    continue
+                inputs = row["inputs"] if is_task else row["files"]
                 archive_outputs = {name: identity(value) for name, value in row.get("outputs", {}).items()
                                    if value != {"absent": True}}
                 for name, value in inputs.items():
