@@ -149,8 +149,8 @@ def run(pulsar, java_home, out):
     probes = out / "probe-classes"
     probes.mkdir()
     cp = os.pathsep.join(map(str, ordered + [probes]))
-    java_exe = java_home / "bin/java"
-    javac_exe = java_home / "bin/javac"
+    java_exe = (java_home / "bin/java").resolve(strict=True)
+    javac_exe = (java_home / "bin/javac").resolve(strict=True)
     java = [str(java_exe), "-Xmx512m", "-XX:MaxDirectMemorySize=256m", "-XX:ActiveProcessorCount=4",
             "--add-exports=java.management/sun.management=ALL-UNNAMED",
             "-Dlog4j.configurationFile=" + str(CONFIG / "console-log.xml"),
