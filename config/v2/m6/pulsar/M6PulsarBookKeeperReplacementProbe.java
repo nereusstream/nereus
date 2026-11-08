@@ -19,9 +19,11 @@ import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicName;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.pulsar.offload.PulsarOffloadKeysV1;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +32,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -48,6 +51,9 @@ import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.metadata.api.MetadataStore;
 import org.apache.pulsar.metadata.api.MetadataStoreConfig;
 import org.apache.pulsar.metadata.api.MetadataStoreFactory;
+import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 
 public class M6PulsarBookKeeperReplacementProbe {
     private static final String NAMESPACE = "public/m6-native";
@@ -57,6 +63,8 @@ public class M6PulsarBookKeeperReplacementProbe {
 
     public static void main(String[] args) throws Exception {
         var state = Path.of(args[4]);
+        var cell = new Properties();
+        try (var file = Files.newBufferedReader(Path.of(args[args.length - 1]))) { cell.load(file); }
         try (var meta = MetadataStoreFactory.create(args[1], MetadataStoreConfig.builder().build());
                 var client = PulsarClient.builder().serviceUrl("pulsar://" + args[3])
                         .operationTimeout(20, TimeUnit.SECONDS).build();
@@ -79,8 +87,6 @@ public class M6PulsarBookKeeperReplacementProbe {
                     throw new AssertionError("No real native rollover before offload");
                 }
                 var fault = Path.of(args[6]);
-                var cell = new Properties();
-                try (var file = Files.newBufferedReader(Path.of(args[7]))) { cell.load(file); }
                 try (var oxia = OxiaClientBuilder.create(cell.getProperty("oxiaAddress"))
                         .namespace(cell.getProperty("oxiaNamespace")).asyncClient().get(10, TimeUnit.SECONDS)) {
                     var prior = mutationTickets(oxia, cell);
@@ -117,6 +123,7 @@ public class M6PulsarBookKeeperReplacementProbe {
                 var expected = new Properties();
                 expected.setProperty("ledger", Long.toString(ledger));
                 expected.setProperty("attempt", before.getUidMsb() + ":" + before.getUidLsb());
+                requireOriginalObjectVersions(cell, ledger, new UUID(before.getUidMsb(), before.getUidLsb()), expected, false);
                 for (int i = 0; i < COUNT; i++) {
                     expected.setProperty("position." + i,
                             Base64.getEncoder().encodeToString(positions.get(i).toByteArray()));
@@ -133,6 +140,7 @@ public class M6PulsarBookKeeperReplacementProbe {
                         || !expected.getProperty("attempt").equals(after.getUidMsb() + ":" + after.getUidLsb())) {
                     throw new AssertionError("Native DONE did not retain original offload identity");
                 }
+                requireOriginalObjectVersions(cell, ledger, new UUID(after.getUidMsb(), after.getUidLsb()), expected, true);
                 try {
                     bookKeeper.getLedgerManager().readLedgerMetadata(ledger).get(10, TimeUnit.SECONDS);
                     throw new AssertionError("Native DONE still has physical BookKeeper ledger metadata");
@@ -198,6 +206,36 @@ public class M6PulsarBookKeeperReplacementProbe {
         return M5PulsarAggregateAuthorityCodecV1.decodeAuthority(exact.canonicalStoredBytes())
                 .referenceMutationTickets().stream().map(ticket -> ticket.operationIdSha256())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private static void requireOriginalObjectVersions(
+            Properties cell, long ledger, UUID attempt, Properties observed, boolean absent) {
+        var keys = PulsarOffloadKeysV1.derive(cell.getProperty("s3KeyPrefix"), ledger, attempt);
+        try (var s3 = S3Client.builder().endpointOverride(URI.create(cell.getProperty("s3Endpoint")))
+                .credentialsProvider(EnvironmentVariableCredentialsProvider.create()).forcePathStyle(true)
+                .region(Region.of(cell.getProperty("s3Region"))).build()) {
+            var exact = s3.listObjectVersions(request -> request.bucket(cell.getProperty("s3Bucket"))
+                    .prefix(keys.attemptPrefix() + "/"));
+            if (exact.isTruncated() || !exact.deleteMarkers().isEmpty()) {
+                throw new AssertionError("Original offload is not one bounded exact-version inventory");
+            }
+            if (absent) {
+                if (observed.getProperty("original.dataVersion") == null
+                        || observed.getProperty("original.rootVersion") == null || !exact.versions().isEmpty()) {
+                    throw new AssertionError("Original NPD1/NPO1 immutable versions remain after settlement");
+                }
+                return;
+            }
+            var root = exact.versions().stream().filter(version -> version.key().equals(keys.rootKey()))
+                    .map(version -> version.versionId()).findFirst().orElseThrow();
+            var data = exact.versions().stream().filter(version -> version.key().equals(keys.dataKey()))
+                    .map(version -> version.versionId()).findFirst().orElseThrow();
+            if (exact.versions().size() != 2 || "null".equals(root) || "null".equals(data)) {
+                throw new AssertionError("Original native offload did not produce exactly one immutable version per object");
+            }
+            observed.setProperty("original.rootVersion", root);
+            observed.setProperty("original.dataVersion", data);
+        }
     }
 
     private static org.apache.bookkeeper.mledger.proto.OffloadContext context(MetadataStore store, long ledger)

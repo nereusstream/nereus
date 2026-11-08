@@ -133,6 +133,7 @@ def run(pulsar, java_home, out):
         cell.write_text(props + f"\nshareOwners=6\nreadMaximumEntries=16\nbkClientJar={hashlib.sha256(broker_jar.read_bytes()).hexdigest()}\n"
                         f"bkMetadataUri={bk_uri}\ns3KeyPrefix=cells/m5-native\nbookKeeperRetention=DELETE_AFTER_VERIFIED\n"
                         f"bookKeeperGcProviderMinimumMillis=0\nbookKeeperGcAuditMinimumMillis=1\nbookKeeperGcGraceMillis=25\n"
+                        "offloadObjectGcProviderMinimumMillis=1\noffloadObjectGcGraceMillis=25\n"
                         f"bookKeeperReadDrainAdmission={capsule}\nbookKeeperReadDrainAdmissionSha256={digest}\n")
         r.run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(cell), str(root),
                             endpoint, kms, endpoint], out / "provision.log")
@@ -200,7 +201,8 @@ def run(pulsar, java_home, out):
             {"ledger": int(original), "exactRequests": delete_fault.matches,
              "originalResponseSuppressed": True, "actualResponseCode": delete_fault.response}))
         stop = r.start_broker(stack, java, conf, out / "restarted.log", web)
-        r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "cold", origin, web, binary, str(expected), bk_uri], out / "cold-client.log")
+        r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "cold", origin, web, binary,
+                            str(expected), bk_uri, str(cell)], out / "cold-client.log")
         stop(strict=True)
         r.SOURCE.require("PULSAR_M6_DELETE_ENROLLED_OUTPUT " + original in (out / "initial-client.log").read_text()
                          and "PULSAR_M6_NATIVE_PUBLICATION_UNKNOWN_SETTLED " + original in (out / "initial-client.log").read_text()
@@ -210,6 +212,8 @@ def run(pulsar, java_home, out):
                          and "PULSAR_M6_NATIVE_DELETE_UNKNOWN_SETTLED " + original
                          in (out / "physical-delete-settled.log").read_text()
                          and "Native BK replacement reached exact RELEASED and DONE for ledger " + original
+                         in (out / "operator.log").read_text()
+                         and "Native offload settled original NPD1 and NPO1 for ledger " + original
                          in (out / "operator.log").read_text()
                          and "PULSAR_M6_DELETE_COLD_BACKLOG_PASS " + original in (out / "cold-client.log").read_text(),
                          "native replacement did not reach its complete real-process assertions")
@@ -244,6 +248,7 @@ def run(pulsar, java_home, out):
                    "active-cell-rejected",
                    "actual-fallback-release", "native-bookkeeper-intent-and-done",
                    "original-physical-delete-unknown-settled", "physical-absence",
+                   "original-native-offload-version-settlement",
                    "cold-official-client-backlog-and-positions"],
     }))
 

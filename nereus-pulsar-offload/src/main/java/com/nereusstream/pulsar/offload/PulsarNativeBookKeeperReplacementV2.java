@@ -77,6 +77,7 @@ public final class PulsarNativeBookKeeperReplacementV2 {
     private PulsarNativeM4FallbackRetirementV1.Result released;
     private CompletableFuture<ReleasedSource> original;
     private CompletableFuture<Void> nativeDone;
+    private CompletableFuture<PulsarNativeM4FallbackRetirementV1.Result> retiredOffload;
 
     public PulsarNativeBookKeeperReplacementV2(
             PulsarNativeBindingV1 binding,
@@ -208,6 +209,48 @@ public final class PulsarNativeBookKeeperReplacementV2 {
                     .thenCompose(unused -> closeScope());
         }
         return nativeDone.copy();
+    }
+
+    /** Closes the materialized generation's original Native fallback before either original Object is deleted. */
+    public synchronized CompletableFuture<PulsarNativeM4FallbackRetirementV1.Result> retireOffloadFallback() {
+        if (nativeDone == null || !nativeDone.isDone() || nativeDone.isCompletedExceptionally()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Native BookKeeper DONE is not confirmed"));
+        }
+        if (retiredOffload == null) {
+            control = binding.m4Control();
+            retiredOffload = control.installControlWriter(writers, aggregate, key, budget)
+                    .thenCompose(unused -> open())
+                    .thenCompose(unused -> prepareMaterialized())
+                    .thenCompose(prepared -> control.prepareMaterializedReadOwner(
+                            prepared, admission, scope.factory().namespace(), scope.offloader(), worker))
+                    .thenCompose(recovery -> recovery.recover(worker, readEventLoop, readSlots, budget))
+                    .thenCompose(recovered -> {
+                        owner = recovered;
+                        preparation = null;
+                        return owner.fence();
+                    })
+                    .thenCompose(unused -> closeScope())
+                    .thenCompose(unused -> open())
+                    .thenCompose(unused -> prepareMaterialized())
+                    .thenCompose(PulsarNativeSourcePreparationV1::view)
+                    .thenCompose(preferred -> control.retireFallback(
+                            owner, preferred, scope.factory().namespace(), scope.offloader(), worker))
+                    .thenCompose(retired -> {
+                        owner = retired.successorOwner();
+                        preparation = null;
+                        return owner.drainForRecovery(worker)
+                                .thenCompose(unused -> closeScope())
+                                .thenCompose(unused -> control.closeControlWriter())
+                                .thenApply(unused -> retired);
+                    });
+        }
+        return retiredOffload.copy();
+    }
+
+    private CompletableFuture<PulsarNativeSourcePreparationV1> prepareMaterialized() {
+        return control.prepareMaterializedReadSources(
+                        scope.ledger(), scope.factory().namespace(), scope.offloader(), scope.objects(), budget, worker)
+                .thenApply(prepared -> preparation = prepared);
     }
 
     private CompletableFuture<Void> open() {

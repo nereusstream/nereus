@@ -24,9 +24,9 @@ import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.pulsar.offload.PulsarNativeBindingV1;
-import com.nereusstream.pulsar.offload.PulsarNativeBookKeeperReclamationV2;
 import com.nereusstream.pulsar.offload.PulsarNativeBookKeeperReplacementV2;
 import com.nereusstream.pulsar.offload.PulsarNativeManagedLedgerFactoryV2;
+import com.nereusstream.pulsar.offload.PulsarNativeSourceReclamationV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.object.materialization.M5MaterializationAdmissionV1.Caps;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
@@ -214,42 +214,67 @@ public final class PulsarM6BookKeeperReplacement {
                 if (!released.originalScope().bookKeeperGcGrace().equals(Optional.of(policy.grace()))) {
                     throw new IllegalStateException("Original BookKeeper birth has a different admitted grace");
                 }
-                VersionedValue physicalDone;
                 try (var original = M5BookKeeperNamespaceAuthorityV2.observePulsarScope(
                         cell.bookKeeperUri(), cell.bookKeeper(), released.originalScope())) {
                     var objectObserver = PulsarM6AsyncObjectScope.open(objects, cell.metadataIdentity())
                             .get();
-                    var gc = new PulsarNativeBookKeeperReclamationV2(
-                            binding,
-                            binding.m4Control(),
-                            released.resource(),
-                            released.release(),
-                            aggregate,
-                            cell.writers(),
-                            worker);
-                    gc.open(
+                    var nativeConfiguration = nativeConfig(cell, actualRetention, readTimeout);
+                    var gc = new PulsarNativeSourceReclamationV2(
+                            binding, binding.m4Control(), aggregate, cell.writers(), worker);
+                    gc.openBookKeeper(
+                                    released.resource(),
+                                    released.release(),
                                     aggregate
                                             .read(key)
                                             .toCompletableFuture()
                                             .get()
                                             .orElseThrow(),
                                     metadata,
-                                    nativeConfig(cell, actualRetention, readTimeout),
+                                    nativeConfiguration,
                                     original,
                                     objectObserver.physical(objects),
                                     budget)
                             .get();
-                    physicalDone = gc.reclaim(policy.grace().durationMillis()).get();
+                    VersionedValue physicalDone = gc.reclaimBookKeeper(
+                                    policy.grace().durationMillis())
+                            .get();
                     gc.closeAsync().get();
+                    replacement.completeNativeDone(physicalDone).get();
+                    if (!attempt.equals(
+                            requireNativeMarker(metadata, topic, ledgerId, BookKeeperDeleteState.BK_DELETE_DONE))) {
+                        throw new IllegalStateException("Native BookKeeper DONE changed the original offload UUID");
+                    }
+                    System.out.println("Native BK replacement reached exact RELEASED and DONE for ledger " + ledgerId);
+                    var retiredOffload = replacement.retireOffloadFallback().get();
+                    var objectGc = new PulsarNativeSourceReclamationV2(
+                            binding, binding.m4Control(), aggregate, cell.writers(), worker);
+                    objectGc.openOffload(
+                                    aggregate
+                                            .read(key)
+                                            .toCompletableFuture()
+                                            .get()
+                                            .orElseThrow(),
+                                    metadata,
+                                    nativeConfiguration,
+                                    original,
+                                    objectObserver.physical(objects),
+                                    budget)
+                            .get();
+                    objectGc.reclaimOffload(
+                                    retiredOffload,
+                                    released.originalScope().namespaceBinding(),
+                                    ledgerId,
+                                    attempt,
+                                    budget,
+                                    objectObserver.offloader(),
+                                    cap,
+                                    policy.objectGrace().durationMillis())
+                            .get();
+                    objectGc.closeAsync().get();
                     objectObserver.closeAsync().get();
-                }
-                replacement.completeNativeDone(physicalDone).get();
-                if (!attempt.equals(
-                        requireNativeMarker(metadata, topic, ledgerId, BookKeeperDeleteState.BK_DELETE_DONE))) {
-                    throw new IllegalStateException("Native BookKeeper DONE changed the original offload UUID");
+                    System.out.println("Native offload settled original NPD1 and NPO1 for ledger " + ledgerId);
                 }
                 budget.closeCell().get();
-                System.out.println("Native BK replacement reached exact RELEASED and DONE for ledger " + ledgerId);
             } finally {
                 readEventLoop.shutdown();
                 worker.shutdown();

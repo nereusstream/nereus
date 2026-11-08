@@ -19,6 +19,7 @@ import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.retention.OxiaQuotaTargetDeleteStoreV2;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.DeleteEligibilitySnapshotV2;
 import com.nereusstream.storage.object.gc.DeleteObservationAuthorityVerifierV2;
@@ -49,8 +50,10 @@ import com.nereusstream.storage.object.s3.S3M5ObjectDeleteIdentityReaderV2;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
@@ -83,6 +86,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
     private CompletableFuture<Void> originalMark;
     private CompletableFuture<VersionedValue> originalDelete;
     private DeleteAttempt deletion;
+    private ReleasedOffloadTarget releasedOffload;
     private BookKeeperDeleteAttempt bookKeeperDeletion;
     private PulsarNativeBookKeeperDeleteV1 nativeDelete;
     private com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1 bookKeeperScope;
@@ -722,33 +726,76 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
             var coverage = M5MaterializationRecordsV1.ProtocolCoverage.pulsar(cursors.coverage()
                     .withRanges(java.util.List.of(
                             new M5PulsarCoverageV2.EntryRange(ledger.ledgerId(), 0, nativeIntent.entries()))));
-            return control.captureRetentionFloors(
-                            scan, cursors, tasks, registry, route.members(), resource, budget, executor)
-                    .thenCompose(floors -> control.capturePhysicalReferences(
-                                    scan, cursors, tasks, registry, route.members(), resource, budget, executor)
-                            .thenCompose(references -> captureBookKeeperReleases(control, selected, released)
-                                    .thenCompose(releases -> buildBookKeeperEvidence(
-                                            control,
-                                            selected,
-                                            tasks,
-                                            registry,
-                                            reason,
-                                            original,
-                                            ready,
-                                            coverage,
-                                            floors,
-                                            references,
-                                            releases))));
+            return capturePublishedEvidence(
+                            control,
+                            tasks,
+                            registry,
+                            released,
+                            bookKeeperScope.namespaceBinding(),
+                            selected,
+                            reason,
+                            original,
+                            ready,
+                            coverage,
+                            ledger.ledgerId(),
+                            nativeIntent.entries())
+                    .thenApply(eligibility -> new BookKeeperDeleteAttempt(
+                            original, eligibility, ready, released.batch().batchIdSha256()));
         });
     }
 
-    private record BookKeeperReleases(
+    private CompletionStage<DeleteEligibilitySnapshotV2> capturePublishedEvidence(
+            PulsarNativeM4ControlV1 control,
+            PulsarNativeMaterializationTaskV2.RetentionRoots tasks,
+            M5ClosedWriterRegistryV1 registry,
+            PulsarNativeM4FallbackRetirementV1.Result released,
+            PhysicalNamespaceAuthorityBindingV2 bookKeeperBinding,
+            PulsarNativeM4ControlV1.SelectedMaterializationSnapshot selected,
+            DeleteEligibilitySnapshotV2.ReclamationReason reason,
+            VersionedValue original,
+            M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady ready,
+            M5MaterializationRecordsV1.ProtocolCoverage coverage,
+            long sourceLedger,
+            long sourceEntries) {
+        var replacements = reason == DeleteEligibilitySnapshotV2.ReclamationReason.REPLACED_REPRESENTATION
+                ? selected.selected()
+                        .readMap()
+                        .physicalLedgerReferences(
+                                binding,
+                                bookKeeperBinding,
+                                selected.selected().providerProfile().physicalBinding(),
+                                sourceLedger,
+                                sourceEntries)
+                        .orElseThrow()
+                : List.<PhysicalResourceIdV2>of();
+        return control.captureRetentionFloors(
+                        scan, cursors, tasks, registry, route.members(), resource, budget, executor)
+                .thenCompose(floors -> control.capturePhysicalReferences(
+                                scan, cursors, tasks, registry, route.members(), resource, budget, executor)
+                        .thenCompose(references -> captureSourceReleases(control, selected, released, bookKeeperBinding)
+                                .thenCompose(releases -> buildPublishedEvidence(
+                                        control,
+                                        selected,
+                                        tasks,
+                                        registry,
+                                        reason,
+                                        original,
+                                        ready,
+                                        coverage,
+                                        floors,
+                                        references,
+                                        releases,
+                                        replacements))));
+    }
+
+    private record SourceReleases(
             java.util.List<M5RetentionRecordsV1.M4ReleaseBindingV1> bindings, java.util.List<VersionedValue> facts) {}
 
-    private CompletionStage<BookKeeperReleases> captureBookKeeperReleases(
+    private CompletionStage<SourceReleases> captureSourceReleases(
             PulsarNativeM4ControlV1 control,
             PulsarNativeM4ControlV1.SelectedMaterializationSnapshot selected,
-            PulsarNativeM4FallbackRetirementV1.Result released) {
+            PulsarNativeM4FallbackRetirementV1.Result released,
+            PhysicalNamespaceAuthorityBindingV2 bookKeeperBinding) {
         var predecessor = released.predecessor();
         var batch = released.batch();
         var mapFact = released.originalSourceMap();
@@ -767,12 +814,12 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                                 && anchor.transitionSha256().equals(batch.transitionSha256())
                                 && M4ReadControlCodecV1.anchorSha256(anchor)
                                         .equals(released.terminal().closureAnchorSha256()))) {
-            throw new IllegalStateException("Native BK release lacks its original source-map/selector closure");
+            throw new IllegalStateException("Native release lacks its original source-map/selector closure");
         }
         var facts = new ArrayList<VersionedValue>();
         CompletionStage<Void> capture = route.read(mapFact.key()).thenAccept(current -> {
             if (!current.equals(Optional.of(mapFact))) {
-                throw new IllegalStateException("Native BK original source-map version changed");
+                throw new IllegalStateException("Native original source-map version changed");
             }
             facts.add(mapFact);
         });
@@ -787,7 +834,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                     capture.thenCompose(ignored -> route.read(expected.getKey()).thenAccept(current -> {
                         var value = current.orElseThrow();
                         if (!value.canonicalStoredBytes().equals(expected.getValue())) {
-                            throw new IllegalStateException("Native BK original M4 terminal/proof changed");
+                            throw new IllegalStateException("Native original M4 terminal/proof changed");
                         }
                         facts.add(value);
                     }));
@@ -803,7 +850,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                                             batch.minimumFirstEpochSummary(),
                                             batch.sharedLastFallbackCapableReadAdmissionEpoch())) {
                                 throw new IllegalStateException(
-                                        "Native BK original M4 release interval is no longer proven");
+                                        "Native original M4 release interval is no longer proven");
                             }
                             facts.add(value);
                         },
@@ -814,7 +861,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
             if (!sourceMap
                     .protectedPhysicalReferences(
                             binding,
-                            bookKeeperScope.namespaceBinding(),
+                            bookKeeperBinding,
                             selected.selected().providerProfile().physicalBinding(),
                             source.sourceIdentitySha256())
                     .contains(resource)) {
@@ -837,7 +884,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                                         .equals(Optional.of(Sha256Digest.hash(
                                                 released.releaseHead().canonicalStoredBytes())))) {
                             throw new IllegalStateException(
-                                    "Native BK protection is not released by this exact original M4 batch");
+                                    "Native protection is not released by this exact original M4 batch");
                         }
                         rows.add(new M5RetentionRecordsV1.M4ReleaseBindingV1(
                                 source.sourceIdentitySha256(),
@@ -851,9 +898,9 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
         }
         return work.thenApply(rows -> {
             if (rows.isEmpty()) {
-                throw new IllegalStateException("Native BK resource has no exact M4 RELEASED binding");
+                throw new IllegalStateException("Native resource has no exact M4 RELEASED binding");
             }
-            return new BookKeeperReleases(java.util.List.copyOf(rows), java.util.List.copyOf(facts));
+            return new SourceReleases(java.util.List.copyOf(rows), java.util.List.copyOf(facts));
         });
     }
 
@@ -864,7 +911,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
         return result.observed().orElseThrow();
     }
 
-    private CompletionStage<BookKeeperDeleteAttempt> buildBookKeeperEvidence(
+    private CompletionStage<DeleteEligibilitySnapshotV2> buildPublishedEvidence(
             PulsarNativeM4ControlV1 control,
             PulsarNativeM4ControlV1.SelectedMaterializationSnapshot selected,
             PulsarNativeMaterializationTaskV2.RetentionRoots tasks,
@@ -875,7 +922,8 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
             M5MaterializationRecordsV1.ProtocolCoverage coverage,
             java.util.List<M5RetentionEvidenceAssemblerV1.FloorAdapterResultV1> floors,
             java.util.List<M5RetentionEvidenceAssemblerV1.ReferenceAdapterResultV1> references,
-            BookKeeperReleases releases) {
+            SourceReleases releases,
+            List<PhysicalResourceIdV2> replacements) {
         var authority = M5TargetDeleteAuthorityCodecV1.decodeAuthority(original.canonicalStoredBytes());
         var source = M5PulsarAggregateAuthorityCodecV1.decodeAuthority(scan.canonicalStoredBytes());
         var configured = source.nativeRetention().orElseThrow();
@@ -897,7 +945,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
         var manifest = selected.immutableFacts().get(keys.manifest(selectedValue.materializedManifestSha256()));
         if (manifest == null) {
             return CompletableFuture.failedFuture(
-                    new IllegalStateException("Native BK lacks actual selected manifest"));
+                    new IllegalStateException("Native source lacks actual selected manifest"));
         }
         var floorRequest = new M5RetentionEvidenceAssemblerV1.FloorSnapshotRequestV1(
                 plan.sourceCut().identity(),
@@ -923,7 +971,7 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
             var rows = new ArrayList<ReferenceObservationV1>();
             for (var row : result.observations()) {
                 if (!row.coverage().contains(coverage)) {
-                    throw new IllegalStateException("Native BK reference inventory omits part of the physical ledger");
+                    throw new IllegalStateException("Native reference inventory omits part of the physical source");
                 }
                 rows.add(new ReferenceObservationV1(
                         row.kind(),
@@ -1011,34 +1059,30 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                                         ? DeleteEligibilitySnapshotV2.NativeDisposition.REPLACEMENT_ALLOWED
                                         : DeleteEligibilitySnapshotV2.NativeDisposition.LOGICAL_EXPIRY_ALLOWED,
                                 replacement
-                                        ? Optional.of(
-                                                bookKeeperReplacement(control, selected, manifest, coverage, snapshot))
+                                        ? Optional.of(replacementEvidence(
+                                                control, selected, manifest, coverage, snapshot, replacements))
                                         : Optional.empty(),
                                 replacement ? Optional.empty() : Optional.of(frontier.orElseThrow()),
                                 Optional.empty());
-                        var eligibility = new DeleteEligibilitySnapshotV2(
+                        return new DeleteEligibilitySnapshotV2(
                                 resource,
                                 reason,
                                 snapshot.generation(),
                                 context.capability(),
                                 members.authority(),
                                 java.util.List.of(member));
-                        return new BookKeeperDeleteAttempt(
-                                original,
-                                eligibility,
-                                ready,
-                                releases.bindings().get(0).releasedByBatchSha256());
                     }));
         });
     }
 
     /** Compares the persisted independent full validation with the original source cut, never caller roots. */
-    private DeleteEligibilitySnapshotV2.ReplacementEvidence bookKeeperReplacement(
+    private DeleteEligibilitySnapshotV2.ReplacementEvidence replacementEvidence(
             PulsarNativeM4ControlV1 control,
             PulsarNativeM4ControlV1.SelectedMaterializationSnapshot selected,
             VersionedValue manifestFact,
             M5MaterializationRecordsV1.ProtocolCoverage coverage,
-            M5RetentionRecordsV1.RetentionFloorSnapshotV1 floors) {
+            M5RetentionRecordsV1.RetentionFloorSnapshotV1 floors,
+            List<PhysicalResourceIdV2> replacements) {
         var keys = new M5MaterializationKeysV1(0, binding.bindingIdentity());
         var manifest = M5MaterializationCodecV1.decodeManifest(manifestFact.canonicalStoredBytes());
         var generationFact = selected.immutableFacts().get(keys.generation(manifest.preferredGenerationSha256()));
@@ -1078,16 +1122,6 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                             control.materializationValidationKey(generation.validationRootSha256()),
                             floors)));
         }
-        var ledger = (PhysicalResourceIdV2.BookKeeperLedger) resource;
-        var replacements = selected.selected()
-                .readMap()
-                .physicalLedgerReferences(
-                        binding,
-                        bookKeeperScope.namespaceBinding(),
-                        selected.selected().providerProfile().physicalBinding(),
-                        ledger.ledgerId(),
-                        cursors.bookKeeperIntent(ledger.ledgerId()).entries())
-                .orElseThrow();
         return new DeleteEligibilitySnapshotV2.ReplacementEvidence(
                 materializationFact(
                         manifestFact,
@@ -1278,6 +1312,102 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                     });
         });
         return originalDelete.copy();
+    }
+
+    private record ReleasedOffloadTarget(
+            PhysicalNamespaceAuthorityBindingV2 bookKeeper, long ledger, UUID attempt, Sha256Digest release) {}
+
+    /** Reclaims one original exact NPD1/NPO1 version after its selected materialization retired the fallback. */
+    public synchronized CompletableFuture<VersionedValue> reclaimPublishedOffloadAfterElapsed(
+            PulsarNativeM4ControlV1 control,
+            PulsarNativeMaterializationTaskV2.RetentionRoots tasks,
+            M5ClosedWriterRegistryV1 registry,
+            PulsarNativeM4FallbackRetirementV1.Result released,
+            PhysicalNamespaceAuthorityBindingV2 bookKeeperBinding,
+            long sourceLedger,
+            UUID attempt) {
+        requireOpen();
+        objectResource();
+        var target = new ReleasedOffloadTarget(
+                bookKeeperBinding, sourceLedger, attempt, released.batch().batchIdSha256());
+        if (releasedOffload != null && !releasedOffload.equals(target)
+                || releasedOffload == null && originalDelete != null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Original Native offload deletion changed"));
+        }
+        releasedOffload = target;
+        if (originalDelete != null && !originalDelete.isCompletedExceptionally()) {
+            return originalDelete.copy();
+        }
+        if (grace == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Native offload deletion lacks its original mark"));
+        }
+        originalDelete = own(() -> requireCurrent().thenCompose(unused -> {
+            if (deletion != null) {
+                return deletion.run();
+            }
+            return grace.requireElapsed().thenCompose(ready -> route.read(resource.authorityKey())
+                    .thenCompose(found -> capturePublishedOffload(
+                            control, tasks, registry, released, target, found.orElseThrow(), ready))
+                    .thenCompose(original -> {
+                        deletion = original;
+                        return original.run();
+                    }));
+        }));
+        return originalDelete.copy();
+    }
+
+    private CompletionStage<DeleteAttempt> capturePublishedOffload(
+            PulsarNativeM4ControlV1 control,
+            PulsarNativeMaterializationTaskV2.RetentionRoots tasks,
+            M5ClosedWriterRegistryV1 registry,
+            PulsarNativeM4FallbackRetirementV1.Result released,
+            ReleasedOffloadTarget target,
+            VersionedValue original,
+            M5TargetDeleteAuthorityCoordinatorV1.EpochGraceReady ready) {
+        return control.readSelectedMaterializationSnapshot(executor).thenCompose(selected -> {
+            var selectedValue = selected.selected();
+            var map = selectedValue.readMap();
+            var objects = selectedValue.providerProfile().physicalBinding();
+            var old = map.predecessor()
+                    .publishedObjects(binding, target.bookKeeper(), objects)
+                    .get(target.ledger());
+            if (old == null
+                    || !old.identity().attemptUuid().equals(target.attempt())
+                    || !map.fullyReplaces(target.ledger(), old.lastEntry())
+                    || !released.batch().binding().equals(binding.bindingIdentity())) {
+                throw new IllegalStateException(
+                        "Native offload deletion lacks the original attempt and full replacement");
+            }
+            long entries = Math.addExact(old.lastEntry(), 1);
+            var coverage = M5MaterializationRecordsV1.ProtocolCoverage.pulsar(cursors.coverage()
+                    .withRanges(List.of(new M5PulsarCoverageV2.EntryRange(target.ledger(), 0, entries))));
+            var identity = java.util.stream.Stream.of(
+                            old.identity().root(), old.identity().data())
+                    .filter(value -> PulsarNativeOffloadedReferenceV2.resource(selectedValue.providerProfile(), value)
+                            .equals(resource))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Native offload exact version is absent"));
+            var body = new ObjectIdentity(
+                    identity.key(),
+                    identity.length(),
+                    Sha256Digest.copyOf(java.util.HexFormat.of().parseHex(identity.sha256())));
+            return capturePublishedEvidence(
+                            control,
+                            tasks,
+                            registry,
+                            released,
+                            target.bookKeeper(),
+                            selected,
+                            DeleteEligibilitySnapshotV2.ReclamationReason.REPLACED_REPRESENTATION,
+                            original,
+                            ready,
+                            coverage,
+                            target.ledger(),
+                            entries)
+                    .thenApply(eligible -> new DeleteAttempt(original, eligible, body, ready));
+        });
     }
 
     private CompletionStage<DeleteAttempt> captureUnpublished(
@@ -1515,7 +1645,11 @@ public final class PulsarNativeGcScopeV1 implements AutoCloseable {
                     ? original.deleteIntent().orElseThrow().deleteAttemptIdSha256()
                     : initialState == TargetDeleteAuthorityStateV1.READ_FENCED_V1
                             ? original.readFence().orElseThrow().attemptIdSha256()
-                            : Sha256Digest.hash(CanonicalUtf8.fromString("NATIVE_UNPUBLISHED_DELETE_V1:"
+                            : Sha256Digest.hash(CanonicalUtf8.fromString((snapshot.reason()
+                                                            == DeleteEligibilitySnapshotV2.ReclamationReason
+                                                                    .UNPUBLISHED_ARTIFACT
+                                                    ? "NATIVE_UNPUBLISHED_DELETE_V1:"
+                                                    : "NATIVE_REPLACED_OFFLOAD_DELETE_V1:")
                                             + ready.mark().clockDomain())
                                     .bytes());
             try {

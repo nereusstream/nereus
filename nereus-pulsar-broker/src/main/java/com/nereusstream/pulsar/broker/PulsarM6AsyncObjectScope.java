@@ -33,6 +33,7 @@ import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1.BookKeeperGcGraceV1;
 import com.nereusstream.storage.object.kms.WrappedRunKeyEnvelope;
+import com.nereusstream.storage.object.materialization.M5CellProviderProfileV2.GcGracePolicyV1;
 import com.nereusstream.storage.object.materialization.M5CellProviderProfileV2.References;
 import com.nereusstream.storage.object.vault.VaultTransitRunKeyKms;
 import java.io.IOException;
@@ -68,7 +69,8 @@ final class PulsarM6AsyncObjectScope {
     private final VaultTransitRunKeyKms kms;
     private final NereusPulsarLedgerOffloaderV1 offloader;
 
-    record BookKeeperDeletePolicy(BookKeeperGcGraceV1 grace, PulsarNativeM4DrainAdmissionV1 drainAdmission) {
+    record BookKeeperDeletePolicy(
+            BookKeeperGcGraceV1 grace, GcGracePolicyV1 objectGrace, PulsarNativeM4DrainAdmissionV1 drainAdmission) {
         // Maintenance owns the Cell exclusively and dispatches one exact source at a time.
         static final M5BookKeeperDeleteCellBudgetV2.Limits NATIVE_BUDGET =
                 new M5BookKeeperDeleteCellBudgetV2.Limits(1, 1);
@@ -86,11 +88,16 @@ final class PulsarM6AsyncObjectScope {
                     Long.parseLong(value.apply("bookKeeperGcProviderMinimumMillis")),
                     Long.parseLong(value.apply("bookKeeperGcAuditMinimumMillis")),
                     Long.parseLong(value.apply("bookKeeperGcGraceMillis")));
+            var objectGrace = new GcGracePolicyV1(
+                    Long.parseLong(value.apply("offloadObjectGcProviderMinimumMillis")),
+                    grace.auditMinimumMillis(),
+                    Long.parseLong(value.apply("offloadObjectGcGraceMillis")));
             try {
                 var digest = com.nereusstream.domain.bytes.Sha256Digest.copyOf(
                         java.util.HexFormat.of().parseHex(value.apply("bookKeeperReadDrainAdmissionSha256")));
                 return new BookKeeperDeletePolicy(
                         grace,
+                        objectGrace,
                         PulsarNativeM4DrainAdmissionV1.load(
                                 Path.of(value.apply("bookKeeperReadDrainAdmission")), digest));
             } catch (Exception failure) {
@@ -184,7 +191,10 @@ final class PulsarM6AsyncObjectScope {
                     config.bucket(),
                     executor,
                     true,
-                    new S3PulsarOffloadObjectStoreV1.MaterializationConfiguration(config.references(), credentials));
+                    new S3PulsarOffloadObjectStoreV1.MaterializationConfiguration(
+                            config.references(),
+                            credentials,
+                            config.bookKeeperDelete().map(BookKeeperDeletePolicy::objectGrace)));
             var token = System.getenv(config.vaultTokenEnvironment());
             if (token == null || token.isBlank()) {
                 throw new IllegalArgumentException("Vault token is absent for the configured Native Object scope");
