@@ -61,16 +61,25 @@ public record KafkaObjectActiveTailStateV1(
     }
 
     public Optional<KafkaObjectExtentLocatorV1> floor(long offset, long readableFrontier) {
+        int index = floorIndex(offset, readableFrontier);
+        return index < 0 ? Optional.empty() : Optional.of(locators.get(index));
+    }
+
+    public int floorIndex(long offset, long readableFrontier) {
         if (offset < startOffset || offset >= readableFrontier || readableFrontier > endOffsetExclusive) {
-            return Optional.empty();
+            return -1;
         }
-        for (int index = locators.size() - 1; index >= 0; index--) {
-            KafkaObjectExtentLocatorV1 locator = locators.get(index);
-            if (locator.startOffset() <= offset && offset < locator.endOffsetExclusive()) {
-                return Optional.of(locator);
+        int first = 0;
+        int end = locators.size();
+        while (first < end) {
+            int middle = first + (end - first) / 2;
+            if (locators.get(middle).endOffsetExclusive() <= offset) {
+                first = middle + 1;
+            } else {
+                end = middle;
             }
         }
-        return Optional.empty();
+        return first;
     }
 
     public KafkaObjectActiveTailStateV1 retirePrefix(

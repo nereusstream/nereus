@@ -75,7 +75,9 @@ for successor recovery. The successor closes and recovers the prior Owner's hist
 Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
 compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO
 plus aborted-transaction response metadata rather than filtering bytes as a storage-only shortcut. Each Fetch pins one
-coherent local view and performs no normal-path remote metadata lookup.
+coherent local view and performs no normal-path remote metadata lookup. Native Object WAL finds the first
+covering extent in that local view and reuses a disposable sequential position only when its fence, view
+version and requested offset still match.
 
 The 0.2 internal Deployment policy selects `BOOKKEEPER_WAL_ONLY` for `__consumer_offsets` and
 `__transaction_state`. `__share_group_state` remains fail-closed until its own explicit internal policy is frozen; no

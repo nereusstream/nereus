@@ -20,6 +20,9 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionStateV1.CompletedTransactionV1;
 import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectExtentLocatorV1;
+import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectActiveTailStateV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1;
 import com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1;
 import java.io.IOException;
@@ -27,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Bounded complete Kafka RecordBatch reads from one captured authorized Object tail. */
 public final class KafkaObjectNativeFetchV1 {
@@ -44,12 +48,21 @@ public final class KafkaObjectNativeFetchV1 {
 
     public record Batch(long startOffset, long endOffsetExclusive, CanonicalBytes rawAssignedBytes) {}
 
+    /** One disposable position in an exact coherent view. The cursor owns no source or buffers. */
+    public record Cursor(KafkaPartitionFenceV1 fence, long version, long offset, int locator) {
+        boolean matches(KafkaPartitionProtocolStateV1 root, long requested) {
+            return version == root.stateVersion() && offset == requested && fence.equals(root.fence());
+        }
+    }
+
     public record Result(List<Batch> batches, List<CompletedTransactionV1> abortedTransactions, int bytes) {
         public Result {
             batches = List.copyOf(batches);
             abortedTransactions = List.copyOf(abortedTransactions);
         }
     }
+
+    public record PositionedResult(Result result, Optional<Cursor> nextCursor) {}
 
     private KafkaObjectNativeFetchV1() {}
 
@@ -61,6 +74,20 @@ public final class KafkaObjectNativeFetchV1 {
             int hardMaximumBytes,
             boolean minOneMessage,
             KafkaReadIsolationV1 isolation)
+            throws IOException {
+        return readPositioned(captured, sources, offset, maximumBytes, hardMaximumBytes, minOneMessage, isolation, null)
+                .result();
+    }
+
+    public static PositionedResult readPositioned(
+            KafkaObjectCoherentProtocolSnapshotV1 captured,
+            Sources sources,
+            long offset,
+            int maximumBytes,
+            int hardMaximumBytes,
+            boolean minOneMessage,
+            KafkaReadIsolationV1 isolation,
+            Cursor cursor)
             throws IOException {
         Objects.requireNonNull(captured, "captured");
         Objects.requireNonNull(sources, "sources");
@@ -74,24 +101,27 @@ public final class KafkaObjectNativeFetchV1 {
         }
         long end = captured.root().readUpperBound(isolation);
         if (end <= offset || maximumBytes == 0) {
-            return new Result(List.of(), List.of(), 0);
+            return new PositionedResult(new Result(List.of(), List.of(), 0), Optional.empty());
         }
         var collected =
                 new Collect(offset, end, Math.min(maximumBytes, hardMaximumBytes), hardMaximumBytes, minOneMessage);
-        for (var locator : captured.activeTail().locators()) {
-            if (locator.endOffsetExclusive() <= collected.next) {
-                continue;
-            }
-            if (locator.startOffset() >= end || collected.stopped) {
-                break;
-            }
+        var tail = captured.activeTail();
+        var locators = tail.locators();
+        int index = startIndex(captured.root(), tail, offset, end, cursor);
+        if (index < 0) {
+            throw new IOException("native Object WAL captured prefix lacks a readable extent");
+        }
+        while (index < locators.size() && collected.next < end && !collected.stopped) {
+            var locator = locators.get(index);
             if (locator.startOffset() > collected.next) {
                 throw new IOException("native Object WAL captured locator plan has a gap");
             }
             try (var extent = Objects.requireNonNull(sources.pin(locator), "pinned extent")) {
                 extent.read(collected::accept);
             }
-            if (collected.next < Math.min(locator.endOffsetExclusive(), end) && !collected.stopped) {
+            if (collected.next >= locator.endOffsetExclusive()) {
+                index++;
+            } else if (collected.next < end && !collected.stopped) {
                 throw new IOException("native Object WAL extent did not cover the captured offset");
             }
         }
@@ -104,7 +134,29 @@ public final class KafkaObjectNativeFetchV1 {
                         .filter(txn -> txn.markerEndOffsetExclusive() > offset && txn.firstOffset() < returnedEnd)
                         .toList()
                 : List.<CompletedTransactionV1>of();
-        return new Result(collected.batches, aborted, collected.bytes);
+        var root = captured.root();
+        var next = returnedEnd > offset && returnedEnd < end
+                ? Optional.of(new Cursor(root.fence(), root.stateVersion(), returnedEnd, index))
+                : Optional.<Cursor>empty();
+        return new PositionedResult(new Result(collected.batches, aborted, collected.bytes), next);
+    }
+
+    private static int startIndex(
+            KafkaPartitionProtocolStateV1 root,
+            KafkaObjectActiveTailStateV1 tail,
+            long offset,
+            long end,
+            Cursor cursor) {
+        if (cursor != null
+                && cursor.matches(root, offset)
+                && cursor.locator() >= 0
+                && cursor.locator() < tail.locators().size()) {
+            var selected = tail.locators().get(cursor.locator());
+            if (selected.startOffset() <= offset && offset < selected.endOffsetExclusive()) {
+                return cursor.locator();
+            }
+        }
+        return tail.floorIndex(offset, end);
     }
 
     private static final class Collect {
