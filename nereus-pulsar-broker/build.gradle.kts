@@ -14,10 +14,12 @@
 
 dependencies {
     implementation(project(":nereus-pulsar-offload"))
+    implementation(project(":nereus-storage-object-vault"))
     implementation(libs.oxia.client)
     compileOnly(libs.pulsar.broker) { isTransitive = false }
     compileOnly("org.apache.pulsar:pulsar-broker-common:${libs.versions.pulsar.get()}") { isTransitive = false }
     compileOnly(libs.pulsar.common) { isTransitive = false }
+    compileOnly(libs.pulsar.client.admin.api) { isTransitive = false }
     compileOnly(libs.pulsar.managed.ledger) { isTransitive = false }
     compileOnly(libs.pulsar.metadata)
     compileOnly(libs.bookkeeper.server)

@@ -159,6 +159,7 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
         private OxiaCellProviderScopeRegistryV2.Attempt scopeAttempt;
         private OxiaCellProviderScopeRegistryV2.Admission scopeAdmission;
         private CompletableFuture<Void> scopeWork;
+        private CompletableFuture<Void> currentCheck;
         private PulsarNativeBindingV1 originalBinding;
         private boolean released;
 
@@ -285,16 +286,25 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
 
         synchronized CompletableFuture<Void> requireProfileCurrent() {
             qualifiedProvider();
-            scopeWork = scopeAdmission.requireCurrent().thenRun(() -> {
-                requireConfiguredEncryption();
-            });
-            return scopeWork.copy();
+            if (currentCheck == null || currentCheck.isDone()) {
+                currentCheck = scopeAdmission
+                        .requireCurrent()
+                        .thenCompose(unused -> S3PulsarOffloadObjectStoreV1.this.<Void>submit(() -> {
+                            requireConfiguredEncryption();
+                            return null;
+                        }))
+                        .toCompletableFuture();
+            }
+            return currentCheck.copy();
         }
 
         /** Historical profile confirmation settles this original loan only; no Task is admitted here. */
         synchronized CompletableFuture<Void> reconcileScopeForClose() {
             if (scopeWork != null && !scopeWork.isDone()) {
                 return scopeWork.handle((ignored, failure) -> null).thenCompose(ignored -> reconcileScopeForClose());
+            }
+            if (currentCheck != null && !currentCheck.isDone()) {
+                return currentCheck.handle((ignored, failure) -> null).thenCompose(ignored -> reconcileScopeForClose());
             }
             if (scopeAttempt == null || scopeAttempt.isSettledForClose()) {
                 return CompletableFuture.completedFuture(null);
@@ -312,6 +322,7 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
         public synchronized void close() {
             if (!released) {
                 if (scopeWork != null && !scopeWork.isDone()
+                        || currentCheck != null && !currentCheck.isDone()
                         || scopeAttempt != null && !scopeAttempt.isSettledForClose()) {
                     throw new IllegalStateException("Original Provider scope metadata remains unresolved");
                 }
@@ -461,20 +472,44 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
         }
     }
 
+    private void requireObjectEncryption(String algorithm, String kmsKey) throws ObjectStoreException {
+        if (materializationConfiguration == null) {
+            return;
+        }
+        String scope = materializationConfiguration.references().allowedEncryptionScope();
+        boolean matches =
+                switch (scope) {
+                    case "NONE" -> algorithm == null && kmsKey == null;
+                    case "S3_MANAGED_AES256" -> "AES256".equals(algorithm) && kmsKey == null;
+                    default -> "aws:kms".equals(algorithm) && scope.equals("AWS_KMS:" + kmsKey);
+                };
+        if (!matches) {
+            throw failure(FailureKind.INTEGRITY, "S3 Object encryption differs from the admitted scope");
+        }
+    }
+
     @Override
     public CompletionStage<ImmutableObject> createImmutable(String key, Body body) {
         Objects.requireNonNull(body, "body");
         return submit(() -> {
             validateKey(key);
             try (InputStream input = body.inputStreamFactory().open()) {
-                PutObjectResponse response = client.putObject(
-                        PutObjectRequest.builder()
-                                .bucket(bucket)
-                                .key(key)
-                                .ifNoneMatch("*")
-                                .metadata(Map.of(SHA256_METADATA, body.sha256()))
-                                .build(),
-                        RequestBody.fromInputStream(input, body.bytes()));
+                var request = PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .ifNoneMatch("*")
+                        .metadata(Map.of(SHA256_METADATA, body.sha256()));
+                if (materializationConfiguration != null) {
+                    String scope = materializationConfiguration.references().allowedEncryptionScope();
+                    if ("S3_MANAGED_AES256".equals(scope)) {
+                        request.serverSideEncryption("AES256");
+                    } else if (scope.startsWith("AWS_KMS:")) {
+                        request.serverSideEncryption("aws:kms").ssekmsKeyId(scope.substring("AWS_KMS:".length()));
+                    }
+                }
+                PutObjectResponse response =
+                        client.putObject(request.build(), RequestBody.fromInputStream(input, body.bytes()));
+                requireObjectEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId());
                 return new ImmutableObject(version(response.versionId(), response.eTag()), body.bytes(), body.sha256());
             }
         });
@@ -521,8 +556,9 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
             }
         }
         try (var input = client.getObject(request.build())) {
+            var response = input.response();
+            requireObjectEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId());
             if (expected != null) {
-                var response = input.response();
                 if (!expected.immutableVersion().equals(version(response.versionId(), response.eTag()))
                         || !expected.sha256().equals(response.metadata().get(SHA256_METADATA))
                         || !Long.valueOf(length).equals(response.contentLength())
@@ -658,6 +694,7 @@ public final class S3PulsarOffloadObjectStoreV1 implements PulsarOffloadObjectSt
             }
             throw new IllegalStateException("unexpected checked S3 HEAD failure", mapped);
         }
+        requireObjectEncryption(response.serverSideEncryptionAsString(), response.ssekmsKeyId());
         String sha256 = response.metadata().get(SHA256_METADATA);
         if (sha256 == null || !sha256.matches("[0-9a-f]{64}") || response.contentLength() <= 0) {
             throw failure(FailureKind.INTEGRITY, "S3 HEAD lacks the exact Nereus length or SHA-256 proof");

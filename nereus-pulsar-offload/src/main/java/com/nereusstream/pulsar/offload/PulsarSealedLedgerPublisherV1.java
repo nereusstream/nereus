@@ -92,6 +92,12 @@ public final class PulsarSealedLedgerPublisherV1 {
         CompletionStage<Void> verify(Publication publication);
     }
 
+    @FunctionalInterface
+    interface ImmutableOutputPublisher {
+        CompletionStage<ImmutableObject> publish(
+                String key, Body body, Supplier<CompletionStage<ImmutableObject>> originalPut);
+    }
+
     private final PulsarOffloadObjectStoreV1 objectStore;
     private final PulsarOffloadLimitCandidateV1 limits;
     private final PublishedAttemptVerifier verifier;
@@ -110,12 +116,21 @@ public final class PulsarSealedLedgerPublisherV1 {
     }
 
     public CompletionStage<Publication> publish(PreparedAttempt prepared) {
+        return publish(prepared, (key, body, originalPut) -> originalPut.get());
+    }
+
+    CompletionStage<Publication> publish(PreparedAttempt prepared, ImmutableOutputPublisher publisher) {
         Objects.requireNonNull(prepared, "prepared");
         PulsarOffloadKeysV1 keys = prepared.attempt().keys();
         return CompletableFuture.supplyAsync(() -> verifiedDataBody(prepared.dataObject()), fileExecutor)
-                .thenCompose(body -> createOrResolve(keys.dataKey(), body))
+                .thenCompose(
+                        body -> publisher.publish(keys.dataKey(), body, () -> createOrResolve(keys.dataKey(), body)))
                 .thenApplyAsync(dataProof -> draft(prepared, dataProof), fileExecutor)
-                .thenCompose(draft -> createOrResolve(keys.rootKey(), draft.rootBody())
+                .thenCompose(draft -> publisher
+                        .publish(
+                                keys.rootKey(),
+                                draft.rootBody(),
+                                () -> createOrResolve(keys.rootKey(), draft.rootBody()))
                         .thenApply(rootProof -> draft.publication(rootProof)))
                 .thenCompose(publication ->
                         callStage(() -> verifier.verify(publication)).thenApply(ignored -> publication));

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Licensed under the Apache License, Version 2.0.
-"""Run source-bound native Pulsar BookKeeper process checks (focused, no promotion)."""
+"""Run source-bound native Pulsar BookKeeper profiles (focused, no promotion)."""
 
 import argparse
 import contextlib
@@ -49,7 +49,7 @@ def capture_runtime(source, output, task, java_home, *extra):
     return [Path(line) for line in output.read_text().splitlines()]
 
 
-def runtime_paths(pulsar, out, java_home):
+def runtime_paths(pulsar, out, java_home, async_object):
     native = capture_runtime(pulsar, out / "native-resolved.paths",
                              ":pulsar-broker:m6WriteRuntimeClasspath", java_home)
     sdk = capture_runtime(ROOT, out / "sdk-resolved.paths", ":nereus-pulsar-broker:m6WriteRuntimeClasspath",
@@ -61,7 +61,9 @@ def runtime_paths(pulsar, out, java_home):
     names = {p.name for p in retained if p.suffix == ".jar"}
     extra = [p for p in sdk if p.suffix == ".jar" and p.name not in names and (
         "/nereus-" in str(p) and "/build/libs/" in str(p)
-        or "/software.amazon.awssdk/" in str(p) or "/org.apache.commons/commons-collections4/" in str(p))]
+        or "/software.amazon.awssdk/" in str(p) or "/org.apache.commons/commons-collections4/" in str(p)
+        or async_object and any(f"/{group}/" in str(p) for group in (
+            "com.github.luben", "org.apache.httpcomponents.client5", "org.apache.httpcomponents.core5")))]
     provider = [p for p in sdk if p.is_dir() and "/nereus-pulsar-broker/build/classes/" in str(p)]
     SOURCE.require(len(provider) == 1, "native provider classes missing from SDK runtime")
     ordered = [p for p in retained + extra + provider if p.exists()]
@@ -69,6 +71,10 @@ def runtime_paths(pulsar, out, java_home):
                  "nereus-pulsar-offload", "bookkeeper-server"):
         found = [p for p in ordered if re.fullmatch(re.escape(name) + r"-[0-9].*\.jar", p.name)]
         SOURCE.require(len(found) == 1, f"runtime must contain exactly one {name}: {found}")
+    if async_object:
+        for name in ("httpclient5", "httpcore5", "zstd-jni", "nereus-storage-object-vault"):
+            found = [p for p in ordered if re.fullmatch(re.escape(name) + r"-[0-9].*\.jar", p.name)]
+            SOURCE.require(len(found) == 1, f"async Object runtime must contain exactly one {name}: {found}")
     return ordered
 
 
@@ -137,13 +143,28 @@ def start_broker(stack, java, config, log, admin, expect_rejection=False):
     raise TimeoutError(f"Broker did not pass its health check: {log}")
 
 
-def run(pulsar, java_home, out):
+def run(pulsar, java_home, out, async_object):
     sources = {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)}
     SOURCE.require(not out.is_relative_to(ROOT) and not out.is_relative_to(pulsar),
                    "evidence output must be outside both source trees")
     out.mkdir()
-    ordered = runtime_paths(pulsar, out, java_home)
+    ordered = runtime_paths(pulsar, out, java_home, async_object)
     inputs = [path_identity(p) for p in ordered]
+    execution_sources = [
+        Path(__file__).resolve(), ROOT / "scripts/run-v2-m6-kafka-bk-process-check.py",
+        ROOT / "scripts/v2-m6-execution-inputs.py", ROOT / "scripts/m5-candidate-inputs.py",
+        ROOT / "scripts/m5-evidence-junit.py",
+        ROOT / "gradlew", pulsar / "gradlew", pulsar / "conf/broker.conf",
+        CONFIG / "capture-runtime.init.gradle", CONFIG / "console-log.xml",
+        CONFIG / "bookkeeper-cell.properties", CONFIG / (CLIENT + ".java"),
+        CONFIG / "M6PulsarCellProvision.java", BK.COMPOSE,
+    ]
+    if async_object:
+        execution_sources.extend(ROOT / "scripts" / name for name in (
+            "run-v2-m6-kafka-async-object-check.py", "run-v2-m6-kafka-object-wal-check.py",
+            "run-v2-m6-kafka-m4-read-check.py", "v2-m6-kafka-object-fault-proxy.py",
+        ))
+    source_inputs = [path_identity(path) for path in execution_sources]
     broker_jar, = [p for p in ordered if re.fullmatch(r"bookkeeper-server-[0-9].*\.jar", p.name)]
     template = pulsar / "conf/broker.conf"
     probes = out / "probe-classes"
@@ -161,6 +182,19 @@ def run(pulsar, java_home, out):
     addresses = [f"127.0.0.1:{port}" for port in ports]
     bk_uri = "zk://127.0.0.1:2181/ledgers"
     with BK.bookkeeper_oxia(out) as oxia, contextlib.ExitStack() as stack:
+        object_arguments = []
+        if async_object:
+            objects = module("m6_real_minio", ROOT / "scripts/run-v2-m6-kafka-async-object-check.py")
+            vault = module("m6_real_vault", ROOT / "scripts/run-v2-m6-kafka-object-wal-check.py")
+            proxy = module("m6_real_object_faults", ROOT / "scripts/v2-m6-kafka-object-fault-proxy.py")
+            minio, _ = stack.enter_context(objects.minio(out))
+            kms, token = stack.enter_context(vault.vault(out))
+            relay, control, control_token = stack.enter_context(proxy.fault_proxy(minio))
+            os.environ.update(AWS_ACCESS_KEY_ID="m6kafka", AWS_SECRET_ACCESS_KEY="m6kafka-test-secret",
+                              NEREUS_M6_PULSAR_TEST_VAULT_TOKEN=token.read_text().strip(),
+                              NEREUS_M6_PULSAR_FAULT_CONTROL=control, NEREUS_M6_PULSAR_FAULT_TOKEN=control_token,
+                              NEREUS_M6_PULSAR_DIRECT_S3=minio)
+            object_arguments = [minio, kms, relay]
         origin = f"oxia-nereus://{oxia}"
         run_to_log(java + ["org.apache.pulsar.PulsarClusterMetadataSetup", "--cluster", "m6", "--metadata-store",
                           origin, "--configuration-metadata-store", origin, "--existing-bk-metadata-service-uri",
@@ -170,7 +204,8 @@ def run(pulsar, java_home, out):
         digest = hashlib.sha256(broker_jar.read_bytes()).hexdigest()
         cell.write_text((CONFIG / "bookkeeper-cell.properties").read_text()
                         + f"\nbkClientJar={digest}\nbkMetadataUri={bk_uri}\n")
-        run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(cell), str(ROOT)],
+        run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(cell), str(ROOT),
+                           *object_arguments],
                    out / "provision.log")
         base = {"clusterName": "m6", "metadataStoreUrl": origin, "configurationMetadataStoreUrl": origin,
                 "bookkeeperMetadataServiceUri": bk_uri, "bindAddress": "127.0.0.1",
@@ -193,11 +228,17 @@ def run(pulsar, java_home, out):
             brokers.append(start_broker(stack, java, config, out / f"broker-{i}.log", addresses[i]))
         state = out / "expected-cold-state.properties"
         args = [CLIENT, origin, *addresses[:4], str(state)]
-        run_to_log(java + args, out / "client.log")
+        run_to_log(java + args + (["async-object", str(cell)] if async_object else []), out / "client.log")
         SOURCE.require("PULSAR_NATIVE_BK_PROTOCOL_SEMANTICS_PASS" in (out / "client.log").read_text(),
                        "native BK protocol checks did not reach their terminal assertions")
         SOURCE.require("PULSAR_NATIVE_MISSING_BINDING_REJECTED" in (out / "client.log").read_text(),
                        "missing Binding was not rejected before native ledger creation")
+        if async_object:
+            probe = (out / "client.log").read_text()
+            SOURCE.require("PULSAR_NATIVE_ENROLLED_NPD1_NPO1_PUBLISHED" in probe
+                           and "PULSAR_NATIVE_OBJECT_LOST_REPLY_AND_INDEPENDENT_ROLLOVER" in probe
+                           and "PULSAR_NATIVE_ORIGINAL_OFFLOAD_DRAIN_AND_RESUME" in probe,
+                           "native enrolled output and independent rollover did not reach terminal assertions")
         SOURCE.require(state.is_file(), "the official client did not record its exact cold restart expectations")
         for stop in reversed(brokers):
             stop(strict=True)
@@ -213,13 +254,22 @@ def run(pulsar, java_home, out):
     SOURCE.require(sources == {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)},
                    "source checkout changed during execution")
     SOURCE.require(inputs == [path_identity(p) for p in ordered], "runtime inputs changed during execution")
-    artifacts = [p for p in sorted(out.iterdir()) if p.is_file()]
+    SOURCE.require(source_inputs == [path_identity(path) for path in execution_sources],
+                   "fixture build/config/launch inputs changed during execution")
+    generated_launch_inputs = {"native-resolved.paths", "sdk-resolved.paths", "cell.properties",
+                               "broker-0.conf", "broker-1.conf", "unqualified.conf"}
+    artifacts = [p for p in sorted(out.iterdir()) if p.is_file() and p.name not in generated_launch_inputs]
     (out / "process-result.json").write_bytes(SOURCE.INPUTS.canonical({
         "schema": "NEREUS_V2_M6_PULSAR_BK_FOCUSED_PROCESS_V1", "promotionEligible": False, "status": "PASS",
-        "sources": sources, "runtime": inputs, "launchTools": [path_identity(java_exe), path_identity(javac_exe)],
+        "profile": "BOOKKEEPER_WAL_ASYNC_OBJECT" if async_object else "BOOKKEEPER_WAL_ONLY",
+        "sources": sources, "sourceInputs": source_inputs, "runtime": inputs,
+        "launchTools": [path_identity(java_exe), path_identity(javac_exe)],
+        "generatedLaunchInputs": {name: BK.M6.file_identity(out / name) for name in sorted(generated_launch_inputs)},
         "compiledProbe": path_identity(probes), "outputs": {p.name: BK.M6.file_identity(p) for p in artifacts},
         "checks": ["official-client", "rollover", "individual-and-cumulative-ack", "native-transfer",
-                   "cold-read-and-reset", "native-restart", "missing-binding", "unsupported-ownership-backend"],
+                   "cold-read-and-reset", "native-restart", "missing-binding", "unsupported-ownership-backend",
+                   *(["enrolled-npd1-npo1", "original-put-response-lost", "independent-bookkeeper-rollover", "original-output-drain-and-resume"]
+                     if async_object else [])],
     }))
 
 
@@ -228,9 +278,11 @@ def main():
     parser.add_argument("--pulsar-root", type=Path, required=True)
     parser.add_argument("--java-home", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--async-object", action="store_true",
+                        help="use the enrolled BookKeeper WAL plus asynchronous Object profile")
     args = parser.parse_args()
     try:
-        run(args.pulsar_root.resolve(strict=True), args.java_home.resolve(strict=True), args.output.resolve())
+        run(args.pulsar_root.resolve(strict=True), args.java_home.resolve(strict=True), args.output.resolve(), args.async_object)
     except (OSError, ValueError, subprocess.SubprocessError, BK.M6.InputError) as error:
         parser.exit(1, f"Pulsar BookKeeper process check: {error}\n")
 

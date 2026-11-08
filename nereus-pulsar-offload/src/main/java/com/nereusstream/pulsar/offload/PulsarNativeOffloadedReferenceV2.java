@@ -138,7 +138,7 @@ final class PulsarNativeOffloadedReferenceV2 {
                 originalHandle == null ? CompletableFuture.completedFuture(null) : originalHandle.closeAsync());
     }
 
-    private static PhysicalResourceIdV2.ObjectVersion resource(
+    static PhysicalResourceIdV2.ObjectVersion resource(
             M5CellProviderProfileV2 profile, OffloadedObjectReadIdentity object) {
         String version = object.version();
         if (!version.startsWith("version:")

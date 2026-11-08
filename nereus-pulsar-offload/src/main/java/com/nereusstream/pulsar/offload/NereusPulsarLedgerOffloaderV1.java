@@ -42,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -146,6 +147,7 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object lifetimeLock = new Object();
     private final CompletableFuture<Void> drained = new CompletableFuture<>();
+    private volatile PulsarNativeOffloadBirthAdmissionV2 enrolledOutput;
     private int activeOperations;
 
     public NereusPulsarLedgerOffloaderV1(
@@ -183,6 +185,39 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     @Override
     public Map<String, String> getOffloadDriverMetadata() {
         return policy.driverMetadata();
+    }
+
+    @Override
+    public boolean preservesIncompleteAttempt() {
+        return enrolledOutput != null;
+    }
+
+    CompletableFuture<Void> drainOriginalOutput() {
+        var original = enrolledOutput;
+        return original == null ? CompletableFuture.completedFuture(null) : original.drain();
+    }
+
+    void enableEnrolledOutput(
+            PulsarNativeBindingV1 binding,
+            PulsarNativeReadCellBudgetV1 budget,
+            S3PulsarOffloadObjectStoreV1.MaterializationConnection connection,
+            com.nereusstream.metadata.oxia.v2.retention.OxiaQuotaTargetDeleteStoreV2 route,
+            com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1 writers,
+            Supplier<CompletionStage<Void>> requireNativeOwnership) {
+        synchronized (lifetimeLock) {
+            if (closed.get() || enrolledOutput != null) {
+                throw new IllegalStateException("Native offloader already has an enrolled output owner or is closed");
+            }
+            enrolledOutput = new PulsarNativeOffloadBirthAdmissionV2(
+                    binding,
+                    budget,
+                    connection,
+                    route,
+                    objectStore,
+                    writers,
+                    binding.nativeOffloadAttempts(),
+                    requireNativeOwnership);
+        }
     }
 
     S3PulsarOffloadObjectStoreV1.MaterializationConnection borrowMaterializationConnection(
@@ -260,7 +295,6 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
 
     private CompletableFuture<Void> offloadLedger(
             ReadHandle ledger, UUID attemptUuid, Map<String, String> extraMetadata) {
-        PreparedAttemptKey attemptKey;
         PulsarSealedLedgerAttemptV1 attempt;
         SealedLedgerSection sealedLedger;
         try {
@@ -274,8 +308,6 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                     || !extraMetadata.containsKey("ManagedLedgerName")) {
                 throw new IllegalArgumentException("offload input is not one exact sealed native ledger");
             }
-            attemptKey = Objects.requireNonNull(
-                    keyManager.create(ledger.getId(), attemptUuid, policy.driverMetadata()), "attemptKey");
             LedgerMetadata metadata = ledger.getLedgerMetadata();
             attempt = new PulsarSealedLedgerAttemptV1(
                     ledger.getId(),
@@ -294,10 +326,55 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             return CompletableFuture.failedFuture(failure);
         }
 
-        return createStagingFile(ledger.getId(), attemptUuid)
-                .thenCompose(target -> encodeLedger(ledger, attemptUuid, attemptKey.plaintextKey(), target)
-                        .thenCompose(data -> publisher.publish(new PreparedAttempt(
-                                attempt, sealedLedger, data, policy.blockClass().targetBytes(), attemptKey.envelope())))
+        var admission = enrolledOutput;
+        if (admission == null) {
+            return CompletableFuture.completedFuture(null)
+                    .thenCompose(unused -> encodeAndPublish(
+                            ledger,
+                            attempt,
+                            sealedLedger,
+                            Objects.requireNonNull(
+                                    keyManager.create(ledger.getId(), attemptUuid, policy.driverMetadata()),
+                                    "attemptKey"),
+                            null));
+        }
+        admission.begin(attemptUuid);
+        return CompletableFuture.completedFuture(null)
+                .thenCompose(unused -> admission.requireCurrent())
+                .thenCompose(unused -> admission
+                        .attempts()
+                        .open(
+                                attempt,
+                                sealedLedger,
+                                policy.blockClass().targetBytes(),
+                                policy.driverMetadata(),
+                                keyManager,
+                                fileExecutor))
+                .thenCompose(original -> admission
+                        .open(original)
+                        .thenCompose(outputs ->
+                                encodeAndPublish(ledger, attempt, sealedLedger, original.keyMaterial(), outputs)))
+                .whenComplete((unused, failure) -> admission.finish(attemptUuid, failure))
+                .toCompletableFuture();
+    }
+
+    private CompletableFuture<Void> encodeAndPublish(
+            ReadHandle ledger,
+            PulsarSealedLedgerAttemptV1 attempt,
+            SealedLedgerSection sealedLedger,
+            PreparedAttemptKey attemptKey,
+            PulsarSealedLedgerPublisherV1.ImmutableOutputPublisher outputs) {
+        return createStagingFile(ledger.getId(), attempt.attemptUuid())
+                .thenCompose(target -> encodeLedger(ledger, attempt.attemptUuid(), attemptKey.plaintextKey(), target)
+                        .thenCompose(data -> {
+                            var prepared = new PreparedAttempt(
+                                    attempt,
+                                    sealedLedger,
+                                    data,
+                                    policy.blockClass().targetBytes(),
+                                    attemptKey.envelope());
+                            return outputs == null ? publisher.publish(prepared) : publisher.publish(prepared, outputs);
+                        })
                         .thenAccept(ignored -> {})
                         .whenComplete((ignored, failure) -> deleteStagingFile(target)))
                 .toCompletableFuture();
@@ -323,13 +400,28 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         return readOffloaded(ledgerId, attemptUuid, persistedDriverMetadata, expected);
     }
 
+    CompletionStage<OffloadedReadSourceIdentity> captureEnrolledOffload(
+            long ledgerId, UUID attempt, Map<String, String> persistedDriverMetadata) {
+        var admission = Objects.requireNonNull(enrolledOutput, "enrolledOutput");
+        var exactPolicy = nativePolicy(persistedDriverMetadata);
+        return admission.capture(
+                ledgerId, attempt, PulsarOffloadKeysV1.derive(exactPolicy.providerScopePrefix(), ledgerId, attempt));
+    }
+
     private CompletableFuture<ReadHandle> readOffloaded(
             long ledgerId,
             UUID attemptUuid,
             Map<String, String> persistedDriverMetadata,
             OffloadedReadSourceIdentity expected) {
-        CompletableFuture<ReadHandle> opening =
-                admittedOperation(() -> openReadHandle(ledgerId, attemptUuid, persistedDriverMetadata, expected));
+        CompletableFuture<ReadHandle> opening = admittedOperation(() -> {
+            if (expected == null && enrolledOutput != null) {
+                return captureEnrolledOffload(ledgerId, attemptUuid, persistedDriverMetadata)
+                        .thenCompose(
+                                captured -> openReadHandle(ledgerId, attemptUuid, persistedDriverMetadata, captured))
+                        .toCompletableFuture();
+            }
+            return openReadHandle(ledgerId, attemptUuid, persistedDriverMetadata, expected);
+        });
         CompletableFuture<ReadHandle> observer = new CompletableFuture<>();
         opening.whenComplete((handle, failure) -> {
             if (failure != null) {

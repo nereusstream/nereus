@@ -31,6 +31,7 @@ import com.nereusstream.pulsar.offload.PulsarNativeReadCellBudgetV1;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateRetirementCoordinatorV1;
+import com.nereusstream.storage.object.s3.S3C1ObjectProviderTransport;
 import io.netty.channel.EventLoopGroup;
 import io.opentelemetry.api.OpenTelemetry;
 import io.oxia.client.api.AsyncOxiaClient;
@@ -40,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -83,6 +85,9 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
     private CompletableFuture<Void> priorDrain = CompletableFuture.completedFuture(null);
     private int activeScopes;
     private boolean closing;
+
+    private record FactoryScope(
+            PulsarNativeManagedLedgerFactoryV2 ledgerFactory, Optional<PulsarM6AsyncObjectScope> objectScope) {}
 
     @Override
     public void initialize(
@@ -210,8 +215,7 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                 .thenApply(binding -> {
                     var aggregate = binding.authority().aggregate();
                     if (!aggregate.binding().cellIdentity().equals(configuration.cell())
-                            || aggregate.initialEpoch().storageProfile()
-                                    != com.nereusstream.domain.aggregate.StorageProfileV1.BOOKKEEPER_WAL_ONLY) {
+                            || aggregate.initialEpoch().storageProfile() != configuration.profile()) {
                         throw new IllegalArgumentException("Pulsar Binding differs from the admitted BookKeeper Cell");
                     }
                     return binding;
@@ -321,18 +325,7 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
             var admitted = ownership
                     .get()
                     .thenCompose(owned -> owned
-                            ? PulsarNativeManagedLedgerFactoryV2.openBookKeeperOnly(
-                                    binding,
-                                    nativeMetadata,
-                                    configuration.bookKeeperUri(),
-                                    bookKeeper,
-                                    budget,
-                                    configuration.bookKeeperQuota(),
-                                    factoryConfiguration,
-                                    configuration.writers(),
-                                    aggregate,
-                                    key,
-                                    broker.getExecutor())
+                            ? openFactory(binding, broker, budget, aggregate, key, config, topicAuthority)
                             : CompletableFuture.failedFuture(
                                     new IllegalStateException("Native bundle was revoked before open")));
             return admitted.exceptionallyCompose(error -> {
@@ -343,7 +336,8 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                             throw openFailure(error, cleanup);
                         });
                     })
-                    .thenCompose(factory -> factory.openLedgerAsync(config, ownership)
+                    .thenCompose(factory -> factory.ledgerFactory()
+                            .openLedgerAsync(config, ownership)
                             .thenCompose(ledger -> topicAuthority
                                     .requestRefresh()
                                     .thenApply(
@@ -355,6 +349,65 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                                         throw openFailure(error, cleanup);
                                     })));
         });
+    }
+
+    private CompletableFuture<FactoryScope> openFactory(
+            PulsarNativeBindingV1 binding,
+            PulsarService broker,
+            PulsarNativeReadCellBudgetV1 budget,
+            M5PulsarAggregateRetirementCoordinatorV1 aggregate,
+            String key,
+            ManagedLedgerConfig ledgerConfig,
+            NereusPulsarTopicAuthority topicAuthority) {
+        if (configuration.objectScope().isEmpty()) {
+            return PulsarNativeManagedLedgerFactoryV2.openBookKeeperOnly(
+                            binding,
+                            nativeMetadata,
+                            configuration.bookKeeperUri(),
+                            bookKeeper,
+                            budget,
+                            configuration.bookKeeperQuota(),
+                            factoryConfiguration,
+                            configuration.writers(),
+                            aggregate,
+                            key,
+                            broker.getExecutor())
+                    .thenApply(factory -> new FactoryScope(factory, Optional.empty()));
+        }
+        var configured = configuration.objectScope().orElseThrow();
+        return PulsarM6AsyncObjectScope.open(configured, configuration.metadataIdentity())
+                .thenCompose(object -> {
+                    ledgerConfig.setLedgerOffloader(object.offloader());
+                    return PulsarNativeManagedLedgerFactoryV2.openEnrolledOffload(
+                                    binding,
+                                    nativeMetadata,
+                                    configuration.bookKeeperUri(),
+                                    bookKeeper,
+                                    budget,
+                                    configuration.bookKeeperQuota(),
+                                    factoryConfiguration,
+                                    configuration.writers(),
+                                    aggregate,
+                                    key,
+                                    object.offloader(),
+                                    configured.physicalNamespace(),
+                                    S3C1ObjectProviderTransport.EVIDENCED_MAXIMUM_OBJECT_BYTES,
+                                    broker.getExecutor(),
+                                    topicAuthority::requestRefresh,
+                                    Optional.empty())
+                            .thenApply(factory -> new FactoryScope(factory, Optional.of(object)))
+                            .exceptionallyCompose(error -> {
+                                if (unwrap(error).getSuppressed().length != 0) {
+                                    return CompletableFuture.failedFuture(error);
+                                }
+                                return object.closeAsync().handle((unused, cleanup) -> {
+                                    if (cleanup != null) {
+                                        unwrap(error).addSuppressed(cleanup);
+                                    }
+                                    throw new java.util.concurrent.CompletionException(error);
+                                });
+                            });
+                });
     }
 
     private static Throwable unwrap(Throwable error) {
@@ -430,11 +483,16 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
         return priorDrain.copy();
     }
 
-    private CompletableFuture<Void> closeScope(PulsarNativeManagedLedgerFactoryV2 factory) {
-        return factory.closeAsync().thenCompose(unused -> releaseBudget());
+    private CompletableFuture<Void> closeScope(FactoryScope factory) {
+        return factory.ledgerFactory()
+                .closeAsync()
+                .thenCompose(unused -> factory.objectScope()
+                        .map(PulsarM6AsyncObjectScope::closeAsync)
+                        .orElseGet(() -> CompletableFuture.completedFuture(null)))
+                .thenCompose(unused -> releaseBudget());
     }
 
-    private Supplier<CompletableFuture<Void>> scopeCloser(PulsarNativeManagedLedgerFactoryV2 factory) {
+    private Supplier<CompletableFuture<Void>> scopeCloser(FactoryScope factory) {
         return new Supplier<>() {
             private CompletableFuture<Void> closingScope;
 

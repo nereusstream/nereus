@@ -50,6 +50,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.impl.MetaStore;
 import org.apache.bookkeeper.mledger.impl.MetaStoreImpl;
+import org.apache.bookkeeper.mledger.offload.OffloadUtils;
+import org.apache.bookkeeper.mledger.proto.ManagedLedgerInfo.LedgerInfo;
 import org.apache.pulsar.metadata.api.Stat;
 
 /** Native metadata C-aggregate tickets. This adapter alone is not all-writer or physical-delete qualification. */
@@ -401,6 +403,19 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
         return objectAdmission.copy();
     }
 
+    CompletableFuture<Void> enableNativeOutput(
+            M5ClosedWriterRegistryV1 registry, Supplier<CompletionStage<Void>> requireNativeOwnership) {
+        return requireObjectPhysicalScope().thenRun(() -> {
+            synchronized (this) {
+                if (closed || objectConnection == null || objectRoute == null) {
+                    throw new IllegalStateException("Native factory cannot enable an unowned Object output route");
+                }
+                objectOffloader.enableEnrolledOutput(
+                        binding, budget, objectConnection, objectRoute, registry, requireNativeOwnership);
+            }
+        });
+    }
+
     private CompletableFuture<Void> closeObjectPhysicalScope() {
         final S3PulsarOffloadObjectStoreV1.MaterializationConnection original;
         final CompletableFuture<Void> admission;
@@ -450,6 +465,9 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
         }
         return reconcileCleanup()
                 .thenCompose(unused -> creation.reconcileSourceAdmission())
+                .thenCompose(unused -> objectOffloader == null
+                        ? CompletableFuture.completedFuture(null)
+                        : objectOffloader.drainOriginalOutput())
                 .thenCompose(unused -> closeObjectPhysicalScope());
     }
 
@@ -865,39 +883,68 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
                         targets.add(new PhysicalResourceIdV2.BookKeeperLedger(
                                 creation.namespace().namespace(), source.getLedgerId()));
                     }
-                    work = work.thenCompose(unused -> requireObjectPhysicalScope())
-                            .thenCompose(unused -> {
-                                var original = new PulsarNativeOffloadedReferenceV2(
-                                        objectOffloader, objectConnection.profile(), ledgerName, source);
-                                sdkCaptures.add(original);
-                                return original.observe().thenAccept(actual -> {
-                                    for (var resource : actual.resources()) {
-                                        var old = objectFacts.putIfAbsent(resource, actual.sdkFactsSha256());
-                                        if (old != null && !old.equals(actual.sdkFactsSha256())) {
-                                            throw new IllegalStateException(
-                                                    "Native immutable Object source facts differ");
-                                        }
-                                        if (old == null) {
-                                            int charge = Math.addExact(
-                                                    128,
-                                                    PhysicalResourceIdCodecV2.encode(resource)
-                                                            .length());
-                                            synchronized (PulsarNativeMetadataWriterV2.this) {
-                                                if (pendingBytes + charge > MAX_BYTES) {
-                                                    throw new IllegalStateException(
-                                                            "Native Object references exceed the writer bound");
-                                                }
-                                                pendingBytes += charge;
-                                                this.charge = Math.addExact(this.charge, charge);
-                                            }
-                                        }
-                                        targets.add(resource);
+                    work = work.thenCompose(unused -> captureOffloadReferences(source))
+                            .thenAccept(actual -> {
+                                for (var resource : actual.resources()) {
+                                    var old = objectFacts.putIfAbsent(resource, actual.sdkFactsSha256());
+                                    if (old != null && !old.equals(actual.sdkFactsSha256())) {
+                                        throw new IllegalStateException("Native immutable Object source facts differ");
                                     }
-                                });
+                                    if (old == null) {
+                                        int charge = Math.addExact(
+                                                128,
+                                                PhysicalResourceIdCodecV2.encode(resource)
+                                                        .length());
+                                        synchronized (PulsarNativeMetadataWriterV2.this) {
+                                            if (pendingBytes + charge > MAX_BYTES) {
+                                                throw new IllegalStateException(
+                                                        "Native Object references exceed the writer bound");
+                                            }
+                                            pendingBytes += charge;
+                                            this.charge = Math.addExact(this.charge, charge);
+                                        }
+                                    }
+                                    targets.add(resource);
+                                }
                             });
                 }
             }
             return work;
+        }
+
+        private CompletionStage<PulsarNativeOffloadedReferenceV2.Captured> captureOffloadReferences(LedgerInfo source) {
+            if (objectOffloader == null || !objectOffloader.preservesIncompleteAttempt()) {
+                return requireObjectPhysicalScope().thenCompose(unused -> {
+                    var original = new PulsarNativeOffloadedReferenceV2(
+                            objectOffloader, objectConnection.profile(), ledgerName, source);
+                    sdkCaptures.add(original);
+                    return original.observe();
+                });
+            }
+            var context = source.getOffloadContext();
+            if (!context.hasUidMsb()
+                    || !context.hasUidLsb()
+                    || !context.getDriverMetadata().getName().equals(objectOffloader.getOffloadDriverName())) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("Published native offload lacks its original provider attempt"));
+            }
+            var attempt = new UUID(context.getUidMsb(), context.getUidLsb());
+            return objectOffloader
+                    .captureEnrolledOffload(
+                            source.getLedgerId(), attempt, OffloadUtils.getOffloadDriverMetadata(source))
+                    .thenApply(actual -> {
+                        var root = PulsarNativeOffloadedReferenceV2.resource(objectConnection.profile(), actual.root());
+                        var data = PulsarNativeOffloadedReferenceV2.resource(objectConnection.profile(), actual.data());
+                        var digest = Sha256Digest.hash(CanonicalBytes.copyOf(java.nio.ByteBuffer.allocate(128)
+                                .put(root.sha256().bytes().toByteArray())
+                                .put(data.sha256().bytes().toByteArray())
+                                .put(java.util.HexFormat.of()
+                                        .parseHex(actual.root().sha256()))
+                                .put(java.util.HexFormat.of()
+                                        .parseHex(actual.data().sha256()))
+                                .array()));
+                        return new PulsarNativeOffloadedReferenceV2.Captured(List.of(root, data), digest);
+                    });
         }
 
         private void requirePredecessor(Optional<MetaStoreImpl.StoredMutationValue> current) {
@@ -1013,6 +1060,8 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
                     .thenCompose(unused -> {
                         synchronized (PulsarNativeMetadataWriterV2.this) {
                             return objectConnection == null
+                                            || objectOffloader.preservesIncompleteAttempt()
+                                                    && selection.source().isEmpty()
                                     ? CompletableFuture.<Void>completedFuture(null)
                                     : requireObjectPhysicalScope();
                         }

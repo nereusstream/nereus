@@ -331,6 +331,15 @@ the Pulsar new-output boundary. BK completion does not promote a mixed-profile r
 Shared M2/M3/M4/M5 prerequisites use their immutable receipts plus checks for the actual affected current paths; no
 automatic rerun of all historical campaigns is required. Current M5 still promotes only its original 14 rows.
 
+Run the focused native Pulsar BookKeeper profiles with
+`python3 scripts/run-v2-m6-pulsar-bk-process-check.py --pulsar-root <checkout> --java-home <jdk21>
+--output <new-absolute-path-outside-checkouts>`. Add `--async-object` to run the enrolled Object output path
+with versioned MinIO and Vault Transit alongside real Oxia and BookKeeper. The async probe checks that BK still
+rolls over with the original PUT reply held and with the Object bucket unavailable. It verifies that unload holds
+the original Cell until SDK I/O drains, then the successor finishes the same UUID and version without repeating
+the original PUT. Both modes verify the official client's exact positions and bytes after transfer and restart.
+The async run uses `RETAIN_BK` and does not qualify explicit source deletion or promote a scenario.
+
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.
 It runs the real BK/Oxia read-root cases and the reader capacity cases, and checks the tested classes against the

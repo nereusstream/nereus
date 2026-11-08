@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenLedgerCallback;
@@ -40,7 +41,10 @@ import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 /** One actual M5 SDK factory owns its guarded BK scope and metadata writer before its first native mutation. */
 public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
     private record ObjectScope(
-            NereusPulsarLedgerOffloaderV1 offloader, PhysicalResourceIdV2.Namespace namespace, long maximumBytes) {}
+            NereusPulsarLedgerOffloaderV1 offloader,
+            PhysicalResourceIdV2.Namespace namespace,
+            long maximumBytes,
+            Optional<Supplier<CompletionStage<Void>>> enrolledOwnership) {}
 
     private final PulsarNativeBindingV1 binding;
     private final PulsarNativeBookKeeperCreateV1 creation;
@@ -153,7 +157,10 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
             return CompletableFuture.failedFuture(failure);
         }
         var objectScope = new ObjectScope(
-                Objects.requireNonNull(offloader), Objects.requireNonNull(objectNamespace), maximumObjectBytes);
+                Objects.requireNonNull(offloader),
+                Objects.requireNonNull(objectNamespace),
+                maximumObjectBytes,
+                Optional.empty());
         return openNativeFactory(
                 binding,
                 metadata,
@@ -168,6 +175,43 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
                 Optional.of(objectScope),
                 executor,
                 bookKeeperGcGrace);
+    }
+
+    public static CompletableFuture<PulsarNativeManagedLedgerFactoryV2> openEnrolledOffload(
+            PulsarNativeBindingV1 binding,
+            MetadataStoreExtended metadata,
+            String metadataServiceUri,
+            M5BookKeeperNamespaceAuthorityV2 bootstrap,
+            PulsarNativeReadCellBudgetV1 budget,
+            long existingQuotaCapacity,
+            ManagedLedgerFactoryConfig factoryConfig,
+            M5ClosedWriterRegistryV1 registry,
+            M5PulsarAggregateRetirementCoordinatorV1 aggregate,
+            String aggregateKey,
+            NereusPulsarLedgerOffloaderV1 offloader,
+            PhysicalResourceIdV2.Namespace objectNamespace,
+            long maximumObjectBytes,
+            Executor executor,
+            Supplier<CompletionStage<Void>> requireNativeOwnership,
+            Optional<com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1.BookKeeperGcGraceV1> gcGrace) {
+        return openNativeFactory(
+                binding,
+                metadata,
+                metadataServiceUri,
+                bootstrap,
+                budget,
+                existingQuotaCapacity,
+                factoryConfig,
+                registry,
+                aggregate,
+                aggregateKey,
+                Optional.of(new ObjectScope(
+                        Objects.requireNonNull(offloader),
+                        Objects.requireNonNull(objectNamespace),
+                        maximumObjectBytes,
+                        Optional.of(requireNativeOwnership))),
+                executor,
+                gcGrace);
     }
 
     private static CompletableFuture<PulsarNativeManagedLedgerFactoryV2> openNativeFactory(
@@ -235,7 +279,10 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
                             return writer.openSdkRecoveryReference(registry)
                                     .thenCompose(unused -> objectScope
                                             .map(scope -> writer.admitObjectPhysicalScope(
-                                                    scope.offloader(), scope.namespace(), scope.maximumBytes()))
+                                                            scope.offloader(), scope.namespace(), scope.maximumBytes())
+                                                    .thenCompose(ignored -> scope.enrolledOwnership()
+                                                            .map(gate -> writer.enableNativeOutput(registry, gate))
+                                                            .orElseGet(() -> CompletableFuture.completedFuture(null))))
                                             .orElseGet(() -> CompletableFuture.completedFuture(null)))
                                     .thenCompose(unused -> writer.admitSealedPlainSources())
                                     .thenApply(unused -> original);

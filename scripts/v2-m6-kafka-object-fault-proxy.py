@@ -14,7 +14,8 @@ import threading
 import urllib.parse
 
 CONTROL = "/__nereus_m6_object_fault"
-LOST_PUT_MODES = {"put-response-lost", "first-put-response-lost"}
+FIRST_LOST_PUT_SUFFIX = {"first-put-response-lost": ".nwg", "first-pulsar-data-put-response-lost": "/data"}
+LOST_PUT_MODES = {"put-response-lost", *FIRST_LOST_PUT_SUFFIX}
 MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"} | LOST_PUT_MODES
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
@@ -121,7 +122,7 @@ def fault_proxy(upstream):
                     if (whole_bucket and (data["version"] != "*" or not data["path"].endswith("/")
                                           or data["path"].count("/") != 2 or data["path"] == "//")
                             or lost_put and (data["version"] != "*" or data["path"].count("/") < 2
-                                             or data["path"].endswith("/") != (data["mode"] == "first-put-response-lost"))
+                                             or data["path"].endswith("/") != (data["mode"] in FIRST_LOST_PUT_SUFFIX))
                             or not whole_bucket and not lost_put and data["version"] == "*"):
                         return self.reply(400)
                     if rule is not None:
@@ -149,13 +150,14 @@ def fault_proxy(upstream):
             path = urllib.parse.unquote(url.path)
             with lock:
                 fault = None
-                if (rule and rule["mode"] == "first-put-response-lost" and self.command == "PUT"
-                        and rule["selectedPath"] is None and path.startswith(rule["path"]) and path.endswith(".nwg")):
+                if (rule and rule["mode"] in FIRST_LOST_PUT_SUFFIX and self.command == "PUT"
+                        and rule["selectedPath"] is None and path.startswith(rule["path"])
+                        and path.endswith(FIRST_LOST_PUT_SUFFIX[rule["mode"]])):
                     rule["selectedPath"] = path
                 if rule and (rule["mode"] == "bucket-unavailable" and
                              (path == rule["path"][:-1] or path.startswith(rule["path"]))
                              or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]
-                             or rule["mode"] == "first-put-response-lost" and self.command == "PUT"
+                             or rule["mode"] in FIRST_LOST_PUT_SUFFIX and self.command == "PUT"
                              and path == rule["selectedPath"]
                              or self.command == "GET" and version == [rule["version"]] and path == rule["path"]):
                     fault = rule

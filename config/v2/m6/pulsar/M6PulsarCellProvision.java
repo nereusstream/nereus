@@ -36,6 +36,26 @@ class M6PulsarCellProvision {
             props.load(r);
         }
         props.setProperty("oxiaAddress", args[0]);
+        boolean asyncObject = args.length == 6;
+        if (asyncObject) {
+            props.setProperty("storageProfile", "BOOKKEEPER_WAL_ASYNC_OBJECT");
+            props.setProperty("s3Endpoint", args[5]);
+            props.setProperty("s3Region", "us-east-1");
+            props.setProperty("s3Bucket", "m6-native-pulsar-offload");
+            props.setProperty("s3KeyPrefix", "m6-native-pulsar");
+            props.setProperty("offloadBlockClass", "latency-1mib");
+            props.setProperty("offloadStagingDirectory", path.resolveSibling("offload-staging").toString());
+            props.setProperty("s3EncryptionScope", "NONE");
+            props.setProperty("s3SecurityScope", "m6-pulsar-test");
+            props.setProperty("s3CredentialScope", "m6-pulsar-fixture:minio");
+            props.setProperty("s3QuotaScope", "m6-pulsar-native-birth");
+            props.setProperty("s3OperatorOwner", "m6-fixture");
+            props.setProperty("s3DeleteCapability", "minio-version-match-v1");
+            props.setProperty("vaultEndpoint", args[4]);
+            props.setProperty("vaultMount", "transit");
+            props.setProperty("vaultKey", "nereus-kafka-wal");
+            props.setProperty("vaultTokenEnvironment", "NEREUS_M6_PULSAR_TEST_VAULT_TOKEN");
+        }
         try (var nativeBookKeeper = new org.apache.bookkeeper.client.BookKeeper(
                 new org.apache.bookkeeper.conf.ClientConfiguration().setMetadataServiceUri(props.getProperty("bkMetadataUri")))) {
             var driver = (org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver) nativeBookKeeper.getMetadataClientDriver();
@@ -56,6 +76,25 @@ class M6PulsarCellProvision {
         try (var oxia = OxiaClientBuilder.create(args[0]).namespace("default").asyncClient().get(15, TimeUnit.SECONDS)) {
             var ns = OxiaPhysicalMetadataNamespaceV2.provision(oxia).toCompletableFuture().get(15, TimeUnit.SECONDS);
             props.setProperty("metadataIdentity", ns.identity().encode().toHex());
+            if (asyncObject) {
+                String bucket = props.getProperty("s3Bucket");
+                try (var s3 = software.amazon.awssdk.services.s3.S3Client.builder()
+                        .credentialsProvider(software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider
+                                .create())
+                        .endpointOverride(java.net.URI.create(args[3])).forcePathStyle(true)
+                        .region(software.amazon.awssdk.regions.Region.US_EAST_1).build()) {
+                    s3.createBucket(r -> r.bucket(bucket));
+                    s3.putBucketVersioning(r -> r.bucket(bucket).versioningConfiguration(v -> v.status("Enabled")));
+                    var object = com.nereusstream.storage.object.s3.S3M5PhysicalNamespaceAuthorityV2.provision(
+                            s3, bucket, ns.identity());
+                    props.setProperty("s3ServiceIdentity", object.namespace().serviceIdentity().value());
+                    props.setProperty("s3ContainerIdentity", object.namespace().containerIdentity().value());
+                    ns.openAuthorityRoute(object,
+                            new com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1(oxia))
+                            .thenCompose(route -> route.initialize(64L * 1024 * 1024))
+                            .toCompletableFuture().get(20, TimeUnit.SECONDS);
+                }
+            }
             try (var writer = Files.newBufferedWriter(path)) {
                 props.store(writer, null);
             }
@@ -74,7 +113,7 @@ class M6PulsarCellProvision {
                 var aggregate = new TopicBindingAggregateV1(TopicBindingAggregateV1.SCHEMA_VERSION,
                         new TopicBindingV1(ProtocolKindV1.PULSAR, bindingId, cell, incarnation),
                         new InitialStorageEpochV1(DeterministicTopicIdsV1.deriveStorageEpochId(bindingId, 0), 0,
-                                StorageProfileV1.BOOKKEEPER_WAL_ONLY, ProfileOriginV1.TOPIC_EXPLICIT,
+                                config.profile(), ProfileOriginV1.TOPIC_EXPLICIT,
                                 new PolicyCatalogDigest(config.bookKeeper().configurationDigest()),
                                 FrameEncodingPolicyValueV1.none()));
                 var bytes = Nta1CodecV1.encode(aggregate);
@@ -82,7 +121,17 @@ class M6PulsarCellProvision {
                         config.metadata().authorityRoot(),
                         new AggregatePublicationCandidate(aggregate, bytes, Sha256Digest.hash(bytes)), config.writers())
                         .toCompletableFuture().get(30, TimeUnit.SECONDS);
+                if (asyncObject) {
+                    var observer = actual.readCellBudget(config.share(),
+                            java.util.Map.of(actual.bindingIdentity(), config.share()), config.readLimits());
+                    props.setProperty("probeCellOwnerKey", observer.ownerKey());
+                }
                 System.out.println("BINDING " + actual.bindingIdentity());
+            }
+            if (asyncObject) {
+                try (var writer = Files.newBufferedWriter(path)) {
+                    props.store(writer, null);
+                }
             }
         }
     }

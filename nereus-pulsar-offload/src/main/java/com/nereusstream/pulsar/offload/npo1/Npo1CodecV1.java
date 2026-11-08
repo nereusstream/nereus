@@ -382,6 +382,23 @@ public final class Npo1CodecV1 {
         }
     }
 
+    /** Canonical NPO1 attempt section used to retain the original wrapped key before either immutable PUT. */
+    public static byte[] canonicalAttemptSection(AttemptSection section) {
+        return attemptBody(Objects.requireNonNull(section));
+    }
+
+    public static AttemptSection parseCanonicalAttemptSection(byte[] bytes) {
+        var attempt = parseAttempt(bytes);
+        if (!Arrays.equals(bytes, attemptBody(attempt))) {
+            throw rejected("attempt section is not canonical");
+        }
+        return attempt;
+    }
+
+    public static String sealedLedgerSectionSha256(SealedLedgerSection section) {
+        return rootSha256(sealedLedgerBody(Objects.requireNonNull(section)));
+    }
+
     private static byte[] attemptBody(AttemptSection section) {
         return body(output -> {
             output.writeLong(section.ledgerId());

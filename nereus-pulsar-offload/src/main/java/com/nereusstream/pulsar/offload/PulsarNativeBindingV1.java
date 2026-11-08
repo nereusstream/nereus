@@ -1286,6 +1286,13 @@ public final class PulsarNativeBindingV1 {
         return authorityRoot;
     }
 
+    PulsarNativeOffloadAttemptStoreV2 nativeOffloadAttempts() {
+        return new PulsarNativeOffloadAttemptStoreV2(
+                new Oxia09ExactMetadataTransactionStoreV1(client),
+                authorityRoot,
+                bindingIdentity.bindingId().digest());
+    }
+
     CompletableFuture<com.nereusstream.metadata.oxia.v2.retention.OxiaCellProviderScopeRegistryV2> providerScopes(
             com.nereusstream.storage.api.lifecycle.NativePhysicalNamespaceAuthorityV2 backend) {
         return revalidate()

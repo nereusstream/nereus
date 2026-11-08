@@ -355,6 +355,10 @@ final class PulsarNativeSealedPlainAdmissionV2 {
             } else if (creation.spec().sealedSourceBindingFor(metadata).isPresent()) {
                 prior = CompletableFuture.completedFuture(null);
             } else {
+                if (!metadata.isClosed()) {
+                    throw new IllegalStateException("Prior Native " + (cursorName == null ? "data" : "cursor")
+                            + " ledger " + id + " is not CLOSED");
+                }
                 prior = creation.namespace().readPriorPulsarSealedBirth(id, metadata);
             }
             return prior.thenCompose(original -> manager.readLedgerMetadata(id).thenCompose(current -> {
@@ -710,19 +714,7 @@ final class PulsarNativeSealedPlainAdmissionV2 {
                     offloader, profile, binding.managedLedgerName(), source, pinned == null ? null : pinned.identity());
             sdkCaptures.add(original);
             return original.observe().thenAccept(actual -> {
-                final Sha256Digest implementation;
-                try (var bytes = PulsarNativeOffloadedReferenceV2.class.getResourceAsStream(
-                        "PulsarNativeOffloadedReferenceV2.class")) {
-                    implementation = Sha256Digest.hash(CanonicalBytes.copyOf(
-                            java.util.Objects.requireNonNull(bytes).readAllBytes()));
-                } catch (java.io.IOException failure) {
-                    throw new CompletionException(failure);
-                }
-                var enrollment = new ProofBoundWriterEnrollmentV1(
-                        List.of(ProofBoundWriterClassV1.values()),
-                        profile.providerConfigurationSha256(),
-                        implementation,
-                        Sha256Digest.hash(profile.encode()));
+                var enrollment = offloadedEnrollment(profile);
                 var root = Sha256Digest.hash(CanonicalBytes.copyOf(ByteBuffer.allocate(100)
                         .putInt(0x4e50534f) // NPSO: original readonly SDK Object source.
                         .put(actual.sdkFactsSha256().bytes().toByteArray())
@@ -747,6 +739,21 @@ final class PulsarNativeSealedPlainAdmissionV2 {
                 }
             });
         });
+    }
+
+    static ProofBoundWriterEnrollmentV1 offloadedEnrollment(
+            com.nereusstream.storage.object.materialization.M5CellProviderProfileV2 profile) {
+        try (var bytes =
+                PulsarNativeOffloadedReferenceV2.class.getResourceAsStream("PulsarNativeOffloadedReferenceV2.class")) {
+            return new ProofBoundWriterEnrollmentV1(
+                    List.of(ProofBoundWriterClassV1.values()),
+                    profile.providerConfigurationSha256(),
+                    Sha256Digest.hash(CanonicalBytes.copyOf(
+                            java.util.Objects.requireNonNull(bytes).readAllBytes())),
+                    Sha256Digest.hash(profile.encode()));
+        } catch (java.io.IOException failure) {
+            throw new CompletionException(failure);
+        }
     }
 
     private CompletableFuture<Void> admitCaptured() {

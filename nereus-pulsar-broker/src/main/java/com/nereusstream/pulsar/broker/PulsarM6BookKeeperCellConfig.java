@@ -14,6 +14,7 @@
 
 package com.nereusstream.pulsar.broker;
 
+import com.nereusstream.domain.aggregate.StorageProfileV1;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.identity.DeploymentId;
@@ -39,6 +40,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.SystemTopicNames;
@@ -56,6 +58,8 @@ record PulsarM6BookKeeperCellConfig(
         PulsarNativeReadCellBudgetV1.Usage share,
         PulsarNativeReadCellBudgetV1.ReadLimits readLimits,
         M5ClosedWriterRegistryV1 writers,
+        StorageProfileV1 profile,
+        Optional<PulsarM6AsyncObjectScope.Configuration> objectScope,
         Map<TopicName, Long> generations) {
 
     static PulsarM6BookKeeperCellConfig read(Path path) throws IOException {
@@ -117,6 +121,21 @@ record PulsarM6BookKeeperCellConfig(
         var writers = PulsarNativeWriterRegistryV2.create(
                 new CapabilityBinding(positive(raw, "writerCapabilityVersion"), digest(raw, "writerCapabilityDigest")),
                 source);
+        var profile = StorageProfileV1.valueOf(raw.getProperty("storageProfile", "BOOKKEEPER_WAL_ONLY"));
+        var objectScope =
+                switch (profile) {
+                    case BOOKKEEPER_WAL_ONLY -> Optional.<PulsarM6AsyncObjectScope.Configuration>empty();
+                    case BOOKKEEPER_WAL_ASYNC_OBJECT -> {
+                        if (!"RETAIN_BK".equals(raw.getProperty("bookKeeperRetention", "RETAIN_BK"))) {
+                            throw new IllegalArgumentException(
+                                    "Native BookKeeper delete requires the release coordinator");
+                        }
+                        yield Optional.of(PulsarM6AsyncObjectScope.Configuration.read(key -> required(raw, key)));
+                    }
+                    default ->
+                        throw new IllegalArgumentException(
+                                "Native BookKeeper Cell profile is not admitted: " + profile);
+                };
         return new PulsarM6BookKeeperCellConfig(
                 namespace,
                 metadata,
@@ -137,6 +156,8 @@ record PulsarM6BookKeeperCellConfig(
                         positive(raw, "readMaximumEntryBytes"),
                         positive(raw, "readMaximumBatchBytes")),
                 writers,
+                profile,
+                objectScope,
                 Map.copyOf(topics));
     }
 
