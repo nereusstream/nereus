@@ -217,7 +217,8 @@ def run(pulsar, java_home, out):
                 r.run_to_log(object_probe + [root_key, root_version, "held"], out / "object-delete-held.log", timeout=15)
                 r.SOURCE.require(pending.poll() is None, "maintenance exited with its original S3 delete unresolved")
                 fault_state(s3_control, s3_token, "PATCH")
-                r.SOURCE.require(pending.wait(max(1, deadline - time.monotonic())) == 0 and delete_fault.matches == 1
+                # Termination starts at the S3 reply cut, after the earlier BookKeeper recovery and M4 retirement.
+                r.SOURCE.require(pending.wait(30) == 0 and delete_fault.matches == 1
                                  and fault_state(s3_control, s3_token)["hits"] == 1,
                                  "original physical deletion did not reconcile without redispatch")
             finally:
