@@ -187,7 +187,7 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         return policy.driverMetadata();
     }
 
-    @Override
+    /** Implements the enrolled Native SPI; the pinned historical M5 compile API predates this method. */
     public boolean preservesIncompleteAttempt() {
         return enrolledOutput != null;
     }

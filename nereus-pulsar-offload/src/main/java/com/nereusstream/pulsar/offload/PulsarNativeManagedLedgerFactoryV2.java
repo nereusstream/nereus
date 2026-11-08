@@ -32,6 +32,7 @@ import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactoryConfig;
+import org.apache.bookkeeper.mledger.SourceSafeLedgerOffloader;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerFactoryImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.MetaStoreImpl;
@@ -199,6 +200,19 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
             Executor executor,
             Supplier<CompletionStage<Void>> requireNativeOwnership,
             Optional<com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1.BookKeeperGcGraceV1> gcGrace) {
+        try {
+            // The historical Native compile API remains supported by the ordinary M5 library path.
+            // Only the enrolled Broker path requires the Native SPI that retains the original UUID.
+            if (SourceSafeLedgerOffloader.class
+                            .getMethod("preservesIncompleteAttempt")
+                            .getReturnType()
+                    != boolean.class) {
+                throw new NoSuchMethodException("original attempt SPI does not return boolean");
+            }
+        } catch (NoSuchMethodException failure) {
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                    "Enrolled Native offload requires original attempt retention in the Pulsar runtime", failure));
+        }
         return openNativeFactory(
                 binding,
                 metadata,
