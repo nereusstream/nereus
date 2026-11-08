@@ -370,8 +370,11 @@ and Kafka production process runtimes. The native route persists the exact Objec
 authorization grant and publishing the coherent cut. On takeover it closes the prior grant Head and dispatch gate,
 verifies the old Root and physical tail, seals the selected Kafka checkpoint, and only then opens a successor.
 The cold Broker reads retained sources with the original writer context and Vault-wrapped keys. An armed write
-with an unknown outcome prevents takeover from using absence as proof. This path has bounded Root and recovery
-budgets; automatic rollover and the aggregate profile and scenario exit are still open.
+with an unknown outcome prevents takeover from using absence as proof. The process check loses the PUT response
+after MinIO stores the original version, confirms the BK-only topic can still append, and verifies both profiles
+after takeover. It also checks a planned handoff in which the departing Broker drains admitted work and publishes
+the terminal NWKCP1 Head before its replacement resumes. This path has bounded Root and recovery budgets; automatic
+rollover and the aggregate profile and scenario exit are still open.
 
 ### Planned aggregate boundaries
 
