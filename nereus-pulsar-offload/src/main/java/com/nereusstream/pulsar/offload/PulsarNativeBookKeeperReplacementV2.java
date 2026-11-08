@@ -227,7 +227,7 @@ public final class PulsarNativeBookKeeperReplacementV2 {
                     .thenCompose(recovered -> {
                         owner = recovered;
                         preparation = null;
-                        return owner.fence();
+                        return owner.drainForRecovery(worker);
                     })
                     .thenCompose(unused -> closeScope())
                     .thenCompose(unused -> open())
