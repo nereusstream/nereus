@@ -498,7 +498,9 @@ build and runtime dependency graph or complete M6-1. No scenario is promoted by 
 The separate `scripts/run-v2-m6-kafka-bk-recovery-check.py` runner rebuilds the current M4 prerequisite and
 executes the required native recovery and compaction cases over real BookKeeper and Oxia. It captures historical
 Fetch and reader drain, lost OPEN/create or ticket responses, fenced takeover, and BK-only internal compaction
-with coordinator recovery. The aggregate requires both this result and the separate production process suite.
+with coordinator recovery. Internal compaction runs in its own fresh BookKeeper and Oxia fixture so its native GC
+capacity is initialized before the first guarded ledger reservation. The aggregate requires both this result and
+the separate production process suite.
 
 `__share_group_state`, online migration, KoP, cross-protocol write-authority migration, compact tombstone deletion and
 allocator orphan GC remain outside these batches. M7 SLO values and M8 baseline/threshold selection are pre-execution

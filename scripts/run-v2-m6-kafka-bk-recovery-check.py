@@ -27,8 +27,42 @@ METHODS = (
     "confirmedCreateWithUnresolvedTicketStaysUnselectedUntilSuccessorReconciles",
     "lostRecoveredNativeFactsRetainOldWriterTicketUntilNextBroker",
     "successorActivatesAfterFencingReservedButNeverCreatedLedger",
-    "nativeM5BookKeeperOnlyInternalTopicsCompactReclaimAndRecover",
 )
+COMPACTION = ("nativeM5BookKeeperOnlyInternalTopicsCompactReclaimAndRecover",)
+
+
+def run_cases(kafka, java, out, repository, receipt, artifacts, methods):
+    out.mkdir()
+    runtime_path = out / f"{TASK}-runtime.json"
+    with BK.bookkeeper_oxia(out) as oxia:
+        command = [
+            "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
+            "--init-script", str(BK.RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={runtime_path}",
+            "-Dnereus.m6.kafkaBkRecoveryRuntimeCapture=true",
+            f"-PnereusDevelopmentRepository={repository}", f"-PnereusDevelopmentVersion={BK.DEVELOPMENT_VERSION}",
+            f"-PnereusLockedOxiaRepository={BK.OXIA_CLIENT}",
+            "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
+            f"-Pv2M5RetentionOxiaServiceAddress={oxia}", f"-Pv2M5KafkaRunSourceRoot={ROOT}",
+            f"-Pv2M5KafkaRunSummaryFile={receipt}", "-Pv2M6KafkaReadQualification=true", f":core:{TASK}",
+        ]
+        for method in methods:
+            command.extend(("--tests", f"{SUITE}.{method}"))
+        env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
+        started = time.time_ns()
+        with (out / "gradle.log").open("xb") as log:
+            completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            xml = kafka / "core/build/test-results" / TASK / f"TEST-{SUITE}.xml"
+            if xml.is_file() and xml.stat().st_mtime_ns >= started:
+                (out / xml.name).write_bytes(JUNIT.regular(xml))
+            completed.check_returncode()
+        test = ASYNC.read_test(kafka, java, out, started, TASK, SUITE,
+                               {method + "()" for method in methods}, artifacts)
+    return {
+        **test, "command": command,
+        "backendFiles": {name: M6.file_identity(out / name)
+                         for name in ("backend.json", "bookkeeper.log", "oxia.log", "gradle.log")},
+    }
 
 
 def run(kafka, java, out):
@@ -58,44 +92,23 @@ def run(kafka, java, out):
             BK.COMPOSE.relative_to(ROOT).as_posix(), BK.RUNTIME_INIT.relative_to(ROOT).as_posix(),
         )
     }
-    runtime_path = out / f"{TASK}-runtime.json"
-    with BK.bookkeeper_oxia(out) as oxia:
-        command = [
-            "./gradlew", "--offline", "--no-daemon", "--no-configuration-cache", "--max-workers=2",
-            "--init-script", str(BK.RUNTIME_INIT), f"-Dnereus.m6.kafkaRuntimeCapture={runtime_path}",
-            "-Dnereus.m6.kafkaBkRecoveryRuntimeCapture=true",
-            f"-PnereusDevelopmentRepository={repository}", f"-PnereusDevelopmentVersion={BK.DEVELOPMENT_VERSION}",
-            f"-PnereusLockedOxiaRepository={BK.OXIA_CLIENT}",
-            "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
-            f"-Pv2M5RetentionOxiaServiceAddress={oxia}", f"-Pv2M5KafkaRunSourceRoot={ROOT}",
-            f"-Pv2M5KafkaRunSummaryFile={receipt}", "-Pv2M6KafkaReadQualification=true", f":core:{TASK}",
-        ]
-        for method in METHODS:
-            command.extend(("--tests", f"{SUITE}.{method}"))
-        env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
-        started = time.time_ns()
-        with (out / "gradle.log").open("xb") as log:
-            completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)
-        if completed.returncode != 0:
-            xml = kafka / "core/build/test-results" / TASK / f"TEST-{SUITE}.xml"
-            if xml.is_file() and xml.stat().st_mtime_ns >= started:
-                (out / xml.name).write_bytes(JUNIT.regular(xml))
-            completed.check_returncode()
-        test = ASYNC.read_test(kafka, java, out, started, TASK, SUITE,
-                               {method + "()" for method in METHODS}, artifacts)
+    # Native GC capacity must be installed before the first reservation in its physical namespace.
+    executions = {
+        "internal-compaction": run_cases(kafka, java, out / "internal-compaction", repository, receipt, artifacts,
+                                         COMPACTION),
+        "recovery": run_cases(kafka, java, out / "recovery", repository, receipt, artifacts, METHODS),
+    }
     M6.require(all(M6.clean_commit(root) == commits[name] for name, root in roots.items())
                and qualified == M6.file_identity(receipt) and files == BK.repository_files(repository),
                "Kafka BK recovery execution inputs changed")
     (out / "bk-recovery-result.json").write_bytes(M6.INPUTS.canonical({
         "kind": "FOCUSED_KAFKA_BK_RECOVERY_CHECK", "promotionEligible": False,
-        "sourceCheckout": commits, "sourceTrees": trees, "command": command,
+        "sourceCheckout": commits, "sourceTrees": trees,
         "executorInputs": executor_inputs,
         "m4Qualification": {"path": str(receipt.relative_to(out)), **qualified},
-        "backendFiles": {name: M6.file_identity(out / name)
-                         for name in ("backend.json", "bookkeeper.log", "oxia.log", "gradle.log")},
-        "tests": {TASK: test},
+        "executions": executions,
     }))
-    print(f"{len(METHODS)} native Kafka BK recovery/compaction checks passed: {out}")
+    print(f"{len(METHODS) + len(COMPACTION)} native Kafka BK recovery/compaction checks passed: {out}")
 
 
 def main():

@@ -24,7 +24,8 @@ KAFKA_PROCESSES = {
     "kafka-object-wal": ("object-wal", "FOCUSED_KAFKA_OBJECT_WAL_CHECK", "object-wal-fixture-result.json"),
     "kafka-bk-recovery": ("bk-recovery", "FOCUSED_KAFKA_BK_RECOVERY_CHECK", "bk-recovery-result.json"),
 }
-KAFKA_BK_RECOVERY_TASK = ":core:nereusBookKeeperM4AdmissionRealTest|"
+KAFKA_BK_RECOVERY_TASK = "nereusBookKeeperM4AdmissionRealTest"
+KAFKA_BK_RECOVERY_CASE_PREFIX = f":core:{KAFKA_BK_RECOVERY_TASK}|"
 PULSAR_PROCESSES = {
     "pulsar-bookkeeper-wal-only": {
         "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ONLY", "--lifecycle"),
@@ -83,7 +84,7 @@ def plan(root):
             require_keys(entry, ("cases",), f"{profile} plan")
             cases = [validate_assignment(entry["cases"], CASE, profile)]
             if profile == "kafka-bookkeeper-wal-only":
-                SOURCE.require({key.startswith(KAFKA_BK_RECOVERY_TASK) for key in entry["cases"]} == {True, False},
+                SOURCE.require({key.startswith(KAFKA_BK_RECOVERY_CASE_PREFIX) for key in entry["cases"]} == {True, False},
                                "Kafka BK plan requires both production process and qualified recovery cases")
         claims[profile] = sorted(set().union(*cases))
     COVERAGE.validate_profiles(root, claims)
@@ -185,6 +186,18 @@ def verify_pulsar_runtime(output, roots, frozen):
                                 roots, output, frozen, {})
 
 
+def kafka_test_runs(result, output):
+    if result["kind"] == "FOCUSED_KAFKA_BK_RECOVERY_CHECK":
+        executions = result["executions"]
+        require_keys(executions, ("internal-compaction", "recovery"), "native BK recovery executions")
+        return [(output / name, KAFKA_BK_RECOVERY_TASK, test)
+                for name, test in executions.items()]
+    nested = result["kind"] == "FOCUSED_KAFKA_OBJECT_WAL_CHECK"
+    for task in result["tests"]:
+        SOURCE.require(re.fullmatch(r"[a-zA-Z][\w]*", task), f"invalid Kafka evidence task: {task}")
+    return [(output / task if nested else output, task, test) for task, test in result["tests"].items()]
+
+
 def verify_kafka_runtime(result_file, roots, output, frozen):
     result = read(result_file)
     captures = []
@@ -195,8 +208,8 @@ def verify_kafka_runtime(result_file, roots, output, frozen):
         nested = result["kind"] == "FOCUSED_KAFKA_OBJECT_WAL_CHECK"
         if not nested:
             repository = output / "m4/development-repository"
-        captures.extend((output / task if nested else output) / test["runtime"]["name"]
-                        for task, test in result["tests"].items())
+        captures.extend(directory / test["runtime"]["name"]
+                        for directory, _, test in kafka_test_runs(result, output))
     group = repository / "com/nereusstream"
     published = {}
     for jar in sorted(group.rglob("*.jar")):
@@ -300,21 +313,18 @@ def verify_kafka_result(output, started, profile, expected, sources):
         junit.extend({"task": ":core:nereusBookKeeperOwnerRelocationRealTest", "path": name, **identity}
                      for name, identity in result["junit"].items())
     else:
-        nested = profile == "kafka-object-wal"
-        if not nested:
-            verify_attachment_map(output, started, result["backendFiles"])
-            if profile != "kafka-bk-recovery":
-                verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
+        if profile != "kafka-object-wal":
             verify_named(output, result["m4Qualification"], "path")
-        process_attached = not nested
-        for task, test in result["tests"].items():
-            SOURCE.require(re.fullmatch(r"[a-zA-Z][\w]*", task), f"invalid Kafka evidence task: {task}")
-            directory = output / task if nested else output
-            if nested:
+        if profile == "kafka-bookkeeper-wal-async-object":
+            verify_attachment_map(output, started, result["backendFiles"])
+            verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
+        process_attached = profile != "kafka-object-wal"
+        for directory, task, test in kafka_test_runs(result, output):
+            if directory != output:
                 verify_attachment_map(directory, started, test["backendFiles"])
-                if test["processLogs"]:
-                    verify_attachment_map(directory / "kafka-process-logs", started, test["processLogs"])
-                    process_attached = True
+            if test.get("processLogs"):
+                verify_attachment_map(directory / "kafka-process-logs", started, test["processLogs"])
+                process_attached = True
             verify_named(directory, test["runtime"], "name")
             xml = test["xml"]
             path = (directory / SOURCE.INPUTS.relative(xml["name"])).relative_to(output)
@@ -344,7 +354,7 @@ def run_kafka_profile(roots, output, profile, expected, frozen):
     if profile != "kafka-bookkeeper-wal-only":
         return run_kafka_process(roots, output, profile, expected, frozen)
     output.mkdir()
-    recovery = {key: rows for key, rows in expected.items() if key.startswith(KAFKA_BK_RECOVERY_TASK)}
+    recovery = {key: rows for key, rows in expected.items() if key.startswith(KAFKA_BK_RECOVERY_CASE_PREFIX)}
     process = {key: rows for key, rows in expected.items() if key not in recovery}
     children = {
         "process": run_kafka_process(roots, output / "process", profile, process, frozen),
