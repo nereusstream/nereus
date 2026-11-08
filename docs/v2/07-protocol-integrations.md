@@ -67,8 +67,9 @@ continuous, legal shared commit whose locator and recoverable producer/transacti
 published. LSO derives from that HW and the first unstable transaction. BookKeeper quorum supplies physical durability,
 not another logical replica or a substitute ISR. On failure, native Controller reassignment selects an eligible new
 Broker, which closes old admission, fences and recovers the legal checkpoint plus tail, then activates only its current
-generation. The current native request path supports `BOOKKEEPER_WAL_ONLY`; the Object core has its own persisted grant
-and closed-history recovery, while native Object Broker/process integration remains M6 work.
+generation. The focused native process checks exercise both BookKeeper-primary profiles and the Object WAL profile.
+The Object route qualifies append publication against its persisted grant and recovers the prior Owner's closed
+history before opening a successor. The activation matrix below defines the remaining M6 acceptance boundaries.
 
 Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
 compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO

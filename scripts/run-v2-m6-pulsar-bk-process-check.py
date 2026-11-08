@@ -41,7 +41,7 @@ def source_checkout(root):
 
 
 def capture_runtime(source, output, task, java_home, *extra):
-    command = [str(source / "gradlew"), "--no-configuration-cache", "-I",
+    command = [str(source / "gradlew"), "--offline", "--no-daemon", "--no-configuration-cache", "-I",
                str(CONFIG / "capture-runtime.init.gradle"), f"-Dm6.runtime.output={output}", *extra, task]
     with output.with_suffix(".log").open("xb") as log:
         subprocess.run(command, cwd=source, env={**os.environ, "JAVA_HOME": str(java_home)},

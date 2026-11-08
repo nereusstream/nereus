@@ -93,7 +93,8 @@ def run(pulsar, java_home, out):
         runtime = out / "actual-runtime.properties"
         start = time.time_ns()
         names = ["v2M5NativeBkDeleteSdkDrainRealTest", "v2M5S3ProviderDrainRealTest"]
-        gradle = [str(root / "gradlew"), f"-PpulsarCheckout={pulsar}", "--no-configuration-cache",
+        gradle = [str(root / "gradlew"), f"-PpulsarCheckout={pulsar}", "--offline", "--no-daemon",
+                  "--no-configuration-cache",
                   "-I", str(work / "qualify-broker-delete-drain.init.gradle"),
                   f"-Dm6.native.qualifiedBrokerClasspath={actual_cp}",
                   f"-Dm6.native.qualifiedBrokerProviderScope={provider_scope}",

@@ -365,9 +365,13 @@ def execute(args):
         "v2M6ExecutionInputsContractTest", "v2M6CoverageContractTest", "v2M4HistoricalM3DependencyCheck",
         "v2M5HistoricalM4DependencyCheck",
         *[f":{name}:{check}" for name in
-          ("nereus-storage-object", "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-pulsar-offload")
+          ("nereus-storage-object", "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper",
+           "nereus-pulsar-offload", "nereus-pulsar-broker", "nereus-metadata-spi")
           for check in ("test", "spotlessCheck", "checkstyleMain", "checkstyleTest")],
     ], root, out / "nereus-regressions.log")
+    run(["./gradlew", "--offline", "--no-configuration-cache", "--no-daemon",
+         ":managed-ledger:test", "--tests", "*ManagedLedgerFactoryShutdownTest", "--tests", "*ManagedLedgerErrorsTest",
+         ":managed-ledger:checkstyleMain"], roots["pulsar"], out / "pulsar-regressions.log")
     qualified = {}
     for profile in COVERAGE.REQUIRED:
         output = out / profile
@@ -381,7 +385,8 @@ def execute(args):
     write(out / "m6-execution-result.json", {
         "schema": "NEREUS_V2_M6_EXECUTION_RESULT_V1", "inputRootSha256": frozen["inputRootSha256"],
         "profiles": qualified, "scenarios": sorted(scenarios),
-        "regressionLogSha256": SOURCE.file_identity(out / "nereus-regressions.log")["sha256"],
+        "regressionLogs": {name: SOURCE.file_identity(out / name)["sha256"]
+                           for name in ("nereus-regressions.log", "pulsar-regressions.log")},
         "promotionEligible": False,
     })
 

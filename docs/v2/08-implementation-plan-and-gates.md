@@ -429,16 +429,20 @@ authorization grant and publishing the coherent cut. On takeover it closes the p
 verifies the old Root and physical tail, seals the selected Kafka checkpoint, and only then opens a successor.
 The cold Broker reads retained sources with the original writer context and Vault-wrapped keys. An armed write
 with an unknown outcome prevents takeover from using absence as proof. The process check loses the PUT response
-after MinIO stores the original version, confirms the BK-only topic can still append, and verifies both profiles
+during an `acks=1` Produce, confirms the BK-only topic can still append, and verifies both profiles
 after takeover. It records actual PUT, LIST and full GET attempts for the original key and checks that the same
 version is selected by the grant. A separate Broker test loses the original applied Oxia grant CAS response,
 holds the exact reconciliation read and checks that Produce stays pending. The same test holds an applied physical
 checkpoint page response, observes the Produce ACK and then verifies publication of the checkpoint Head.
+An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
+stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
 In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
 immutable version in its terminal Head before its replacement resumes. A live Owner rolls the physical run before
 admitting new positions at its count or age bound. At the extent limit the process check holds a real S3 Range GET
 from the old Run, verifies the original Fetch response and offsets, and checks the same Owner's exact successor.
-It then reads both sides of the boundary in one Fetch. Retained
+It then reads both sides of the boundary in one Fetch. Native OffsetForLeaderEpoch checks the first and second
+Owners' boundaries on the third acquisition and rejects a stale client leader epoch after the physical Run rolls.
+Retained
 sources still count against the bounded history budget; automatic source retirement and the aggregate exit remain open.
 
 ### Planned aggregate boundaries
