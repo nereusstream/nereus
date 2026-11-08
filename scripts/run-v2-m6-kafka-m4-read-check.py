@@ -89,6 +89,7 @@ def run(out):
             ":nereus-kafka-bookkeeper:test", "--tests", SUITES["v2M5KafkaM4BrokerReadOwnerTest"][1],
             ":nereus-kafka-bookkeeper:v2M5KafkaRunRootsRealTest",
         ]
+        command = M6.gradle_command(command, out / "m4-gradle.log")
         started = time.time_ns()
         with (out / "m4-gradle.log").open("xb") as log:
             completed = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)

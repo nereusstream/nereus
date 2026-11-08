@@ -149,6 +149,7 @@ def run_task(task, kafka, java, out, repository, artifacts):
             f"-Pv2M6VaultEndpoint={vault_url}", f"-Pv2M6VaultTokenFile={token}",
             f"-Pv2M6ObjectWalProcessEvidenceDir={out / 'kafka-process-logs'}", ":core:" + task,
         ]
+        command = M6.gradle_command(command, out / "gradle.log")
         started = time.time_ns()
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"],
                    NEREUS_M6_TEST_FAULT_PROXY=relay, NEREUS_M6_TEST_FAULT_CONTROL=control,

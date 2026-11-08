@@ -49,6 +49,7 @@ def run_cases(kafka, java, out, repository, receipt, artifacts, methods):
         for method in methods:
             command.extend(("--tests", f"{SUITE}.{method}"))
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
+        command = M6.gradle_command(command, out / "gradle.log")
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
             completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)

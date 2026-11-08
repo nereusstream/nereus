@@ -49,6 +49,7 @@ def module(root, name):
 
 SOURCE = module(ROOT, "v2-m6-execution-inputs")
 COVERAGE = module(ROOT, "v2-m6-coverage")
+BUILD_INPUTS = module(ROOT, "v2-m6-build-inputs")
 JUNIT = module(ROOT, "m5-evidence-junit")
 
 
@@ -106,6 +107,8 @@ def validate_assignment(cases, pattern, profile):
 
 
 def run(command, cwd, log_path):
+    if Path(command[0]).name == "gradlew":
+        command = SOURCE.gradle_command(command, log_path)
     with log_path.open("xb") as log:
         subprocess.run(command, cwd=cwd, check=True, stdout=log, stderr=subprocess.STDOUT)
 
@@ -365,6 +368,55 @@ def run_kafka_profile(roots, output, profile, expected, frozen):
     })}
 
 
+def required_build_logs():
+    logs = {"nereus-regressions", "pulsar-regressions"}
+    bk = "kafka-bookkeeper-wal-only"
+    async_object = "kafka-bookkeeper-wal-async-object"
+    object_wal = "kafka-object-wal"
+    for name in (f"{bk}/process", f"{async_object}/m4", f"{bk}/recovery/m4", object_wal):
+        logs.add(f"{name}/nereus-publication")
+    for name in (f"{async_object}/m4", f"{bk}/recovery/m4"):
+        logs.add(f"{name}/m4-gradle")
+    for name in (f"{bk}/process", f"{bk}/recovery/internal-compaction", f"{bk}/recovery/recovery", async_object,
+                 *(f"{object_wal}/{task}" for task in ("nereusObjectWalAdapterRealTest",
+                     "nereusKafkaObjectWalAuthorizationRealTest", "nereusKafkaObjectWalProcessRealTest"))):
+        logs.add(f"{name}/gradle")
+    for profile, processes in PULSAR_PROCESSES.items():
+        for process in processes:
+            logs.update(f"{profile}/{process}/{name}-resolved" for name in ("native", "sdk"))
+    logs.add("pulsar-bookkeeper-wal-async-object/replacement/m4-current")
+    return logs
+
+
+def verify_build_inputs(output, roots, frozen):
+    traces = []
+    repositories = {}
+    plans = set(output.rglob("*" + SOURCE.BUILD_PLAN_SUFFIX))
+    SOURCE.require(plans == {output / (name + SOURCE.BUILD_PLAN_SUFFIX) for name in required_build_logs()},
+                   "Gradle invocation plans differ from the mandatory native suites")
+    for plan in plans:
+        SOURCE.require(plan.resolve(strict=True) == plan, f"redirected Gradle invocation plan: {plan}")
+        capture = read(plan)
+        require_keys(capture, ("command", "startedNs"), "Gradle invocation plan")
+        relative = plan.relative_to(output).as_posix().removesuffix(SOURCE.BUILD_PLAN_SUFFIX)
+        trace = current_attachment(output, capture["startedNs"], relative + SOURCE.BUILD_TRACE_SUFFIX)
+        SOURCE.require(f"-Dnereus.m6.buildInputCapture={trace}" in capture["command"],
+                       f"Gradle invocation names a different capture: {plan}")
+        traces.append((capture["startedNs"], trace))
+        property_name = "-PnereusDevelopmentRepository="
+        supplied = [Path(arg.removeprefix(property_name)) for arg in capture["command"]
+                    if arg.startswith(property_name)]
+        if supplied:
+            SOURCE.require(len(supplied) == 1 and supplied[0].is_relative_to(output)
+                           and supplied[0].resolve(strict=True) == supplied[0],
+                           f"Gradle consumed a repository outside the source-built output: {plan}")
+            repositories[trace] = supplied[0]
+    inventory = set(output.rglob("*" + SOURCE.BUILD_TRACE_SUFFIX))
+    SOURCE.require(traces and {trace for _, trace in traces} == inventory, "incomplete Gradle capture inventory")
+    return BUILD_INPUTS.verify([trace for _, trace in sorted(traces)], frozen, roots, output,
+                               SOURCE.file_identity, SOURCE.require, repositories)
+
+
 def execute(args):
     roots = {"nereus": args.nereus.resolve(strict=True), "kafka": args.kafka.resolve(strict=True),
              "pulsar": args.pulsar.resolve(strict=True)}
@@ -390,6 +442,7 @@ def execute(args):
     out.mkdir(parents=True, exist_ok=False)
     source = out / "execution-inputs.json"
     write(source, frozen)
+    os.environ[SOURCE.BUILD_EVIDENCE_ROOT] = str(out)
     run([
         "./gradlew", "--offline", "--no-configuration-cache", "--no-daemon",
         f"-PpulsarCheckout={roots['pulsar']}", "v2M0Check", "v2M1FastSourceCheck",
@@ -411,11 +464,12 @@ def execute(args):
         else:
             qualified[profile] = run_kafka_profile(roots, output, profile, profiles[profile]["cases"], frozen)
     scenarios = COVERAGE.validate_profiles(root, {key: row["scenarios"] for key, row in qualified.items()})
+    build_inputs = verify_build_inputs(out, roots, frozen)
     SOURCE.require(frozen == capture() and source.read_bytes() == SOURCE.INPUTS.canonical(frozen),
                    "execution source or dependency graph changed")
     write(out / "m6-execution-result.json", {
         "schema": "NEREUS_V2_M6_EXECUTION_RESULT_V1", "inputRootSha256": frozen["inputRootSha256"],
-        "profiles": qualified, "scenarios": sorted(scenarios),
+        "profiles": qualified, "scenarios": sorted(scenarios), "buildInputs": build_inputs,
         "regressionLogs": {name: SOURCE.file_identity(out / name)["sha256"]
                            for name in ("nereus-regressions.log", "pulsar-regressions.log")},
         "promotionEligible": False,

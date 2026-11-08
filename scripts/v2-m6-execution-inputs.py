@@ -11,6 +11,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+import time
 
 
 spec = importlib.util.spec_from_file_location(
@@ -201,6 +202,30 @@ def capture(roots, output, historical_paths, runtime, runtime_budget):
                     "runtimeBytes": runtime_budget},
     }
     return {**content, "inputRootSha256": INPUTS.digest(INPUTS.canonical(content))}
+
+
+BUILD_EVIDENCE_ROOT = "NEREUS_M6_BUILD_EVIDENCE_ROOT"
+BUILD_PLAN_SUFFIX = ".build-plan.json"
+BUILD_TRACE_SUFFIX = ".build-inputs.jsonl"
+
+
+def gradle_command(command, log):
+    """Observe each Gradle invocation during the aggregate without changing standalone runners."""
+    evidence_root = os.environ.get(BUILD_EVIDENCE_ROOT)
+    if evidence_root is None:
+        return command
+    root = Path(evidence_root)
+    require(log.is_relative_to(root) and log.parent == log.parent.resolve(strict=True),
+            f"Gradle execution log is outside its evidence root: {log}")
+    trace = log.with_suffix(BUILD_TRACE_SUFFIX)
+    require(not trace.exists() and not trace.is_symlink(), f"Gradle evidence already exists: {trace}")
+    script = Path(__file__).resolve().parent.parent / "config/v2/m6/capture-build-inputs.init.gradle"
+    flags = ["--init-script", str(script), f"-Dnereus.m6.buildInputCapture={trace}"]
+    flags.extend(flag for flag in ("--no-build-cache", "--rerun-tasks") if flag not in command)
+    actual = [command[0], *flags, *command[1:]]
+    with log.with_suffix(BUILD_PLAN_SUFFIX).open("xb") as plan:
+        plan.write(INPUTS.canonical({"command": actual, "startedNs": time.time_ns()}))
+    return actual
 
 
 def runtime_manifest(manifest):

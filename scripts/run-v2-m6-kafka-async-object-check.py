@@ -185,6 +185,7 @@ def run(kafka, java, out):
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"],
                    NEREUS_M6_TEST_FAULT_PROXY=relay, NEREUS_M6_TEST_FAULT_CONTROL=control,
                    NEREUS_M6_TEST_FAULT_TOKEN=token)
+        command = M6.gradle_command(command, out / "gradle.log")
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
             try:

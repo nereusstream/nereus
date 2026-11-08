@@ -101,6 +101,7 @@ def run(pulsar, java_home, out):
                   f"-Pv2M5NativeOffloadEndpoint={endpoint}", f"-Pv2M5S3DrainEndpoint={endpoint}",
                   f"-Pv2M5NativeOffloadZk={zk_address}", f"-Pv2M5NativeOffloadOxia={oxia}",
                   f"-Pv2M5NativeM4RuntimeOutput={runtime}"] + [":nereus-pulsar-offload:" + x for x in names]
+        gradle = bk.M6.gradle_command(gradle, out / "m4-current.log")
         with (out / "m4-current.log").open("xb") as log:
             subprocess.run(gradle, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
         suites = []

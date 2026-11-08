@@ -19,6 +19,12 @@ spec = importlib.util.spec_from_file_location(
 M6 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(M6)
 
+build_spec = importlib.util.spec_from_file_location(
+    "m6_build_inputs", Path(__file__).with_name("v2-m6-build-inputs.py")
+)
+BUILD = importlib.util.module_from_spec(build_spec)
+build_spec.loader.exec_module(BUILD)
+
 
 class ExecutionInputsTest(unittest.TestCase):
     def setUp(self):
@@ -133,6 +139,30 @@ class ExecutionInputsTest(unittest.TestCase):
         produced.write_text("result")
         with self.assertRaisesRegex(M6.InputError, "overlaps source or evidence output"):
             self.capture(runtime={"artifact": produced})
+
+    def test_gradle_consumer_requires_its_exact_earlier_producer(self):
+        frozen = self.capture()
+        self.output.mkdir()
+        trace = self.output / "build.jsonl"
+        generated = self.root / "build" / "compiled"
+        generated.parent.mkdir()
+        generated.write_bytes(b"output")
+        source = self.root / "src"
+        config = {"event": "gradle", "build": str(self.root), "files": {str(source): M6.file_identity(source)}}
+        task = {"event": "task", "build": str(self.root), "produced": True, "task": ":compile",
+                "inputs": {}, "outputs": {str(generated): M6.file_identity(generated)}}
+        consumer = {**task, "task": ":check", "produced": False, "outputs": {},
+                    "inputs": task["outputs"]}
+        trace.write_bytes(b"".join(M6.INPUTS.canonical(row) for row in (config, task, consumer)))
+        verified = BUILD.verify([trace], frozen, self.roots, self.output, M6.file_identity, M6.require)
+        self.assertEqual(2, verified[trace.name]["tasks"])
+        trace.write_bytes(b"".join(M6.INPUTS.canonical(row) for row in (config, consumer, task)))
+        with self.assertRaisesRegex(M6.InputError, "Gradle consumed an unbound file"):
+            BUILD.verify([trace], frozen, self.roots, self.output, M6.file_identity, M6.require)
+        consumer["inputs"] = {str(self.runtime): {"absent": True}}
+        trace.write_bytes(b"".join(M6.INPUTS.canonical(row) for row in (config, task, consumer)))
+        with self.assertRaisesRegex(M6.InputError, "missing frozen Gradle input"):
+            BUILD.verify([trace], frozen, self.roots, self.output, M6.file_identity, M6.require)
 
     def test_tracked_symlink_requires_a_declared_in_tree_target(self):
         link = self.root / "receipt-link"

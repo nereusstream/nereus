@@ -537,8 +537,12 @@ source, historical and runtime budgets, and writes the input record outside the 
 `verify` operation recomputes the record for comparison after execution. `v2M6ExecutionInputsContractTest` exercises
 rejection cases without running Brokers or promoting scenarios.
 
-Formal execution still requires the runner to account for the actual build, gate and runtime file graph, including
-generated artifacts consumed by later stages, and to enforce the stage and aggregate coverage described above.
+The aggregate records each mandatory offline Gradle invocation, the configured build classpaths, task file inputs,
+and generated outputs. It requires the complete invocation inventory, resolves generated files through earlier
+producer tasks, and checks extracted Protobuf files and generated JAR manifests against their archive bytes.
+External build and runtime files must match the predeclared input closure. Task captures and their digests are
+execution outputs.
+
 Capturing an inventory alone establishes no process or scenario result. Historical M1–M5 frozen sources, raw failures,
 Finals, source locks and original provenance remain byte-for-byte unchanged.
 

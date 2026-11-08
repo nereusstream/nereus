@@ -77,6 +77,7 @@ def publish_development_repository(out, repository):
         f"-PdevelopmentRepository={repository}",
         *[f":{name}:publishMavenJavaPublicationToDevelopmentRepository" for name in ARTIFACT_MODULES],
     ]
+    command = M6.gradle_command(command, out / "nereus-publication.log")
     with (out / "nereus-publication.log").open("xb") as log:
         subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
     return command
@@ -215,6 +216,7 @@ def run_checks(kafka, java, repository, out):
             f"-Pv2M5RetentionOxiaServiceAddress={address}", TASK,
         ]
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"])
+        command = M6.gradle_command(command, out / "gradle.log")
         started = time.time_ns()
         with (out / "gradle.log").open("xb") as log:
             completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)

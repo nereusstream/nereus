@@ -1,0 +1,119 @@
+// Capture Gradle's task file graph before work and the produced files after work.
+import groovy.json.JsonOutput
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+import org.gradle.jvm.tasks.Jar
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+import java.nio.file.attribute.BasicFileAttributes
+
+def output = Path.of(System.getProperty("nereus.m6.buildInputCapture"))
+def seen = new java.util.concurrent.ConcurrentHashMap()
+def tasks = new java.util.concurrent.ConcurrentHashMap()
+
+def identity = { Path path ->
+    if (path.toRealPath() != path || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+        throw new GradleException("Gradle consumed a non-regular or redirected file: " + path)
+    }
+    def before = Files.readAttributes(path, BasicFileAttributes)
+    def sha = MessageDigest.getInstance("SHA-256")
+    Files.newInputStream(path).withCloseable { stream ->
+        byte[] block = new byte[65536]
+        for (int n; (n = stream.read(block)) >= 0;) sha.update(block, 0, n)
+    }
+    def after = Files.readAttributes(path, BasicFileAttributes)
+    if (before.size() != after.size() || before.lastModifiedTime() != after.lastModifiedTime()
+            || before.fileKey() != after.fileKey()) throw new GradleException("Gradle input changed: " + path)
+    return [bytes: before.size(), sha256: sha.digest().encodeHex().toString()]
+}
+
+def inventory = { Collection<File> files ->
+    def result = [:]
+    def read = { Path path ->
+        def key = path.toString()
+        def attrs = Files.readAttributes(path, BasicFileAttributes, LinkOption.NOFOLLOW_LINKS)
+        def stamp = [attrs.size(), attrs.lastModifiedTime(), attrs.fileKey()]
+        def previous = seen[key]
+        if (previous == null || previous.stamp != stamp) {
+            previous = [stamp: stamp, identity: identity(path)]
+            seen[key] = previous
+        }
+        result[key] = previous.identity
+    }
+    for (File entry : files.sort()) {
+        Path path = entry.toPath().toAbsolutePath().normalize()
+        if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+            Files.walk(path).withCloseable { entries ->
+                entries.filter { !Files.isDirectory(it, LinkOption.NOFOLLOW_LINKS) }.sorted().forEach { read(it) }
+            }
+        } else if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+            read(path)
+        } else {
+            result[path.toString()] = [absent: true]
+        }
+    }
+    return result
+}
+
+def emit = { Map row ->
+    synchronized (output.toString().intern()) {
+        Files.writeString(output, JsonOutput.toJson(row) + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+    }
+}
+
+gradle.projectsEvaluated {
+    def script = gradle.startParameter.allInitScripts
+    def build = gradle.rootProject
+    def javaHome = new File(System.getProperty("java.home"))
+    def files = [
+        new File(gradle.gradleUserHomeDir, "gradle.properties"),
+        new File(gradle.gradleHomeDir, "lib"),
+        new File(javaHome, "bin/java"),
+        new File(javaHome, "release"),
+        new File(javaHome, "lib/modules"),
+    ]
+    files.addAll(script)
+    for (def project : build.allprojects) {
+        files.add(project.buildFile)
+        def configuration = project.buildscript.configurations.findByName("classpath")
+        if (configuration != null) files.addAll(configuration.files)
+    }
+    emit([event: "gradle", build: build.projectDir.toString(), files: inventory(files)])
+}
+
+gradle.taskGraph.beforeTask { Task task ->
+    def files = new LinkedHashSet<>(task.inputs.files.files)
+    for (String property : ["javaCompiler", "javaLauncher"]) {
+        if (task.hasProperty(property)) {
+            def tool = task.property(property).getOrNull()
+            if (tool != null) {
+                files.add(tool.executablePath.asFile)
+                files.add(tool.metadata.installationPath.file("release").asFile)
+                files.add(tool.metadata.installationPath.file("lib/modules").asFile)
+            }
+        }
+    }
+    def protoSources = []
+    if (task.class.name.startsWith("com.google.protobuf.gradle.ProtobufExtract")) {
+        protoSources.addAll(task.inputFiles.files)
+        files.addAll(protoSources)
+    }
+    tasks[task] = [files: inventory(files),
+                   protoSources: protoSources.collect { it.absolutePath }.sort(),
+                   jarManifest: task instanceof Jar ? new File(task.temporaryDir, "MANIFEST.MF").absolutePath : null]
+}
+
+gradle.taskGraph.afterTask { Task task, state ->
+    def work = state.didWork && !state.skipped && state.failure == null
+    def files = new LinkedHashSet<>(task.outputs.files.files)
+    if (work && task instanceof PublishToMavenRepository && task.repository.url.scheme == "file") {
+        files.add(new File(task.repository.url))
+    }
+    def inputs = tasks.remove(task)
+    emit([event: "task", build: task.project.rootProject.projectDir.toString(), task: task.path,
+          produced: work, skip: state.skipMessage, inputs: inputs.files,
+          protoSources: inputs.protoSources, jarManifest: inputs.jarManifest,
+          outputs: state.failure == null ? inventory(files) : [:]])
+}
