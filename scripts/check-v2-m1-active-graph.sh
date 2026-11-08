@@ -27,6 +27,7 @@ expected = {
     "nereus-storage-object-vault",
     "nereus-kafka-bookkeeper",
     "nereus-pulsar-offload",
+    "nereus-pulsar-broker",
 }
 if actual != expected:
     raise SystemExit(f"V2 M1 active-graph check: active settings graph differs: {sorted(actual)}")
@@ -45,6 +46,7 @@ for required in \
     "$repo_root/nereus-storage-api" \
     "$repo_root/nereus-storage-bookkeeper" \
     "$repo_root/nereus-kafka-bookkeeper" \
+    "$repo_root/nereus-pulsar-broker" \
     "$repo_root/docs/v1" \
     "$repo_root/docs/v2/07-protocol-integrations.md"; do
     [[ -e "$required" ]] || fail "required V2/archive boundary is missing: ${required#"$repo_root/"}"
