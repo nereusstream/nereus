@@ -354,6 +354,13 @@ ZooKeeper delete and loses one applied S3 DELETE reply. Independent probes requi
 quota until exact settlement. The restarted Broker must preserve the backlog, entry bytes and MessageIds after the
 old BookKeeper ledger and both native Object versions are gone. This check records focused evidence only.
 
+Add `--lifecycle` to the focused Pulsar BookKeeper runner for the raw read and write cuts. The same command with
+`--async-object --lifecycle` also runs the enrolled offload checks. The fixture holds positive BookKeeper v3 replies
+for one ledger and entry. It cancels the official client's wait after the backend has replied, then checks that the
+Broker keeps the original Cell owner and that the target cannot take over before the reply is released. The
+independently admitted Cell serves a write and read during each hold. After release, the target reads the original
+positions and bytes, and the runner verifies the durable subscription after restart.
+
 The focused Pulsar Object WAL runner is
 `python3 scripts/run-v2-m6-pulsar-object-wal-process-check.py --pulsar-root <checkout> --java-home <jdk21>
 --output <new-absolute-path-outside-checkouts>`. It loads the three current allocator JARs and revalidates the

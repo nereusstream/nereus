@@ -250,9 +250,9 @@ class M6PulsarBookKeeperSemanticsProbe {
         return props;
     }
 
-    private record CellOwner(long generation, java.util.UUID owner) {}
+    record CellOwner(long generation, java.util.UUID owner) {}
 
-    private static CellOwner readActiveCellOwner(org.apache.pulsar.metadata.api.MetadataStore metadata, String key)
+    static CellOwner readActiveCellOwner(org.apache.pulsar.metadata.api.MetadataStore metadata, String key)
             throws Exception {
         var raw = metadata.get(key).get(5, TimeUnit.SECONDS).orElseThrow().getValue();
         var bytes = java.nio.ByteBuffer.wrap(raw);

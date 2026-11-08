@@ -140,11 +140,11 @@ def process_logs(out, started):
 
 
 @contextmanager
-def bookkeeper_oxia(out):
+def bookkeeper_oxia(out, compose_file=COMPOSE):
     observe_image(BOOKKEEPER, BOOKKEEPER_ID, ("linux", "amd64"))
     observe_image(OXIA_ID, OXIA_ID, ("linux", "arm64"))
     project = "nereus-m6-kafka-bk-" + uuid.uuid4().hex[:12]
-    compose = ("docker", "compose", "-p", project, "-f", str(COMPOSE))
+    compose = ("docker", "compose", "-p", project, "-f", str(compose_file))
     oxia = None
     try:
         subprocess.run([*compose, "up", "-d", "--pull", "never", "--wait"], check=True)

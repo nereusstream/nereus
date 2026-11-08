@@ -133,17 +133,13 @@ class M6PulsarCellProvision {
                                 : PulsarRetentionPolicyV1.NATIVE_PULSAR_ONLY_V1,
                         deletesBookKeeper ? Optional.of(M5PulsarAuditDomainV1.empty()) : Optional.empty())
                         .toCompletableFuture().get(30, TimeUnit.SECONDS);
-                if (asyncObject) {
-                    var observer = actual.readCellBudget(config.share(),
-                            java.util.Map.of(actual.bindingIdentity(), config.share()), config.readLimits());
-                    props.setProperty("probeCellOwnerKey", observer.ownerKey());
-                }
+                var observer = actual.readCellBudget(config.share(),
+                        java.util.Map.of(actual.bindingIdentity(), config.share()), config.readLimits());
+                props.setProperty("probeCellOwnerKey", observer.ownerKey());
                 System.out.println("BINDING " + actual.bindingIdentity());
             }
-            if (asyncObject) {
-                try (var writer = Files.newBufferedWriter(path)) {
-                    props.store(writer, null);
-                }
+            try (var writer = Files.newBufferedWriter(path)) {
+                props.store(writer, null);
             }
         }
     }

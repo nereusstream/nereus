@@ -62,7 +62,8 @@ def runtime_paths(pulsar, out, java_home, async_object, object_wal=False):
         # Object WAL uses the exact current packaged NARS5 parser and allocator, without locked N1 shadowing.
         retained = [p for p in retained if not re.fullmatch(r"nereus-domain-[0-9].*\.jar", p.name)]
     names = {p.name for p in retained if p.suffix == ".jar"}
-    extra = [p for p in sdk if p.suffix == ".jar" and p.name not in names and (
+    extra = [p for p in sdk if p.suffix == ".jar" and p.name not in names
+             and (object_wal or not re.fullmatch(r"nereus-domain-[0-9].*\.jar", p.name)) and (
         "/nereus-" in str(p) and "/build/libs/" in str(p)
         or "/software.amazon.awssdk/" in str(p) or "/org.apache.commons/commons-collections4/" in str(p)
         or async_object and any(f"/{group}/" in str(p) for group in (
@@ -151,7 +152,7 @@ def start_broker(stack, java, config, log, admin, expect_rejection=False):
     raise TimeoutError(f"Broker did not pass its health check: {log}")
 
 
-def run(pulsar, java_home, out, async_object):
+def run(pulsar, java_home, out, async_object, lifecycle=False):
     sources = {"nereus": source_checkout(ROOT), "pulsar": source_checkout(pulsar)}
     SOURCE.require(not out.is_relative_to(ROOT) and not out.is_relative_to(pulsar),
                    "evidence output must be outside both source trees")
@@ -172,6 +173,10 @@ def run(pulsar, java_home, out, async_object):
             "run-v2-m6-kafka-async-object-check.py", "run-v2-m6-kafka-object-wal-check.py",
             "run-v2-m6-kafka-m4-read-check.py", "v2-m6-kafka-object-fault-proxy.py",
         ))
+    io_probe = CONFIG / "M6PulsarBkIoProbe.java"
+    io_proxy = ROOT / "scripts/v2-m6-pulsar-bk-io-fault-proxy.py"
+    if lifecycle:
+        execution_sources.extend([io_probe, io_proxy])
     source_inputs = [path_identity(path) for path in execution_sources]
     broker_jar, = [p for p in ordered if re.fullmatch(r"bookkeeper-server-[0-9].*\.jar", p.name)]
     template = pulsar / "conf/broker.conf"
@@ -185,11 +190,24 @@ def run(pulsar, java_home, out, async_object):
             "-Dlog4j.configurationFile=" + str(CONFIG / "console-log.xml"),
             f"-Dpulsar.metadatastore.providers={PROVIDER}", "-cp", cp]
     run_to_log([str(javac_exe), "-proc:none", "-cp", cp, "-d", str(probes),
-                str(CONFIG / (CLIENT + ".java")), str(CONFIG / "M6PulsarCellProvision.java")], out / "javac.log")
-    ports = distinct_ports(6)
+                str(CONFIG / (CLIENT + ".java")), str(CONFIG / "M6PulsarCellProvision.java"),
+                *([str(io_probe)] if lifecycle else [])], out / "javac.log")
+    ports = distinct_ports(8 if lifecycle else 6)
     addresses = [f"127.0.0.1:{port}" for port in ports]
     bk_uri = "zk://127.0.0.1:2181/ledgers"
-    with BK.bookkeeper_oxia(out) as oxia, contextlib.ExitStack() as stack:
+    with contextlib.ExitStack() as stack:
+        compose = BK.COMPOSE
+        if lifecycle:
+            fault = module("m6_pulsar_bookkeeper_wire", io_proxy)
+            targets = dict(zip((3181, 3182, 3183), distinct_ports(3), strict=True))
+            control, token = stack.enter_context(fault.fault_relays(targets))
+            os.environ.update(NEREUS_M6_PULSAR_BK_IO_CONTROL=control, NEREUS_M6_PULSAR_BK_IO_TOKEN=token)
+            wire_compose = BK.COMPOSE.read_text()
+            for port, destination in targets.items():
+                wire_compose = wire_compose.replace(f"127.0.0.1:{port}:{port}", f"127.0.0.1:{destination}:{port}")
+            compose = out / "bookkeeper-wire.compose.yml"
+            compose.write_text(wire_compose)
+        oxia = stack.enter_context(BK.bookkeeper_oxia(out, compose))
         object_arguments = []
         if async_object:
             objects = module("m6_real_minio", ROOT / "scripts/run-v2-m6-kafka-async-object-check.py")
@@ -210,8 +228,8 @@ def run(pulsar, java_home, out, async_object):
                           f"pulsar://{addresses[2]}", "--default-namespace-bundle-number", "1"], out / "init.log")
         cell = out / "cell.properties"
         digest = hashlib.sha256(broker_jar.read_bytes()).hexdigest()
-        cell.write_text((CONFIG / "bookkeeper-cell.properties").read_text()
-                        + f"\nbkClientJar={digest}\nbkMetadataUri={bk_uri}\n")
+        cell_text = (CONFIG / "bookkeeper-cell.properties").read_text() + f"\nbkClientJar={digest}\nbkMetadataUri={bk_uri}\n"
+        cell.write_text(cell_text + ("\nbinding.persistent\\://public/m6-native/io-write=1\n" if lifecycle else ""))
         run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(cell), str(ROOT),
                            *object_arguments],
                    out / "provision.log")
@@ -251,6 +269,37 @@ def run(pulsar, java_home, out, async_object):
         for stop in reversed(brokers):
             stop(strict=True)
         restarted = start_broker(stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])
+        if lifecycle:
+            foreign = out / "foreign"
+            foreign.mkdir()
+            foreign_cell = foreign / "cell.properties"
+            foreign_cell.write_text(cell_text.replace("public/m6-native", "public/m6-foreign")
+                                    .replace("/handoff=1", "/sentinel=1")
+                                    .replace("native-bookkeeper", "native-bookkeeper-foreign")
+                                    .replace("00000000000000050000000000000006", "00000000000000050000000000000016"))
+            foreign_web, foreign_service = f"localhost:{ports[6]}", f"localhost:{ports[7]}"
+            run_to_log(java + ["M6PulsarBkIoProbe", "configure", origin, addresses[0], addresses[2]],
+                       foreign / "isolate.log")
+            run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(foreign_cell), str(ROOT)],
+                       foreign / "provision.log")
+            foreign_broker = foreign / "broker.conf"
+            broker_config(template, foreign_broker, {**base, "advertisedAddress": "localhost",
+                                                     "webServicePort": ports[6], "brokerServicePort": ports[7],
+                                                     "nereusPulsarCellConfig": str(foreign_cell)})
+            stop_foreign = start_broker(stack, java, foreign_broker, foreign / "broker.log", addresses[6])
+            run_to_log(java + ["M6PulsarBkIoProbe", "foreign", origin, foreign_web, foreign_service],
+                       foreign / "warm-up.log")
+            stop_peer = start_broker(stack, java, out / "broker-1.conf", out / "io-peer.log", addresses[1])
+            for operation, source, target in (("read", 0, 1), ("write", 1, 0)):
+                log = out / f"bookkeeper-held-{operation}.log"
+                run_to_log(java + ["M6PulsarBkIoProbe", operation, origin, addresses[source], addresses[source + 2],
+                                  addresses[target], str(cell), str(state), foreign_web, foreign_service], log)
+                evidence = log.read_text()
+                SOURCE.require(f"PULSAR_NATIVE_BK_HELD_{operation.upper()}_CANCEL_AND_UNLOAD_PASS" in evidence
+                               and "PULSAR_NATIVE_BK_INDEPENDENT_FOREIGN_CELL_PASS" in evidence,
+                               f"native BK {operation} drain and foreign Cell evidence are absent")
+            stop_peer(strict=True)
+            stop_foreign(strict=True)
         run_to_log(java + args + ["restart"], out / "restart-client.log")
         SOURCE.require("PULSAR_NATIVE_BK_RESTART_PASS" in (out / "restart-client.log").read_text(),
                        "native BK restart did not reach its terminal assertions")
@@ -266,16 +315,23 @@ def run(pulsar, java_home, out, async_object):
                    "fixture build/config/launch inputs changed during execution")
     generated_launch_inputs = {"native-resolved.paths", "sdk-resolved.paths", "cell.properties",
                                "broker-0.conf", "broker-1.conf", "unqualified.conf"}
-    artifacts = [p for p in sorted(out.iterdir()) if p.is_file() and p.name not in generated_launch_inputs]
+    candidates = list(out.iterdir())
+    if lifecycle:
+        generated_launch_inputs.update(("bookkeeper-wire.compose.yml", "foreign/cell.properties", "foreign/broker.conf"))
+        candidates.extend((out / "foreign").iterdir())
+    artifacts = [p for p in sorted(candidates)
+                 if p.is_file() and p.relative_to(out).as_posix() not in generated_launch_inputs]
     (out / "process-result.json").write_bytes(SOURCE.INPUTS.canonical({
         "schema": "NEREUS_V2_M6_PULSAR_BK_FOCUSED_PROCESS_V1", "promotionEligible": False, "status": "PASS",
         "profile": "BOOKKEEPER_WAL_ASYNC_OBJECT" if async_object else "BOOKKEEPER_WAL_ONLY",
         "sources": sources, "sourceInputs": source_inputs, "runtime": inputs,
         "launchTools": [path_identity(java_exe), path_identity(javac_exe)],
         "generatedLaunchInputs": {name: BK.M6.file_identity(out / name) for name in sorted(generated_launch_inputs)},
-        "compiledProbe": path_identity(probes), "outputs": {p.name: BK.M6.file_identity(p) for p in artifacts},
+        "compiledProbe": path_identity(probes),
+        "outputs": {p.relative_to(out).as_posix(): BK.M6.file_identity(p) for p in artifacts},
         "checks": ["official-client", "rollover", "individual-and-cumulative-ack", "native-transfer",
                    "cold-read-and-reset", "native-restart", "missing-binding", "unsupported-ownership-backend",
+                   *(["held-bookkeeper-read", "held-bookkeeper-write", "independent-foreign-cell"] if lifecycle else []),
                    *(["enrolled-npd1-npo1", "original-put-response-lost", "independent-bookkeeper-rollover", "original-output-drain-and-resume"]
                      if async_object else [])],
     }))
@@ -288,9 +344,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--async-object", action="store_true",
                         help="use the enrolled BookKeeper WAL plus asynchronous Object profile")
+    parser.add_argument("--lifecycle", action="store_true", help="hold exact raw BookKeeper wire responses during unload")
     args = parser.parse_args()
     try:
-        run(args.pulsar_root.resolve(strict=True), args.java_home.resolve(strict=True), args.output.resolve(), args.async_object)
+        run(args.pulsar_root.resolve(strict=True), args.java_home.resolve(strict=True), args.output.resolve(),
+            args.async_object, args.lifecycle)
     except (OSError, ValueError, subprocess.SubprocessError, BK.M6.InputError) as error:
         parser.exit(1, f"Pulsar BookKeeper process check: {error}\n")
 
