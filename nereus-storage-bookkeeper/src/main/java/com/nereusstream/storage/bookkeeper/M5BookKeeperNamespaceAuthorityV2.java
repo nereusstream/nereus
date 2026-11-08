@@ -139,6 +139,11 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
             throw new IllegalArgumentException("Native Pulsar scope differs from the actual no-auth capability");
         }
         var configuration = RealBookKeeperClientConfigurationV1.from(metadataServiceUri, capability);
+        if (existingOnly) {
+            // An original-scope delete must surface the first ZooKeeper result to the retained intent.
+            // The BookKeeper metadata driver otherwise retries the same multi before its caller sees UNKNOWN.
+            configuration.setZkRetryBackoffMaxRetries(0);
+        }
         M5PulsarNativeMetadataDriverV1.register();
         configuration.setProperty(M5PulsarNativeMetadataDriverV1.OBSERVE_PROPERTY, existingOnly);
         configuration.setProperty(
