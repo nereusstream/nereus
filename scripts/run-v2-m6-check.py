@@ -417,13 +417,27 @@ def verify_build_inputs(output, roots, frozen):
                                SOURCE.file_identity, SOURCE.require, repositories)
 
 
+def verify_launcher(root):
+    commit = SOURCE.clean_commit(root)
+    SOURCE.require(root != ROOT and SOURCE.clean_commit(ROOT) == commit,
+                   "execute M6 in a dedicated source worktree at the launcher's exact commit")
+    paths = (
+        "gradlew", "gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties",
+        "build.gradle.kts", "settings.gradle.kts", "gradle.properties",
+        "scripts/run-v2-m6-check.py", "scripts/v2-m6-execution-inputs.py", "scripts/v2-m6-build-inputs.py",
+        "scripts/v2-m6-coverage.py", "scripts/m5-candidate-inputs.py", "scripts/m5-evidence-junit.py",
+    )
+    tracked = SOURCE.tree(root, commit)
+    for path in paths:
+        SOURCE.file_identity(ROOT / path, tracked[path])
+    return commit
+
+
 def execute(args):
     roots = {"nereus": args.nereus.resolve(strict=True), "kafka": args.kafka.resolve(strict=True),
              "pulsar": args.pulsar.resolve(strict=True)}
     root = roots["nereus"]
-    SOURCE.require(root != ROOT, "execute M6 in a dedicated source worktree separate from the launcher")
-    SOURCE.require(SOURCE.clean_commit(root) == SOURCE.clean_commit(ROOT),
-                   "launcher and actual Nereus execution worktree differ")
+    launcher = verify_launcher(root)
     profiles = plan(root)
     out = args.output.absolute()
     declaration = args.runtime_manifest.resolve(strict=True)
@@ -465,7 +479,8 @@ def execute(args):
             qualified[profile] = run_kafka_profile(roots, output, profile, profiles[profile]["cases"], frozen)
     scenarios = COVERAGE.validate_profiles(root, {key: row["scenarios"] for key, row in qualified.items()})
     build_inputs = verify_build_inputs(out, roots, frozen)
-    SOURCE.require(frozen == capture() and source.read_bytes() == SOURCE.INPUTS.canonical(frozen),
+    SOURCE.require(launcher == verify_launcher(root)
+                   and frozen == capture() and source.read_bytes() == SOURCE.INPUTS.canonical(frozen),
                    "execution source or dependency graph changed")
     write(out / "m6-execution-result.json", {
         "schema": "NEREUS_V2_M6_EXECUTION_RESULT_V1", "inputRootSha256": frozen["inputRootSha256"],
