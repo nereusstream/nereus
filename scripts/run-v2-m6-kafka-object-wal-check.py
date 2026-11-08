@@ -26,6 +26,10 @@ CASES = {
         "kafka.server.nereus.KafkaObjectWalAdapterRealTest",
         "publishesOnlyAfterTheExactGrantAndReopensTheExactPhysicalRoot(Path)",
     ),
+    "nereusKafkaObjectWalAuthorizationRealTest": (
+        "kafka.server.nereus.KafkaObjectWalAuthorizationRealTest",
+        "nativeObjectWalWaitsForExactAuthorizationAfterLostCasResponse(Path)",
+    ),
     PROCESS_TASK: (
         "kafka.server.nereus.KafkaObjectWalProcessRealTest",
         "productionObjectWalPublishesAndRecoversOnColdBroker(Path)",

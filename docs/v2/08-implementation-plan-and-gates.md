@@ -424,13 +424,17 @@ promote M6 scenarios.
 The focused Kafka Object WAL fixture runs with `python3 scripts/run-v2-m6-kafka-object-wal-check.py
 --kafka-root <checkout> --kafka-java-home <jdk17> --output <new-absolute-path-outside-checkouts>`.
 It uses real BK, Oxia, MinIO and Vault Transit, builds the current SDK jars and records the separate adapter test
-and Kafka production process runtimes. The native route persists the exact Object before selecting its Kafka
+and native Kafka runtimes. The native route persists the exact Object before selecting its Kafka
 authorization grant and publishing the coherent cut. On takeover it closes the prior grant Head and dispatch gate,
 verifies the old Root and physical tail, seals the selected Kafka checkpoint, and only then opens a successor.
 The cold Broker reads retained sources with the original writer context and Vault-wrapped keys. An armed write
 with an unknown outcome prevents takeover from using absence as proof. The process check loses the PUT response
 after MinIO stores the original version, confirms the BK-only topic can still append, and verifies both profiles
-after takeover. It also checks a planned handoff in which the departing Broker drains admitted work and publishes
+after takeover. It records actual PUT, LIST and full GET attempts for the original key and checks that the same
+version is selected by the grant. A separate Broker test loses the original applied Oxia grant CAS response,
+holds the exact reconciliation read and checks that Produce stays pending. The same test holds an applied physical
+checkpoint page response, observes the Produce ACK and then verifies publication of the checkpoint Head.
+The process check also exercises a planned handoff in which the departing Broker drains admitted work and publishes
 the terminal NWKCP1 Head before its replacement resumes. A live Owner rolls the physical run before admitting new
 positions at its count or age bound. The process check fills one run to its declared extent limit, verifies its
 terminal Head and the same Owner's exact successor, and reads both sides of that boundary in one Fetch. Retained
@@ -440,7 +444,10 @@ sources still count against the bounded history budget; automatic source retirem
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
 the affected regression gates from the declared source and runtime inputs. It refuses to run formal acceptance
-until the committed suite plan and all required drivers exist. The process suite plan is still incomplete.
+until the committed suite plan and all required drivers exist. The Pulsar profiles use their source-owned process
+runners directly. The aggregate checks the exact check inventory, source tuple, raw process outputs and generated
+launch files. The transient Object WAL credentials are represented by their launch-time identities. The process
+suite plan is still incomplete.
 `v2M7Check`, `v2M8Check` and `v2FinalCheck` remain design targets. The mandatory boundaries are:
 
 - **M6:** all JSON rows whose milestone includes M6, every applicable cell of the six-row activation matrix, the
@@ -467,9 +474,10 @@ their files, Kafka's Java launcher and Log4j configuration, before and after Kaf
 own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for each declared native
 case. The result binds the backend logs and each separate Kafka JVM's configuration and logs. Coverage includes
 a three-Controller election with the old leader offline, a cold Broker starting from a
-Controller snapshot, rejection of a mismatched BookKeeper scope, and idempotent and non-idempotent retries after a
-disconnected Produce. Fetch checks include a v12 request that wakes on transaction commit, multi-partition waits
-through a deadline or topic deletion, and complete compressed batches across successive bounded reads.
+Controller snapshot, format rejection at feature level 1, rejection of a mismatched BookKeeper scope, and
+idempotent and non-idempotent retries after a disconnected Produce. Fetch checks include delayed native requests
+that wake after a shared commit or transaction marker, multi-partition waits through a deadline or topic deletion,
+and complete compressed batches across successive bounded reads.
 The suite also exercises Produce with `acks=1`, `acks=all` and `acks=0` against real BookKeeper, including a quorum
 response delivered after Owner replacement and an unknown response recovered by the next Owner.
 Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`

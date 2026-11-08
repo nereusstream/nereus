@@ -133,7 +133,7 @@ def fault_proxy(upstream):
                     if rule is not None:
                         rule["release"].set()
                     rule = dict(data, hits=0, appliedVersion=None, selectedPath=None,
-                                upstreamReads=0, release=threading.Event())
+                                upstreamReads=0, originalFullGets=0, originalLists=0, release=threading.Event())
                 elif self.command == "PATCH":
                     if rule is None or not (
                             rule["mode"] in LOST_RESPONSE_MODES and rule["appliedVersion"] is not None
@@ -149,14 +149,17 @@ def fault_proxy(upstream):
                 state = {"hits": rule["hits"] if rule else 0,
                          "appliedVersion": rule["appliedVersion"] if rule else None,
                          "selectedPath": rule["selectedPath"] if rule else None,
-                         "upstreamReads": rule["upstreamReads"] if rule else 0}
+                         "upstreamReads": rule["upstreamReads"] if rule else 0,
+                         "originalFullGets": rule["originalFullGets"] if rule else 0,
+                         "originalLists": rule["originalLists"] if rule else 0}
             return self.reply(200, json.dumps(state).encode("ascii"), [("Content-Type", "application/json")])
 
         def relay(self):
             if self.path == CONTROL:
                 return self.control()
             url = urllib.parse.urlsplit(self.path)
-            version = urllib.parse.parse_qs(url.query).get("versionId")
+            query = urllib.parse.parse_qs(url.query)
+            version = query.get("versionId")
             path = urllib.parse.unquote(url.path)
             with lock:
                 fault = None
@@ -164,6 +167,15 @@ def fault_proxy(upstream):
                         and rule["selectedPath"] is None and path.startswith(rule["path"])
                         and path.endswith(FIRST_LOST_PUT_SUFFIX[rule["mode"]])):
                     rule["selectedPath"] = path
+                if (rule and rule["mode"] == "first-put-response-lost"
+                        and rule["selectedPath"] is not None and self.command == "GET"):
+                    _, bucket, original_key = rule["selectedPath"].split("/", 2)
+                    if path == rule["selectedPath"] and self.headers.get("Range") is None:
+                        rule["originalFullGets"] += 1
+                    prefixes = query.get("prefix", [])
+                    if (path.rstrip("/") == "/" + bucket and query.get("list-type") == ["2"]
+                            and len(prefixes) == 1 and prefixes[0] and original_key.startswith(prefixes[0])):
+                        rule["originalLists"] += 1
                 if rule and (rule["mode"] == "bucket-unavailable" and
                              (path == rule["path"][:-1] or path.startswith(rule["path"]))
                              or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]

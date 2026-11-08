@@ -50,6 +50,37 @@ class M6CoverageTest(unittest.TestCase):
             with self.assertRaisesRegex(M6.JUNIT.JUnitEvidenceError, "skipped"):
                 M6.verify_native_result(root, started, profile, cases, "a" * 64)
 
+    def test_pulsar_process_requires_fresh_raw_attachments_and_exact_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            started = time.time_ns()
+            profile = "BOOKKEEPER_WAL_ONLY"
+            kind = "BK"
+            sources = {
+                "nereus": {"commit": "a" * 40, "tree": "b" * 40},
+                "pulsar": {"commit": "c" * 40, "tree": "d" * 40},
+            }
+            backend = root / "backend.json"
+            backend.write_text('{"bookies":3}\n')
+            launch = root / "broker.conf"
+            launch.write_text("managedLedgerDefaultEnsembleSize=3\n")
+            M6.write(root / "process-result.json", {
+                "schema": "NEREUS_V2_M6_PULSAR_BK_FOCUSED_PROCESS_V1",
+                "profile": profile, "status": "PASS", "promotionEligible": False,
+                "sources": sources, "checks": ["official-client"],
+                "outputs": {backend.name: M6.SOURCE.file_identity(backend)},
+                "generatedLaunchInputs": {launch.name: M6.SOURCE.file_identity(launch)},
+            })
+            expected = {"official-client": ["V2-PUL-PROC-001"]}
+            self.assertEqual(1, M6.verify_pulsar_process(root, started, kind, profile, expected, sources)["checks"])
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "frozen source"):
+                M6.verify_pulsar_process(root, started, kind, "OBJECT_WAL", expected, sources)
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "check inventory differs"):
+                M6.verify_pulsar_process(root, started, kind, profile, {"different-cut": []}, sources)
+            launch.write_text("managedLedgerDefaultEnsembleSize=1\n")
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "attachment differs"):
+                M6.verify_pulsar_process(root, started, kind, profile, expected, sources)
+
 
 if __name__ == "__main__":
     unittest.main()

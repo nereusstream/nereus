@@ -41,7 +41,7 @@ gradle.projectsEvaluated {
     def core = gradle.rootProject.project(':core')
     def processTask = walFixture ? 'nereusKafkaObjectWalProcessRealTest'
         : objectFixture ? 'nereusKafkaAsyncObjectProcessRealTest' : 'nereusBookKeeperOwnerRelocationRealTest'
-    def testTasks = walFixture ? ['nereusObjectWalAdapterRealTest', processTask]
+    def testTasks = walFixture ? ['nereusObjectWalAdapterRealTest', 'nereusKafkaObjectWalAuthorizationRealTest', processTask]
         : objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', processTask]
         : [processTask]
     testTasks.each { task ->

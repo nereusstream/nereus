@@ -32,6 +32,7 @@ ARTIFACT_MODULES = (
 CASES = {
     "kafka.server.nereus.KafkaBookKeeperAckRealTest": {
         "bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)",
+        "delayedNativeFetchWakesOnSharedCommitAndTransactionMarker(Path)",
         "nativeFetchPreservesCompleteCompressedBatchesAcrossViewChanges(Path)",
         "staleQuorumCallbackCannotPublishAfterNativeOwnerChange(Path)",
         "unknownBookKeeperResponseFencesOldPublicationAndColdOwnerRecoversExactBatch(Path)",
@@ -124,7 +125,7 @@ def process_logs(out, started):
     required = {f"node-{node}/{name}" for node in range(5)
                 for name in ("server.log", "launcher.log", "format.log", "server.properties")}
     required.update({f"node-{node}/controller.log" for node in (2, 3, 4)})
-    required.update({"node-2/implicit-format.log", "node-0/foreign-scope.log",
+    required.update({"node-2/implicit-format.log", "node-2/legacy-feature-format.log", "node-0/foreign-scope.log",
                      "node-0/foreign-scope.properties", "capability.properties"})
     files = {}
     for path in sorted(directory.rglob("*")):

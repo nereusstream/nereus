@@ -17,6 +17,19 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 SUITE_PLAN = Path("config/v2/m6/acceptance-suites.json")
 CASE = re.compile(r":[\w:-]+\|[\w.$]+\|[^\x00|]+")
+CHECK = re.compile(r"[a-z][a-z0-9-]+")
+PULSAR_PROCESSES = {
+    "pulsar-bookkeeper-wal-only": {
+        "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ONLY", "--lifecycle"),
+    },
+    "pulsar-bookkeeper-wal-async-object": {
+        "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ASYNC_OBJECT", "--lifecycle", "--async-object"),
+        "replacement": ("pulsar-bookkeeper-replacement", "BK_REPLACEMENT", None),
+    },
+    "pulsar-object-wal": {
+        "lifecycle": ("pulsar-object-wal-process", "OBJECT_WAL", "OBJECT_WAL"),
+    },
+}
 
 
 def module(root, name):
@@ -55,17 +68,27 @@ def plan(root):
     SOURCE.require(isinstance(profiles, dict), "missing M6 native profile plans")
     claims = {}
     for profile, entry in profiles.items():
-        require_keys(entry, ("cases",), f"{profile} plan")
-        cases = entry["cases"]
-        SOURCE.require(isinstance(cases, dict) and cases, f"missing M6 native cases for {profile}")
-        SOURCE.require(all(CASE.fullmatch(key) and isinstance(rows, list) and rows
-                           and len(rows) == len(set(rows)) for key, rows in cases.items()),
-                       f"invalid testcase assignment for {profile}")
-        claims[profile] = sorted({row for rows in cases.values() for row in rows})
+        if profile in PULSAR_PROCESSES:
+            require_keys(entry, ("processes",), f"{profile} plan")
+            require_keys(entry["processes"], PULSAR_PROCESSES[profile], f"{profile} process inventory")
+            cases = [validate_assignment(item, CHECK, profile) for item in entry["processes"].values()]
+        else:
+            require_keys(entry, ("cases",), f"{profile} plan")
+            cases = [validate_assignment(entry["cases"], CASE, profile)]
+        claims[profile] = sorted(set().union(*cases))
     COVERAGE.validate_profiles(root, claims)
-    for profile in profiles:
+    for profile in profiles.keys() - PULSAR_PROCESSES.keys():
         SOURCE.require(driver(root, profile).is_file(), f"missing executable native driver for {profile}")
     return profiles
+
+
+def validate_assignment(cases, pattern, profile):
+    SOURCE.require(isinstance(cases, dict) and cases, f"missing M6 native cases for {profile}")
+    SOURCE.require(all(pattern.fullmatch(key) and isinstance(rows, list) and rows
+                       and all(isinstance(row, str) for row in rows)
+                       and len(rows) == len(set(rows)) for key, rows in cases.items()),
+                   f"invalid testcase assignment for {profile}")
+    return {row for rows in cases.values() for row in rows}
 
 
 def driver(root, profile):
@@ -88,9 +111,66 @@ def require_runtime_tools(runtime):
                        f"actual M6 tool is missing from runtime inputs: {name}")
 
 
+def current_attachment(output, started, name):
+    path = output / SOURCE.INPUTS.relative(name)
+    SOURCE.require(path.resolve(strict=True) == path and path.stat().st_mtime_ns >= started,
+                   f"stale or redirected native attachment: {path}")
+    return path
+
+
+def verify_pulsar_process(output, started, kind, profile, expected, sources):
+    result_file = current_attachment(output, started, "process-result.json")
+    result = read(result_file)
+    SOURCE.require(result.get("schema") == f"NEREUS_V2_M6_PULSAR_{kind}_FOCUSED_PROCESS_V1"
+                   and result.get("profile") == profile and result.get("status") == "PASS"
+                   and result.get("promotionEligible") is False and result.get("sources") == sources,
+                   f"Pulsar process result differs from the launched profile or frozen source: {output}")
+    actual = result["checks"]
+    SOURCE.require(isinstance(actual, list) and len(actual) == len(expected) and set(actual) == set(expected),
+                   f"Pulsar process check inventory differs: {output}")
+    temporary_credentials = {"s3-credentials", "vault-token"} if kind == "OBJECT_WAL" else set()
+    for group in ("outputs", "generatedLaunchInputs"):
+        files = result[group]
+        SOURCE.require(isinstance(files, dict) and files, f"missing Pulsar process {group}: {output}")
+        ephemeral = temporary_credentials if group == "generatedLaunchInputs" else set()
+        SOURCE.require(ephemeral <= files.keys(), f"missing identity for temporary Pulsar credentials: {output}")
+        for name, identity in files.items():
+            if name in ephemeral:
+                require_keys(identity, ("mode", "bytes", "sha256"), f"temporary credential {name}")
+                SOURCE.require(identity["mode"] == "100644" and type(identity["bytes"]) is int
+                               and identity["bytes"] > 0 and SOURCE.INPUTS.SHA.fullmatch(identity["sha256"])
+                               and not (output / name).exists() and not (output / name).is_symlink(),
+                               f"invalid identity or retained temporary credential: {name}")
+                continue
+            SOURCE.require(SOURCE.file_identity(current_attachment(output, started, name)) == identity,
+                           f"Pulsar process attachment differs: {name}")
+    SOURCE.require("backend.json" in result["outputs"], f"missing Pulsar backend inventory: {output}")
+    if temporary_credentials:
+        vault = read(current_attachment(output, started, "vault.json"))
+        SOURCE.require(result["generatedLaunchInputs"]["vault-token"]["sha256"] == vault["tokenFileSha256"],
+                       f"temporary Vault token identity differs: {output}")
+    return {"resultSha256": SOURCE.file_identity(result_file)["sha256"], "checks": len(actual)}
+
+
+def run_pulsar_profile(roots, output, profile, expected, frozen):
+    sources = {repo: {key: frozen["sourceIdentity"][repo][key] for key in ("commit", "tree")}
+               for repo in ("nereus", "pulsar")}
+    java = os.environ.get("JAVA_HOME") or str(Path(shutil.which("java")).resolve(strict=True).parent.parent)
+    output.mkdir()
+    results = {}
+    for name, (script, kind, storage_profile, *flags) in PULSAR_PROCESSES[profile].items():
+        process_output = output / name
+        started = time.time_ns()
+        run([sys.executable, f"scripts/run-v2-m6-{script}-check.py", "--pulsar-root", str(roots["pulsar"]),
+             "--java-home", java, "--output", str(process_output), *flags], roots["nereus"], output / f"{name}.log")
+        results[name] = verify_pulsar_process(process_output, started, kind, storage_profile, expected[name], sources)
+    return {"processResults": results, "scenarios": sorted({
+        row for assignment in expected.values() for rows in assignment.values() for row in rows
+    })}
+
+
 def verify_native_result(output, started, profile, expected, input_digest):
-    result_file = output / "profile-result.json"
-    SOURCE.require(result_file.stat().st_mtime_ns >= started, f"stale M6 result for {profile}")
+    result_file = current_attachment(output, started, "profile-result.json")
     result = read(result_file)
     require_keys(result, ("schema", "profile", "inputRootSha256", "junit", "backendFacts"), "profile result")
     SOURCE.require(result["schema"] == "NEREUS_V2_M6_NATIVE_PROFILE_RESULT_V1"
@@ -98,10 +178,7 @@ def verify_native_result(output, started, profile, expected, input_digest):
                    f"profile result has the wrong execution inputs: {profile}")
 
     def current_file(name):
-        path = output / SOURCE.INPUTS.relative(name)
-        SOURCE.require(path.resolve(strict=True) == path and path.stat().st_mtime_ns >= started,
-                       f"stale or redirected native attachment: {path}")
-        return path
+        return current_attachment(output, started, name)
 
     # Each source-owned driver must capture its actual process/backend inputs and outputs, and
     # attach them before returning. A raw JUnit file by itself is never a profile result.
@@ -154,6 +231,9 @@ def execute(args):
     qualified = {}
     for profile in COVERAGE.REQUIRED:
         output = out / profile
+        if profile in PULSAR_PROCESSES:
+            qualified[profile] = run_pulsar_profile(roots, output, profile, profiles[profile]["processes"], frozen)
+            continue
         started = time.time_ns()
         run([sys.executable, str(driver(root, profile)), "--execution-inputs", str(source),
              "--runtime-manifest", str(declaration), "--nereus", str(root),
