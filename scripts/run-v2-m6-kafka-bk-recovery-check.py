@@ -43,7 +43,8 @@ def run_cases(kafka, java, out, repository, receipt, artifacts, methods):
             f"-PnereusLockedOxiaRepository={BK.OXIA_CLIENT}",
             "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers",
             f"-Pv2M5RetentionOxiaServiceAddress={oxia}", f"-Pv2M5KafkaRunSourceRoot={ROOT}",
-            f"-Pv2M5KafkaRunSummaryFile={receipt}", "-Pv2M6KafkaReadQualification=true", f":core:{TASK}",
+            f"-Pv2M5KafkaRunSummaryFile={receipt}", "-Pv2M6KafkaReadQualification=true",
+            f"-Pv2M5KafkaSealedGcProfile={str(methods == COMPACTION).lower()}", f":core:{TASK}",
         ]
         for method in methods:
             command.extend(("--tests", f"{SUITE}.{method}"))
