@@ -23,8 +23,11 @@ import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespace
 import com.nereusstream.metadata.spi.model.AggregatePublicationCandidate;
 import com.nereusstream.pulsar.offload.PulsarNativeBindingV1;
 import com.nereusstream.pulsar.offload.PulsarNativeWriterRegistryV2;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1.PulsarRetentionPolicyV1;
+import com.nereusstream.storage.object.retention.M5PulsarAuditDomainV1;
 import io.oxia.client.api.OxiaClientBuilder;
 import java.nio.file.*;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -42,7 +45,7 @@ class M6PulsarCellProvision {
             props.setProperty("s3Endpoint", args[5]);
             props.setProperty("s3Region", "us-east-1");
             props.setProperty("s3Bucket", "m6-native-pulsar-offload");
-            props.setProperty("s3KeyPrefix", "m6-native-pulsar");
+            props.putIfAbsent("s3KeyPrefix", "m6-native-pulsar");
             props.setProperty("offloadBlockClass", "latency-1mib");
             props.setProperty("offloadStagingDirectory", path.resolveSibling("offload-staging").toString());
             props.setProperty("s3EncryptionScope", "NONE");
@@ -99,9 +102,15 @@ class M6PulsarCellProvision {
                 props.store(writer, null);
             }
             var config = PulsarM6BookKeeperCellConfig.read(path);
+            boolean deletesBookKeeper = config.objectScope()
+                    .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete).isPresent();
             try (var bk = com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2.connect(
                     config.bookKeeperUri(), config.bookKeeper())) {
                 bk.bind(ns.identity()).toCompletableFuture().get(15, TimeUnit.SECONDS);
+                if (deletesBookKeeper) {
+                    bk.nativeDeleteCellBudget().initialize(PulsarM6AsyncObjectScope.BookKeeperDeletePolicy.NATIVE_BUDGET)
+                            .toCompletableFuture().get(15, TimeUnit.SECONDS);
+                }
             }
             for (var row : config.generations().entrySet()) {
                 var topic = row.getKey();
@@ -119,7 +128,10 @@ class M6PulsarCellProvision {
                 var bytes = Nta1CodecV1.encode(aggregate);
                 var actual = PulsarNativeBindingV1.createNativeOnly(oxia, ns.identity(),
                         config.metadata().authorityRoot(),
-                        new AggregatePublicationCandidate(aggregate, bytes, Sha256Digest.hash(bytes)), config.writers())
+                        new AggregatePublicationCandidate(aggregate, bytes, Sha256Digest.hash(bytes)), config.writers(),
+                        deletesBookKeeper ? PulsarRetentionPolicyV1.NATIVE_PULSAR_ONLY_WITHOUT_ACCESS_PROJECTION_V2
+                                : PulsarRetentionPolicyV1.NATIVE_PULSAR_ONLY_V1,
+                        deletesBookKeeper ? Optional.of(M5PulsarAuditDomainV1.empty()) : Optional.empty())
                         .toCompletableFuture().get(30, TimeUnit.SECONDS);
                 if (asyncObject) {
                     var observer = actual.readCellBudget(config.share(),

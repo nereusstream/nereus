@@ -20,6 +20,7 @@ import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.DeleteOutcome;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2;
 import com.nereusstream.storage.bookkeeper.M5BookKeeperNativeDeleteAuthorityV2.PulsarTarget;
@@ -325,11 +326,18 @@ final class PulsarNativeBookKeeperDeleteV1
     }
 
     private void requireAbsentResult(M5BookKeeperDeleteCellBudgetV2.Result result) {
-        if (result.reservationRetained()
-                || result.deleteResult().outcome()
-                        != com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteAdapterV1.DeleteOutcome
-                                .AUTHORITATIVELY_ABSENT) {
+        var outcome = result.deleteResult().outcome();
+        if (result.reservationRetained() && outcome != DeleteOutcome.DIFFERENT_LEDGER_OR_METADATA) {
+            throw new OriginalDeleteUnsettledException();
+        }
+        if (result.reservationRetained() || outcome != DeleteOutcome.AUTHORITATIVELY_ABSENT) {
             throw new IllegalStateException("Original Native BK delete remains unknown or retained");
+        }
+    }
+
+    static final class OriginalDeleteUnsettledException extends IllegalStateException {
+        OriginalDeleteUnsettledException() {
+            super("Original Native BK delete remains unknown or retained");
         }
     }
 

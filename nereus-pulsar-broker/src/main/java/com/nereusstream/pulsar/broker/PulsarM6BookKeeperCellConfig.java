@@ -125,17 +125,39 @@ record PulsarM6BookKeeperCellConfig(
         var objectScope =
                 switch (profile) {
                     case BOOKKEEPER_WAL_ONLY -> Optional.<PulsarM6AsyncObjectScope.Configuration>empty();
-                    case BOOKKEEPER_WAL_ASYNC_OBJECT -> {
-                        if (!"RETAIN_BK".equals(raw.getProperty("bookKeeperRetention", "RETAIN_BK"))) {
-                            throw new IllegalArgumentException(
-                                    "Native BookKeeper delete requires the release coordinator");
-                        }
-                        yield Optional.of(PulsarM6AsyncObjectScope.Configuration.read(key -> required(raw, key)));
-                    }
+                    case BOOKKEEPER_WAL_ASYNC_OBJECT ->
+                        Optional.of(PulsarM6AsyncObjectScope.Configuration.read(
+                                key -> required(raw, key), raw.getProperty("bookKeeperRetention", "RETAIN_BK")));
                     default ->
                         throw new IllegalArgumentException(
                                 "Native BookKeeper Cell profile is not admitted: " + profile);
                 };
+        var share = new PulsarNativeReadCellBudgetV1.Usage(
+                positive(raw, "shareOwners"), positive(raw, "shareReadSlots"),
+                positive(raw, "shareEncodedBytes"), positive(raw, "shareDecodedBytes"));
+        var readLimits = new PulsarNativeReadCellBudgetV1.ReadLimits(
+                integer(raw, "readMaximumEntries"),
+                positive(raw, "readMaximumEntryBytes"),
+                positive(raw, "readMaximumBatchBytes"));
+        if (objectScope
+                .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete)
+                .isPresent()) {
+            // One factory, metadata and M4 writers, source preparation, read owner and replacement workspace.
+            long frames = Math.multiplyExact((long) readLimits.maximumEntries(), capability.clientFrameLimitBytes());
+            long minimumEncoded = Math.multiplyExact(share.readSlots(), frames);
+            long minimumDecoded = Math.multiplyExact(
+                    share.readSlots(),
+                    Math.addExact(
+                            Math.multiplyExact(4L, frames),
+                            Math.multiplyExact(2L, readLimits.maximumOwnedBatchBytes())));
+            if (share.owners() < 6
+                    || share.readSlots() > 65_536
+                    || share.encodedBytes() < minimumEncoded
+                    || share.decodedBytes() < minimumDecoded) {
+                throw new IllegalArgumentException(
+                        "Verified Native deletion requires capacity for its original M4 and SDK actors");
+            }
+        }
         return new PulsarM6BookKeeperCellConfig(
                 namespace,
                 metadata,
@@ -146,15 +168,8 @@ record PulsarM6BookKeeperCellConfig(
                 required(raw, "bkMetadataUri"),
                 required(raw, "bkNamespaceIdentity"),
                 positive(raw, "bkQuotaBytes"),
-                new PulsarNativeReadCellBudgetV1.Usage(
-                        positive(raw, "shareOwners"),
-                        positive(raw, "shareReadSlots"),
-                        positive(raw, "shareEncodedBytes"),
-                        positive(raw, "shareDecodedBytes")),
-                new PulsarNativeReadCellBudgetV1.ReadLimits(
-                        integer(raw, "readMaximumEntries"),
-                        positive(raw, "readMaximumEntryBytes"),
-                        positive(raw, "readMaximumBatchBytes")),
+                share,
+                readLimits,
                 writers,
                 profile,
                 objectScope,

@@ -168,6 +168,13 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                             .equals(configuration.bookKeeperNamespace())) {
                 throw new IllegalArgumentException("Native BookKeeper namespace differs from the exact Cell scope");
             }
+            var delete = configuration.objectScope().flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete);
+            if (delete.isPresent()) {
+                delete.orElseThrow()
+                        .requireNativeBudget(bookKeeper)
+                        .toCompletableFuture()
+                        .get(timeout, TimeUnit.SECONDS);
+            }
         } catch (Exception failure) {
             try {
                 close();
@@ -212,13 +219,19 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                         configuration.metadataIdentity(),
                         configuration.metadata().authorityRoot(),
                         incarnation(topic))
-                .thenApply(binding -> {
+                .thenCompose(binding -> {
                     var aggregate = binding.authority().aggregate();
                     if (!aggregate.binding().cellIdentity().equals(configuration.cell())
                             || aggregate.initialEpoch().storageProfile() != configuration.profile()) {
                         throw new IllegalArgumentException("Pulsar Binding differs from the admitted BookKeeper Cell");
                     }
-                    return binding;
+                    return configuration
+                                    .objectScope()
+                                    .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete)
+                                    .isPresent()
+                            ? binding.requireBookKeeperDeleteAuditEnrollment(configuration.writers())
+                                    .thenApply(unused -> binding)
+                            : CompletableFuture.completedFuture(binding);
                 });
     }
 
@@ -338,10 +351,29 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                     })
                     .thenCompose(factory -> factory.ledgerFactory()
                             .openLedgerAsync(config, ownership)
+                            .thenCompose(ledger -> configuration
+                                    .objectScope()
+                                    .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete)
+                                    .map(policy -> factory.ledgerFactory()
+                                            .recoverSelectedReadOwner(
+                                                    ledger,
+                                                    policy.drainAdmission(),
+                                                    budget,
+                                                    configuration.writers(),
+                                                    aggregate,
+                                                    key,
+                                                    Math.toIntExact(configuration
+                                                            .share()
+                                                            .readSlots())))
+                                    .orElseGet(() -> CompletableFuture.completedFuture(null))
+                                    .thenApply(unused -> ledger))
                             .thenCompose(ledger -> topicAuthority
                                     .requestRefresh()
-                                    .thenApply(
-                                            unused -> new OpenedLedger(ledger, topicAuthority, scopeCloser(factory))))
+                                    .thenApply(unused -> new OpenedLedger(
+                                            ledger,
+                                            topicAuthority,
+                                            factory.ledgerFactory()::drainSelectedReadOwner,
+                                            scopeCloser(factory))))
                             .exceptionallyCompose(error -> topicAuthority
                                     .closeAsync()
                                     .thenCompose(unused -> closeScope(factory))
@@ -394,7 +426,9 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                                     S3C1ObjectProviderTransport.EVIDENCED_MAXIMUM_OBJECT_BYTES,
                                     broker.getExecutor(),
                                     topicAuthority::requestRefresh,
-                                    Optional.empty())
+                                    configured
+                                            .bookKeeperDelete()
+                                            .map(PulsarM6AsyncObjectScope.BookKeeperDeletePolicy::grace))
                             .thenApply(factory -> new FactoryScope(factory, Optional.of(object)))
                             .exceptionallyCompose(error -> {
                                 if (unwrap(error).getSuppressed().length != 0) {

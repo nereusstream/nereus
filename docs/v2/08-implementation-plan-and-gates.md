@@ -271,7 +271,7 @@ remain required; M6-deferred activation rows cannot be promoted by these checks.
 | M3 | Original NWG1 Object WAL, Root-bound NWKCP1, publication and recovery; NSIP-1 adds exact persistent authorization, closed Owner history, asynchronous physical checkpoint and KMS Cell lock/lease correction | Historical M3 Final retains its exact-source scope. Current NSIP Object core and KMS slice have limited-scope real MinIO/Oxia coordination acceptance; native Object Broker/process wiring remains M6 | Historical `v2M3Check`; current NSIP checks |
 | M4 | Original Binding read view, source planning, generation hazards, exact interval verification and protection release; NSIP-1 adapts Kafka HW/LSO from the captured root, direct Kafka/Pulsar ordered route lookup, and BK per-snapshot lookup statistics | Historical M4 Final retains exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` and its five M4-only scenario promotions. Current NSIP M4-local read adaptation has separate limited-scope acceptance; complete M5 release/delete and native Object process work remain outside it | Historical `v2M4Check`; current NSIP checks |
 | M5 | deterministic materialization with Object-WAL reuse/index-only/rewrite selection; immutable generation and selector publication; Kafka-semantic compaction plus complete index rebuild; typed logical retention and exact reference-free proof; consume exact `RELEASED`; irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction and final Pulsar aggregate tombstone; final provider/source revalidation; per-Cell admission/isolation; conditional Object, root/data/multipart, BookKeeper, orphan, and GC execution | **VERIFIED current-source M5 Final:** five stages,17 obligations/five children and2736 passing tests; exact14-row promotion. Frozen design/older focused receipts retain their original scope; M6-deferred rows, READ15 and production boundaries remain. [Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json). | `v2M5Check` |
-| M6 | four integration batches under the protocol/profile activation matrix: Kafka BK, Kafka Object profiles, Pulsar BK/offload, Pulsar Object WAL | Planned beyond the accepted minimal BK slice; no mandatory logical Follower observation, journal, ISR eligibility or election-adoption mode | Planned `v2M6Check`, scope below; no executable aggregate yet |
+| M6 | four integration batches under the protocol/profile activation matrix: Kafka BK, Kafka Object profiles, Pulsar BK/offload, Pulsar Object WAL | Acceptance requires all 25 scenarios and six real process paths; no mandatory logical Follower observation, journal, ISR eligibility or election-adoption mode | `v2M6Check` requires exact current-source inputs, dependencies and outputs for the full gate below |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | Planned `v2M7Check`, scope below; no executable aggregate yet |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | Planned `v2M8Check` and `v2FinalCheck`, scope below; no executable aggregates yet |
 
@@ -339,6 +339,18 @@ rolls over with the original PUT reply held and with the Object bucket unavailab
 the original Cell until SDK I/O drains, then the successor finishes the same UUID and version without repeating
 the original PUT. Both modes verify the official client's exact positions and bytes after transfer and restart.
 The async run uses `RETAIN_BK` and does not qualify explicit source deletion or promote a scenario.
+
+The focused `DELETE_AFTER_VERIFIED` check is
+`python3 scripts/run-v2-m6-pulsar-bookkeeper-replacement-check.py --pulsar-root <checkout> --java-home <jdk21>
+--output <new-absolute-path-outside-checkouts>`. The first admission provisions the BookKeeper Cell's native delete
+budget and the Binding's audit domain. The serving Broker and the maintenance process require those existing
+authorities. The check qualifies current M4 read drain against the Broker's actual runtime, loses the original
+native offload publication reply after the real Oxia write, and verifies the same publication and ticket settlement.
+The maintenance command accepts one exact closed ledger only after the serving Cell drains. It publishes a replacement,
+proves the exact fallback release, and records native INTENT. After verified physical absence and GC settlement,
+it records native DONE without changing the original offload UUID. The restarted Broker must preserve the backlog,
+entry bytes and MessageIds through the official client. This check covers the selected source replacement and records
+focused evidence only.
 
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.

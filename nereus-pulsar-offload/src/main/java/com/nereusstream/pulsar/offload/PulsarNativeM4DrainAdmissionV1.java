@@ -201,6 +201,17 @@ public final class PulsarNativeM4DrainAdmissionV1 {
         }
     }
 
+    void requireConfiguration(
+            org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl.CapturedNativeReadView view,
+            M5BookKeeperNamespaceAuthorityV2 bookKeeper,
+            NereusPulsarLedgerOffloaderV1 offloader,
+            com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2 metadataNamespace) {
+        if (!configuration.equals(PulsarNativeBindingReadViewV1.readAdmissionConfiguration(
+                view, bookKeeper, offloader, metadataNamespace))) {
+            throw new IllegalArgumentException("Native M4 actual backend configuration differs from conformance");
+        }
+    }
+
     Sha256Digest receipt() {
         return receipt;
     }

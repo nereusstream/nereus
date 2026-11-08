@@ -1178,19 +1178,39 @@ public final class PulsarNativeBindingV1 {
                 }));
     }
 
+    /** Confirms the original audit enrollment before a Broker or maintenance actor admits source deletion. */
+    public CompletionStage<Void> requireBookKeeperDeleteAuditEnrollment(M5ClosedWriterRegistryV1 registry) {
+        var key = new OxiaV2AuthorityKeys(authorityRoot).aggregateKey(incarnation);
+        return revalidate()
+                .thenCompose(unused -> new Oxia09ExactMetadataTransactionStoreV1(client).read(key))
+                .thenAccept(found -> requireAuditEnrollment(
+                        M5PulsarAggregateAuthorityCodecV1.decodeAuthority(
+                                found.orElseThrow().canonicalStoredBytes()),
+                        registry));
+    }
+
     private void requireAuditDomain(
             com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1
                             .PulsarAggregateRetirementAuthorityV1
                     value,
             M5ClosedWriterRegistryV1 registry) {
+        requireAuditEnrollment(value, registry);
+        if (value.firstNativeFactoryScope().isEmpty()) {
+            throw new IllegalStateException("Native audit capture has no first factory scope");
+        }
+    }
+
+    private void requireAuditEnrollment(
+            com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1
+                            .PulsarAggregateRetirementAuthorityV1
+                    value,
+            M5ClosedWriterRegistryV1 registry) {
         if (value.auditDomain().isEmpty()
-                || value.firstNativeFactoryScope().isEmpty()
                 || !value.writerEnrollment().equals(Optional.of(registry.enrollment()))
                 || !value.canonicalAggregateBytes().equals(authority.aggregate().canonicalStoredBytes())
                 || !value.originalAggregateVersion()
                         .equals(Optional.of(authority.aggregate().aggregateSourceVersion()))) {
-            throw new IllegalStateException(
-                    "Native audit capture lacks its first-admission domain and exact enrolled P1");
+            throw new IllegalStateException("Native audit requires its first-admission domain and exact enrolled P1");
         }
     }
 

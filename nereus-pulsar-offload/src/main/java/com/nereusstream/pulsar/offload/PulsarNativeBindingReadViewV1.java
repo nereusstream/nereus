@@ -530,6 +530,14 @@ public final class PulsarNativeBindingReadViewV1 {
 
     Sha256Digest readAdmissionConfiguration(
             M5BookKeeperNamespaceAuthorityV2 bookKeeper, NereusPulsarLedgerOffloaderV1 offloader) {
+        return readAdmissionConfiguration(nativeView, bookKeeper, offloader, bookKeeperBinding.metadataNamespace());
+    }
+
+    static Sha256Digest readAdmissionConfiguration(
+            CapturedNativeReadView nativeView,
+            M5BookKeeperNamespaceAuthorityV2 bookKeeper,
+            NereusPulsarLedgerOffloaderV1 offloader,
+            com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2 metadataNamespace) {
         if (!nativeView.usesBookKeeper(bookKeeper.borrowClient()) || !nativeView.usesOffloader(offloader)) {
             throw new IllegalArgumentException("Native M4 configuration belongs to another owned SDK");
         }
@@ -537,7 +545,7 @@ public final class PulsarNativeBindingReadViewV1 {
         offloader.readAdmissionConfiguration().forEach((key, value) -> values.put("object." + key, value));
         values.put("bookKeeper", bookKeeper.capability().toString());
         values.put("bookKeeper.namespace", bookKeeper.namespace().toString());
-        values.put("metadataNamespace", bookKeeperBinding.metadataNamespace().toString());
+        values.put("metadataNamespace", metadataNamespace.toString());
         return PulsarNativeM4DrainAdmissionV1.digest(values);
     }
 

@@ -56,6 +56,11 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
     private final java.util.Set<ManagedLedgerImpl> ownedLedgers = new java.util.HashSet<>();
     private CompletableFuture<ManagedLedgerImpl> opening;
     private CompletableFuture<Void> closing;
+    private CompletableFuture<Void> readOpening;
+    private CompletableFuture<Void> readClosing;
+    private PulsarNativeM4ControlV1 readControl;
+    private PulsarNativeSourcePreparationV1 readPreparation;
+    private PulsarNativeM4ReadOwnerV1 selectedReadOwner;
     private boolean factoryClosed;
     private boolean closed;
 
@@ -427,13 +432,94 @@ public final class PulsarNativeManagedLedgerFactoryV2 implements AutoCloseable {
         return opened;
     }
 
+    synchronized void requireOwnedLedger(ManagedLedgerImpl ledger) {
+        requireOpen();
+        if (!ownedLedgers.contains(ledger)) {
+            throw new IllegalArgumentException("Native factory does not own this ledger");
+        }
+    }
+
+    com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity bindingIdentity() {
+        return binding.bindingIdentity();
+    }
+
+    /** Opens the exact previously published Native read plan before Broker data admission. */
+    public synchronized CompletableFuture<Void> recoverSelectedReadOwner(
+            ManagedLedgerImpl ledger,
+            PulsarNativeM4DrainAdmissionV1 admission,
+            PulsarNativeReadCellBudgetV1 budget,
+            M5ClosedWriterRegistryV1 registry,
+            M5PulsarAggregateRetirementCoordinatorV1 aggregate,
+            String aggregateKey,
+            int readSlots) {
+        requireOpen();
+        if (!ownedLedgers.contains(ledger) || readOpening != null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Native read plan must own its exact ledger"));
+        }
+        var scope = objectScope.orElseThrow();
+        readControl = binding.m4Control();
+        var sdk = creation.namespace();
+        readOpening = ledger.captureNativeReadView()
+                .thenAccept(view ->
+                        admission.requireConfiguration(view, sdk, scope.offloader(), binding.metadataNamespace()))
+                .thenCompose(unused -> readControl.captureSelectedSourceMap())
+                .thenCompose(selected -> {
+                    if (selected.source().isEmpty()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    boolean materialized = selected.manifest()
+                            || selected.map()
+                                    .map(map -> PulsarNativeMaterializedReadV2.isRecipe(map.actualViewBytes()))
+                                    .orElse(false);
+                    return readControl
+                            .installControlWriter(registry, aggregate, aggregateKey, budget)
+                            .thenCompose(unused -> materialized
+                                    ? readControl.prepareMaterializedReadSources(
+                                            ledger, sdk, scope.offloader(), scope.namespace(), budget, executor)
+                                    : readControl.preparePublishedReadSources(
+                                            ledger, sdk, scope.offloader(), scope.namespace(), budget))
+                            .thenCompose(preparation -> {
+                                readPreparation = preparation;
+                                return materialized
+                                        ? readControl.prepareMaterializedReadOwner(
+                                                preparation, admission, sdk, scope.offloader(), executor)
+                                        : readControl.prepareColdReadOwner(
+                                                preparation, admission, sdk, scope.offloader(), executor);
+                            })
+                            .thenCompose(
+                                    recovery -> recovery.recover(executor, ledger.getExecutor(), readSlots, budget))
+                            .thenAccept(owner -> selectedReadOwner = owner);
+                });
+        return readOpening.copy();
+    }
+
+    /** Drains the original selected read owner while its actual ManagedLedger is still open. */
+    public synchronized CompletableFuture<Void> drainSelectedReadOwner() {
+        if (readOpening == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (readClosing == null || readClosing.isCompletedExceptionally()) {
+            readClosing = readOpening
+                    .handle((unused, failure) -> null)
+                    .thenCompose(unused -> selectedReadOwner != null
+                            ? selectedReadOwner.drainForRecovery(executor)
+                            : CompletableFuture.completedFuture(null))
+                    .thenCompose(unused ->
+                            readPreparation == null ? CompletableFuture.completedFuture(null) : readPreparation.close())
+                    .thenCompose(unused -> readControl.closeControlWriter());
+        }
+        return readClosing.copy();
+    }
+
     public synchronized CompletableFuture<Void> closeAsync() {
         closed = true;
         if (closing == null || closing.isCompletedExceptionally()) {
             var opened = opening == null
                     ? CompletableFuture.completedFuture(null)
                     : opening.handle((ledger, failure) -> null);
-            closing = opened.thenCompose(unused -> closeNativeFactory())
+            closing = opened.thenCompose(unused -> drainSelectedReadOwner())
+                    .thenCompose(unused -> closeNativeFactory())
                     .thenCompose(unused -> metadataWriter == null
                             ? CompletableFuture.completedFuture(null)
                             : metadataWriter.prepareSdkClose())

@@ -19,6 +19,7 @@ import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1;
 import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.AttemptKeyManager;
 import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.PreparedAttemptKey;
+import com.nereusstream.pulsar.offload.PulsarNativeM4DrainAdmissionV1;
 import com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1.BlockClass;
 import com.nereusstream.pulsar.offload.PulsarOffloadLimitCandidateV1;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
@@ -28,6 +29,9 @@ import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.storage.api.lifecycle.MetadataNamespaceIdentityV2;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.Namespace;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2.ProviderKind;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperDeleteCellBudgetV2;
+import com.nereusstream.storage.bookkeeper.M5BookKeeperNamespaceAuthorityV2;
+import com.nereusstream.storage.bookkeeper.M5PulsarNativeCreateSpecV1.BookKeeperGcGraceV1;
 import com.nereusstream.storage.object.kms.WrappedRunKeyEnvelope;
 import com.nereusstream.storage.object.materialization.M5CellProviderProfileV2.References;
 import com.nereusstream.storage.object.vault.VaultTransitRunKeyKms;
@@ -41,6 +45,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import javax.crypto.SecretKey;
@@ -58,9 +63,41 @@ final class PulsarM6AsyncObjectScope {
     // NPO1 uses lowercase canonical identifiers; the Vault runtime has a distinct wire envelope.
     private static final String NPO1_VAULT_PROVIDER = "hashicorp_vault_transit";
     private static final String NPO1_VAULT_ALGORITHM = "aes256_gcm96";
+    private final S3Client client;
     private final S3PulsarOffloadObjectStoreV1 objects;
     private final VaultTransitRunKeyKms kms;
     private final NereusPulsarLedgerOffloaderV1 offloader;
+
+    record BookKeeperDeletePolicy(BookKeeperGcGraceV1 grace, PulsarNativeM4DrainAdmissionV1 drainAdmission) {
+        // Maintenance owns the Cell exclusively and dispatches one exact source at a time.
+        static final M5BookKeeperDeleteCellBudgetV2.Limits NATIVE_BUDGET =
+                new M5BookKeeperDeleteCellBudgetV2.Limits(1, 1);
+
+        CompletionStage<Void> requireNativeBudget(M5BookKeeperNamespaceAuthorityV2 bookKeeper) {
+            return bookKeeper.nativeDeleteCellBudget().snapshot().thenAccept(snapshot -> {
+                if (!NATIVE_BUDGET.equals(snapshot.limits())) {
+                    throw new IllegalStateException("Native BookKeeper delete budget differs from the admitted policy");
+                }
+            });
+        }
+
+        static BookKeeperDeletePolicy read(Function<String, String> value) {
+            var grace = new BookKeeperGcGraceV1(
+                    Long.parseLong(value.apply("bookKeeperGcProviderMinimumMillis")),
+                    Long.parseLong(value.apply("bookKeeperGcAuditMinimumMillis")),
+                    Long.parseLong(value.apply("bookKeeperGcGraceMillis")));
+            try {
+                var digest = com.nereusstream.domain.bytes.Sha256Digest.copyOf(
+                        java.util.HexFormat.of().parseHex(value.apply("bookKeeperReadDrainAdmissionSha256")));
+                return new BookKeeperDeletePolicy(
+                        grace,
+                        PulsarNativeM4DrainAdmissionV1.load(
+                                Path.of(value.apply("bookKeeperReadDrainAdmission")), digest));
+            } catch (Exception failure) {
+                throw new IllegalArgumentException("Exact current Native M4 read drain admission is required", failure);
+            }
+        }
+    }
 
     record Configuration(
             URI endpoint,
@@ -74,8 +111,15 @@ final class PulsarM6AsyncObjectScope {
             URI vaultEndpoint,
             String vaultMount,
             String vaultKey,
-            String vaultTokenEnvironment) {
-        static Configuration read(Function<String, String> value) {
+            String vaultTokenEnvironment,
+            java.util.Optional<BookKeeperDeletePolicy> bookKeeperDelete) {
+        static Configuration read(Function<String, String> value, String retention) {
+            var delete =
+                    switch (retention) {
+                        case "RETAIN_BK" -> java.util.Optional.<BookKeeperDeletePolicy>empty();
+                        case "DELETE_AFTER_VERIFIED" -> java.util.Optional.of(BookKeeperDeletePolicy.read(value));
+                        default -> throw new IllegalArgumentException("Native BK retention class is unsupported");
+                    };
             String mount = value.apply("vaultMount");
             String key = value.apply("vaultKey");
             return new Configuration(
@@ -99,12 +143,17 @@ final class PulsarM6AsyncObjectScope {
                     URI.create(value.apply("vaultEndpoint")),
                     mount,
                     key,
-                    value.apply("vaultTokenEnvironment"));
+                    value.apply("vaultTokenEnvironment"),
+                    delete);
         }
     }
 
     private PulsarM6AsyncObjectScope(
-            S3PulsarOffloadObjectStoreV1 objects, VaultTransitRunKeyKms kms, NereusPulsarLedgerOffloaderV1 offloader) {
+            S3Client client,
+            S3PulsarOffloadObjectStoreV1 objects,
+            VaultTransitRunKeyKms kms,
+            NereusPulsarLedgerOffloaderV1 offloader) {
+        this.client = client;
         this.objects = objects;
         this.kms = kms;
         this.offloader = offloader;
@@ -151,14 +200,19 @@ final class PulsarM6AsyncObjectScope {
             var offloadPolicies = new OffloadPoliciesImpl();
             offloadPolicies.setManagedLedgerOffloadedReadPriority(OffloadedReadPriority.TIERED_STORAGE_FIRST);
             var scope = new PulsarM6AsyncObjectScope(
+                    client,
                     objects,
                     vault,
                     new NereusPulsarLedgerOffloaderV1(
                             objects,
                             new NereusPulsarLedgerOffloaderV1.RuntimePolicy(
-                                    "m6-native-retain-bk",
+                                    config.bookKeeperDelete().isPresent()
+                                            ? "m6-native-verified-delete"
+                                            : "m6-native-retain-bk",
                                     config.keyPrefix(),
-                                    RetentionClass.RETAIN_BK,
+                                    config.bookKeeperDelete().isPresent()
+                                            ? RetentionClass.DELETE_AFTER_VERIFIED
+                                            : RetentionClass.RETAIN_BK,
                                     config.blocks(),
                                     CompressionPolicy.ZSTD_IF_SMALLER,
                                     PulsarOffloadLimitCandidateV1.adr0056EvidenceCandidate()),
@@ -196,6 +250,12 @@ final class PulsarM6AsyncObjectScope {
             }
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    com.nereusstream.storage.object.s3.S3M5PhysicalNamespaceAuthorityV2 physical(Configuration configured)
+            throws IOException {
+        return com.nereusstream.storage.object.s3.S3M5PhysicalNamespaceAuthorityV2.connect(
+                client, configured.bucket(), configured.physicalNamespace());
     }
 
     NereusPulsarLedgerOffloaderV1 offloader() {

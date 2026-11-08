@@ -1087,7 +1087,8 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
         private CompletionStage<ExternalMutationResultV1> dispatchPreparedSdk() {
             dispatched = true;
             try {
-                sdk = Objects.requireNonNull(dispatch.get(), "original Native SDK future");
+                sdk = Objects.requireNonNull(dispatch.get(), "original Native SDK future")
+                        .exceptionallyCompose(this::observeOriginalEnrolledParentPut);
             } catch (Throwable failure) {
                 sdk = CompletableFuture.failedFuture(failure);
             }
@@ -1122,6 +1123,39 @@ public final class PulsarNativeMetadataWriterV2 implements MetaStore.StoredMutat
                         });
                     })
                     .thenCompose(value -> value);
+        }
+
+        @SuppressWarnings("unchecked") // The native metadata SPI returns Stat for a versioned put.
+        private CompletableFuture<T> observeOriginalEnrolledParentPut(Throwable originalFailure) {
+            if (bytes == null
+                    || !path.equals("/managed-ledgers/" + ledgerName)
+                    || objectOffloader == null
+                    || !objectOffloader.preservesIncompleteAttempt()
+                    || expectedVersion.isEmpty()
+                    || predecessorStat.isEmpty()
+                    || expectedVersion.orElseThrow()
+                            != predecessorStat.orElseThrow().getVersion()) {
+                return CompletableFuture.failedFuture(originalFailure);
+            }
+            // The caller holds the original Native parent mutation and the physical reference tickets.
+            // Only the exact successor on the original backend can settle a lost callback.
+            long before = expectedVersion.orElseThrow();
+            return budget.requireNativeOwner(binding, creation.spec().allocatorOwner())
+                    .thenCompose(unused -> binding.revalidate())
+                    .thenCompose(unused -> nativeStore.readStoredMutationValue(ledgerName, path, MAX_BYTES))
+                    .handle((observed, readFailure) -> {
+                        if (readFailure != null && readFailure != originalFailure) {
+                            originalFailure.addSuppressed(readFailure);
+                        }
+                        return readFailure == null
+                                ? observed.filter(value -> value.stat().getVersion() > before
+                                        && java.util.Arrays.equals(value.storedBytes(), bytes))
+                                : Optional.<MetaStoreImpl.StoredMutationValue>empty();
+                    })
+                    .thenCompose(exact -> exact.isPresent()
+                            ? CompletableFuture.completedFuture(
+                                    (T) exact.orElseThrow().stat())
+                            : CompletableFuture.failedFuture(originalFailure));
         }
 
         private CompletableFuture<Void> verifySdkCompletion(T value) {

@@ -189,6 +189,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /** Actual Pulsar/BK/S3 source prerequisite; this supplies no M4 release or M5 deletion qualification. */
 class M5NativePulsarOffloadRealTest {
+    private static final String M6_BROKER_PROVIDER_SCOPE = System.getProperty("nereus.m6.brokerDeleteProviderScope");
+
     private static final String SDK_NAMESPACE_SUFFIX = System.getProperty("nereus.m5.nativeM4RuntimeOutput") != null
                     && "DELETE_AFTER_VERIFIED".equals(System.getProperty("nereus.m5.nativeOffloadRetentionClass"))
             ? "-sdk-delete"
@@ -16461,11 +16463,13 @@ class M5NativePulsarOffloadRealTest {
         return new NereusPulsarLedgerOffloaderV1(
                 store,
                 new RuntimePolicy(
-                        "m5-native-real",
+                        M6_BROKER_PROVIDER_SCOPE == null ? "m5-native-real" : "m6-native-verified-delete",
                         "cells/m5-native",
                         retention,
                         BlockClass.LATENCY_1_MIB,
-                        CompressionPolicy.FIXED_NONE,
+                        M6_BROKER_PROVIDER_SCOPE == null
+                                ? CompressionPolicy.FIXED_NONE
+                                : CompressionPolicy.ZSTD_IF_SMALLER,
                         LIMITS),
                 keyManager(),
                 (ledgerId, attempt, failure) -> {
@@ -16728,6 +16732,9 @@ class M5NativePulsarOffloadRealTest {
                 .setMaxEntriesPerLedger(SEALED_ENTRIES)
                 .setRetentionTime(1, TimeUnit.HOURS)
                 .setLedgerOffloader(offloader);
+        if (M6_BROKER_PROVIDER_SCOPE != null) {
+            config.setReadEntryTimeoutSeconds(Integer.getInteger("nereus.m6.brokerReadTimeoutSeconds", 0));
+        }
         config.setMinimumRolloverTime(0, TimeUnit.SECONDS);
         return config;
     }
@@ -16801,8 +16808,11 @@ class M5NativePulsarOffloadRealTest {
     private static BookKeeperCapabilitySnapshotV1 bookKeeperCapability() {
         int frameLimit = 5_242_880;
         return new BookKeeperCapabilitySnapshotV1(
-                new CellProviderScopeId(Sha256Digest.hash(
-                        CanonicalBytes.copyOf("m5-native-pulsar-bk".getBytes(StandardCharsets.UTF_8)))),
+                new CellProviderScopeId(
+                        M6_BROKER_PROVIDER_SCOPE == null
+                                ? Sha256Digest.hash(
+                                        CanonicalBytes.copyOf("m5-native-pulsar-bk".getBytes(StandardCharsets.UTF_8)))
+                                : Sha256Digest.copyOf(java.util.HexFormat.of().parseHex(M6_BROKER_PROVIDER_SCOPE))),
                 "cd06340851d6d657b7c7546df01df365c18980de",
                 Sha256Digest.copyOf(java.util.HexFormat.of()
                         .parseHex("8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f")),
