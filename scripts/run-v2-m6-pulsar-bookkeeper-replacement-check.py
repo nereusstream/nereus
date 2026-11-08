@@ -174,7 +174,7 @@ def run(pulsar, java_home, out):
                                     f"pulsar.metadatastore.providers={r.PROVIDER},M6PulsarOffloadPublicationFault")
                       for value in java]
         fault_java.insert(1, f"-Dnereus.m6.publishFaultDirectory={fault}")
-        stop = r.start_broker(stack, fault_java, original_conf, out / "broker.log", web)
+        _, stop = r.start_broker(stack, fault_java, original_conf, out / "broker.log", web)
         expected = out / "expected.properties"
         r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "initial", origin, web, binary,
                             str(expected), bk_uri, str(fault), str(cell)], out / "initial-client.log")
@@ -240,7 +240,7 @@ def run(pulsar, java_home, out):
         (out / "object-delete-transport.json").write_bytes(r.SOURCE.INPUTS.canonical(
             {"ledger": int(original), "exactVersion": root_version, "originalResponseSuppressed": True,
              **fault_state(s3_control, s3_token)}))
-        stop = r.start_broker(stack, java, conf, out / "restarted.log", web)
+        _, stop = r.start_broker(stack, java, conf, out / "restarted.log", web)
         r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "cold", origin, web, binary,
                             str(expected), bk_uri, str(cell)], out / "cold-client.log")
         stop(strict=True)

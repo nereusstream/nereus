@@ -359,7 +359,9 @@ Add `--lifecycle` to the focused Pulsar BookKeeper runner for the raw read and w
 for one ledger and entry. It cancels the official client's wait after the backend has replied, then checks that the
 Broker keeps the original Cell owner and that the target cannot take over before the reply is released. The
 independently admitted Cell serves a write and read during each hold. After release, the target reads the original
-positions and bytes, and the runner verifies the durable subscription after restart.
+positions and bytes. A separate cut sends SIGTERM with a real read still held and verifies that the old Cell
+remains active while the foreign Cell serves. After the old Broker exits cleanly, a fresh process verifies the
+durable subscription and reads the original held write.
 
 The focused Pulsar Object WAL runner is
 `python3 scripts/run-v2-m6-pulsar-object-wal-process-check.py --pulsar-root <checkout> --java-home <jdk21>
@@ -382,9 +384,10 @@ The same runner writes past the 1,024-extent physical Run bound under one native
 predecessor Seal and reads the entries on both sides of the cut. Separate unload cuts hold an actual S3 Range GET
 and an applied PUT response. Cancelling the client wait leaves the original read or dispatch reservation active
 until the underlying work settles. A separately admitted Cell writes and reads during each hold. The successor
-reads the original bytes and MessageId. Live PUT reconciliation checks the exact original key and body with its
-own bounded work, including after the cold recovery window has elapsed. These cases provide focused Object WAL
-evidence for the M6 aggregate.
+reads the original bytes and MessageId. The runner also sends SIGTERM with a real Range GET still held,
+then checks clean exit and reads the exact retained entries from a fresh Broker. Live PUT reconciliation checks
+the exact original key and body with its own bounded work, including after the cold recovery window has elapsed.
+These cases provide focused Object WAL evidence for the M6 aggregate.
 
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.

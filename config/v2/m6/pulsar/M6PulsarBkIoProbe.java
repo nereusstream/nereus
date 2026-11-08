@@ -71,12 +71,18 @@ final class M6PulsarBkIoProbe {
                 verifyForeign(args[2], args[3], metadata);
                 return;
             }
-            String target = args[4];
+            if ("cold-after-shutdown".equals(mode)) {
+                var state = properties(Path.of(args[6]));
+                verifyExact(client, WRITE_TOPIC, MessageId.fromByteArray(
+                        Base64.getDecoder().decode(state.getProperty("heldWritePosition"))), HELD_WRITE);
+                System.out.println("PULSAR_NATIVE_BK_HELD_WRITE_COLD_RESTART_PASS");
+                return;
+            }
+            boolean shutdown = "shutdown".equals(mode);
             String cellKey = properties(Path.of(args[5])).getProperty("probeCellOwnerKey");
             var original = M6PulsarBookKeeperSemanticsProbe.readActiveCellOwner(metadata, cellKey);
-            var witness = new MetadataStoreNereusOwnershipWitnessProvider(metadata, target);
             var wire = new Wire();
-            if ("read".equals(mode)) {
+            if ("read".equals(mode) || shutdown) {
                 var state = properties(Path.of(args[6]));
                 var last = id(state, Integer.parseInt(state.getProperty("count")) - 1);
                 var rawLedgers = admin.topics().getInternalStats(TOPIC).ledgers.stream()
@@ -101,12 +107,20 @@ final class M6PulsarBkIoProbe {
                         throw new AssertionError("Raw BK read completed before observer cancellation");
                     }
                     reader.closeAsync();
-                    verifyDrain(args, admin, metadata, cellKey, original, witness, wire, observed);
+                    if (shutdown) {
+                        verifyShutdown(args, metadata, cellKey, original, wire, observed);
+                    } else {
+                        verifyDrain(args, admin, metadata, cellKey, original, wire, observed);
+                    }
                 } finally {
                     wire.call("DELETE", "");
                 }
-                verifyExact(client, TOPIC, position, payload);
-                System.out.println("PULSAR_NATIVE_BK_HELD_READ_CANCEL_AND_UNLOAD_PASS");
+                if (shutdown) {
+                    System.out.println("PULSAR_NATIVE_BK_HELD_READ_CANCEL_AND_SHUTDOWN_PASS");
+                } else {
+                    verifyExact(client, TOPIC, position, payload);
+                    System.out.println("PULSAR_NATIVE_BK_HELD_READ_CANCEL_AND_UNLOAD_PASS");
+                }
             } else if ("write".equals(mode)) {
                 MessageIdAdv position;
                 try (var producer = client.newProducer().topic(WRITE_TOPIC).enableBatching(false).create()) {
@@ -122,11 +136,17 @@ final class M6PulsarBkIoProbe {
                     if (!observed.cancel(false)) {
                         throw new AssertionError("Native BK write completed before observer cancellation");
                     }
-                    verifyDrain(args, admin, metadata, cellKey, original, witness, wire, observed);
+                    verifyDrain(args, admin, metadata, cellKey, original, wire, observed);
                 } finally {
                     wire.call("DELETE", "");
                 }
                 verifyExact(client, WRITE_TOPIC, position, HELD_WRITE);
+                var statePath = Path.of(args[6]);
+                var state = properties(statePath);
+                state.setProperty("heldWritePosition", Base64.getEncoder().encodeToString(position.toByteArray()));
+                try (var output = Files.newBufferedWriter(statePath)) {
+                    state.store(output, null);
+                }
                 System.out.println("PULSAR_NATIVE_BK_HELD_WRITE_CANCEL_AND_UNLOAD_PASS");
             } else {
                 throw new AssertionError("Unknown raw BookKeeper I/O probe");
@@ -135,8 +155,9 @@ final class M6PulsarBkIoProbe {
     }
 
     private static void verifyDrain(String[] args, PulsarAdmin admin, MetadataStore metadata, String cellKey,
-            M6PulsarBookKeeperSemanticsProbe.CellOwner owner, MetadataStoreNereusOwnershipWitnessProvider target,
-            Wire wire, CompletableFuture<?> cancelled) throws Exception {
+            M6PulsarBookKeeperSemanticsProbe.CellOwner owner, Wire wire, CompletableFuture<?> cancelled)
+            throws Exception {
+        var target = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[4]);
         var unloading = admin.namespaces().unloadNamespaceBundleAsync(NAMESPACE, RANGE, args[4]);
         try {
             unloading.get(800, TimeUnit.MILLISECONDS);
@@ -152,6 +173,25 @@ final class M6PulsarBkIoProbe {
             wire.call("PATCH", "");
         }
         unloading.get(30, TimeUnit.SECONDS);
+    }
+
+    private static void verifyShutdown(String[] args, MetadataStore metadata, String cellKey,
+            M6PulsarBookKeeperSemanticsProbe.CellOwner owner, Wire wire, CompletableFuture<?> cancelled)
+            throws Exception {
+        var source = ProcessHandle.of(Long.parseLong(args[4])).orElseThrow();
+        if (!source.destroy()) {
+            throw new AssertionError("Could not initiate shutdown of the original fixture Broker");
+        }
+        try {
+            Thread.sleep(800);
+            verifyForeign(args[7], args[8], metadata);
+            if (!source.isAlive() || !cancelled.isCancelled() || wire.call("GET", "").path("hits").asInt() == 0
+                    || !owner.equals(M6PulsarBookKeeperSemanticsProbe.readActiveCellOwner(metadata, cellKey))) {
+                throw new AssertionError("Broker shutdown released the original BookKeeper read before its callback");
+            }
+        } finally {
+            wire.call("PATCH", "");
+        }
     }
 
     static void isolate(PulsarAdmin admin, String name, String namespace, String primary) throws Exception {

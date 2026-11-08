@@ -200,7 +200,7 @@ def run(pulsar, java_home, out):
             stop(True)
         cold, stop = start_broker(stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])
         PUL.run_to_log(java + args + ["restart", "record-restart-position"], out / "restart-client.log")
-        _, stop_peer = start_broker(stack, java, out / "broker-1.conf", out / "after-crash-broker.log", addresses[1])
+        peer, stop_peer = start_broker(stack, java, out / "broker-1.conf", out / "after-crash-broker.log", addresses[1])
         native_probe = "M6PulsarObjectWalProbe"
         ready = out / "original-put-held"
         with (out / "before-crash.log").open("xb") as probe_log, subprocess.Popen(
@@ -279,9 +279,23 @@ def run(pulsar, java_home, out):
             SOURCE.require(f"PULSAR_OBJECT_WAL_{marker}_CANCEL_AND_UNLOAD_PASS" in drain
                            and "PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS" in drain,
                            f"native {kind} drain or foreign Cell made no terminal observation")
+        PUL.run_to_log(java + [native_probe, "held-read-shutdown", origin, addresses[1], addresses[3],
+                              str(expected), str(cell), str(peer.pid), foreign_web, foreign_service],
+                       out / "held-read-shutdown.log", timeout=100)
+        shutdown = (out / "held-read-shutdown.log").read_text()
+        peer.wait(35)
+        SOURCE.require("PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_SHUTDOWN_PASS" in shutdown
+                       and "PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS" in shutdown,
+                       "native shutdown did not retain and then drain the original Object read")
         stop_peer(True)
         stop_successor(True)
         stop_foreign(True)
+        _, stop_after_drain = start_broker(stack, java, out / "broker-0.conf", out / "restarted-after-drain.log",
+                                           addresses[0])
+        PUL.run_to_log(java + args + ["restart"], out / "cold-after-drain.log")
+        SOURCE.require("PULSAR_NATIVE_BK_RESTART_PASS" in (out / "cold-after-drain.log").read_text(),
+                       "cold owner did not read exact positions and bytes after held I/O drained")
+        stop_after_drain(True)
         negative = out / "unqualified.conf"
         PUL.broker_config(template, negative, {**base, "webServicePort": ports[4], "brokerServicePort": ports[5],
                                                "metadataStoreUrl": f"oxia://{oxia}"})
@@ -327,6 +341,7 @@ def run(pulsar, java_home, out):
         "checks": ["real-r1-range64", "official-client", "rollover", "individual-and-cumulative-ack", "seek-reset-backlog",
                    "planned-transfer", "cold-read", "crash-takeover", "original-unknown-key-version",
                    "no-native-ledger-id-reuse", "held-read-cancellation-and-unload", "held-write-cancellation-and-unload",
+                   "held-read-cancellation-and-shutdown", "cold-read-after-shutdown-drain",
                    "independent-foreign-cell", "live-physical-run-rollover",
                    "unqualified-ownership-rejected", "foreign-namespace-rejected", "wrong-artifact-rejected",
                    "wrong-range64-receipt-rejected"],

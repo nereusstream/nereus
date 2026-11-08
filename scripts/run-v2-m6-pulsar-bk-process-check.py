@@ -140,13 +140,13 @@ def start_broker(stack, java, config, log, admin, expect_rejection=False):
         SOURCE.require(proc.wait(35) != 0, "unqualified Broker startup unexpectedly succeeded")
         SOURCE.require("Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM" in log.read_text(),
                        "startup did not fail at the native ownership capability check")
-        return stop
+        return proc, stop
     for _ in range(50):
         SOURCE.require(proc.poll() is None, f"Broker exited before health check: {log}")
         try:
             with urllib.request.urlopen(f"http://{admin}/admin/v2/brokers/health", timeout=2) as response:
                 if response.status == 200:
-                    return stop
+                    return proc, stop
         except OSError:
             time.sleep(1)
     raise TimeoutError(f"Broker did not pass its health check: {log}")
@@ -251,7 +251,8 @@ def run(pulsar, java_home, out, async_object, lifecycle=False):
         for i in range(2):
             config = out / f"broker-{i}.conf"
             broker_config(template, config, {**base, "webServicePort": ports[i], "brokerServicePort": ports[i+2]})
-            brokers.append(start_broker(stack, java, config, out / f"broker-{i}.log", addresses[i]))
+            _, stop = start_broker(stack, java, config, out / f"broker-{i}.log", addresses[i])
+            brokers.append(stop)
         state = out / "expected-cold-state.properties"
         args = [CLIENT, origin, *addresses[:4], str(state)]
         run_to_log(java + args + (["async-object", str(cell)] if async_object else []), out / "client.log")
@@ -268,7 +269,8 @@ def run(pulsar, java_home, out, async_object, lifecycle=False):
         SOURCE.require(state.is_file(), "the official client did not record its exact cold restart expectations")
         for stop in reversed(brokers):
             stop(strict=True)
-        restarted = start_broker(stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])
+        restart_process, restarted = start_broker(
+            stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])
         if lifecycle:
             foreign = out / "foreign"
             foreign.mkdir()
@@ -286,10 +288,10 @@ def run(pulsar, java_home, out, async_object, lifecycle=False):
             broker_config(template, foreign_broker, {**base, "advertisedAddress": "localhost",
                                                      "webServicePort": ports[6], "brokerServicePort": ports[7],
                                                      "nereusPulsarCellConfig": str(foreign_cell)})
-            stop_foreign = start_broker(stack, java, foreign_broker, foreign / "broker.log", addresses[6])
+            _, stop_foreign = start_broker(stack, java, foreign_broker, foreign / "broker.log", addresses[6])
             run_to_log(java + ["M6PulsarBkIoProbe", "foreign", origin, foreign_web, foreign_service],
                        foreign / "warm-up.log")
-            stop_peer = start_broker(stack, java, out / "broker-1.conf", out / "io-peer.log", addresses[1])
+            _, stop_peer = start_broker(stack, java, out / "broker-1.conf", out / "io-peer.log", addresses[1])
             for operation, source, target in (("read", 0, 1), ("write", 1, 0)):
                 log = out / f"bookkeeper-held-{operation}.log"
                 run_to_log(java + ["M6PulsarBkIoProbe", operation, origin, addresses[source], addresses[source + 2],
@@ -299,7 +301,23 @@ def run(pulsar, java_home, out, async_object, lifecycle=False):
                                and "PULSAR_NATIVE_BK_INDEPENDENT_FOREIGN_CELL_PASS" in evidence,
                                f"native BK {operation} drain and foreign Cell evidence are absent")
             stop_peer(strict=True)
+            run_to_log(java + ["M6PulsarBkIoProbe", "shutdown", origin, addresses[0], addresses[2],
+                              str(restart_process.pid), str(cell), str(state), foreign_web, foreign_service],
+                       out / "bookkeeper-held-shutdown.log")
+            restart_process.wait(35)
+            restarted(strict=True)
+            held_shutdown = (out / "bookkeeper-held-shutdown.log").read_text()
+            SOURCE.require("PULSAR_NATIVE_BK_HELD_READ_CANCEL_AND_SHUTDOWN_PASS" in held_shutdown
+                           and "PULSAR_NATIVE_BK_INDEPENDENT_FOREIGN_CELL_PASS" in held_shutdown,
+                           "native shutdown did not keep the original read and foreign Cell usable")
             stop_foreign(strict=True)
+            _, restarted = start_broker(stack, java, out / "broker-0.conf", out / "restarted-after-shutdown.log",
+                                        addresses[0])
+            run_to_log(java + ["M6PulsarBkIoProbe", "cold-after-shutdown", origin, addresses[0], addresses[2],
+                              "-", str(cell), str(state)], out / "bookkeeper-cold-after-shutdown.log")
+            SOURCE.require("PULSAR_NATIVE_BK_HELD_WRITE_COLD_RESTART_PASS" in
+                           (out / "bookkeeper-cold-after-shutdown.log").read_text(),
+                           "cold native Broker did not read the original held BookKeeper write")
         run_to_log(java + args + ["restart"], out / "restart-client.log")
         SOURCE.require("PULSAR_NATIVE_BK_RESTART_PASS" in (out / "restart-client.log").read_text(),
                        "native BK restart did not reach its terminal assertions")
@@ -331,7 +349,8 @@ def run(pulsar, java_home, out, async_object, lifecycle=False):
         "outputs": {p.relative_to(out).as_posix(): BK.M6.file_identity(p) for p in artifacts},
         "checks": ["official-client", "rollover", "individual-and-cumulative-ack", "native-transfer",
                    "cold-read-and-reset", "native-restart", "missing-binding", "unsupported-ownership-backend",
-                   *(["held-bookkeeper-read", "held-bookkeeper-write", "independent-foreign-cell"] if lifecycle else []),
+                   *(["held-bookkeeper-read", "held-bookkeeper-write", "held-bookkeeper-shutdown",
+                      "cold-read-after-shutdown-drain", "independent-foreign-cell"] if lifecycle else []),
                    *(["enrolled-npd1-npo1", "original-put-response-lost", "independent-bookkeeper-rollover", "original-output-drain-and-resume"]
                      if async_object else [])],
     }))

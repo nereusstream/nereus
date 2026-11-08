@@ -85,7 +85,7 @@ final class M6PulsarObjectWalProbe {
                 verifyWriteDrain(args, client, admin, metadata, expected);
                 return;
             }
-            if ("held-read-unload".equals(args[0])) {
+            if ("held-read-unload".equals(args[0]) || "held-read-shutdown".equals(args[0])) {
                 verifyReadDrain(args, client, admin, metadata, expected);
                 return;
             }
@@ -263,7 +263,7 @@ final class M6PulsarObjectWalProbe {
         byte[] before = raw(metadata, gate);
         requireGate(before, false);
         var source = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[2]);
-        var target = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[6]);
+        boolean shutdown = "held-read-shutdown".equals(args[0]);
         var original = source.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
         var faults = new M6PulsarBookKeeperSemanticsProbe.Faults();
         faults.set("/" + bucket(args) + "/" + key, "held-unversioned");
@@ -281,6 +281,32 @@ final class M6PulsarObjectWalProbe {
                 throw new AssertionError("The official client observer completed before cancellation");
             }
             reader.closeAsync();
+            if (shutdown) {
+                var broker = ProcessHandle.of(Long.parseLong(args[6])).orElseThrow();
+                if (!broker.destroy()) {
+                    throw new AssertionError("Could not initiate shutdown of the original fixture Broker");
+                }
+                try {
+                    Thread.sleep(800);
+                    verifyForeign(args[7], args[8], metadata);
+                    if (!broker.isAlive() || !observed.isCancelled() || !Arrays.equals(before, raw(metadata, gate))
+                            || faults.call("GET", "").path("upstreamReads").asInt() == 0) {
+                        throw new AssertionError("Shutdown released the original Object read before terminal I/O");
+                    }
+                } finally {
+                    faults.call("PATCH", "");
+                }
+                long shutdownDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                byte[] settled = raw(metadata, gate);
+                while (settled[5] == 0 && System.nanoTime() < shutdownDeadline) {
+                    Thread.sleep(25);
+                    settled = raw(metadata, gate);
+                }
+                requireGate(settled, true);
+                System.out.println("PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_SHUTDOWN_PASS");
+                return;
+            }
+            var target = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[6]);
             String[] parts = BUNDLE.split("/");
             var unloading = admin.namespaces().unloadNamespaceBundleAsync(parts[0] + "/" + parts[1], parts[2], args[6]);
             try {
@@ -310,7 +336,8 @@ final class M6PulsarObjectWalProbe {
                 throw new AssertionError("Late source callback changed the original read on the successor");
             }
         }
-        var next = target.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
+        var next = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[6])
+                .read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
         if (next.acquisitionId().equals(original.acquisitionId())
                 || next.backendVersion() <= original.backendVersion()) {
             throw new AssertionError("Read drain did not hand off to a distinct native acquisition");
@@ -376,6 +403,11 @@ final class M6PulsarObjectWalProbe {
             }
         }
         assertExactVersion(bucket(args), key, version);
+        record(expected, count, position, HELD_WRITE);
+        requirePositions(expected);
+        try (var output = Files.newBufferedWriter(Path.of(args[4]))) {
+            expected.store(output, null);
+        }
         System.out.println("PULSAR_OBJECT_WAL_HELD_WRITE_CANCEL_AND_UNLOAD_PASS");
     }
 
