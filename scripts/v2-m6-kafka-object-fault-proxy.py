@@ -14,7 +14,11 @@ import threading
 import urllib.parse
 
 CONTROL = "/__nereus_m6_object_fault"
-FIRST_LOST_PUT_SUFFIX = {"first-put-response-lost": ".nwg", "first-pulsar-data-put-response-lost": "/data"}
+FIRST_LOST_PUT_SUFFIX = {
+    "first-put-response-lost": ".nwg",
+    "first-pulsar-data-put-response-lost": "/data",
+    "first-kafka-checkpoint-put-response-lost": ".nwkcp1",
+}
 LOST_PUT_MODES = {"put-response-lost", *FIRST_LOST_PUT_SUFFIX}
 LOST_DELETE = "delete-response-lost"
 LOST_RESPONSE_MODES = LOST_PUT_MODES | {LOST_DELETE}

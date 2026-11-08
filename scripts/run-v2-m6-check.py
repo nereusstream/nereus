@@ -18,6 +18,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SUITE_PLAN = Path("config/v2/m6/acceptance-suites.json")
 CASE = re.compile(r":[\w:-]+\|[\w.$]+\|[^\x00|]+")
 CHECK = re.compile(r"[a-z][a-z0-9-]+")
+KAFKA_PROCESSES = {
+    "kafka-bookkeeper-wal-only": ("bk-process", "FOCUSED_KAFKA_BK_PROCESS_CHECK", "process-result.json"),
+    "kafka-bookkeeper-wal-async-object": ("async-object", "FOCUSED_KAFKA_ASYNC_OBJECT_CHECK", "object-fixture-result.json"),
+    "kafka-object-wal": ("object-wal", "FOCUSED_KAFKA_OBJECT_WAL_CHECK", "object-wal-fixture-result.json"),
+}
 PULSAR_PROCESSES = {
     "pulsar-bookkeeper-wal-only": {
         "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ONLY", "--lifecycle"),
@@ -77,8 +82,11 @@ def plan(root):
             cases = [validate_assignment(entry["cases"], CASE, profile)]
         claims[profile] = sorted(set().union(*cases))
     COVERAGE.validate_profiles(root, claims)
-    for profile in profiles.keys() - PULSAR_PROCESSES.keys():
-        SOURCE.require(driver(root, profile).is_file(), f"missing executable native driver for {profile}")
+    scripts = {f"kafka-{script}" for script, _, _ in KAFKA_PROCESSES.values()}
+    scripts.update(spec[0] for processes in PULSAR_PROCESSES.values() for spec in processes.values())
+    for script in scripts:
+        SOURCE.require((root / f"scripts/run-v2-m6-{script}-check.py").is_file(),
+                       f"missing committed native runner: {script}")
     return profiles
 
 
@@ -89,10 +97,6 @@ def validate_assignment(cases, pattern, profile):
                        and len(rows) == len(set(rows)) for key, rows in cases.items()),
                    f"invalid testcase assignment for {profile}")
     return {row for rows in cases.values() for row in rows}
-
-
-def driver(root, profile):
-    return root / "scripts" / f"run-v2-m6-{profile}-acceptance.py"
 
 
 def run(command, cwd, log_path):
@@ -116,6 +120,97 @@ def current_attachment(output, started, name):
     SOURCE.require(path.resolve(strict=True) == path and path.stat().st_mtime_ns >= started,
                    f"stale or redirected native attachment: {path}")
     return path
+
+
+def verify_attachment(output, started, name, identity):
+    path = current_attachment(output, started, name)
+    SOURCE.require(SOURCE.file_identity(path) == identity, f"native process attachment differs: {path}")
+    return path
+
+
+def verify_attachment_map(output, started, files):
+    SOURCE.require(isinstance(files, dict) and files, f"missing native process attachments: {output}")
+    for name, identity in files.items():
+        verify_attachment(output, started, name, identity)
+
+
+def verify_runtime_file(path, identity, roots, output, frozen, published):
+    SOURCE.require(path.is_absolute(), f"non-absolute native runtime input: {path}")
+    actual = SOURCE.file_identity(path)
+    SOURCE.require(all(actual.get(key) == value for key, value in identity.items()),
+                   f"native runtime input bytes changed: {path}")
+    if path.is_relative_to(output):
+        return
+    for repo, root in roots.items():
+        if not path.is_relative_to(root):
+            continue
+        relative = path.relative_to(root)
+        tracked = frozen["sourceInputs"][repo].get(relative.as_posix())
+        if repo == "nereus" and tracked is None:
+            tracked = frozen["historicalInputs"]["files"].get(relative.as_posix())
+        SOURCE.require(tracked == actual or tracked is None and "build" in relative.parts[:-1],
+                       f"native input is outside tracked source and generated build outputs: {path}")
+        return
+    if published.get(path.name) == actual:
+        return
+    SOURCE.require(any(item["path"] == str(path) and item["sha256"] == actual["sha256"]
+                       and item["bytes"] == actual["bytes"] and item["mode"] == actual["mode"]
+                       for item in frozen["runtimeInputs"].values()),
+                   f"actual external native runtime file was not frozen: {path}")
+
+
+def verify_pulsar_runtime(output, roots, frozen):
+    result = read(output / "process-result.json")
+    groups = [result["runtime"], result["launchTools"], [result["compiledProbe"]],
+              result.get("sourceInputs", result.get("fixtureInputs", []))]
+    if "publicationFault" in result:
+        groups.append([result["publicationFault"]])
+    for entry in (entry for group in groups for entry in group):
+        path = Path(entry["path"])
+        if "files" in entry:
+            SOURCE.require(path.resolve(strict=True) == path, f"redirected Pulsar runtime directory: {path}")
+            rows = entry["files"]
+            actual = {file.relative_to(path).as_posix() for file in path.rglob("*") if file.is_file()}
+            SOURCE.require(actual == {row["path"] for row in rows}, f"Pulsar runtime directory changed: {path}")
+            for row in rows:
+                verify_runtime_file(path / SOURCE.INPUTS.relative(row["path"]),
+                                    {key: val for key, val in row.items() if key != "path"}, roots, output, frozen, {})
+        else:
+            verify_runtime_file(path, {key: val for key, val in entry.items() if key != "path"},
+                                roots, output, frozen, {})
+
+
+def verify_kafka_runtime(result_file, roots, output, frozen):
+    result = read(result_file)
+    captures = []
+    repository = output / "development-repository"
+    if "kafkaRuntime" in result:
+        captures.append(output / result["kafkaRuntime"]["path"])
+    else:
+        nested = result["kind"] == "FOCUSED_KAFKA_OBJECT_WAL_CHECK"
+        if not nested:
+            repository = output / "m4/development-repository"
+        captures.extend((output / task if nested else output) / test["runtime"]["name"]
+                        for task, test in result["tests"].items())
+    group = repository / "com/nereusstream"
+    published = {}
+    for jar in sorted(group.rglob("*.jar")):
+        if jar.name.endswith(("-sources.jar", "-javadoc.jar")):
+            continue
+        module = jar.relative_to(group).parts[0]
+        filename = f"{module}-0.2.0-SNAPSHOT.jar"
+        SOURCE.require(filename not in published, f"ambiguous generated Kafka dependency: {filename}")
+        published[filename] = SOURCE.file_identity(jar)
+    for capture in captures:
+        for name, identity in read(capture)["files"].items():
+            path = Path(name)
+            if identity == {"absent": True}:
+                SOURCE.require(not path.exists() and not path.is_symlink()
+                               and path.is_relative_to(roots["kafka"])
+                               and "build" in path.relative_to(roots["kafka"]).parts,
+                               f"Kafka runtime classpath absence changed: {path}")
+            else:
+                verify_runtime_file(path, identity, roots, output, frozen, published)
 
 
 def verify_pulsar_process(output, started, kind, profile, expected, sources):
@@ -142,8 +237,7 @@ def verify_pulsar_process(output, started, kind, profile, expected, sources):
                                and not (output / name).exists() and not (output / name).is_symlink(),
                                f"invalid identity or retained temporary credential: {name}")
                 continue
-            SOURCE.require(SOURCE.file_identity(current_attachment(output, started, name)) == identity,
-                           f"Pulsar process attachment differs: {name}")
+            verify_attachment(output, started, name, identity)
     SOURCE.require("backend.json" in result["outputs"], f"missing Pulsar backend inventory: {output}")
     if temporary_credentials:
         vault = read(current_attachment(output, started, "vault.json"))
@@ -152,46 +246,92 @@ def verify_pulsar_process(output, started, kind, profile, expected, sources):
     return {"resultSha256": SOURCE.file_identity(result_file)["sha256"], "checks": len(actual)}
 
 
+def source_pair(frozen, protocol):
+    return {repo: {key: frozen["sourceIdentity"][repo][key] for key in ("commit", "tree")}
+            for repo in ("nereus", protocol)}
+
+
+def java_home():
+    return os.environ.get("JAVA_HOME") or str(Path(shutil.which("java")).resolve(strict=True).parent.parent)
+
+
 def run_pulsar_profile(roots, output, profile, expected, frozen):
-    sources = {repo: {key: frozen["sourceIdentity"][repo][key] for key in ("commit", "tree")}
-               for repo in ("nereus", "pulsar")}
-    java = os.environ.get("JAVA_HOME") or str(Path(shutil.which("java")).resolve(strict=True).parent.parent)
+    sources = source_pair(frozen, "pulsar")
     output.mkdir()
     results = {}
     for name, (script, kind, storage_profile, *flags) in PULSAR_PROCESSES[profile].items():
         process_output = output / name
         started = time.time_ns()
         run([sys.executable, f"scripts/run-v2-m6-{script}-check.py", "--pulsar-root", str(roots["pulsar"]),
-             "--java-home", java, "--output", str(process_output), *flags], roots["nereus"], output / f"{name}.log")
+             "--java-home", java_home(), "--output", str(process_output), *flags],
+            roots["nereus"], output / f"{name}.log")
         results[name] = verify_pulsar_process(process_output, started, kind, storage_profile, expected[name], sources)
+        verify_pulsar_runtime(process_output, roots, frozen)
     return {"processResults": results, "scenarios": sorted({
         row for assignment in expected.values() for rows in assignment.values() for row in rows
     })}
 
 
-def verify_native_result(output, started, profile, expected, input_digest):
-    result_file = current_attachment(output, started, "profile-result.json")
+def verify_kafka_result(output, started, profile, expected, sources):
+    _, kind, receipt = KAFKA_PROCESSES[profile]
+    result_file = current_attachment(output, started, receipt)
     result = read(result_file)
-    require_keys(result, ("schema", "profile", "inputRootSha256", "junit", "backendFacts"), "profile result")
-    SOURCE.require(result["schema"] == "NEREUS_V2_M6_NATIVE_PROFILE_RESULT_V1"
-                   and result["profile"] == profile and result["inputRootSha256"] == input_digest,
-                   f"profile result has the wrong execution inputs: {profile}")
+    SOURCE.require(result.get("kind") == kind and result.get("promotionEligible") is False
+                   and result.get("sourceCheckout") == {repo: row["commit"] for repo, row in sources.items()}
+                   and result.get("sourceTrees") == {repo: row["tree"] for repo, row in sources.items()},
+                   f"Kafka profile result has the wrong execution inputs: {profile}")
 
-    def current_file(name):
-        return current_attachment(output, started, name)
+    def verify_named(directory, attachment, field):
+        return verify_attachment(directory, started, attachment[field],
+                                 {key: value for key, value in attachment.items() if key != field})
 
-    # Each source-owned driver must capture its actual process/backend inputs and outputs, and
-    # attach them before returning. A raw JUnit file by itself is never a profile result.
-    backend = result["backendFacts"]
-    require_keys(backend, ("path", "sha256", "bytes"), "native process attachment")
-    SOURCE.require(SOURCE.file_identity(current_file(backend["path"])) ==
-                   {"mode": "100644", "bytes": backend["bytes"], "sha256": backend["sha256"]},
-                   f"native process attachment differs for {profile}")
-    suites = JUNIT.validate_suites(result["junit"], lambda name: JUNIT.regular(current_file(name)))
+    junit = []
+    if profile == "kafka-bookkeeper-wal-only":
+        verify_attachment_map(output, started, result["backendFiles"])
+        verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
+        verify_named(output, result["kafkaRuntime"], "path")
+        SOURCE.require(SOURCE.file_identity(current_attachment(output, started, "development-repository.json"))
+                       ["sha256"] == result["developmentRepositorySha256"], "Kafka BK runtime repository inventory differs")
+        junit.extend({"task": ":core:nereusBookKeeperOwnerRelocationRealTest", "path": name, **identity}
+                     for name, identity in result["junit"].items())
+    else:
+        nested = profile == "kafka-object-wal"
+        if not nested:
+            verify_attachment_map(output, started, result["backendFiles"])
+            verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
+            verify_named(output, result["m4Qualification"], "path")
+        process_attached = not nested
+        for task, test in result["tests"].items():
+            SOURCE.require(re.fullmatch(r"[a-zA-Z][\w]*", task), f"invalid Kafka evidence task: {task}")
+            directory = output / task if nested else output
+            if nested:
+                verify_attachment_map(directory, started, test["backendFiles"])
+                if test["processLogs"]:
+                    verify_attachment_map(directory / "kafka-process-logs", started, test["processLogs"])
+                    process_attached = True
+            verify_named(directory, test["runtime"], "name")
+            xml = test["xml"]
+            path = (directory / SOURCE.INPUTS.relative(xml["name"])).relative_to(output)
+            junit.append({"task": ":core:" + task, "path": path.as_posix(),
+                          "bytes": xml["bytes"], "sha256": xml["sha256"]})
+        SOURCE.require(process_attached, "Kafka Object WAL did not attach its production process logs")
+
+    suites = JUNIT.validate_suites(junit, lambda name: JUNIT.regular(current_attachment(output, started, name)))
     actual = {"|".join((case["task"], case["class"], case["name"])) for case in suites["cases"]}
     SOURCE.require(actual == set(expected), f"native testcase inventory differs for {profile}")
     return {"profileResultSha256": SOURCE.INPUTS.digest(result_file.read_bytes()), "tests": len(actual),
             "scenarios": sorted({claim for key in actual for claim in expected[key]})}
+
+
+def run_kafka_profile(roots, output, profile, expected, frozen):
+    script, _, receipt = KAFKA_PROCESSES[profile]
+    started = time.time_ns()
+    run([sys.executable, f"scripts/run-v2-m6-kafka-{script}-check.py", "--kafka-root", str(roots["kafka"]),
+         "--kafka-java-home", java_home(), "--output", str(output)],
+        roots["nereus"], output.with_suffix(".log"))
+    result = verify_kafka_result(output, started, profile, expected, source_pair(frozen, "kafka"))
+    verify_kafka_runtime(output / receipt, roots, output, frozen)
+    return result
 
 
 def execute(args):
@@ -233,14 +373,8 @@ def execute(args):
         output = out / profile
         if profile in PULSAR_PROCESSES:
             qualified[profile] = run_pulsar_profile(roots, output, profile, profiles[profile]["processes"], frozen)
-            continue
-        started = time.time_ns()
-        run([sys.executable, str(driver(root, profile)), "--execution-inputs", str(source),
-             "--runtime-manifest", str(declaration), "--nereus", str(root),
-             "--kafka", str(roots["kafka"]), "--pulsar", str(roots["pulsar"]),
-             "--output", str(output)], root, out / f"{profile}.log")
-        qualified[profile] = verify_native_result(
-            output, started, profile, profiles[profile]["cases"], frozen["inputRootSha256"])
+        else:
+            qualified[profile] = run_kafka_profile(roots, output, profile, profiles[profile]["cases"], frozen)
     scenarios = COVERAGE.validate_profiles(root, {key: row["scenarios"] for key, row in qualified.items()})
     SOURCE.require(frozen == capture() and source.read_bytes() == SOURCE.INPUTS.canonical(frozen),
                    "execution source or dependency graph changed")

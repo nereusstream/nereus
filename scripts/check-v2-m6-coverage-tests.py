@@ -32,23 +32,30 @@ class M6CoverageTest(unittest.TestCase):
             test = b'<testsuite name="Suite" tests="1" failures="0" errors="0" skipped="1">' \
                    b'<testcase name="required()" classname="Suite" time="0"><skipped/></testcase></testsuite>'
             (root / "suite.xml").write_bytes(test)
-            facts = b'{"example":"real-process-contract-fixture"}\n'
-            (root / "backend.json").write_bytes(facts)
-            M6.write(root / "profile-result.json", {
-                "schema": "NEREUS_V2_M6_NATIVE_PROFILE_RESULT_V1", "profile": profile,
-                "inputRootSha256": "a" * 64, "junit": [{
-                    "path": "suite.xml", "task": ":core:nativeTest",
+            (root / "kafka-process-logs").mkdir()
+            for name in ("backend.json", "runtime.json", "development-repository.json", "kafka-process-logs/server.log"):
+                (root / name).write_text('{"example":"native-process-contract-fixture"}\n')
+            sources = {
+                "nereus": {"commit": "a" * 40, "tree": "b" * 40},
+                "kafka": {"commit": "c" * 40, "tree": "d" * 40},
+            }
+            M6.write(root / "process-result.json", {
+                "kind": "FOCUSED_KAFKA_BK_PROCESS_CHECK", "promotionEligible": False,
+                "sourceCheckout": {repo: row["commit"] for repo, row in sources.items()},
+                "sourceTrees": {repo: row["tree"] for repo, row in sources.items()},
+                "junit": {"suite.xml": {
                     "bytes": len(test), "sha256": M6.SOURCE.INPUTS.digest(test),
-                }],
-                "backendFacts": {
-                    "path": "backend.json", "bytes": len(facts), "sha256": M6.SOURCE.INPUTS.digest(facts),
-                },
+                }},
+                "backendFiles": {"backend.json": M6.SOURCE.file_identity(root / "backend.json")},
+                "processLogs": {"server.log": M6.SOURCE.file_identity(root / "kafka-process-logs/server.log")},
+                "kafkaRuntime": {"path": "runtime.json", **M6.SOURCE.file_identity(root / "runtime.json")},
+                "developmentRepositorySha256": M6.SOURCE.file_identity(root / "development-repository.json")["sha256"],
             })
-            cases = {":core:nativeTest|Suite|required()": ["V2-KAF-PROC-001"]}
+            cases = {":core:nereusBookKeeperOwnerRelocationRealTest|Suite|required()": ["V2-KAF-PROC-001"]}
             with self.assertRaisesRegex(M6.SOURCE.InputError, "wrong execution inputs"):
-                M6.verify_native_result(root, started, profile, cases, "b" * 64)
+                M6.verify_kafka_result(root, started, profile, cases, {})
             with self.assertRaisesRegex(M6.JUNIT.JUnitEvidenceError, "skipped"):
-                M6.verify_native_result(root, started, profile, cases, "a" * 64)
+                M6.verify_kafka_result(root, started, profile, cases, sources)
 
     def test_pulsar_process_requires_fresh_raw_attachments_and_exact_checks(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -80,6 +87,21 @@ class M6CoverageTest(unittest.TestCase):
             launch.write_text("managedLedgerDefaultEnsembleSize=1\n")
             with self.assertRaisesRegex(M6.SOURCE.InputError, "attachment differs"):
                 M6.verify_pulsar_process(root, started, kind, profile, expected, sources)
+
+    def test_actual_runtime_file_must_match_the_frozen_declaration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            jar = root / "provider.jar"
+            jar.write_bytes(b"original provider")
+            observed = M6.SOURCE.file_identity(jar)
+            frozen = {"runtimeInputs": {}}
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "was not frozen"):
+                M6.verify_runtime_file(jar, observed, {}, root / "output", frozen, {})
+            frozen["runtimeInputs"]["provider"] = {"path": str(jar), **observed}
+            M6.verify_runtime_file(jar, observed, {}, root / "output", frozen, {})
+            jar.write_bytes(b"changed provider")
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "bytes changed"):
+                M6.verify_runtime_file(jar, observed, {}, root / "output", frozen, {})
 
 
 if __name__ == "__main__":

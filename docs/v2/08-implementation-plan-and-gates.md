@@ -434,20 +434,23 @@ after takeover. It records actual PUT, LIST and full GET attempts for the origin
 version is selected by the grant. A separate Broker test loses the original applied Oxia grant CAS response,
 holds the exact reconciliation read and checks that Produce stays pending. The same test holds an applied physical
 checkpoint page response, observes the Produce ACK and then verifies publication of the checkpoint Head.
-The process check also exercises a planned handoff in which the departing Broker drains admitted work and publishes
-the terminal NWKCP1 Head before its replacement resumes. A live Owner rolls the physical run before admitting new
-positions at its count or age bound. The process check fills one run to its declared extent limit, verifies its
-terminal Head and the same Owner's exact successor, and reads both sides of that boundary in one Fetch. Retained
+In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
+immutable version in its terminal Head before its replacement resumes. A live Owner rolls the physical run before
+admitting new positions at its count or age bound. At the extent limit the process check holds a real S3 Range GET
+from the old Run, verifies the original Fetch response and offsets, and checks the same Owner's exact successor.
+It then reads both sides of the boundary in one Fetch. Retained
 sources still count against the bounded history budget; automatic source retirement and the aggregate exit remain open.
 
 ### Planned aggregate boundaries
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
 the affected regression gates from the declared source and runtime inputs. It refuses to run formal acceptance
-until the committed suite plan and all required drivers exist. The Pulsar profiles use their source-owned process
-runners directly. The aggregate checks the exact check inventory, source tuple, raw process outputs and generated
-launch files. The transient Object WAL credentials are represented by their launch-time identities. The process
-suite plan is still incomplete.
+until the committed suite plan and all required runners exist. The Pulsar profiles use their source-owned process
+runners directly. The Kafka profiles use the same focused runners and raw JUnit attachments. The aggregate checks
+each exact case inventory, source tuple, backend outputs and launch files. Every external runtime file observed by
+the native runners must match the frozen declaration. A Kafka dependency built into the fresh development
+repository can also appear in the Gradle cache if its bytes match the published artifact. The transient Pulsar
+Object WAL credentials are represented by their launch-time identities. The process suite plan is still incomplete.
 `v2M7Check`, `v2M8Check` and `v2FinalCheck` remain design targets. The mandatory boundaries are:
 
 - **M6:** all JSON rows whose milestone includes M6, every applicable cell of the six-row activation matrix, the
