@@ -235,6 +235,8 @@ public class M6PulsarBookKeeperReplacementProbe {
             }
             observed.setProperty("original.rootVersion", root);
             observed.setProperty("original.dataVersion", data);
+            observed.setProperty("original.rootKey", keys.rootKey());
+            observed.setProperty("original.dataKey", keys.dataKey());
         }
     }
 

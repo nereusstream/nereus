@@ -348,9 +348,11 @@ authorities. The check qualifies current M4 read drain against the Broker's actu
 native offload publication reply after the real Oxia write, and verifies the same publication and ticket settlement.
 The maintenance command accepts one exact closed ledger only after the serving Cell drains. It publishes a replacement,
 proves the exact fallback release, and records native INTENT. After verified physical absence and GC settlement,
-it records native DONE without changing the original offload UUID. The restarted Broker must preserve the backlog,
-entry bytes and MessageIds through the official client. This check covers the selected source replacement and records
-focused evidence only.
+it records native DONE without changing the original offload UUID. It then drains and retires the materialized
+generation's original fallback and settles the two exact native Object versions. The check withholds the original
+ZooKeeper delete and loses one applied S3 DELETE reply. Independent probes require the original INTENT and reserved
+quota until exact settlement. The restarted Broker must preserve the backlog, entry bytes and MessageIds after the
+old BookKeeper ledger and both native Object versions are gone. This check records focused evidence only.
 
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.

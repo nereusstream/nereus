@@ -16,7 +16,9 @@ import urllib.parse
 CONTROL = "/__nereus_m6_object_fault"
 FIRST_LOST_PUT_SUFFIX = {"first-put-response-lost": ".nwg", "first-pulsar-data-put-response-lost": "/data"}
 LOST_PUT_MODES = {"put-response-lost", *FIRST_LOST_PUT_SUFFIX}
-MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"} | LOST_PUT_MODES
+LOST_DELETE = "delete-response-lost"
+LOST_RESPONSE_MODES = LOST_PUT_MODES | {LOST_DELETE}
+MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"} | LOST_RESPONSE_MODES
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
@@ -129,7 +131,7 @@ def fault_proxy(upstream):
                         rule["release"].set()
                     rule = dict(data, hits=0, appliedVersion=None, selectedPath=None, release=threading.Event())
                 elif self.command == "PATCH":
-                    if rule is None or rule["mode"] not in LOST_PUT_MODES or rule["appliedVersion"] is None:
+                    if rule is None or rule["mode"] not in LOST_RESPONSE_MODES or rule["appliedVersion"] is None:
                         return self.reply(409)
                     rule["release"].set()
                 elif self.command == "DELETE":
@@ -159,7 +161,9 @@ def fault_proxy(upstream):
                              or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]
                              or rule["mode"] in FIRST_LOST_PUT_SUFFIX and self.command == "PUT"
                              and path == rule["selectedPath"]
-                             or self.command == "GET" and version == [rule["version"]] and path == rule["path"]):
+                             or version == [rule["version"]] and path == rule["path"] and
+                             (rule["mode"] == LOST_DELETE and self.command == "DELETE"
+                              or rule["mode"] not in LOST_RESPONSE_MODES and self.command == "GET")):
                     fault = rule
                     fault["hits"] += 1
             mode = fault["mode"] if fault else None
@@ -203,6 +207,13 @@ def fault_proxy(upstream):
                 # Lose the original response and every conditional retry response for this exact key.
                 self.close_connection = True
                 return
+            if mode == LOST_DELETE:
+                if response.status in (200, 204):
+                    with lock:
+                        fault["appliedVersion"] = fault["version"]
+                    fault["release"].wait(30)
+                    self.close_connection = True
+                    return
             if mode == "held" and not fault["release"].wait(30):
                 return self.reply(504)
             if mode == "corrupt" and response.status == 200 and content:

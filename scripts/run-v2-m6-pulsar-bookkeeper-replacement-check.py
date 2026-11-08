@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """Check one source-bound native Pulsar verified BK replacement (focused, no scenario promotion)."""
 
@@ -6,11 +5,11 @@ import argparse
 import contextlib
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -28,6 +27,19 @@ proxy = load("pulsar_m6_delete_minio", "v2-m6-kafka-object-fault-proxy.py")
 zk_fault = load("pulsar_m6_delete_zk", "v2-m6-pulsar-bk-delete-fault-proxy.py")
 vault = load("pulsar_m6_delete_vault", "run-v2-m6-kafka-object-wal-check.py")
 bk = r.BK
+
+
+def fault_state(control, token, method="GET", rule=None):
+    request = urllib.request.Request(control, method=method, headers={"X-Nereus-Test-Token": token},
+                                     data=None if rule is None else json.dumps(rule).encode("ascii"))
+    with urllib.request.urlopen(request, timeout=5) as response:
+        return json.load(response)
+
+
+def property_value(path, name):
+    return re.search(r"(?m)^" + re.escape(name) + r"=([^\r\n]+)$", path.read_text())[1]
+
+
 def run(pulsar, java_home, out):
     root, work = ROOT, CONFIG
     sources = {"nereus": r.source_checkout(root), "pulsar": r.source_checkout(pulsar)}
@@ -47,7 +59,7 @@ def run(pulsar, java_home, out):
             f"-Dpulsar.metadatastore.providers={r.PROVIDER}", "-cp", cp]
     r.run_to_log([str((java_home / "bin/javac").resolve(strict=True)), "-proc:none", "-cp", cp, "-d", str(out_cp),
                   str(work / "M6PulsarBookKeeperReplacementProbe.java"), str(work / "M6PulsarOffloadPublicationFault.java"),
-                  str(work / "M6PulsarBookKeeperDeleteHoldProbe.java"),
+                  str(work / "M6PulsarBookKeeperDeleteHoldProbe.java"), str(work / "M6PulsarOffloadDeleteHoldProbe.java"),
                   str(r.CONFIG / "M6PulsarCellProvision.java")], out / "javac.log")
     image = "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
     bk.observe_image(image, image, ("linux", "arm64"))
@@ -63,10 +75,10 @@ def run(pulsar, java_home, out):
         stack.callback(lambda: subprocess.run(["docker", "stop", minio], check=True, stdout=subprocess.DEVNULL))
         if bk.output("docker", "inspect", "--format", "{{.Image}}", minio) != image:
             raise RuntimeError("Actual MinIO differs from pinned image")
-        endpoint = stack.enter_context(proxy.minio_loopback(minio))
+        direct_endpoint = stack.enter_context(proxy.minio_loopback(minio))
         for attempt in range(20):
             try:
-                with urllib.request.urlopen(endpoint + "/minio/health/live", timeout=2) as response:
+                with urllib.request.urlopen(direct_endpoint + "/minio/health/live", timeout=2) as response:
                     if response.status != 200:
                         raise RuntimeError("MinIO health check did not return success")
                     break
@@ -74,6 +86,7 @@ def run(pulsar, java_home, out):
                 if attempt == 19:
                     raise
                 time.sleep(1)
+        endpoint, s3_control, s3_token = stack.enter_context(proxy.fault_proxy(direct_endpoint))
         kms, token = stack.enter_context(vault.vault(out))
         os.environ.update(AWS_ACCESS_KEY_ID="nereus-m5-drain", AWS_SECRET_ACCESS_KEY="nereus-m5-drain-secret",
                           NEREUS_M6_PULSAR_TEST_VAULT_TOKEN=token.read_text().strip(), JAVA_HOME=str(java_home))
@@ -136,7 +149,7 @@ def run(pulsar, java_home, out):
                         "offloadObjectGcProviderMinimumMillis=1\noffloadObjectGcGraceMillis=25\n"
                         f"bookKeeperReadDrainAdmission={capsule}\nbookKeeperReadDrainAdmissionSha256={digest}\n")
         r.run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarCellProvision", oxia, str(cell), str(root),
-                            endpoint, kms, endpoint], out / "provision.log")
+                            direct_endpoint, kms, endpoint], out / "provision.log")
         conf = out / "broker.conf"
         template = pulsar / "conf/broker.conf"
         r.broker_config(template, conf, {"clusterName": "m6", "metadataStoreUrl": origin, "configurationMetadataStoreUrl": origin,
@@ -165,7 +178,9 @@ def run(pulsar, java_home, out):
         expected = out / "expected.properties"
         r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "initial", origin, web, binary,
                             str(expected), bk_uri, str(fault), str(cell)], out / "initial-client.log")
-        original = re.search(r"(?m)^ledger=(\d+)$", expected.read_text())[1]
+        original = property_value(expected, "ledger")
+        root_key = property_value(expected, "original.rootKey")
+        root_version = property_value(expected, "original.rootVersion")
         operator = java + ["com.nereusstream.pulsar.broker.PulsarM6BookKeeperReplacement", str(cell), str(original_conf),
                            "persistent://public/m6-native/handoff", original]
         with (out / "live-owner-rejection.log").open("xb") as log:
@@ -178,6 +193,10 @@ def run(pulsar, java_home, out):
         topic = "persistent://public/m6-native/handoff"
         hold_probe = java + ["com.nereusstream.pulsar.broker.M6PulsarBookKeeperDeleteHoldProbe", str(cell),
                              direct_bk_uri, original, topic]
+        object_probe = java + ["com.nereusstream.pulsar.broker.M6PulsarOffloadDeleteHoldProbe", str(cell)]
+        fault_state(s3_control, s3_token, "POST",
+                    {"path": "/" + property_value(cell, "s3Bucket") + "/" + root_key,
+                     "version": root_version, "mode": "delete-response-lost"})
         delete_fault.arm(int(original))
         with (out / "operator.log").open("xb") as log:
             pending = subprocess.Popen(operator, stdout=log, stderr=subprocess.STDOUT)
@@ -186,8 +205,21 @@ def run(pulsar, java_home, out):
                 r.run_to_log(hold_probe + ["held"], out / "physical-delete-held.log", timeout=35)
                 r.SOURCE.require(pending.poll() is None, "maintenance exited with its original delete unresolved")
                 delete_fault.deliver()
-                r.SOURCE.require(pending.wait(90) == 0 and delete_fault.matches == 1,
-                                 "original BookKeeper deletion did not reconcile without redispatch")
+                deadline = time.monotonic() + 90
+                while True:
+                    state = fault_state(s3_control, s3_token)
+                    if state["appliedVersion"] == root_version:
+                        break
+                    r.SOURCE.require(pending.poll() is None and time.monotonic() < deadline,
+                                     "original immutable S3 deletion did not reach its fault")
+                    time.sleep(0.1)
+                r.SOURCE.require(state["hits"] == 1, "original S3 deletion was dispatched more than once")
+                r.run_to_log(object_probe + [root_key, root_version, "held"], out / "object-delete-held.log", timeout=15)
+                r.SOURCE.require(pending.poll() is None, "maintenance exited with its original S3 delete unresolved")
+                fault_state(s3_control, s3_token, "PATCH")
+                r.SOURCE.require(pending.wait(max(1, deadline - time.monotonic())) == 0 and delete_fault.matches == 1
+                                 and fault_state(s3_control, s3_token)["hits"] == 1,
+                                 "original physical deletion did not reconcile without redispatch")
             finally:
                 if pending.poll() is None:
                     pending.terminate()
@@ -197,9 +229,16 @@ def run(pulsar, java_home, out):
                         pending.kill()
                         pending.wait(10)
         r.run_to_log(hold_probe + ["settled"], out / "physical-delete-settled.log", timeout=20)
+        for part in ("root", "data"):
+            r.run_to_log(object_probe + [property_value(expected, f"original.{part}Key"),
+                         property_value(expected, f"original.{part}Version"), "settled"],
+                         out / f"object-delete-{part}-settled.log", timeout=20)
         (out / "physical-delete-transport.json").write_bytes(r.SOURCE.INPUTS.canonical(
             {"ledger": int(original), "exactRequests": delete_fault.matches,
              "originalResponseSuppressed": True, "actualResponseCode": delete_fault.response}))
+        (out / "object-delete-transport.json").write_bytes(r.SOURCE.INPUTS.canonical(
+            {"ledger": int(original), "exactVersion": root_version, "originalResponseSuppressed": True,
+             **fault_state(s3_control, s3_token)}))
         stop = r.start_broker(stack, java, conf, out / "restarted.log", web)
         r.run_to_log(java + ["M6PulsarBookKeeperReplacementProbe", "cold", origin, web, binary,
                             str(expected), bk_uri, str(cell)], out / "cold-client.log")
@@ -215,6 +254,9 @@ def run(pulsar, java_home, out):
                          in (out / "operator.log").read_text()
                          and "Native offload settled original NPD1 and NPO1 for ledger " + original
                          in (out / "operator.log").read_text()
+                         and "PULSAR_M6_ORIGINAL_OBJECT_DELETE_HELD " in (out / "object-delete-held.log").read_text()
+                         and all("PULSAR_M6_ORIGINAL_OBJECT_DELETE_SETTLED "
+                                 in (out / f"object-delete-{part}-settled.log").read_text() for part in ("root", "data"))
                          and "PULSAR_M6_DELETE_COLD_BACKLOG_PASS " + original in (out / "cold-client.log").read_text(),
                          "native replacement did not reach its complete real-process assertions")
     r.SOURCE.require(sources == {"nereus": r.source_checkout(root), "pulsar": r.source_checkout(pulsar)}
@@ -231,6 +273,7 @@ def run(pulsar, java_home, out):
             Path(__file__).resolve(), work / "M6PulsarCellProvision.java", work / "bookkeeper-cell.properties",
             work / "M6PulsarBookKeeperReplacementProbe.java", work / "M6PulsarOffloadPublicationFault.java",
             work / "M6PulsarBookKeeperDeleteHoldProbe.java",
+            work / "M6PulsarOffloadDeleteHoldProbe.java",
             work / "qualify-broker-delete-drain.init.gradle",
             work / "capture-runtime.init.gradle", work / "console-log.xml", pulsar / "conf/broker.conf",
             root / "scripts/run-v2-m6-pulsar-bk-process-check.py",
@@ -249,6 +292,7 @@ def run(pulsar, java_home, out):
                    "actual-fallback-release", "native-bookkeeper-intent-and-done",
                    "original-physical-delete-unknown-settled", "physical-absence",
                    "original-native-offload-version-settlement",
+                   "original-native-object-delete-unknown-settled",
                    "cold-official-client-backlog-and-positions"],
     }))
 
