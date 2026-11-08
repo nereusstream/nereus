@@ -131,7 +131,7 @@ public final class KafkaObjectNativeAppendV1 {
                 pipeline,
                 bridge,
                 current,
-                new RunOwner(fresh, metadata, authority));
+                new RunOwner(fresh, metadata, authority, checkpoint));
     }
 
     private static KafkaObjectCompletionTrackerV1 tracker(
@@ -307,10 +307,17 @@ public final class KafkaObjectNativeAppendV1 {
         fenced = true;
     }
 
+    /** Stop the original background publisher before releasing its WalRun session. */
+    public void closeCheckpointAfterDrain() {
+        fence();
+        runOwner.checkpoint().closeAfterDrain();
+    }
+
     private record RunOwner(
             WalRunObjectSession session,
             CanonicalControlMetadataStore metadata,
-            KafkaObjectAuthorizationV1 authority) {}
+            KafkaObjectAuthorizationV1 authority,
+            WalCheckpointPublisher checkpoint) {}
 
     public record ClosedRun(WalRunPredecessor predecessor, KafkaObjectAuthorizationV1.ClosedHistory history) {}
 
