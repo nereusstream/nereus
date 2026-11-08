@@ -323,6 +323,19 @@ final class PulsarM6ObjectWalRuns {
         return provider.openRun(selected.root(), null);
     }
 
+    WalRunPredecessor sealedPredecessor(Selected selected) {
+        if (!current().equals(Optional.of(selected))) {
+            throw new IllegalStateException("Pulsar Object WAL rollover predecessor is no longer current");
+        }
+        var root = selected.root();
+        String key = WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch());
+        var raw = requireControl(key);
+        if (!WalRunControlCodec.decodeSeal(raw).root().equals(selected.reference())) {
+            throw new IllegalStateException("Pulsar Object WAL rollover Seal does not cover its predecessor");
+        }
+        return new WalRunPredecessor(selected.reference(), key, Sha256Digest.hash(raw), Optional.empty());
+    }
+
     void abandonFresh(Fresh fresh, Throwable failure) {
         try {
             closeAndRequireDrained(fresh.selected());

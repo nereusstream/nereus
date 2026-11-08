@@ -169,6 +169,7 @@ final class M6PulsarObjectWalProvision {
                 var exactSlice = await(allocator.readSlice());
                 var initialCell = await(allocator.createInitialCell(exactSlice));
                 provisionProvider(metadata, settings.provider(), cell);
+                var incarnations = new Properties();
                 for (var row : configured.generations().entrySet()) {
                     var topic = row.getKey();
                     var incarnation = new PulsarTopicIncarnationIdentity(
@@ -187,10 +188,12 @@ final class M6PulsarObjectWalProvision {
                     var actual = await(PulsarNativeBindingV1.readObjectWal(oxia, metadata.identity(),
                             configured.metadata().authorityRoot(), incarnation));
                     var ledger = PulsarM6ObjectWalAllocator.incarnation(actual);
+                    incarnations.setProperty(topic.toString(), ledger.value().toHex());
                     await(allocator.createInitialHead(initialCell, exactSlice, ledger));
                     await(PulsarM6ObjectWalCursorStore.provision(new Oxia09ExactMetadataTransactionStoreV1(oxia),
                             configured.metadata().authorityRoot(), ledger.value()));
                 }
+                store(path.resolveSibling("object-wal-incarnations.properties"), incarnations);
                 System.out.println("PULSAR_OBJECT_WAL_ACTUAL_NAMESPACE_AND_PROVIDER_PROVISIONED");
             }
         }

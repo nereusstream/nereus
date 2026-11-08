@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -100,7 +101,10 @@ def run(pulsar, java_home, out):
     input_names = [Path(__file__), SCRIPTS / "run-v2-m6-pulsar-bk-process-check.py",
                    SCRIPTS / "run-v2-m6-kafka-async-object-check.py", SCRIPTS / "run-v2-m6-kafka-object-wal-check.py",
                    SCRIPTS / "run-v2-m6-kafka-bk-process-check.py", SCRIPTS / "v2-m6-kafka-object-fault-proxy.py",
-                   SCRIPTS / "check-v2-m4-historical-m3.py", SCRIPTS / "v2-m6-execution-inputs.py",
+                   SCRIPTS / "run-v2-m6-kafka-m4-read-check.py", SCRIPTS / "check-v2-m4-historical-m3.py",
+                   SCRIPTS / "check-v2-m3-final.py", SCRIPTS / "check-v2-m3-child.py",
+                   SCRIPTS / "v2-m6-execution-inputs.py", SCRIPTS / "m5-candidate-inputs.py",
+                   SCRIPTS / "m5-evidence-junit.py", ROOT / "docs/v2/v2-scenarios.json",
                    SELECTION_WRAPPER, ROOT / "gradlew", pulsar / "gradlew", pulsar / "conf/broker.conf",
                    CONFIG / "capture-runtime.init.gradle", CONFIG / "console-log.xml",
                    CONFIG / "bookkeeper-cell.properties", PUL.BK.COMPOSE]
@@ -110,6 +114,12 @@ def run(pulsar, java_home, out):
     source_inputs = [PUL.path_identity(path) for path in input_names]
     runtime = [PUL.path_identity(path) for path in ordered]
     java_exe, javac = ((java_home / "bin" / name).resolve(strict=True) for name in ("java", "javac"))
+    executables = [java_exe, javac, Path(sys.executable).resolve(strict=True)]
+    for name in ("git", "docker"):
+        tool = shutil.which(name)
+        SOURCE.require(tool is not None, f"fixture requires {name} on PATH")
+        executables.append(Path(tool).resolve(strict=True))
+    launch_tools = [PUL.path_identity(path) for path in executables]
     compiled = out / "probe-classes"
     compiled.mkdir()
     cp = os.pathsep.join(map(str, ordered + [compiled]))
@@ -118,7 +128,7 @@ def run(pulsar, java_home, out):
             f"-Dlog4j.configurationFile={CONFIG / 'console-log.xml'}",
             f"-Dpulsar.metadatastore.providers={PUL.PROVIDER}", "-cp", cp]
     PUL.run_to_log([str(javac), "-proc:none", "-cp", cp, "-d", str(compiled), *map(str, probes)], out / "javac.log")
-    ports = PUL.distinct_ports(6)
+    ports = PUL.distinct_ports(8)
     addresses = [f"127.0.0.1:{port}" for port in ports]
     template = pulsar / "conf/broker.conf"
     bk_uri = "zk://127.0.0.1:2181/ledgers"
@@ -157,7 +167,7 @@ def run(pulsar, java_home, out):
         for key, value in settings.items():
             config_text = re.sub(r"(?m)^" + re.escape(key) + r"=.*$", "", config_text)
             config_text += f"\n{key}={value}\n"
-        cell.write_text(config_text)
+        cell.write_text(config_text + "\nbinding.persistent\\://public/m6-native/physical-run=1\n")
         PUL.run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarObjectWalProvision", oxia,
                               str(cell), str(ROOT)], out / "provision.log")
         SOURCE.require("PULSAR_OBJECT_WAL_ACTUAL_NAMESPACE_AND_PROVIDER_PROVISIONED" in (out / "provision.log").read_text(),
@@ -222,7 +232,56 @@ def run(pulsar, java_home, out):
         SOURCE.require("PULSAR_OBJECT_WAL_CRASH_TAKEOVER_PASS" in recovered
                        and "PULSAR_OBJECT_WAL_ORIGINAL_UNKNOWN_RECOVERY_PASS" in recovered,
                        "official Pulsar client did not verify takeover and exact original UNKNOWN recovery")
+        foreign = out / "foreign"
+        foreign.mkdir()
+        foreign_cell = foreign / "cell.properties"
+        foreign_text = config_text.replace("public/m6-native", "public/m6-foreign").replace("/handoff=1", "/sentinel=1")
+        foreign_settings = {
+            "authorityRoot": "/nereus/v2/m6/native-object-wal-foreign",
+            "deploymentId": "00000000000000010000000000000012",
+            "reservationDomainId": "00000000000000030000000000000014",
+            "pulsarCellId": "00000000000000050000000000000016",
+            "objectWalBookKeeperLedgerRoot": "/m6-object-compat-foreign",
+            "objectWalProviderProfile": foreign / "object-provider-profile.bin",
+            "s3Bucket": "m6-native-pulsar-wal-foreign",
+        }
+        for key, value in foreign_settings.items():
+            foreign_text = re.sub(r"(?m)^" + re.escape(key) + r"=.*$", "", foreign_text)
+            foreign_text += f"\n{key}={value}\n"
+        foreign_cell.write_text(foreign_text)
+        foreign_web, foreign_service = f"localhost:{ports[6]}", f"localhost:{ports[7]}"
+        PUL.run_to_log(java + [native_probe, "configure-foreign", origin, addresses[1], addresses[3],
+                              str(expected), str(cell)], foreign / "isolate.log")
+        PUL.run_to_log(java + ["com.nereusstream.pulsar.broker.M6PulsarObjectWalProvision", oxia,
+                              str(foreign_cell), str(ROOT)], foreign / "provision.log")
+        foreign_broker = foreign / "broker.conf"
+        PUL.broker_config(template, foreign_broker, {**base, "advertisedAddress": "localhost",
+                                                    "webServicePort": ports[6], "brokerServicePort": ports[7],
+                                                    "nereusPulsarCellConfig": str(foreign_cell)})
+        _, stop_foreign = start_broker(stack, java, foreign_broker, foreign / "broker.log", addresses[6])
+        PUL.run_to_log(java + [native_probe, "verify-foreign", origin, foreign_web, foreign_service,
+                              str(expected), str(foreign_cell)], foreign / "warm-up.log")
+        _, stop_successor = start_broker(stack, java, out / "broker-0.conf", out / "read-drain-successor.log", addresses[0])
+        PUL.run_to_log(java + [native_probe, "held-read-unload", origin, addresses[1], addresses[3],
+                              str(expected), str(cell), addresses[0], foreign_web, foreign_service],
+                       out / "held-read-unload.log", timeout=100)
+        SOURCE.require("PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_UNLOAD_PASS" in
+                       (out / "held-read-unload.log").read_text(), "held read or client cancellation released the Cell")
+        PUL.run_to_log(java + [native_probe, "live-physical-rollover", origin, addresses[0], addresses[2],
+                              str(expected), str(cell)], out / "physical-run-rollover.log", timeout=240)
+        SOURCE.require("PULSAR_OBJECT_WAL_LIVE_PHYSICAL_ROLLOVER_PASS 1024" in
+                       (out / "physical-run-rollover.log").read_text(), "no native rollover across the full physical Run")
+        PUL.run_to_log(java + [native_probe, "held-write-unload", origin, addresses[0], addresses[2],
+                              str(expected), str(cell), addresses[1], foreign_web, foreign_service],
+                       out / "held-write-unload.log", timeout=110)
+        for kind, marker in (("read", "HELD_RANGE"), ("write", "HELD_WRITE")):
+            drain = (out / f"held-{kind}-unload.log").read_text()
+            SOURCE.require(f"PULSAR_OBJECT_WAL_{marker}_CANCEL_AND_UNLOAD_PASS" in drain
+                           and "PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS" in drain,
+                           f"native {kind} drain or foreign Cell made no terminal observation")
         stop_peer(True)
+        stop_successor(True)
+        stop_foreign(True)
         negative = out / "unqualified.conf"
         PUL.broker_config(template, negative, {**base, "webServicePort": ports[4], "brokerServicePort": ports[5],
                                                "metadataStoreUrl": f"oxia://{oxia}"})
@@ -246,25 +305,29 @@ def run(pulsar, java_home, out):
                                                   "nereusPulsarCellConfig": str(config)})
             start_broker(stack, java, broker, out / f"{name}.log", addresses[4], reason)
         for path in [receipt, cell, credentials, token, *out.glob("*.conf"), out / "object-provider-profile.bin",
-                     *out.glob("wrong-*.properties"), out / "foreign-namespace.properties", wrong_receipt]:
-            launched[path.name] = PUL.BK.M6.file_identity(path)
+                     *out.glob("wrong-*.properties"), out / "foreign-namespace.properties", wrong_receipt,
+                     foreign_cell, foreign_broker, foreign / "object-provider-profile.bin"]:
+            launched[path.relative_to(out).as_posix()] = PUL.BK.M6.file_identity(path)
 
     SOURCE.require(sources == {"nereus": PUL.source_checkout(ROOT), "pulsar": PUL.source_checkout(pulsar)},
                    "native Object WAL source changed during execution")
     SOURCE.require(runtime == [PUL.path_identity(path) for path in ordered]
-                   and source_inputs == [PUL.path_identity(path) for path in input_names],
+                   and source_inputs == [PUL.path_identity(path) for path in input_names]
+                   and launch_tools == [PUL.path_identity(path) for path in executables],
                    "native Object WAL inputs changed during execution")
-    outputs = {path.name: PUL.BK.M6.file_identity(path) for path in sorted(out.iterdir())
-               if path.is_file() and path.name not in launched}
+    outputs = {path.relative_to(out).as_posix(): PUL.BK.M6.file_identity(path)
+               for path in sorted([*out.iterdir(), *foreign.iterdir()])
+               if path.is_file() and path.relative_to(out).as_posix() not in launched}
     (out / "process-result.json").write_bytes(SOURCE.INPUTS.canonical({
         "schema": "NEREUS_V2_M6_PULSAR_OBJECT_WAL_FOCUSED_PROCESS_V1", "promotionEligible": False, "status": "PASS",
         "profile": "OBJECT_WAL", "sources": sources, "sourceInputs": source_inputs, "runtime": runtime,
         "historicalAllocatorSelection": {"wrapperSha256": SELECTION_WRAPPER_SHA, "selectionSha256": SELECTION_SHA},
-        "launchTools": [PUL.path_identity(java_exe), PUL.path_identity(javac)],
+        "launchTools": launch_tools,
         "generatedLaunchInputs": launched, "compiledProbe": PUL.path_identity(compiled), "outputs": outputs,
         "checks": ["real-r1-range64", "official-client", "rollover", "individual-and-cumulative-ack", "seek-reset-backlog",
                    "planned-transfer", "cold-read", "crash-takeover", "original-unknown-key-version",
-                   "no-native-ledger-id-reuse",
+                   "no-native-ledger-id-reuse", "held-read-cancellation-and-unload", "held-write-cancellation-and-unload",
+                   "independent-foreign-cell", "live-physical-run-rollover",
                    "unqualified-ownership-rejected", "foreign-namespace-rejected", "wrong-artifact-rejected",
                    "wrong-range64-receipt-rejected"],
     }))

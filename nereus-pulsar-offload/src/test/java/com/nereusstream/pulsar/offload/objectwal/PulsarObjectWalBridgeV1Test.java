@@ -453,8 +453,9 @@ class PulsarObjectWalBridgeV1Test {
         WalRunLifecycleManager ownerLifecycle = new WalRunLifecycleManager(metadata);
         var ownerRoot = ownerLifecycle.createRootAndInitializePointer(
                 WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch()), root);
+        var clock = new java.util.concurrent.atomic.AtomicLong();
         WalRunObjectSession session =
-                WalRunObjectSession.openNew(ownerRoot.ownerAuthority().orElseThrow(), provider, kms, () -> 0);
+                WalRunObjectSession.openNew(ownerRoot.ownerAuthority().orElseThrow(), provider, kms, clock::get);
         PulsarObjectWalBridgeV1.PlannedEntry member = new PulsarObjectWalBridgeV1.PlannedEntry(
                 BINDING_A,
                 7,
@@ -482,6 +483,8 @@ class PulsarObjectWalBridgeV1Test {
         assertThat(metadata.contains(WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch())))
                 .isFalse();
 
+        // This is still the original live writer, well after its cold recovery window.
+        clock.set(Math.incrementExact(root.recoveryEnvelope().maxWallTimeNanos()));
         PublishResult reconciled =
                 store.reconcile(plan, unknown.identity()).toCompletableFuture().join();
         assertThat(reconciled.outcome()).isEqualTo(ProviderObjectOutcome.EXISTING_EXACT);
@@ -492,7 +495,7 @@ class PulsarObjectWalBridgeV1Test {
         assertThat(kms.cachedRunKeyCount()).isZero();
         assertThat(transport.putCalls).isOne();
         assertThat(transport.listCalls).isOne();
-        assertThat(transport.fullGetCalls).isEqualTo(2);
+        assertThat(transport.fullGetCalls).isOne();
     }
 
     @Test

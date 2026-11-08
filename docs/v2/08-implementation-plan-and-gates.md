@@ -369,8 +369,15 @@ Each read batch holds one M4 generation until its actual reads finish. The runne
 ACKs, seek/reset and backlog, graceful transfer and restart, and SIGKILL takeover. At the crash cut a versioned
 MinIO PUT has taken effect but its response is held and the original producer is killed before it can resend.
 The successor must recover that exact version, entry bytes and MessageId. Additional startup cases reject
-mismatched ownership, namespace, allocator JARs and the historical receipt. The independent Cell drain and
-the M6 aggregate have separate acceptance requirements.
+mismatched ownership, namespace, allocator JARs and the historical receipt.
+
+The same runner writes past the 1,024-extent physical Run bound under one native acquisition. It checks the complete
+predecessor Seal and reads the entries on both sides of the cut. Separate unload cuts hold an actual S3 Range GET
+and an applied PUT response. Cancelling the client wait leaves the original read or dispatch reservation active
+until the underlying work settles. A separately admitted Cell writes and reads during each hold. The successor
+reads the original bytes and MessageId. Live PUT reconciliation checks the exact original key and body with its
+own bounded work, including after the cold recovery window has elapsed. These cases provide focused Object WAL
+evidence for the M6 aggregate.
 
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.

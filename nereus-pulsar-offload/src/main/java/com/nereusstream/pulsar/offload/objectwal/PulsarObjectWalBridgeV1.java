@@ -2462,8 +2462,7 @@ public final class PulsarObjectWalBridgeV1 {
                         candidate,
                         () -> applyProviderResult(
                                 candidate,
-                                objectSession.reconcileUnknownExtent(
-                                        candidate.identity().objectIdentity()),
+                                objectSession.reconcileLiveNwg1Candidate(candidate.admitted()),
                                 plan.members()));
             } catch (Throwable error) {
                 return failed(error);

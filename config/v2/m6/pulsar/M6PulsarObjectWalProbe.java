@@ -12,6 +12,9 @@
  * limitations under the License.
  */
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.storage.object.control.WalRunControlCodec;
+import com.nereusstream.storage.object.control.WalRunControlKeys;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,6 +25,7 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pulsar.broker.storage.nereus.v2.MetadataStoreNereusOwnershipWitnessProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.MessageId;
@@ -29,6 +33,7 @@ import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.metadata.api.MetadataStore;
 import org.apache.pulsar.metadata.api.MetadataStoreConfig;
 import org.apache.pulsar.metadata.api.MetadataStoreFactory;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
@@ -37,12 +42,17 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 final class M6PulsarObjectWalProbe {
     private static final String TOPIC = "persistent://public/m6-native/handoff";
+    private static final String ROLLOVER_TOPIC = "persistent://public/m6-native/physical-run";
     private static final String BUNDLE = "public/m6-native/0x00000000_0xffffffff";
+    private static final String FOREIGN_NAMESPACE = "public/m6-foreign";
+    private static final String FOREIGN_TOPIC = "persistent://" + FOREIGN_NAMESPACE + "/sentinel";
     private static final long RESERVED_START = 1L << 62;
     private static final long SLICE_END = RESERVED_START + (1L << 40);
     private static final byte[] CRASH_BODY = "acknowledged by original Object WAL before SIGKILL"
             .getBytes(StandardCharsets.UTF_8);
     private static final byte[] UNKNOWN_BODY = "original applied Object WAL append with no response before SIGKILL"
+            .getBytes(StandardCharsets.UTF_8);
+    private static final byte[] HELD_WRITE = "original Object WAL append held across native unload"
             .getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEW_BODY = "new native owner wrote after Object WAL recovery"
             .getBytes(StandardCharsets.UTF_8);
@@ -57,6 +67,28 @@ final class M6PulsarObjectWalProbe {
                     .operationTimeout(75, TimeUnit.SECONDS).build();
                 var admin = PulsarAdmin.builder().serviceHttpUrl("http://" + args[2]).build();
                 var metadata = MetadataStoreFactory.create(args[1], MetadataStoreConfig.builder().build())) {
+            if ("configure-foreign".equals(args[0])) {
+                admin.namespaces().createNamespace(FOREIGN_NAMESPACE, 1);
+                isolate(admin, "foreign-cell", FOREIGN_NAMESPACE, "localhost");
+                isolate(admin, "primary-cell", "public/m6-native", "127[.]0[.]0[.]1");
+                return;
+            }
+            if ("verify-foreign".equals(args[0])) {
+                verifyForeign(args[2], args[3], metadata);
+                return;
+            }
+            if ("live-physical-rollover".equals(args[0])) {
+                verifyPhysicalRollover(args, client, metadata);
+                return;
+            }
+            if ("held-write-unload".equals(args[0])) {
+                verifyWriteDrain(args, client, admin, metadata, expected);
+                return;
+            }
+            if ("held-read-unload".equals(args[0])) {
+                verifyReadDrain(args, client, admin, metadata, expected);
+                return;
+            }
             if ("before-crash-with-unknown".equals(args[0])) {
                 int count = Integer.parseInt(expected.getProperty("count"));
                 var bucket = bucket(args);
@@ -84,6 +116,7 @@ final class M6PulsarObjectWalProbe {
                     expected.setProperty("crashVersion", Long.toString(current.backendVersion()));
                     expected.setProperty("unknownKey", key);
                     expected.setProperty("unknownVersion", version);
+                    expected.setProperty("unknownPositionIndex", Integer.toString(count + 1));
                     record(expected, count + 1, new MessageIdImpl(acknowledged.getLedgerId(), 1,
                             acknowledged.getPartitionIndex()), UNKNOWN_BODY);
                     requirePositions(expected);
@@ -141,6 +174,9 @@ final class M6PulsarObjectWalProbe {
             if (admin.topics().getInternalStats(TOPIC).ledgers.size() < 4) {
                 throw new AssertionError("Native admin did not expose the retained virtual ledger chain");
             }
+            try (var output = Files.newBufferedWriter(path)) {
+                expected.store(output, null);
+            }
             if (expected.containsKey("unknownKey")) {
                 assertExactVersion(bucket(args), expected.getProperty("unknownKey"),
                         expected.getProperty("unknownVersion"));
@@ -150,12 +186,282 @@ final class M6PulsarObjectWalProbe {
         }
     }
 
+    private static void verifyPhysicalRollover(String[] args, PulsarClient client, MetadataStore metadata)
+            throws Exception {
+        var identities = new Properties();
+        try (var file = Files.newBufferedReader(Path.of(args[5]).resolveSibling("object-wal-incarnations.properties"))) {
+            identities.load(file);
+        }
+        String prefix = cell(args).getProperty("authorityRoot") + "/native-object-wal/"
+                + identities.getProperty(ROLLOVER_TOPIC);
+        var witnesses = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[2]);
+        var nativeBefore = witnesses.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
+        var positions = new java.util.ArrayList<MessageIdAdv>();
+        com.nereusstream.storage.object.control.WalRunReference original;
+        final int limit = 1024;
+        try (var producer = client.newProducer().topic(ROLLOVER_TOPIC).enableBatching(false).create()) {
+            positions.add((MessageIdAdv) producer.send(numbered(0)));
+            original = pointer(metadata, prefix).current();
+            var root = WalRunControlCodec.decodeRoot(CanonicalBytes.copyOf(raw(metadata, prefix + "/" + original.rootKey())));
+            if (root.bounds().maxExtentCount() != limit) {
+                throw new AssertionError("Live rollover must cross the original production extent bound");
+            }
+            for (int index = 1; index < limit + 2; index++) {
+                var next = (MessageIdAdv) producer.send(numbered(index));
+                var previous = positions.getLast();
+                if (next.getLedgerId() < previous.getLedgerId()
+                        || next.getEntryId() != (next.getLedgerId() == previous.getLedgerId() ? previous.getEntryId() + 1 : 0)) {
+                    throw new AssertionError("Physical rollover repeated or skipped a native position: " + next);
+                }
+                positions.add(next);
+            }
+        }
+        var next = pointer(metadata, prefix).current();
+        var root = WalRunControlCodec.decodeRoot(CanonicalBytes.copyOf(raw(metadata, prefix + "/" + next.rootKey())));
+        var previous = root.predecessor().orElseThrow();
+        var sealBytes = CanonicalBytes.copyOf(raw(metadata, prefix + "/" + previous.sealKey()));
+        var seal = WalRunControlCodec.decodeSeal(sealBytes);
+        if (next.shardRunEpoch() != original.shardRunEpoch() + 1 || !original.equals(previous.root())
+                || !original.equals(seal.root()) || seal.aggregateExtentCount() != limit
+                || !com.nereusstream.domain.bytes.Sha256Digest.hash(sealBytes).equals(previous.sealSha256())) {
+            throw new AssertionError("Successor did not select the original complete physical Seal");
+        }
+        try (var reader = client.newReader().topic(ROLLOVER_TOPIC).startMessageId(positions.get(limit - 1))
+                .startMessageIdInclusive().create()) {
+            for (int index = limit - 1; index < positions.size(); index++) {
+                var actual = reader.readNext(15, TimeUnit.SECONDS);
+                if (actual == null || !positions.get(index).equals(actual.getMessageId())
+                        || !Arrays.equals(numbered(index), actual.getData())) {
+                    throw new AssertionError("Native read changed position or bytes across physical rollover: " + index);
+                }
+            }
+        }
+        var nativeAfter = witnesses.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
+        if (!nativeBefore.equals(nativeAfter)) {
+            throw new AssertionError("Physical rollover unexpectedly changed native ownership");
+        }
+        System.out.println("PULSAR_OBJECT_WAL_LIVE_PHYSICAL_ROLLOVER_PASS " + limit);
+    }
+
+    private static byte[] numbered(int value) {
+        return java.nio.ByteBuffer.allocate(Integer.BYTES).putInt(value).array();
+    }
+
+    private static com.nereusstream.storage.object.control.CurrentWalRunPointer pointer(
+            MetadataStore metadata, String prefix) throws Exception {
+        return WalRunControlCodec.decodePointer(CanonicalBytes.copyOf(raw(metadata,
+                prefix + "/" + WalRunControlKeys.pointerKey(0))));
+    }
+
+    private static void verifyReadDrain(String[] args, PulsarClient client, PulsarAdmin admin, MetadataStore metadata,
+            Properties expected) throws Exception {
+        String key = expected.getProperty("unknownKey");
+        int entry = Integer.parseInt(expected.getProperty("unknownPositionIndex"));
+        String prefix = cell(args).getProperty("authorityRoot") + "/native-object-wal/" + binding(key);
+        var pointer = pointer(metadata, prefix);
+        String gate = prefix + "/dispatch/" + pointer.current().rootSha256().toHex();
+        byte[] before = raw(metadata, gate);
+        requireGate(before, false);
+        var source = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[2]);
+        var target = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[6]);
+        var original = source.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
+        var faults = new M6PulsarBookKeeperSemanticsProbe.Faults();
+        faults.set("/" + bucket(args) + "/" + key, "held-unversioned");
+        try (var reader = client.newReader().topic(TOPIC).startMessageId(id(expected, entry))
+                .startMessageIdInclusive().create()) {
+            var observed = reader.readNextAsync();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (faults.call("GET", "").path("upstreamReads").asInt() == 0) {
+                if (observed.isDone() || System.nanoTime() >= deadline) {
+                    throw new AssertionError("The exact historical NWG1 range was not held on the S3 wire");
+                }
+                Thread.sleep(25);
+            }
+            if (!observed.cancel(false)) {
+                throw new AssertionError("The official client observer completed before cancellation");
+            }
+            reader.closeAsync();
+            String[] parts = BUNDLE.split("/");
+            var unloading = admin.namespaces().unloadNamespaceBundleAsync(parts[0] + "/" + parts[1], parts[2], args[6]);
+            try {
+                unloading.get(2, TimeUnit.SECONDS);
+                throw new AssertionError("Native unload completed before the admitted S3 read");
+            } catch (TimeoutException held) {
+                verifyForeign(args[7], args[8], metadata);
+                if (unloading.isDone() || !Arrays.equals(before, raw(metadata, gate))
+                        || target.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).isPresent()
+                        || faults.call("GET", "").path("upstreamReads").asInt() == 0
+                        || !observed.isCancelled()) {
+                    throw new AssertionError("Cancellation released the original Cell, source or read observer");
+                }
+            } finally {
+                faults.call("PATCH", "");
+            }
+            unloading.get(35, TimeUnit.SECONDS);
+        } finally {
+            faults.call("DELETE", "");
+        }
+        requireGate(raw(metadata, gate), true);
+        try (var reader = client.newReader().topic(TOPIC).startMessageId(id(expected, entry))
+                .startMessageIdInclusive().create()) {
+            var same = reader.readNext(15, TimeUnit.SECONDS);
+            if (same == null || !id(expected, entry).equals(same.getMessageId())
+                    || !Arrays.equals(UNKNOWN_BODY, same.getData())) {
+                throw new AssertionError("Late source callback changed the original read on the successor");
+            }
+        }
+        var next = target.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).orElseThrow();
+        if (next.acquisitionId().equals(original.acquisitionId())
+                || next.backendVersion() <= original.backendVersion()) {
+            throw new AssertionError("Read drain did not hand off to a distinct native acquisition");
+        }
+        System.out.println("PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_UNLOAD_PASS");
+    }
+
+    private static void verifyWriteDrain(String[] args, PulsarClient client, PulsarAdmin admin, MetadataStore metadata,
+            Properties expected) throws Exception {
+        String prefix = cell(args).getProperty("authorityRoot") + "/native-object-wal/"
+                + binding(expected.getProperty("unknownKey"));
+        String gate = prefix + "/dispatch/" + pointer(metadata, prefix).current().rootSha256().toHex();
+        requireGate(raw(metadata, gate), false);
+        int count = Integer.parseInt(expected.getProperty("count"));
+        var last = id(expected, count - 1);
+        if (last.getEntryId() != 0) {
+            throw new AssertionError("Write drain fixture must leave one entry in the virtual ledger");
+        }
+        var position = new MessageIdImpl(last.getLedgerId(), 1, last.getPartitionIndex());
+        var faults = new M6PulsarBookKeeperSemanticsProbe.Faults();
+        String key;
+        String version;
+        try (var producer = client.newProducer().topic(TOPIC).enableBatching(false).create()) {
+            faults.set("/" + bucket(args) + "/", "first-put-response-lost");
+            var pending = producer.sendAsync(HELD_WRITE);
+            version = faults.awaitAppliedVersion();
+            var wire = faults.call("GET", "");
+            var path = wire.path("selectedPath").asText();
+            if (wire.path("hits").asInt() != 1 || !path.startsWith("/" + bucket(args) + "/")
+                    || !pending.cancel(false)) {
+                throw new AssertionError("Original native Object WAL dispatch did not stay unresolved");
+            }
+            key = path.substring(bucket(args).length() + 2);
+            assertExactVersion(bucket(args), key, version);
+            byte[] original = raw(metadata, gate);
+            if (!pendingCandidate(original).equals(key)) {
+                throw new AssertionError("Held physical PUT is not the exact durable dispatch candidate");
+            }
+            String[] parts = BUNDLE.split("/");
+            var target = new MetadataStoreNereusOwnershipWitnessProvider(metadata, args[6]);
+            var unloading = admin.namespaces().unloadNamespaceBundleAsync(parts[0] + "/" + parts[1], parts[2], args[6]);
+            try {
+                unloading.get(2, TimeUnit.SECONDS);
+                throw new AssertionError("Native unload completed before the original S3 PUT callback");
+            } catch (TimeoutException held) {
+                verifyForeign(args[7], args[8], metadata);
+                if (unloading.isDone() || !Arrays.equals(original, raw(metadata, gate)) || !pending.isCancelled()
+                        || target.read(BUNDLE).toCompletableFuture().get(5, TimeUnit.SECONDS).isPresent()) {
+                    throw new AssertionError("Held original write no longer owns the same dispatch reservation");
+                }
+            } finally {
+                faults.call("PATCH", "");
+            }
+            unloading.get(40, TimeUnit.SECONDS);
+        } finally {
+            faults.call("DELETE", "");
+        }
+        requireGate(raw(metadata, gate), true);
+        try (var reader = client.newReader().topic(TOPIC).startMessageId(position).startMessageIdInclusive().create()) {
+            var same = reader.readNext(15, TimeUnit.SECONDS);
+            if (same == null || !position.equals(same.getMessageId()) || !Arrays.equals(HELD_WRITE, same.getData())) {
+                throw new AssertionError("Original held write changed after the native ownership cut");
+            }
+        }
+        assertExactVersion(bucket(args), key, version);
+        System.out.println("PULSAR_OBJECT_WAL_HELD_WRITE_CANCEL_AND_UNLOAD_PASS");
+    }
+
+    private static String pendingCandidate(byte[] gate) {
+        var value = java.nio.ByteBuffer.wrap(gate);
+        if (value.remaining() < 47 || value.getInt() != 0x50574431
+                || value.get() != 1 || value.get() != 0 || value.get() != 1) {
+            throw new AssertionError("Original Root has no active write reservation");
+        }
+        value.position(47);
+        int length = Short.toUnsignedInt(value.getShort());
+        if (length < 1 || value.remaining() != length + Long.BYTES + 32) {
+            throw new AssertionError("Original Root has an invalid candidate identity");
+        }
+        byte[] path = new byte[length];
+        value.get(path);
+        return new String(path, StandardCharsets.US_ASCII);
+    }
+
+    private static void isolate(PulsarAdmin admin, String policy, String namespace, String primary) throws Exception {
+        var configuration = org.apache.pulsar.common.policies.data.NamespaceIsolationData.builder()
+                .namespaces(java.util.List.of(namespace)).primary(java.util.List.of(primary))
+                .secondary(java.util.List.of())
+                .unloadScope(org.apache.pulsar.common.policies.data.NamespaceIsolationPolicyUnloadScope.none)
+                .autoFailoverPolicy(org.apache.pulsar.common.policies.data.AutoFailoverPolicyData.builder()
+                        .policyType(org.apache.pulsar.common.policies.data.AutoFailoverPolicyType.min_available)
+                        .parameters(java.util.Map.of("min_limit", "1", "usage_threshold", "100")).build())
+                .build();
+        admin.clusters().createNamespaceIsolationPolicy("m6", policy, configuration);
+    }
+
+    private static void verifyForeign(String web, String service, MetadataStore metadata) throws Exception {
+        byte[] payload = java.util.UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
+        try (var foreign = PulsarClient.builder().serviceUrl("pulsar://" + service)
+                .operationTimeout(8, TimeUnit.SECONDS).build();
+                var producer = foreign.newProducer().topic(FOREIGN_TOPIC).enableBatching(false).create()) {
+            var accepted = (MessageIdAdv) producer.sendAsync(payload).get(6, TimeUnit.SECONDS);
+            if (accepted.getLedgerId() < RESERVED_START || accepted.getLedgerId() >= SLICE_END) {
+                throw new AssertionError("Foreign Broker did not write through its own Object WAL Cell");
+            }
+            try (var reader = foreign.newReader().topic(FOREIGN_TOPIC).startMessageId(accepted)
+                    .startMessageIdInclusive().create()) {
+                var same = reader.readNext(6, TimeUnit.SECONDS);
+                if (same == null || !accepted.equals(same.getMessageId()) || !Arrays.equals(payload, same.getData())) {
+                    throw new AssertionError("Foreign Cell could not read its newly accepted entry");
+                }
+            }
+        }
+        var owner = new MetadataStoreNereusOwnershipWitnessProvider(metadata, web)
+                .read(FOREIGN_NAMESPACE + "/0x00000000_0xffffffff").toCompletableFuture()
+                .get(5, TimeUnit.SECONDS).orElseThrow();
+        System.out.println("PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS " + owner.acquisitionId());
+    }
+
+    private static byte[] raw(MetadataStore metadata, String key) throws Exception {
+        return metadata.get(key).get(5, TimeUnit.SECONDS).orElseThrow().getValue();
+    }
+
+    private static void requireGate(byte[] gate, boolean closed) {
+        var value = java.nio.ByteBuffer.wrap(gate);
+        if (gate.length < 7 || value.getInt() != 0x50574431 || value.get() != 1
+                || value.get() != (closed ? 1 : 0) || value.get() != 0) {
+            throw new AssertionError("Unexpected exact current Root dispatch gate");
+        }
+    }
+
+    private static String binding(String key) {
+        var parts = key.split("/");
+        for (int i = 0; i < parts.length - 1; i++) {
+            if ("object-wal".equals(parts[i]) && parts[i + 1].matches("[a-f0-9]{64}")) {
+                return parts[i + 1];
+            }
+        }
+        throw new AssertionError("Unknown Object WAL identity has no Binding");
+    }
+
     private static String bucket(String[] args) throws Exception {
+        return cell(args).getProperty("s3Bucket");
+    }
+
+    private static Properties cell(String[] args) throws Exception {
         var props = new Properties();
         try (var input = Files.newBufferedReader(Path.of(args[5]))) {
             props.load(input);
         }
-        return props.getProperty("s3Bucket");
+        return props;
     }
 
     private static void assertExactVersion(String bucket, String key, String version) {

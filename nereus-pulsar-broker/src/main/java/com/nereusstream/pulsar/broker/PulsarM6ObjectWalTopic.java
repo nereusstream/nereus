@@ -39,10 +39,12 @@ import com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1.Verifie
 import com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1.VerifiedManifestHandoff;
 import com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalM4ReaderV1;
 import com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalReadViewV1;
+import com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1.FixedSlice;
 import com.nereusstream.pulsar.offload.objectwal.PulsarVirtualLedgerChainControllerV1.PulsarBindingKey;
 import com.nereusstream.storage.object.control.WalLaneId;
 import com.nereusstream.storage.object.control.WalRunControlKeys;
 import com.nereusstream.storage.object.control.WalRunLifecycleManager;
+import com.nereusstream.storage.object.control.WalRunPredecessor;
 import com.nereusstream.storage.object.kms.KmsCellSession;
 import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
@@ -67,20 +69,16 @@ final class PulsarM6ObjectWalTopic {
     private static final WalLaneId LANE = WalLaneId.OBJECT_LATENCY;
     private final PulsarM6ObjectWalAllocator.BoundChain chain;
     private final PulsarM6ObjectWalRuns runs;
-    private final PulsarM6ObjectWalRuns.Fresh fresh;
-    private final PulsarM6ObjectWalHistory history;
-    private final KmsCellSession writerKms;
-    private final ProductionObjectWalExtentStore active;
-    private final PulsarObjectWalBridgeV1 bridge;
-    private final PulsarObjectWalM4ReaderV1 reader;
+    private final PulsarM6ObjectWalProvider provider;
+    private final PulsarNativeBindingV1 binding;
+    private final FixedSlice geometry;
+    private final Limits limits;
+    private final Duration timeout;
     private final Executor io;
     private final Executor ownerLoop;
-    private final int maximumEntryBytes;
-    private final long entriesPerLedger;
-    private final int maximumPendingAppends;
-    private final long maximumPendingBytes;
-    private final CapabilityBinding capability;
     private final Map<PulsarPosition, Integer> decodedSizes;
+    private volatile Run run;
+    private CompletableFuture<Run> runRollover;
     private CompletableFuture<Void> appendTail = CompletableFuture.completedFuture(null);
     private CompletableFuture<Void> closing;
     private Throwable appendFailure;
@@ -126,9 +124,8 @@ final class PulsarM6ObjectWalTopic {
                     new PulsarM6ObjectWalRuns(oxia, root, incarnation, provider, limits.maximumEntryBytes(), timeout);
             var history = new PulsarM6ObjectWalHistory(
                     runs, provider, binding, key, scope.geometry(), timeout, RECOVERY_LOCATORS);
-            var predecessor = new java.util.concurrent.atomic.AtomicReference<
-                    Optional<com.nereusstream.storage.object.control.WalRunPredecessor>>();
-            var opened = allocator
+            var predecessor = new java.util.concurrent.atomic.AtomicReference<Optional<WalRunPredecessor>>();
+            return allocator
                     .openBinding(
                             binding,
                             authority,
@@ -138,115 +135,255 @@ final class PulsarM6ObjectWalTopic {
                                         return null;
                                     },
                                     io))
-                    .thenCompose(chain -> async(
-                            () -> {
-                                var writerKms = provider.openKms();
-                                try {
-                                    var fresh = history.openFresh(predecessor.get(), chain.owner(), writerKms);
-                                    try {
-                                        var projection = new PulsarM6ObjectWalProjection(
-                                                fresh.selected().root(),
-                                                binding,
-                                                key,
-                                                scope.geometry(),
-                                                chain.owner().witness());
-                                        return new Pending(
-                                                chain,
-                                                runs,
-                                                fresh,
-                                                history,
-                                                writerKms,
-                                                makeActive(chain, runs, fresh, projection, timeout, io),
-                                                new CapabilityBinding(
-                                                        1,
-                                                        Sha256Digest.hash(provider.profile()
-                                                                .encode())));
-                                    } catch (Exception | Error failure) {
-                                        runs.abandonFresh(fresh, failure);
-                                        throw failure;
-                                    }
-                                } catch (Exception | Error failure) {
-                                    closeAfterFailure(writerKms, failure);
-                                    throw failure;
-                                }
-                            },
-                            io))
-                    .thenCompose(pending -> {
-                        var bridge = new PulsarObjectWalBridgeV1(
-                                new PulsarObjectWalBridgeV1.Configuration(
-                                        limits.maximumEntryBytes(),
-                                        limits.entriesPerLedger(),
-                                        1,
-                                        RECOVERY_LOCATORS,
-                                        RECOVERY_LOCATORS,
-                                        1,
-                                        pending.fresh()
-                                                .selected()
-                                                .root()
-                                                .nwg1AdmissionCaps()
-                                                .maxCanonicalBodyBytes()),
-                                pending.chain().controller(),
-                                new PulsarM6ObjectWalExtentRoute(pending.fresh(), pending.active(), history, io));
-                        return bridge.activateRecoveredChain(
-                                        key,
-                                        pending.chain().owner().epoch(),
-                                        (node, terminal) -> CompletableFuture.completedFuture(
-                                                history.recover(node.virtualLedgerId())))
-                                .thenCompose(unused -> pending.chain().owner().requireCurrent())
-                                .thenApply(unused -> {
-                                    history.requireNoForeignLedgers();
-                                    return new PulsarM6ObjectWalTopic(pending, bridge, limits, io, ownerLoop);
-                                })
-                                .exceptionallyCompose(failure -> async(
-                                        () -> {
-                                            var original = unwrap(failure);
-                                            runs.abandonFresh(pending.fresh(), original);
-                                            closeAfterFailure(pending.writerKms(), original);
-                                            throw new CompletionException(original);
-                                        },
-                                        io));
+                    .thenCompose(chain -> openRun(
+                                    chain,
+                                    runs,
+                                    provider,
+                                    binding,
+                                    scope.geometry(),
+                                    history,
+                                    predecessor.get(),
+                                    limits,
+                                    timeout,
+                                    io,
+                                    ownerLoop)
+                            .thenApply(opened -> new PulsarM6ObjectWalTopic(
+                                    chain,
+                                    runs,
+                                    provider,
+                                    binding,
+                                    scope.geometry(),
+                                    limits,
+                                    timeout,
+                                    io,
+                                    ownerLoop,
+                                    opened)))
+                    .whenComplete((unused, failure) -> {
+                        if (failure != null) {
+                            closeAfterFailure(history, unwrap(failure));
+                        }
                     });
-            return opened.whenComplete((unused, failure) -> {
-                if (failure != null) {
-                    closeAfterFailure(history, unwrap(failure));
-                }
-            });
         });
     }
 
-    private record Pending(
+    private static CompletionStage<Run> openRun(
             PulsarM6ObjectWalAllocator.BoundChain chain,
             PulsarM6ObjectWalRuns runs,
+            PulsarM6ObjectWalProvider provider,
+            PulsarNativeBindingV1 binding,
+            FixedSlice geometry,
+            PulsarM6ObjectWalHistory history,
+            Optional<WalRunPredecessor> predecessor,
+            Limits limits,
+            Duration timeout,
+            Executor io,
+            Executor ownerLoop) {
+        return async(
+                        () -> {
+                            var writerKms = provider.openKms();
+                            try {
+                                var fresh = history.openFresh(predecessor, chain.owner(), writerKms);
+                                try {
+                                    var projection = new PulsarM6ObjectWalProjection(
+                                            fresh.selected().root(),
+                                            binding,
+                                            chain.binding(),
+                                            geometry,
+                                            chain.owner().witness());
+                                    return new Resources(
+                                            fresh,
+                                            history,
+                                            writerKms,
+                                            makeActive(chain, runs, fresh, projection, timeout, io));
+                                } catch (Exception | Error failure) {
+                                    runs.abandonFresh(fresh, failure);
+                                    throw failure;
+                                }
+                            } catch (Exception | Error failure) {
+                                closeAfterFailure(writerKms, failure);
+                                throw failure;
+                            }
+                        },
+                        io)
+                .thenCompose(resources -> {
+                    var root = resources.fresh().selected().root();
+                    var bridge = new PulsarObjectWalBridgeV1(
+                            new PulsarObjectWalBridgeV1.Configuration(
+                                    limits.maximumEntryBytes(),
+                                    limits.entriesPerLedger(),
+                                    1,
+                                    RECOVERY_LOCATORS,
+                                    RECOVERY_LOCATORS,
+                                    1,
+                                    root.nwg1AdmissionCaps().maxCanonicalBodyBytes()),
+                            chain.controller(),
+                            new PulsarM6ObjectWalExtentRoute(resources.fresh(), resources.active(), history, io));
+                    var capability = new CapabilityBinding(
+                            1, Sha256Digest.hash(provider.profile().encode()));
+                    return bridge.activateRecoveredChain(
+                                    chain.binding(),
+                                    chain.owner().epoch(),
+                                    (node, terminal) ->
+                                            CompletableFuture.completedFuture(history.recover(node.virtualLedgerId())))
+                            .thenCompose(unused -> chain.owner().requireCurrent())
+                            .thenApply(unused -> {
+                                history.requireNoForeignLedgers();
+                                var reader = new PulsarObjectWalM4ReaderV1(
+                                        bridge,
+                                        chain.binding(),
+                                        selector(bridge, chain.binding(), root.shardRunEpoch(), capability),
+                                        new BindingReadHazardPoolV1(limits.readSlots(), 3),
+                                        ownerLoop,
+                                        limits.maximumReadEntries());
+                                return new Run(resources, bridge, reader, capability);
+                            })
+                            .exceptionallyCompose(failure -> async(
+                                    () -> {
+                                        var original = unwrap(failure);
+                                        runs.abandonFresh(resources.fresh(), original);
+                                        closeAfterFailure(resources.writerKms(), original);
+                                        throw new CompletionException(original);
+                                    },
+                                    io));
+                });
+    }
+
+    private record Resources(
             PulsarM6ObjectWalRuns.Fresh fresh,
             PulsarM6ObjectWalHistory history,
             KmsCellSession writerKms,
-            ProductionObjectWalExtentStore active,
-            CapabilityBinding capability) {}
+            ProductionObjectWalExtentStore active) {}
+
+    private static final class Run {
+        private final Resources resources;
+        private final PulsarObjectWalBridgeV1 bridge;
+        private final PulsarObjectWalM4ReaderV1 reader;
+        private final CapabilityBinding capability;
+        private CompletableFuture<Void> drained;
+
+        private Run(
+                Resources resources,
+                PulsarObjectWalBridgeV1 bridge,
+                PulsarObjectWalM4ReaderV1 reader,
+                CapabilityBinding capability) {
+            this.resources = resources;
+            this.bridge = bridge;
+            this.reader = reader;
+            this.capability = capability;
+        }
+
+        private boolean needsSuccessor() {
+            var root = resources.fresh().selected().root();
+            var runtime = resources.fresh().session().runtimeRecoveryState();
+            return runtime.reservedExtentCount() >= root.bounds().maxExtentCount()
+                    || root.nwg1AdmissionCaps().maxCanonicalBodyBytes()
+                            > root.bounds().maxCanonicalBodyBytes() - runtime.reservedCanonicalBodyBytes()
+                    || System.currentTimeMillis() - root.openedAtMillis()
+                            >= root.bounds().maxRunAgeMillis();
+        }
+
+        private synchronized CompletableFuture<Void> drain(PulsarM6ObjectWalRuns runs, Executor io) {
+            if (drained == null) {
+                drained = reader.stopAndDrain()
+                        .thenCompose(unused -> resources.active().stopAndDrainProviderTasks())
+                        .thenCompose(unused -> async(
+                                () -> {
+                                    runs.closeAndRequireDrained(
+                                            resources.fresh().selected());
+                                    resources.active().close();
+                                    resources.history().close();
+                                    resources.writerKms().close();
+                                    return null;
+                                },
+                                io));
+            }
+            return drained;
+        }
+    }
 
     private PulsarM6ObjectWalTopic(
-            Pending pending, PulsarObjectWalBridgeV1 bridge, Limits limits, Executor io, Executor ownerLoop) {
-        chain = pending.chain();
-        runs = pending.runs();
-        fresh = pending.fresh();
-        history = pending.history();
-        writerKms = pending.writerKms();
-        active = pending.active();
-        capability = pending.capability();
-        decodedSizes = new ConcurrentHashMap<>(history.exactSizes());
-        this.bridge = bridge;
+            PulsarM6ObjectWalAllocator.BoundChain chain,
+            PulsarM6ObjectWalRuns runs,
+            PulsarM6ObjectWalProvider provider,
+            PulsarNativeBindingV1 binding,
+            FixedSlice geometry,
+            Limits limits,
+            Duration timeout,
+            Executor io,
+            Executor ownerLoop,
+            Run run) {
+        this.chain = chain;
+        this.runs = runs;
+        this.provider = provider;
+        this.binding = binding;
+        this.geometry = geometry;
+        this.limits = limits;
+        this.timeout = timeout;
         this.io = io;
         this.ownerLoop = ownerLoop;
-        maximumEntryBytes = limits.maximumEntryBytes();
-        entriesPerLedger = limits.entriesPerLedger();
-        maximumPendingAppends = limits.maximumPendingAppends();
-        maximumPendingBytes = limits.pendingBytes();
-        reader = new PulsarObjectWalM4ReaderV1(
-                bridge,
-                chain.binding(),
-                selector(),
-                new BindingReadHazardPoolV1(limits.readSlots(), 3),
-                ownerLoop,
-                limits.maximumReadEntries());
+        this.run = run;
+        decodedSizes = new ConcurrentHashMap<>(run.resources.history().exactSizes());
+    }
+
+    private synchronized CompletionStage<Run> writableRun() {
+        var current = run;
+        if (!current.needsSuccessor()) {
+            return CompletableFuture.completedFuture(current);
+        }
+        if (runRollover != null) {
+            return runRollover;
+        }
+        var barrier = new CompletableFuture<Run>();
+        runRollover = barrier;
+        current.drain(runs, io)
+                .thenCompose(unused -> async(
+                        () -> runs.sealedPredecessor(current.resources.fresh().selected()), io))
+                .thenCompose(predecessor -> {
+                    var history = new PulsarM6ObjectWalHistory(
+                            runs, provider, binding, chain.binding(), geometry, timeout, RECOVERY_LOCATORS);
+                    return openRun(
+                                    chain,
+                                    runs,
+                                    provider,
+                                    binding,
+                                    geometry,
+                                    history,
+                                    Optional.of(predecessor),
+                                    limits,
+                                    timeout,
+                                    io,
+                                    ownerLoop)
+                            .whenComplete((unused, failure) -> {
+                                if (failure != null) {
+                                    closeAfterFailure(history, unwrap(failure));
+                                }
+                            });
+                })
+                .thenCompose(next -> {
+                    if (next.resources.history().exactSizes().equals(decodedSizes)) {
+                        return CompletableFuture.completedFuture(next);
+                    }
+                    var error =
+                            new IllegalStateException("Pulsar Object WAL successor lost its exact retained positions");
+                    return next.drain(runs, io).handle((unused, failure) -> {
+                        if (failure != null) {
+                            error.addSuppressed(unwrap(failure));
+                        }
+                        throw error;
+                    });
+                })
+                .whenComplete((next, failure) -> {
+                    if (failure != null) {
+                        barrier.completeExceptionally(failure);
+                        return;
+                    }
+                    synchronized (this) {
+                        run = next;
+                        runRollover = null;
+                    }
+                    barrier.complete(next);
+                });
+        return barrier;
     }
 
     private static ProductionObjectWalExtentStore makeActive(
@@ -320,9 +457,9 @@ final class PulsarM6ObjectWalTopic {
 
     synchronized CompletionStage<PulsarPosition> append(byte[] payload, Object authorityWord) {
         if (closing != null
-                || payload.length > maximumEntryBytes
-                || pendingAppends >= maximumPendingAppends
-                || payload.length > maximumPendingBytes - pendingBytes
+                || payload.length > limits.maximumEntryBytes()
+                || pendingAppends >= limits.maximumPendingAppends()
+                || payload.length > limits.pendingBytes() - pendingBytes
                 || appendFailure != null) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("Pulsar Object WAL append admission closed"));
@@ -340,40 +477,7 @@ final class PulsarM6ObjectWalTopic {
                                 return CompletableFuture.<PulsarPosition>failedFuture(new IllegalStateException(
                                         "Pulsar Object WAL publish started under stale ownership"));
                             }
-                            var input = new AppendInput(
-                                    chain.binding(),
-                                    owner.epoch(),
-                                    LANE,
-                                    PACKING_POLICY,
-                                    PulsarM6ObjectWalProjection.newId(),
-                                    payload);
-                            CompletionStage<?> space =
-                                    bridge.frontiers(chain.binding()).bindingDurableThrough() + 1 >= entriesPerLedger
-                                            ? bridge.rollover(chain.binding(), owner.epoch())
-                                            : CompletableFuture.completedFuture(null);
-                            return space.thenCompose(available -> bridge.appendShared(List.of(input)))
-                                    .exceptionallyCompose(failure -> {
-                                        var exact = unwrap(failure);
-                                        if (exact instanceof BridgeException bridgeFailure
-                                                && bridgeFailure.code()
-                                                        == BridgeRejectionCode.PROVIDER_OUTCOME_UNKNOWN) {
-                                            return bridge.resumePendingEntry(chain.binding(), owner.epoch());
-                                        }
-                                        return CompletableFuture.failedFuture(exact);
-                                    })
-                                    .thenApply(accepted -> {
-                                        MemberAppendResult result = accepted.get(0);
-                                        if (!(result instanceof VerifiedAppend exact)) {
-                                            throw new IllegalStateException(
-                                                    "Pulsar Object WAL append was not durably published");
-                                        }
-                                        if (decodedSizes.putIfAbsent(exact.position(), payload.length) != null) {
-                                            throw new IllegalStateException(
-                                                    "Native Object WAL published a repeated position");
-                                        }
-                                        reader.refresh(selector());
-                                        return exact.position();
-                                    });
+                            return writableRun().thenCompose(next -> appendInRun(next, payload, authorityWord));
                         },
                         ownerLoop)
                 .toCompletableFuture();
@@ -390,9 +494,54 @@ final class PulsarM6ObjectWalTopic {
         return original.copy();
     }
 
-    CompletionStage<List<ReadEntry>> read(List<PulsarPosition> positions) {
+    private CompletionStage<PulsarPosition> appendInRun(Run selected, byte[] payload, Object authorityWord) {
+        var owner = chain.owner();
+        if (owner.capture() != authorityWord) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Pulsar Object WAL publish crossed native ownership"));
+        }
+        var input = new AppendInput(
+                chain.binding(), owner.epoch(), LANE, PACKING_POLICY, PulsarM6ObjectWalProjection.newId(), payload);
+        var bridge = selected.bridge;
+        CompletionStage<?> space =
+                bridge.frontiers(chain.binding()).bindingDurableThrough() + 1 >= limits.entriesPerLedger()
+                        ? bridge.rollover(chain.binding(), owner.epoch())
+                        : CompletableFuture.completedFuture(null);
+        return space.thenCompose(available -> bridge.appendShared(List.of(input)))
+                .exceptionallyCompose(failure -> {
+                    var exact = unwrap(failure);
+                    if (exact instanceof BridgeException bridgeFailure
+                            && bridgeFailure.code() == BridgeRejectionCode.PROVIDER_OUTCOME_UNKNOWN) {
+                        return bridge.resumePendingEntry(chain.binding(), owner.epoch());
+                    }
+                    return CompletableFuture.failedFuture(exact);
+                })
+                .thenApply(accepted -> {
+                    MemberAppendResult result = accepted.get(0);
+                    if (!(result instanceof VerifiedAppend exact)) {
+                        throw new IllegalStateException("Pulsar Object WAL append was not durably published");
+                    }
+                    if (decodedSizes.putIfAbsent(exact.position(), payload.length) != null) {
+                        throw new IllegalStateException("Native Object WAL published a repeated position");
+                    }
+                    selected.reader.refresh(selector(
+                            bridge,
+                            chain.binding(),
+                            selected.resources.fresh().selected().root().shardRunEpoch(),
+                            selected.capability));
+                    return exact.position();
+                });
+    }
+
+    synchronized CompletionStage<List<ReadEntry>> read(List<PulsarPosition> positions) {
+        if (closing != null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Pulsar Object WAL read admission closed"));
+        }
+        if (runRollover != null) {
+            return runRollover.thenCompose(unused -> read(positions));
+        }
         final var before = chain.owner().capture();
-        return reader.readBatch(positions).thenApply(values -> {
+        return run.reader.readBatch(positions).thenApply(values -> {
             if (!chain.owner().isCurrent(before)) {
                 throw new IllegalStateException("Pulsar Object WAL read completed under stale ownership");
             }
@@ -401,7 +550,7 @@ final class PulsarM6ObjectWalTopic {
     }
 
     int maximumEntryBytes() {
-        return maximumEntryBytes;
+        return limits.maximumEntryBytes();
     }
 
     PulsarM6ObjectWalOwner owner() {
@@ -413,11 +562,11 @@ final class PulsarM6ObjectWalTopic {
     }
 
     PulsarObjectWalReadViewV1 view() {
-        return bridge.captureReadView(chain.binding());
+        return run.bridge.captureReadView(chain.binding());
     }
 
     PulsarObjectWalReadViewV1 publishedView() {
-        var state = reader.currentAuthority().get().publicationCell().protocolStateReference();
+        var state = run.reader.currentAuthority().get().publicationCell().protocolStateReference();
         return ((PulsarObjectBindingReadAdapterV1.ReadCell) state).view();
     }
 
@@ -437,25 +586,30 @@ final class PulsarM6ObjectWalTopic {
 
     synchronized CompletableFuture<Void> close() {
         if (closing == null) {
-            var reads = reader.stopAndDrain();
-            closing = CompletableFuture.allOf(appendTail, reads)
-                    .thenCompose(unused -> active.stopAndDrainProviderTasks())
-                    .thenCompose(unused -> async(
-                            () -> {
-                                runs.closeAndRequireDrained(fresh.selected());
-                                active.close();
-                                history.close();
-                                writerKms.close();
-                                return null;
-                            },
-                            io));
+            closing = appendTail
+                    .thenCompose(unused -> {
+                        var rollover = runRollover;
+                        return rollover == null
+                                ? run.drain(runs, io)
+                                : rollover.thenCompose(opened -> opened.drain(runs, io));
+                    })
+                    .exceptionallyCompose(failure -> {
+                        var cause = unwrap(failure);
+                        if (appendFailure == null || appendFailure == cause) {
+                            return CompletableFuture.failedFuture(cause);
+                        }
+                        var unsettled =
+                                new IllegalStateException("Pulsar Object WAL drain left an unsettled append", cause);
+                        unsettled.addSuppressed(appendFailure);
+                        return CompletableFuture.failedFuture(unsettled);
+                    });
         }
         return closing.copy();
     }
 
-    private com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector selector() {
-        return PulsarObjectBindingReadAdapterV1.preferredSelector(
-                view(), fresh.selected().root().shardRunEpoch(), capability);
+    private static com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector selector(
+            PulsarObjectWalBridgeV1 bridge, PulsarBindingKey binding, long epoch, CapabilityBinding capability) {
+        return PulsarObjectBindingReadAdapterV1.preferredSelector(bridge.captureReadView(binding), epoch, capability);
     }
 
     private static void closeAfterFailure(AutoCloseable resource, Throwable failure) {

@@ -979,6 +979,31 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
     }
 
+    /** Resolves one live writer's exact original Object with bounded work independent of cold recovery time. */
+    public ProviderObjectResult reconcileLiveNwg1Candidate(AdmittedNwg1Candidate candidate) throws IOException {
+        try (var lease = acquireCandidateIo(candidate)) {
+            requireCandidate(candidate);
+            var persistence = candidate.persistenceResult;
+            if (persistence == null) {
+                throw new IllegalStateException("Live reconciliation requires an original conditional create");
+            }
+            if (persistence.outcome() != ProviderObjectOutcome.OUTCOME_UNKNOWN) {
+                return persistence;
+            }
+            if (candidate.liveReconciliations >= 2) {
+                throw new IllegalStateException("Exact live Object reconciliation has exhausted its attempts");
+            }
+            candidate.liveReconciliations++;
+            var identity = candidate.identity;
+            int keyBytes = identity.key().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            // Only this full content-addressed key can resolve the original dispatch. The Provider verifies the
+            // complete body, and its transport still decides whether a negative observation is terminal.
+            candidate.persistenceResult = provider.reconcileUnknown(identity, identity.key(), 1, 1, keyBytes, keyBytes)
+                    .objectResult();
+            return candidate.persistenceResult;
+        }
+    }
+
     /** Authenticated routine prefix plus the compact selected-unit fold; it never retains decoded frame bytes. */
     public record VerifiedRoutineNwg1AppendUnit(
             Nwg1ObjectReaderV1.AuthenticatedPrefix authenticatedPrefix,
@@ -1536,6 +1561,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         private final ObjectIdentity identity;
         private final RepeatableObjectBody uploadBody;
         private ProviderObjectResult persistenceResult;
+        private int liveReconciliations;
         private boolean ioInFlight;
         private int conditionalCreateAttempts;
         private boolean terminal;

@@ -18,7 +18,7 @@ FIRST_LOST_PUT_SUFFIX = {"first-put-response-lost": ".nwg", "first-pulsar-data-p
 LOST_PUT_MODES = {"put-response-lost", *FIRST_LOST_PUT_SUFFIX}
 LOST_DELETE = "delete-response-lost"
 LOST_RESPONSE_MODES = LOST_PUT_MODES | {LOST_DELETE}
-MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"} | LOST_RESPONSE_MODES
+MODES = {"denied", "unavailable", "corrupt", "held", "held-unversioned", "observe", "bucket-unavailable"} | LOST_RESPONSE_MODES
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
@@ -120,18 +120,24 @@ def fault_proxy(upstream):
                             or data["mode"] not in MODES or not data["path"].startswith("/") or not data["version"]):
                         return self.reply(400)
                     whole_bucket = data["mode"] == "bucket-unavailable"
+                    held_read = data["mode"] == "held-unversioned"
                     lost_put = data["mode"] in LOST_PUT_MODES
                     if (whole_bucket and (data["version"] != "*" or not data["path"].endswith("/")
                                           or data["path"].count("/") != 2 or data["path"] == "//")
                             or lost_put and (data["version"] != "*" or data["path"].count("/") < 2
                                              or data["path"].endswith("/") != (data["mode"] in FIRST_LOST_PUT_SUFFIX))
-                            or not whole_bucket and not lost_put and data["version"] == "*"):
+                            or held_read and (data["version"] != "*" or data["path"].count("/") < 2
+                                              or data["path"].endswith("/"))
+                            or not whole_bucket and not lost_put and not held_read and data["version"] == "*"):
                         return self.reply(400)
                     if rule is not None:
                         rule["release"].set()
-                    rule = dict(data, hits=0, appliedVersion=None, selectedPath=None, release=threading.Event())
+                    rule = dict(data, hits=0, appliedVersion=None, selectedPath=None,
+                                upstreamReads=0, release=threading.Event())
                 elif self.command == "PATCH":
-                    if rule is None or rule["mode"] not in LOST_RESPONSE_MODES or rule["appliedVersion"] is None:
+                    if rule is None or not (
+                            rule["mode"] in LOST_RESPONSE_MODES and rule["appliedVersion"] is not None
+                            or rule["mode"] == "held-unversioned" and rule["upstreamReads"] > 0):
                         return self.reply(409)
                     rule["release"].set()
                 elif self.command == "DELETE":
@@ -142,7 +148,8 @@ def fault_proxy(upstream):
                     return self.reply(405)
                 state = {"hits": rule["hits"] if rule else 0,
                          "appliedVersion": rule["appliedVersion"] if rule else None,
-                         "selectedPath": rule["selectedPath"] if rule else None}
+                         "selectedPath": rule["selectedPath"] if rule else None,
+                         "upstreamReads": rule["upstreamReads"] if rule else 0}
             return self.reply(200, json.dumps(state).encode("ascii"), [("Content-Type", "application/json")])
 
         def relay(self):
@@ -162,6 +169,8 @@ def fault_proxy(upstream):
                              or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]
                              or rule["mode"] in FIRST_LOST_PUT_SUFFIX and self.command == "PUT"
                              and path == rule["selectedPath"]
+                             or rule["mode"] == "held-unversioned" and self.command == "GET"
+                             and path == rule["path"] and version is None
                              or version == [rule["version"]] and path == rule["path"] and
                              (rule["mode"] == LOST_DELETE and self.command == "DELETE"
                               or rule["mode"] not in LOST_RESPONSE_MODES and self.command == "GET")):
@@ -215,7 +224,12 @@ def fault_proxy(upstream):
                     fault["release"].wait(30)
                     self.close_connection = True
                     return
-            if mode == "held" and not fault["release"].wait(30):
+            if mode == "held-unversioned":
+                if response.status != 206:
+                    return self.reply(response.status, content, response_headers)
+                with lock:
+                    fault["upstreamReads"] += 1
+            if mode in {"held", "held-unversioned"} and not fault["release"].wait(30):
                 return self.reply(504)
             if mode == "corrupt" and response.status == 200 and content:
                 content = bytes([content[0] ^ 1]) + content[1:]
