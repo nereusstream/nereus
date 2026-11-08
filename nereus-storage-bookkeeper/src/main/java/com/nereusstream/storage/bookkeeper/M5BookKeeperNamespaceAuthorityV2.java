@@ -55,6 +55,17 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
     /** May initialize ordinary BK metadata and the permanent unbound creation gate; performs no ledger allocation. */
     public static M5BookKeeperNamespaceAuthorityV2 connect(
             String metadataServiceUri, BookKeeperCapabilitySnapshotV1 capability) throws Exception {
+        return connect(metadataServiceUri, capability, true);
+    }
+
+    /** Broker startup reopens a previously provisioned namespace without creating an authority row. */
+    public static M5BookKeeperNamespaceAuthorityV2 connectExisting(
+            String metadataServiceUri, BookKeeperCapabilitySnapshotV1 capability) throws Exception {
+        return connect(metadataServiceUri, capability, false);
+    }
+
+    private static M5BookKeeperNamespaceAuthorityV2 connect(
+            String metadataServiceUri, BookKeeperCapabilitySnapshotV1 capability, boolean provision) throws Exception {
         var configuration = RealBookKeeperClientConfigurationV1.from(metadataServiceUri, capability);
         var client = (BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(configuration)
                 .build();
@@ -64,7 +75,9 @@ public final class M5BookKeeperNamespaceAuthorityV2 implements NativePhysicalNam
             String instance =
                     new String(driver.getZk().getData(root + "/INSTANCEID", false, null), StandardCharsets.US_ASCII);
             var gate = new M5BookKeeperNamespaceGateV2(driver.getZk(), root, instance, ZkUtils.getACLs(configuration));
-            gate.initializeUnbound().get();
+            if (provision) {
+                gate.initializeUnbound().get();
+            }
             return new M5BookKeeperNamespaceAuthorityV2(client, gate, ZkUtils.getACLs(configuration), capability);
         } catch (Exception failure) {
             client.close();

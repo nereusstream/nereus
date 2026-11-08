@@ -202,7 +202,8 @@ public final class PulsarNativeBindingV1 {
         this.incarnation = incarnation;
         this.authority = authority;
         if (!authority.aggregate().binding().incarnationIdentity().equals(incarnation)
-                || authority.aggregate().initialEpoch().storageProfile() != StorageProfileV1.BOOKKEEPER_WAL_ASYNC_OBJECT
+                || !isNativeBookKeeperProfile(
+                        authority.aggregate().initialEpoch().storageProfile())
                 || authority.selector().value().generation().value()
                         != incarnation.bindingGeneration().value()) {
             throw new IllegalArgumentException("native offload Binding differs from its P1 incarnation/profile");
@@ -268,8 +269,8 @@ public final class PulsarNativeBindingV1 {
             com.nereusstream.domain.aggregate.TopicBindingAggregateValidatorV1.validate(candidate.aggregate());
             if (!(candidate.aggregate().binding().incarnationIdentity()
                             instanceof PulsarTopicIncarnationIdentity incarnation)
-                    || candidate.aggregate().initialEpoch().storageProfile()
-                            != StorageProfileV1.BOOKKEEPER_WAL_ASYNC_OBJECT
+                    || !isNativeBookKeeperProfile(
+                            candidate.aggregate().initialEpoch().storageProfile())
                     || !com.nereusstream.domain.codec.Nta1CodecV1.encode(candidate.aggregate())
                             .equals(candidate.canonicalStoredBytes())
                     || !Sha256Digest.hash(candidate.canonicalStoredBytes()).equals(candidate.canonicalStoredDigest())) {
@@ -303,6 +304,11 @@ public final class PulsarNativeBindingV1 {
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private static boolean isNativeBookKeeperProfile(StorageProfileV1 profile) {
+        return profile == StorageProfileV1.BOOKKEEPER_WAL_ONLY
+                || profile == StorageProfileV1.BOOKKEEPER_WAL_ASYNC_OBJECT;
     }
 
     private static CompletionStage<

@@ -1,0 +1,1 @@
+<Configuration status="WARN"><Appenders><Console name="c"><PatternLayout pattern="%d %-5p %c{1} %m%n%throwable"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="c"/></Root></Loggers></Configuration>

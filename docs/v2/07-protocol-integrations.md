@@ -204,6 +204,13 @@ Focused coverage does not promote a row or grant deployment authority.
 Kafka rows require fresh feature-2 bootstrap and RF=1/minISR=1. The existing no-online-migration boundary applies to
 both protocols.
 
+The focused native Pulsar BookKeeper route uses an explicit Protocol Cell and pre-admitted Bindings. The Broker
+checks the live Oxia namespace, the provisioned BookKeeper namespace and the actual BK client artifact, then opens
+the topic through the M5 ManagedLedger factory. Pulsar system topics still use their native storage. A native
+ownership or aggregate notification revokes admission until a fresh authoritative read. An in-flight operation
+cannot acknowledge with a later authority word. Planned unload and shutdown wait for the original factory and Cell
+drain before releasing ownership. The focused process check is `scripts/run-v2-m6-pulsar-bk-process-check.py`.
+
 | Protocol/profile | Startup and routing authority | Recovery and lifecycle gate | Mandatory M6 exit |
 | --- | --- | --- | --- |
 | Kafka `BOOKKEEPER_WAL_ONLY` | native Controller assignment and exact feature-2 aggregate; admitted BK capability, Cell and internal-topic policy | close old run admission, fence all legal ledgers, recover common checkpoint plus tail, install stock protocol state and activate only current generation | `V2-KAF-META-004/005`, `V2-KAF-PROC-001` and applicable `V2-KAF-DATA` rows |
