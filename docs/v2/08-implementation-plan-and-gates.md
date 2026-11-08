@@ -373,8 +373,10 @@ The cold Broker reads retained sources with the original writer context and Vaul
 with an unknown outcome prevents takeover from using absence as proof. The process check loses the PUT response
 after MinIO stores the original version, confirms the BK-only topic can still append, and verifies both profiles
 after takeover. It also checks a planned handoff in which the departing Broker drains admitted work and publishes
-the terminal NWKCP1 Head before its replacement resumes. This path has bounded Root and recovery budgets; automatic
-rollover and the aggregate profile and scenario exit are still open.
+the terminal NWKCP1 Head before its replacement resumes. A live Owner rolls the physical run before admitting new
+positions at its count or age bound. The process check fills one run to its declared extent limit, verifies its
+terminal Head and the same Owner's exact successor, and reads both sides of that boundary in one Fetch. Retained
+sources still count against the bounded history budget; automatic source retirement and the aggregate exit remain open.
 
 ### Planned aggregate boundaries
 

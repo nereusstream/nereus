@@ -76,6 +76,8 @@ public final class KafkaObjectNativeAppendV1 {
     private final Nwg1DirectoryV1.BindingContext binding;
     private final RunOwner runOwner;
     private volatile boolean fenced;
+    private WalRunPredecessor rolloverPredecessor;
+    private boolean openedSuccessor;
 
     /** Arms a fresh physical run only after the exact current native owner selected its authorization Head. */
     public static KafkaObjectNativeAppendV1 open(
@@ -103,9 +105,22 @@ public final class KafkaObjectNativeAppendV1 {
             throw new IllegalStateException("native Object WAL locator admission differs from the coherent cut");
         }
         var root = fresh.rootRecord();
-        var verification = KafkaObjectNativeVerificationV1.context(root, fence);
         var tracker = tracker(root, fence, recoveredTail);
         tracker.bindAuthorization(authority, fence, root.nwg1AdmissionCaps().maxCanonicalBodyBytes());
+        return openSelected(fresh, metadata, authority, coordinator, tracker, current, fence, end);
+    }
+
+    private static KafkaObjectNativeAppendV1 openSelected(
+            WalRunObjectSession fresh,
+            CanonicalControlMetadataStore metadata,
+            KafkaObjectAuthorizationV1 authority,
+            KafkaCoherentCommitCoordinatorV1 coordinator,
+            KafkaObjectCompletionTrackerV1 tracker,
+            BooleanSupplier current,
+            KafkaPartitionFenceV1 fence,
+            long end) {
+        var root = fresh.rootRecord();
+        var verification = KafkaObjectNativeVerificationV1.context(root, fence);
         var checkpoint = new WalCheckpointPublisher(
                 metadata,
                 WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch()),
@@ -192,6 +207,14 @@ public final class KafkaObjectNativeAppendV1 {
 
     public int maximumFrameBytes() {
         return root.nwg1AdmissionCaps().maxDecodedFrameBytes();
+    }
+
+    /** A local check before reserving another native position. */
+    public boolean requiresRollover(long nowMillis) {
+        requireCurrent();
+        var cut = runOwner.session().runtimeRecoveryState();
+        return cut.reservedExtentCount() >= root.bounds().maxExtentCount()
+                || nowMillis - root.openedAtMillis() >= root.bounds().maxRunAgeMillis();
     }
 
     public KafkaObjectCoherentProtocolSnapshotV1 append(
@@ -321,11 +344,55 @@ public final class KafkaObjectNativeAppendV1 {
 
     public record ClosedRun(WalRunPredecessor predecessor, KafkaObjectAuthorizationV1.ClosedHistory history) {}
 
+    private record TerminalRun(WalRunPredecessor predecessor, KafkaProtocolCheckpointStateV1 checkpoint) {}
+
     /**
      * Planned handoff only: the native lifecycle has stopped and drained request admission while the assignment is
      * still current. Close of an unexpected predecessor uses durable recovery instead.
      */
     public ClosedRun sealDrained() {
+        var terminal = sealPhysicalAndProtocol();
+        var authority = runOwner.authority();
+        var history = authority.close(fence);
+        if (authority.checkpoint(history).filter(terminal.checkpoint()::equals).isEmpty()) {
+            throw new IllegalStateException("Object WAL handoff selected a different terminal protocol cut");
+        }
+        return new ClosedRun(terminal.predecessor(), history);
+    }
+
+    /** Same native Owner: seal the physical run and retain the selected Kafka authorization Head. */
+    public WalRunPredecessor sealForRollover() {
+        requireCurrent();
+        rolloverPredecessor = sealPhysicalAndProtocol().predecessor();
+        return rolloverPredecessor;
+    }
+
+    /** The fresh Root must carry exactly this writer's terminal physical and protocol identities. */
+    public KafkaObjectNativeAppendV1 openSuccessor(WalRunObjectSession fresh) {
+        var next = fresh.rootRecord();
+        var authority = runOwner.authority();
+        var snapshot = coordinator.captureObject();
+        var head = authority.read(fence).orElseThrow();
+        long end = snapshot.root().frontiers().durableEndOffset();
+        if (rolloverPredecessor == null
+                || openedSuccessor
+                || !current.getAsBoolean()
+                || fresh.runtimeState() != WalRunRuntime.State.ADMITTING
+                || !next.predecessor().equals(Optional.of(rolloverPredecessor))
+                || !next.nwg1AdmissionCaps().equals(root.nwg1AdmissionCaps())
+                || !next.bounds().equals(root.bounds())
+                || head.closed()
+                || !head.fence().equals(fence)
+                || head.endOffset() != end
+                || head.checkpointEnd() != end) {
+            throw new IllegalStateException("Object WAL rollover does not name the exact same-owner cut");
+        }
+        var successor = openSelected(fresh, runOwner.metadata(), authority, coordinator, tracker, current, fence, end);
+        openedSuccessor = true;
+        return successor;
+    }
+
+    private TerminalRun sealPhysicalAndProtocol() {
         if (!current.getAsBoolean()) {
             throw new IllegalStateException("native Object WAL cannot seal under a superseded assignment");
         }
@@ -353,14 +420,10 @@ public final class KafkaObjectNativeAppendV1 {
         session.sealRuntime();
         var physical = pipeline.publishPhysicalSeal(new WalRunLifecycleManager(metadata));
         var terminal = store.terminalize(physical).toCompletableFuture().join();
-        var history = authority.close(fence);
-        if (authority.checkpoint(history).filter(checkpoint::equals).isEmpty()) {
-            throw new IllegalStateException("Object WAL handoff selected a different terminal protocol cut");
-        }
-        return new ClosedRun(
+        return new TerminalRun(
                 new WalRunPredecessor(
                         physical.root(), physical.sealKey(), physical.sealSha256(), Optional.of(terminal)),
-                history);
+                checkpoint);
     }
 
     public static String checkpointPrefix(WalRunRootRecord root) {
