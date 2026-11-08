@@ -211,8 +211,19 @@ def run(pulsar, java_home, out):
                     state = fault_state(s3_control, s3_token)
                     if state["appliedVersion"] == root_version:
                         break
-                    r.SOURCE.require(pending.poll() is None and time.monotonic() < deadline,
-                                     "original immutable S3 deletion did not reach its fault")
+                    if pending.poll() is not None or time.monotonic() >= deadline:
+                        (out / "object-delete-cut-failure.json").write_bytes(r.SOURCE.INPUTS.canonical({
+                            "ledger": int(original), "expectedKey": root_key, "expectedVersion": root_version,
+                            "operatorExitCode": pending.poll(), "relay": state,
+                        }))
+                        if pending.poll() is None:
+                            with (out / "operator-threads-at-delete-cut.log").open("xb") as threads:
+                                try:
+                                    subprocess.run([str(java_home / "bin/jcmd"), str(pending.pid), "Thread.print", "-l"],
+                                                   stdout=threads, stderr=subprocess.STDOUT, timeout=10, check=False)
+                                except (OSError, subprocess.TimeoutExpired) as failure:
+                                    threads.write(f"Thread capture failed: {failure}\n".encode())
+                        raise r.SOURCE.InputError("original immutable S3 deletion did not reach its fault")
                     time.sleep(0.1)
                 r.SOURCE.require(state["hits"] == 1, "original S3 deletion was dispatched more than once")
                 r.run_to_log(object_probe + [root_key, root_version, "held"], out / "object-delete-held.log", timeout=15)

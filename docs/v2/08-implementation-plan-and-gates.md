@@ -401,6 +401,7 @@ check mixed async Object and BK-only routing, BK ACKs while the Object bucket re
 bucket configuration, and cold takeover of the same selected Object version after the original Broker stops.
 The TestKit fixture covers quota rejection before PUT, original version reuse, background scheduling, hot and cold recovery
 after response loss, and protected BK fallback when an exact Object version is missing, unavailable or corrupt.
+It records zero Oxia calls between a warm BookKeeper append and its ACK in the async Object profile.
 It also rejects BK fallback after Object authorization failure and retains the actual provider read pin after client
 disconnect. Its retirement case keeps an
 admitted Object Fetch pinned through BK rollover, verifies the exact fallback release after drain, then records
@@ -413,6 +414,7 @@ verifies that the old Broker drains the scan before Controller handoff and that 
 records. A Task superseded by BK rollover is cancelled only while its original live actor can prove it never entered
 the Object output phase. The semantic case checks a rewritten sparse Kafka batch, a Fetch beginning at a compacted gap,
 a retained tombstone, timestamp lookup, transaction markers and transaction filtering on both the original and cold Owner.
+The original and compacted markers retain the same coordinator epoch, producer identity, leader epoch and timestamp.
 The successor case takes its prefix from the first compacted Object version and its suffix from sealed BK runs. It
 checks the selected input identities and the exact visible values on both Owners, and rereads the successor's side
 indexes on the cold Broker. A missing compacted Object version fails closed because the original BK bytes contain
