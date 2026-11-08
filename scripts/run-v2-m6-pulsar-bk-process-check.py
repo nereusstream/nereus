@@ -198,6 +198,7 @@ def run(pulsar, java_home, out):
                        "native BK protocol checks did not reach their terminal assertions")
         SOURCE.require("PULSAR_NATIVE_MISSING_BINDING_REJECTED" in (out / "client.log").read_text(),
                        "missing Binding was not rejected before native ledger creation")
+        SOURCE.require(state.is_file(), "the official client did not record its exact cold restart expectations")
         for stop in reversed(brokers):
             stop(strict=True)
         restarted = start_broker(stack, java, out / "broker-0.conf", out / "restarted.log", addresses[0])

@@ -146,6 +146,19 @@ class M6PulsarBookKeeperSemanticsProbe {
                         throw new AssertionError("successor write differs");
                     }
                 }
+                var expected = new Properties();
+                var encoder = Base64.getEncoder();
+                expected.setProperty("firstBrokerIncarnation", before.brokerIncarnationId().value());
+                expected.setProperty("secondBrokerIncarnation", after.brokerIncarnationId().value());
+                initialPositions.add(second);
+                initialBodies.add(successorData);
+                for (int i = 0; i < initialPositions.size(); i++) {
+                    expected.setProperty("position." + i, encoder.encodeToString(initialPositions.get(i).toByteArray()));
+                    expected.setProperty("body." + i, encoder.encodeToString(initialBodies.get(i)));
+                }
+                try (var output = Files.newBufferedWriter(Path.of(args[5]))) {
+                    expected.store(output, null);
+                }
                 System.out.println("PULSAR_NATIVE_BK_PROTOCOL_SEMANTICS_PASS " + first + " " + second);
             }
         }
