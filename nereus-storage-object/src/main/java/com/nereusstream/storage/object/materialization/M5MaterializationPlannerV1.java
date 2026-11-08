@@ -79,9 +79,12 @@ public final class M5MaterializationPlannerV1 {
         sourceCut.coverage().requireCurrentPulsar();
         M5MaterializationCodecV1.encodeSourceCut(sourceCut);
         if (sourceCut.sources().stream()
-                .anyMatch(source -> source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2
-                        || source.kind() == SourceKind.KAFKA_NMS1_DATA_V2)) {
-            throw new IllegalArgumentException("compacted Kafka generation input requires the M5-B semantic path");
+                .anyMatch(source -> source.kind() == SourceKind.KAFKA_BK_COMPACTED_GENERATION_V2)) {
+            throw new IllegalArgumentException("compacted BK generation input requires the M5-B semantic path");
+        }
+        if (sourceCut.sources().stream().anyMatch(source -> source.kind() == SourceKind.KAFKA_NMS1_DATA_V2)) {
+            throw new IllegalArgumentException(
+                    "compacted Kafka Object generation input requires the M5-B semantic path");
         }
         requireProtocolPayloadCompatibility(sourceCut, policy.rewritePayloadKind());
         requireSharedObjectIsolation(sourceCut);
