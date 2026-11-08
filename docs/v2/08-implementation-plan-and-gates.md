@@ -486,13 +486,19 @@ a three-Controller election with the old leader offline, a cold Broker starting 
 Controller snapshot, format rejection at feature level 1, rejection of a mismatched BookKeeper scope, and
 idempotent and non-idempotent retries after a disconnected Produce. Fetch checks include delayed native requests
 that wake after a shared commit or transaction marker, multi-partition waits through a deadline or topic deletion,
-and complete compressed batches across successive bounded reads.
+and complete compressed batches across successive bounded reads. A read-committed request with one reread slot
+waits through a separate HW advance and uses that slot when the transaction marker advances LSO.
 The suite also exercises Produce with `acks=1`, `acks=all` and `acks=0` against real BookKeeper, including a quorum
 response delivered after Owner replacement and an unknown response recovered by the next Owner.
 Pass `v2M6KafkaCheckout`, `v2M6KafkaJavaHome` and `v2M6ProcessOutput`
 as Gradle properties; the output must be a new directory outside the inputs. For diagnosis, an existing
 repository can be supplied with `v2M6KafkaDevelopmentRepository`. The focused check does not attest the complete
 build and runtime dependency graph or complete M6-1. No scenario is promoted by its output.
+
+The separate `scripts/run-v2-m6-kafka-bk-recovery-check.py` runner rebuilds the current M4 prerequisite and
+executes the required native recovery and compaction cases over real BookKeeper and Oxia. It captures historical
+Fetch and reader drain, lost OPEN/create or ticket responses, fenced takeover, and BK-only internal compaction
+with coordinator recovery. The aggregate requires both this result and the separate production process suite.
 
 `__share_group_state`, online migration, KoP, cross-protocol write-authority migration, compact tombstone deletion and
 allocator orphan GC remain outside these batches. M7 SLO values and M8 baseline/threshold selection are pre-execution

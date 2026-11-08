@@ -22,7 +22,9 @@ KAFKA_PROCESSES = {
     "kafka-bookkeeper-wal-only": ("bk-process", "FOCUSED_KAFKA_BK_PROCESS_CHECK", "process-result.json"),
     "kafka-bookkeeper-wal-async-object": ("async-object", "FOCUSED_KAFKA_ASYNC_OBJECT_CHECK", "object-fixture-result.json"),
     "kafka-object-wal": ("object-wal", "FOCUSED_KAFKA_OBJECT_WAL_CHECK", "object-wal-fixture-result.json"),
+    "kafka-bk-recovery": ("bk-recovery", "FOCUSED_KAFKA_BK_RECOVERY_CHECK", "bk-recovery-result.json"),
 }
+KAFKA_BK_RECOVERY_TASK = ":core:nereusBookKeeperM4AdmissionRealTest|"
 PULSAR_PROCESSES = {
     "pulsar-bookkeeper-wal-only": {
         "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ONLY", "--lifecycle"),
@@ -80,6 +82,9 @@ def plan(root):
         else:
             require_keys(entry, ("cases",), f"{profile} plan")
             cases = [validate_assignment(entry["cases"], CASE, profile)]
+            if profile == "kafka-bookkeeper-wal-only":
+                SOURCE.require({key.startswith(KAFKA_BK_RECOVERY_TASK) for key in entry["cases"]} == {True, False},
+                               "Kafka BK plan requires both production process and qualified recovery cases")
         claims[profile] = sorted(set().union(*cases))
     COVERAGE.validate_profiles(root, claims)
     scripts = {f"kafka-{script}" for script, _, _ in KAFKA_PROCESSES.values()}
@@ -298,7 +303,8 @@ def verify_kafka_result(output, started, profile, expected, sources):
         nested = profile == "kafka-object-wal"
         if not nested:
             verify_attachment_map(output, started, result["backendFiles"])
-            verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
+            if profile != "kafka-bk-recovery":
+                verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
             verify_named(output, result["m4Qualification"], "path")
         process_attached = not nested
         for task, test in result["tests"].items():
@@ -323,7 +329,7 @@ def verify_kafka_result(output, started, profile, expected, sources):
             "scenarios": sorted({claim for key in actual for claim in expected[key]})}
 
 
-def run_kafka_profile(roots, output, profile, expected, frozen):
+def run_kafka_process(roots, output, profile, expected, frozen):
     script, _, receipt = KAFKA_PROCESSES[profile]
     started = time.time_ns()
     run([sys.executable, f"scripts/run-v2-m6-kafka-{script}-check.py", "--kafka-root", str(roots["kafka"]),
@@ -332,6 +338,21 @@ def run_kafka_profile(roots, output, profile, expected, frozen):
     result = verify_kafka_result(output, started, profile, expected, source_pair(frozen, "kafka"))
     verify_kafka_runtime(output / receipt, roots, output, frozen)
     return result
+
+
+def run_kafka_profile(roots, output, profile, expected, frozen):
+    if profile != "kafka-bookkeeper-wal-only":
+        return run_kafka_process(roots, output, profile, expected, frozen)
+    output.mkdir()
+    recovery = {key: rows for key, rows in expected.items() if key.startswith(KAFKA_BK_RECOVERY_TASK)}
+    process = {key: rows for key, rows in expected.items() if key not in recovery}
+    children = {
+        "process": run_kafka_process(roots, output / "process", profile, process, frozen),
+        "recovery": run_kafka_process(roots, output / "recovery", "kafka-bk-recovery", recovery, frozen),
+    }
+    return {"checks": children, "scenarios": sorted({
+        scenario for child in children.values() for scenario in child["scenarios"]
+    })}
 
 
 def execute(args):

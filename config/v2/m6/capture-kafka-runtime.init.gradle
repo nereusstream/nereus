@@ -10,7 +10,8 @@ import org.gradle.api.tasks.testing.Test
 def output = Path.of(System.getProperty('nereus.m6.kafkaRuntimeCapture'))
 def objectFixture = Boolean.getBoolean('nereus.m6.kafkaObjectRuntimeCapture')
 def walFixture = Boolean.getBoolean('nereus.m6.kafkaObjectWalRuntimeCapture')
-if (objectFixture && walFixture) {
+def bkRecovery = Boolean.getBoolean('nereus.m6.kafkaBkRecoveryRuntimeCapture')
+if ([objectFixture, walFixture, bkRecovery].count { it } > 1) {
     throw new GradleException('M6 Kafka runtime capture requires one exact profile')
 }
 
@@ -39,9 +40,10 @@ gradle.projectsEvaluated {
         throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
     }
     def core = gradle.rootProject.project(':core')
-    def processTask = walFixture ? 'nereusKafkaObjectWalProcessRealTest'
+    def processTask = bkRecovery ? null : walFixture ? 'nereusKafkaObjectWalProcessRealTest'
         : objectFixture ? 'nereusKafkaAsyncObjectProcessRealTest' : 'nereusBookKeeperOwnerRelocationRealTest'
-    def testTasks = walFixture ? ['nereusObjectWalAdapterRealTest', 'nereusKafkaObjectWalAuthorizationRealTest', processTask]
+    def testTasks = bkRecovery ? ['nereusBookKeeperM4AdmissionRealTest']
+        : walFixture ? ['nereusObjectWalAdapterRealTest', 'nereusKafkaObjectWalAuthorizationRealTest', processTask]
         : objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', processTask]
         : [processTask]
     testTasks.each { task ->
