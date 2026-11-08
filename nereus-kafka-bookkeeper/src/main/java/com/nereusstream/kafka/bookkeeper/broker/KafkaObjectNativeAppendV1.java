@@ -62,9 +62,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /** Synchronous native Kafka append for one already admitted Object WAL Owner, serialized by its partition log. */
 public final class KafkaObjectNativeAppendV1 {
+    /** Runs the short local publication under the same gate that revokes the native assignment. */
+    @FunctionalInterface
+    public interface PublicationFence {
+        KafkaObjectCoherentProtocolSnapshotV1 whileCurrent(Supplier<KafkaObjectCoherentProtocolSnapshotV1> publish);
+    }
+
     private final WalRunRootRecord root;
     private final Nwg1VerificationContextV1 verification;
     private final KafkaCoherentCommitCoordinatorV1 coordinator;
@@ -222,6 +229,16 @@ public final class KafkaObjectNativeAppendV1 {
             List<KafkaNativeAssignedRecordBatchV1> assigned,
             long nowMillis,
             Consumer<KafkaObjectCoherentProtocolSnapshotV1> acceptPublished) {
+        return append(admitted, assigned, nowMillis, Supplier::get, acceptPublished);
+    }
+
+    public KafkaObjectCoherentProtocolSnapshotV1 append(
+            Admission admitted,
+            List<KafkaNativeAssignedRecordBatchV1> assigned,
+            long nowMillis,
+            PublicationFence publicationFence,
+            Consumer<KafkaObjectCoherentProtocolSnapshotV1> acceptPublished) {
+        Objects.requireNonNull(publicationFence, "publicationFence");
         Objects.requireNonNull(acceptPublished, "acceptPublished");
         requireCurrent();
         var batches = List.copyOf(assigned);
@@ -253,21 +270,24 @@ public final class KafkaObjectNativeAppendV1 {
                     Math.min(end, transactions.firstUnstableOffset(end).orElse(end)));
             requireCurrent();
             pipeline.writeResolveAndInstall(plan, ticket, commit, nativeState, nowMillis);
-            requireCurrent();
-            return bridge.publishNext(() -> {
-                        requireCurrent();
-                        var selected = coordinator.captureObject();
-                        if (selected.root().frontiers().durableEndOffset() != end) {
-                            throw new IllegalStateException("Object WAL published another append range");
-                        }
-                        acceptPublished.accept(selected);
-                    })
-                    .orElseThrow(
-                            () -> new IllegalStateException("durably authorized Object WAL append was not selected"));
+            return publicationFence.whileCurrent(() -> publishAuthorized(end, acceptPublished));
         } catch (RuntimeException | Error failure) {
             fence();
             throw failure;
         }
+    }
+
+    private synchronized KafkaObjectCoherentProtocolSnapshotV1 publishAuthorized(
+            long end, Consumer<KafkaObjectCoherentProtocolSnapshotV1> acceptPublished) {
+        requireCurrent();
+        return bridge.publishNext(() -> {
+                    var selected = coordinator.captureObject();
+                    if (selected.root().frontiers().durableEndOffset() != end) {
+                        throw new IllegalStateException("Object WAL published another append range");
+                    }
+                    acceptPublished.accept(selected);
+                })
+                .orElseThrow(() -> new IllegalStateException("durably authorized Object WAL append was not selected"));
     }
 
     private GroupEncodingPlanV1 plan(
@@ -326,7 +346,7 @@ public final class KafkaObjectNativeAppendV1 {
         }
     }
 
-    public void fence() {
+    public synchronized void fence() {
         fenced = true;
     }
 

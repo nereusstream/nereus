@@ -68,8 +68,9 @@ published. LSO derives from that HW and the first unstable transaction. BookKeep
 not another logical replica or a substitute ISR. On failure, native Controller reassignment selects an eligible new
 Broker, which closes old admission, fences and recovers the legal checkpoint plus tail, then activates only its current
 generation. The focused native process checks exercise both BookKeeper-primary profiles and the Object WAL profile.
-The Object route qualifies append publication against its persisted grant and recovers the prior Owner's closed
-history before opening a successor. The activation matrix below defines the remaining M6 acceptance boundaries.
+The Object route persists and verifies its exact grant before entering the native assignment gate. Under that gate,
+the current Owner publishes the coherent append and signals affected Fetch waiters. A revoked Owner leaves the grant
+for successor recovery. The successor closes and recovers the prior Owner's history before opening its own.
 
 Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
 compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO

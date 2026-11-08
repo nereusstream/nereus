@@ -154,7 +154,12 @@ def run_task(task, kafka, java, out, repository, artifacts):
                    NEREUS_M6_TEST_FAULT_PROXY=relay, NEREUS_M6_TEST_FAULT_CONTROL=control,
                    NEREUS_M6_TEST_FAULT_TOKEN=fault_token)
         with (out / "gradle.log").open("xb") as log:
-            subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            completed = subprocess.run(command, cwd=kafka, env=env, stdout=log, stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            xml = kafka / "core/build/test-results" / task / f"TEST-{CASES[task][0]}.xml"
+            if xml.is_file() and xml.stat().st_mtime_ns >= started:
+                (out / xml.name).write_bytes(JUNIT.regular(xml))
+            completed.check_returncode()
         result = result_for(task, kafka, java, out, started, artifacts)
     return {
         **result, "command": command,
