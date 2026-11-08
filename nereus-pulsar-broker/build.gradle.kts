@@ -24,3 +24,9 @@ dependencies {
     compileOnly(libs.pulsar.metadata)
     compileOnly(libs.bookkeeper.server)
 }
+
+// The native Object WAL path consumes the current Registry and allocator API.
+// The BookKeeper Storage API still carries its historical N1 domain dependency.
+configurations.configureEach {
+    resolutionStrategy.preferProjectModules()
+}

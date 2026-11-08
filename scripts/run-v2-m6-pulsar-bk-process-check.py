@@ -49,7 +49,7 @@ def capture_runtime(source, output, task, java_home, *extra):
     return [Path(line) for line in output.read_text().splitlines()]
 
 
-def runtime_paths(pulsar, out, java_home, async_object):
+def runtime_paths(pulsar, out, java_home, async_object, object_wal=False):
     native = capture_runtime(pulsar, out / "native-resolved.paths",
                              ":pulsar-broker:m6WriteRuntimeClasspath", java_home)
     sdk = capture_runtime(ROOT, out / "sdk-resolved.paths", ":nereus-pulsar-broker:m6WriteRuntimeClasspath",
@@ -58,6 +58,9 @@ def runtime_paths(pulsar, out, java_home, async_object):
     # metadata implementation and one SPI; keep the immutable N1 domain from the native graph.
     retained = [p for p in native if ("locked-artifacts/nereus-p1" not in str(p)
                 and "locked-artifacts/nereus-n1" not in str(p)) or "/nereus-domain/" in str(p)]
+    if object_wal:
+        # Object WAL uses the exact current packaged NARS5 parser and allocator, without locked N1 shadowing.
+        retained = [p for p in retained if not re.fullmatch(r"nereus-domain-[0-9].*\.jar", p.name)]
     names = {p.name for p in retained if p.suffix == ".jar"}
     extra = [p for p in sdk if p.suffix == ".jar" and p.name not in names and (
         "/nereus-" in str(p) and "/build/libs/" in str(p)
@@ -75,6 +78,11 @@ def runtime_paths(pulsar, out, java_home, async_object):
         for name in ("httpclient5", "httpcore5", "zstd-jni", "nereus-storage-object-vault"):
             found = [p for p in ordered if re.fullmatch(re.escape(name) + r"-[0-9].*\.jar", p.name)]
             SOURCE.require(len(found) == 1, f"async Object runtime must contain exactly one {name}: {found}")
+    if object_wal:
+        for name in ("nereus-domain", "nereus-metadata-spi", "nereus-metadata-oxia"):
+            matched = [p for p in ordered if re.fullmatch(re.escape(name) + r"-[0-9].*\.jar", p.name)]
+            SOURCE.require(len(matched) == 1 and matched[0].is_relative_to(ROOT / name / "build/libs"),
+                           f"Object WAL must load the exact source-built allocator JAR: {name} {matched}")
     return ordered
 
 

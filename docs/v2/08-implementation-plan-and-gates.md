@@ -354,6 +354,24 @@ ZooKeeper delete and loses one applied S3 DELETE reply. Independent probes requi
 quota until exact settlement. The restarted Broker must preserve the backlog, entry bytes and MessageIds after the
 old BookKeeper ledger and both native Object versions are gone. This check records focused evidence only.
 
+The focused Pulsar Object WAL runner is
+`python3 scripts/run-v2-m6-pulsar-object-wal-process-check.py --pulsar-root <checkout> --java-home <jdk21>
+--output <new-absolute-path-outside-checkouts>`. It loads the three current allocator JARs and revalidates the
+immutable M3 Final NARS5 selection separately. The fixture starts actual ZooKeeper, BookKeeper, Oxia, versioned MinIO
+and Vault. Its dedicated compatibility namespace keeps INSTANCEID and ledger metadata immutable. The exact enrolled
+native BookKeeper principal can allocate through the bounded BookKeeper ID generator and cannot create a reserved
+ledger; other principals cannot allocate there. This supports the two closed writer rows in the R1 Registry.
+
+The Broker uses the exact NVAH1/NVAN1 chain and a native owner epoch. Before ACK it verifies the original Object and
+commits its position under the same durable gate that closes old writer admission. A successor closes that gate, verifies
+the original physical Root and retained NWG1 frames, then reopens the typed chain and the exact cursor state.
+Each read batch holds one M4 generation until its actual reads finish. The runner exercises official-client rollover,
+ACKs, seek/reset and backlog, graceful transfer and restart, and SIGKILL takeover. At the crash cut a versioned
+MinIO PUT has taken effect but its response is held and the original producer is killed before it can resend.
+The successor must recover that exact version, entry bytes and MessageId. Additional startup cases reject
+mismatched ownership, namespace, allocator JARs and the historical receipt. The independent Cell drain and
+the M6 aggregate have separate acceptance requirements.
+
 The focused Kafka M4 prerequisite for M6 can be rerun with
 `python3 scripts/run-v2-m6-kafka-m4-read-check.py --output <new-absolute-path-outside-checkout>`.
 It runs the real BK/Oxia read-root cases and the reader capacity cases, and checks the tested classes against the

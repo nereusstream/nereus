@@ -338,17 +338,17 @@ class M6PulsarBookKeeperSemanticsProbe {
         }
     }
 
-    private static final class Faults {
+    static final class Faults {
         private final java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
         private final java.net.URI control = java.net.URI.create(System.getenv("NEREUS_M6_PULSAR_FAULT_CONTROL"));
         private final String token = System.getenv("NEREUS_M6_PULSAR_FAULT_TOKEN");
         private final com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
 
-        private void set(String path, String mode) throws Exception {
+        void set(String path, String mode) throws Exception {
             call("POST", json.writeValueAsString(java.util.Map.of("path", path, "mode", mode, "version", "*")));
         }
 
-        private String awaitAppliedVersion() throws Exception {
+        String awaitAppliedVersion() throws Exception {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12);
             do {
                 var response = call("GET", "");
@@ -360,7 +360,7 @@ class M6PulsarBookKeeperSemanticsProbe {
             throw new AssertionError("MinIO did not apply the original held native PUT");
         }
 
-        private com.fasterxml.jackson.databind.JsonNode call(String method, String body) throws Exception {
+        com.fasterxml.jackson.databind.JsonNode call(String method, String body) throws Exception {
             var request = java.net.http.HttpRequest.newBuilder(control)
                     .header("X-Nereus-Test-Token", token)
                     .timeout(java.time.Duration.ofSeconds(5))
@@ -410,6 +410,15 @@ class M6PulsarBookKeeperSemanticsProbe {
                 if (confirmed == null || !id.equals(confirmed.getMessageId())
                         || !Arrays.equals(body, confirmed.getData())) {
                     throw new AssertionError("restart did not continue the native ledger chain");
+                }
+                if (args.length == 8 && "record-restart-position".equals(args[7])) {
+                    int next = Integer.parseInt(expected.getProperty("count"));
+                    expected.setProperty("count", Integer.toString(next + 1));
+                    expected.setProperty("position." + next, Base64.getEncoder().encodeToString(id.toByteArray()));
+                    expected.setProperty("body." + next, Base64.getEncoder().encodeToString(body));
+                    try (var output = Files.newBufferedWriter(Path.of(args[5]))) {
+                        expected.store(output, null);
+                    }
                 }
             }
             System.out.println("PULSAR_NATIVE_BK_RESTART_PASS");

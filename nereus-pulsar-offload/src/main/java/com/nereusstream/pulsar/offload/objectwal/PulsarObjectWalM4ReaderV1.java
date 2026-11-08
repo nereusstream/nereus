@@ -27,7 +27,10 @@ import com.nereusstream.storage.object.read.BindingReadPlannerV1;
 import com.nereusstream.storage.object.read.PulsarBindingReadPlanBufferV1;
 import com.nereusstream.storage.object.read.PulsarBindingReadPlannerV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,6 +43,9 @@ public final class PulsarObjectWalM4ReaderV1 {
     private final BindingReadAsyncExecutorV1 asyncExecutor;
     private final PulsarBindingReadPlanBufferV1 reusablePlan = new PulsarBindingReadPlanBufferV1(1);
     private final AtomicReference<BindingReadAuthorityV1> current = new AtomicReference<>();
+    private final int maximumBatchPositions;
+    private int acceptedBatches;
+    private CompletableFuture<Void> drain;
 
     public PulsarObjectWalM4ReaderV1(
             PulsarObjectWalBridgeV1 bridge,
@@ -47,6 +53,20 @@ public final class PulsarObjectWalM4ReaderV1 {
             BindingReadSelector initialSelector,
             BindingReadHazardPoolV1 hazardPool,
             Executor ownerEventLoop) {
+        this(bridge, binding, initialSelector, hazardPool, ownerEventLoop, 1);
+    }
+
+    public PulsarObjectWalM4ReaderV1(
+            PulsarObjectWalBridgeV1 bridge,
+            PulsarBindingKey binding,
+            BindingReadSelector initialSelector,
+            BindingReadHazardPoolV1 hazardPool,
+            Executor ownerEventLoop,
+            int maximumBatchPositions) {
+        if (maximumBatchPositions <= 0) {
+            throw new IllegalArgumentException("Pulsar read batch bound must be positive");
+        }
+        this.maximumBatchPositions = maximumBatchPositions;
         this.bridge = Objects.requireNonNull(bridge, "bridge");
         this.binding = Objects.requireNonNull(binding, "binding");
         this.hazardPool = Objects.requireNonNull(hazardPool, "hazardPool");
@@ -72,39 +92,125 @@ public final class PulsarObjectWalM4ReaderV1 {
     }
 
     public CompletableFuture<ReadEntry> read(PulsarPosition position) {
-        Objects.requireNonNull(position, "position");
-        if (position.entryId() == Long.MAX_VALUE) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Pulsar entry upper bound overflows"));
+        var batch = readBatch(List.of(position));
+        var read = batch.thenApply(entries -> entries.get(0));
+        read.whenComplete((unused, failure) -> {
+            if (read.isCancelled()) {
+                batch.cancel(false);
+            }
+        });
+        return read;
+    }
+
+    /** Prepares every route against one generation, then holds it until all original source stages terminate. */
+    public synchronized CompletableFuture<List<ReadEntry>> readBatch(List<PulsarPosition> positions) {
+        var exact = List.copyOf(positions);
+        if (drain != null
+                || exact.isEmpty()
+                || exact.size() > maximumBatchPositions
+                || exact.stream().anyMatch(position -> position.entryId() == Long.MAX_VALUE)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Pulsar read batch is outside admission"));
         }
-        return asyncExecutor.execute(
-                current,
-                hazardPool,
-                authority -> {
-                    if (!(authority.publicationCell().protocolStateReference() instanceof ReadCell cell)) {
-                        throw new IllegalStateException(
-                                "captured Pulsar authority lacks its typed current-source cell");
-                    }
-                    PulsarObjectWalReadViewV1.LedgerView ledger = cell.view().requireLedger(position.virtualLedgerId());
-                    BindingReadPlannerV1.Outcome outcome = PulsarBindingReadPlannerV1.plan(
-                            cell.routes(),
-                            position.virtualLedgerId(),
-                            position.entryId(),
-                            Math.addExact(position.entryId(), 1),
-                            Math.addExact(ledger.readableThrough(), 1),
-                            reusablePlan);
-                    if (outcome != BindingReadPlannerV1.Outcome.PLANNED || reusablePlan.size() != 1) {
-                        throw new IllegalStateException("captured Pulsar source plan failed closed: " + outcome);
-                    }
-                    PhysicalRoute expected = cell.requirePhysical(reusablePlan.routeOrdinal(0), reusablePlan.route(0));
-                    return bridge.readCaptured(cell.view(), binding, position).thenApply(result -> {
-                        if (!result.binding().equals(binding)
-                                || !result.position().equals(position)
-                                || result.source() != expected.source()) {
-                            throw new IllegalStateException("P4 read result differs from the exact captured M4 route");
+        var observer = new CompletableFuture<List<ReadEntry>>();
+        acceptedBatches++;
+        try {
+            asyncExecutor
+                    .execute(
+                            current,
+                            hazardPool,
+                            authority -> {
+                                if (observer.isCancelled()) {
+                                    throw new CancellationException(
+                                            "Pulsar read batch was cancelled before source admission");
+                                }
+                                if (!(authority.publicationCell().protocolStateReference() instanceof ReadCell cell)) {
+                                    throw new IllegalStateException(
+                                            "captured Pulsar authority lacks its typed current-source cell");
+                                }
+                                List<PhysicalRoute> routes = exact.stream()
+                                        .map(position -> plan(cell, position))
+                                        .toList();
+                                var source = new ArrayList<CompletableFuture<ReadEntry>>(exact.size());
+                                for (int index = 0; index < exact.size() && !observer.isCancelled(); index++) {
+                                    var position = exact.get(index);
+                                    var route = routes.get(index);
+                                    try {
+                                        source.add(bridge.readCaptured(cell.view(), binding, position)
+                                                .thenApply(result -> {
+                                                    if (!result.binding().equals(binding)
+                                                            || !result.position()
+                                                                    .equals(position)
+                                                            || result.source() != route.source()) {
+                                                        throw new IllegalStateException(
+                                                                "P4 result differs from the exact captured M4 route");
+                                                    }
+                                                    return result;
+                                                })
+                                                .toCompletableFuture());
+                                    } catch (RuntimeException failure) {
+                                        source.add(CompletableFuture.failedFuture(failure));
+                                        break;
+                                    }
+                                }
+                                return CompletableFuture.allOf(source.toArray(CompletableFuture<?>[]::new))
+                                        .thenApply(unused -> source.stream()
+                                                .map(CompletableFuture::join)
+                                                .toList());
+                            },
+                            () -> bridge.reconcileM4Retirement(binding))
+                    .whenComplete((read, failure) -> {
+                        batchFinished();
+                        if (failure == null) {
+                            observer.complete(read);
+                        } else {
+                            observer.completeExceptionally(failure);
                         }
-                        return result;
                     });
-                },
-                () -> bridge.reconcileM4Retirement(binding));
+        } catch (RuntimeException failure) {
+            batchFinished();
+            observer.completeExceptionally(failure);
+        }
+        return observer;
+    }
+
+    private PhysicalRoute plan(ReadCell cell, PulsarPosition position) {
+        var ledger = cell.view().requireLedger(position.virtualLedgerId());
+        var outcome = PulsarBindingReadPlannerV1.plan(
+                cell.routes(),
+                position.virtualLedgerId(),
+                position.entryId(),
+                Math.addExact(position.entryId(), 1),
+                Math.addExact(ledger.readableThrough(), 1),
+                reusablePlan);
+        if (outcome != BindingReadPlannerV1.Outcome.PLANNED || reusablePlan.size() != 1) {
+            throw new IllegalStateException("captured Pulsar source plan failed closed: " + outcome);
+        }
+        return cell.requirePhysical(reusablePlan.routeOrdinal(0), reusablePlan.route(0));
+    }
+
+    public synchronized CompletableFuture<Void> stopAndDrain() {
+        if (drain == null) {
+            drain = new CompletableFuture<>();
+            finishDrain();
+        }
+        return drain.copy();
+    }
+
+    private synchronized void batchFinished() {
+        if (--acceptedBatches < 0) {
+            throw new IllegalStateException("Pulsar read batch accounting underflow");
+        }
+        finishDrain();
+    }
+
+    private void finishDrain() {
+        if (drain != null && acceptedBatches == 0) {
+            var key = PulsarObjectBindingReadAdapterV1.bindingIdentity(binding).bindingId();
+            if (hazardPool.scanBinding(key) == ScanOutcome.CLEAN) {
+                drain.complete(null);
+            } else {
+                drain.completeExceptionally(new IllegalStateException("Pulsar read drain retains a source pin"));
+            }
+        }
     }
 }

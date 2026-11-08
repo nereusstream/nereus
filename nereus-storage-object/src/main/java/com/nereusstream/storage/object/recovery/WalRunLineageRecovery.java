@@ -17,9 +17,11 @@ package com.nereusstream.storage.object.recovery;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.protocol.ProtocolCellIdentity;
+import com.nereusstream.domain.protocol.ProtocolKindV1;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.CurrentWalRunPointer;
+import com.nereusstream.storage.object.control.ProviderResolvedExtentRowV1;
 import com.nereusstream.storage.object.control.TerminalProtocolCheckpointBindingV1;
 import com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1;
 import com.nereusstream.storage.object.control.WalCheckpointChainVerifier;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 
 /** Fail-closed exact Root/Seal lineage walk from the current pointer to a retirement frontier or genesis. */
@@ -100,6 +103,24 @@ public final class WalRunLineageRecovery {
             CellProviderScopeId expectedProviderScope,
             Optional<WalRunReference> retirementFrontier,
             LongSupplier nanoTime) {
+        return recover(
+                pointerKey,
+                expectedProtocolCell,
+                expectedProviderScope,
+                retirementFrontier,
+                nanoTime,
+                (reference, row) -> {});
+    }
+
+    /** Retained rows may be staged during verification; they are usable only after the whole lineage succeeds. */
+    public RecoveredLineage recover(
+            String pointerKey,
+            ProtocolCellIdentity expectedProtocolCell,
+            CellProviderScopeId expectedProviderScope,
+            Optional<WalRunReference> retirementFrontier,
+            LongSupplier nanoTime,
+            BiConsumer<WalRunReference, ProviderResolvedExtentRowV1> retainedRows) {
+        Objects.requireNonNull(retainedRows, "retainedRows");
         Objects.requireNonNull(pointerKey, "pointerKey");
         Objects.requireNonNull(expectedProtocolCell, "expectedProtocolCell");
         Objects.requireNonNull(expectedProviderScope, "expectedProviderScope");
@@ -146,7 +167,7 @@ public final class WalRunLineageRecovery {
                 throw new RecoveryEnvelopeExceededException("Root maxRecoverablePredecessorRuns");
             }
             if (successorLineage != null) {
-                verifyExactSealedPhysicalClosure(root, successorPredecessorSeal, budget);
+                verifyExactSealedPhysicalClosure(root, successorPredecessorSeal, budget, retainedRows);
                 verifyTerminalProtocolCheckpoint(currentRoot, root, successorPredecessorSeal, successorLineage, budget);
             }
             lineage.add(new RecoveredRun(current, root, Optional.empty()));
@@ -223,7 +244,10 @@ public final class WalRunLineageRecovery {
     }
 
     private void verifyExactSealedPhysicalClosure(
-            WalRunRootRecord predecessorRoot, WalRunSealRecord predecessorSeal, CumulativeRecoveryBudget budget) {
+            WalRunRootRecord predecessorRoot,
+            WalRunSealRecord predecessorSeal,
+            CumulativeRecoveryBudget budget,
+            BiConsumer<WalRunReference, ProviderResolvedExtentRowV1> retainedRows) {
         budget.chargeControlMetadata(MAX_BOOTSTRAP_CONTROL_BYTES);
         CanonicalBytes exactHeadValue =
                 requiredCappedControl(predecessorSeal.finalCheckpointHeadKey(), "final physical checkpoint Head");
@@ -236,8 +260,9 @@ public final class WalRunLineageRecovery {
                 || !head.coveredThrough().equals(predecessorSeal.terminalSequence())) {
             throw new IllegalStateException("final physical checkpoint Head differs from exact predecessor Seal/Root");
         }
-        WalCheckpointChainVerifier.StreamingVerification verified =
-                new WalCheckpointChainVerifier(metadata, predecessorRoot).verifyStreaming(head, budget);
+        WalCheckpointChainVerifier.StreamingVerification verified = new WalCheckpointChainVerifier(
+                        metadata, predecessorRoot)
+                .verifyStreaming(head, budget, row -> retainedRows.accept(predecessorSeal.root(), row));
         if (verified.aggregateExtentCount() != predecessorSeal.aggregateExtentCount()
                 || verified.aggregateCanonicalBodyBytes() != predecessorSeal.aggregateCanonicalBodyBytes()
                 || !verified.coveredThrough().equals(predecessorSeal.terminalSequence())) {
@@ -327,6 +352,23 @@ public final class WalRunLineageRecovery {
                 }
             }
             throw new IllegalArgumentException("historical Object reader requires a verified sealed predecessor");
+        }
+
+        /** Charges the original Root envelope before opening the two ranges for one retained Pulsar frame. */
+        public synchronized void chargeRetainedPulsarFrame(WalRunReference reference, int prefix, long body) {
+            var root = requireSealedPredecessor(reference).root();
+            if (root.protocolCellIdentity().protocolKind() != ProtocolKindV1.PULSAR
+                    || root.nwg1AdmissionCaps().maxFrames() != 1
+                    || prefix <= 0
+                    || prefix >= body
+                    || prefix > root.nwg1AdmissionCaps().maxDirectoryPrefixBytes()
+                    || body > root.nwg1AdmissionCaps().maxCanonicalBodyBytes()) {
+                throw new IllegalArgumentException("retained row differs from the admitted Pulsar frame shape");
+            }
+            requireConsumableFor(currentRoot);
+            liveBudget.chargeRangeGet(prefix);
+            liveBudget.chargeRangeGet(Math.subtractExact(body, prefix));
+            liveBudget.chargeDecoded(1, 1, 1);
         }
 
         /**

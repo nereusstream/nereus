@@ -60,6 +60,7 @@ record PulsarM6BookKeeperCellConfig(
         M5ClosedWriterRegistryV1 writers,
         StorageProfileV1 profile,
         Optional<PulsarM6AsyncObjectScope.Configuration> objectScope,
+        Optional<PulsarM6ObjectWalSettings> objectWal,
         Map<TopicName, Long> generations) {
 
     static PulsarM6BookKeeperCellConfig read(Path path) throws IOException {
@@ -124,7 +125,7 @@ record PulsarM6BookKeeperCellConfig(
         var profile = StorageProfileV1.valueOf(raw.getProperty("storageProfile", "BOOKKEEPER_WAL_ONLY"));
         var objectScope =
                 switch (profile) {
-                    case BOOKKEEPER_WAL_ONLY -> Optional.<PulsarM6AsyncObjectScope.Configuration>empty();
+                    case BOOKKEEPER_WAL_ONLY, OBJECT_WAL -> Optional.<PulsarM6AsyncObjectScope.Configuration>empty();
                     case BOOKKEEPER_WAL_ASYNC_OBJECT ->
                         Optional.of(PulsarM6AsyncObjectScope.Configuration.read(
                                 key -> required(raw, key), raw.getProperty("bookKeeperRetention", "RETAIN_BK")));
@@ -173,6 +174,9 @@ record PulsarM6BookKeeperCellConfig(
                 writers,
                 profile,
                 objectScope,
+                profile == StorageProfileV1.OBJECT_WAL
+                        ? Optional.of(PulsarM6ObjectWalSettings.read(key -> required(raw, key)))
+                        : Optional.empty(),
                 Map.copyOf(topics));
     }
 

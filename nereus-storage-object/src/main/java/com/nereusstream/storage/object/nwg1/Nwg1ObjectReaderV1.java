@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0. */
 package com.nereusstream.storage.object.nwg1;
 
+import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.codec.DeterministicTopicIdsV1;
 import com.nereusstream.domain.codec.TopicIncarnationIdentityCodecV1;
 import com.nereusstream.domain.protocol.TopicIncarnationIdentity;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.zip.CRC32C;
 
 /** Bounded full-body NWG1 reader with typed earliest-stage failures. */
@@ -84,13 +86,40 @@ public final class Nwg1ObjectReaderV1 {
         void accept(VerifiedFrame frame, ByteBuffer readOnlyDecodedPayload) throws IOException;
     }
 
+    /** Exact stored bytes of a Pulsar frame from an authenticated provider range. */
+    public record StoredPulsarFrame(long offset, long length, Sha256Digest digest) {
+        public StoredPulsarFrame {
+            Objects.requireNonNull(digest, "digest");
+            if (offset < 0 || length <= 0 || digest.isZero()) {
+                throw new IllegalArgumentException("invalid stored Pulsar frame");
+            }
+        }
+    }
+
     public record VerifiedFrame(
             long absoluteFrameOrdinal,
             long appendUnitFrameOrdinal,
             long coverage0,
             long coverage1,
-            int decodedPayloadBytes) {
+            int decodedPayloadBytes,
+            Optional<StoredPulsarFrame> storedPulsarFrame) {
+        public VerifiedFrame(
+                long absoluteFrameOrdinal,
+                long appendUnitFrameOrdinal,
+                long coverage0,
+                long coverage1,
+                int decodedPayloadBytes) {
+            this(
+                    absoluteFrameOrdinal,
+                    appendUnitFrameOrdinal,
+                    coverage0,
+                    coverage1,
+                    decodedPayloadBytes,
+                    Optional.empty());
+        }
+
         public VerifiedFrame {
+            Objects.requireNonNull(storedPulsarFrame, "storedPulsarFrame");
             if (absoluteFrameOrdinal < 0
                     || appendUnitFrameOrdinal < 0
                     || coverage0 < 0
@@ -622,9 +651,15 @@ public final class Nwg1ObjectReaderV1 {
                                 "selected decoded append-unit byte total overflow",
                                 failure);
                     }
+                    var stored = pulsar == null
+                            ? Optional.<StoredPulsarFrame>empty()
+                            : Optional.of(new StoredPulsarFrame(
+                                    frame.storedBodyOffset(),
+                                    frame.storedBlockBytes(),
+                                    Sha256Digest.copyOf(Nwg1CommitmentsV1.sha256(ciphertext))));
                     consumer.accept(
                             new VerifiedFrame(
-                                    frameOrdinal, index, frame.coverage0(), frame.coverage1(), payload.length),
+                                    frameOrdinal, index, frame.coverage0(), frame.coverage1(), payload.length, stored),
                             ByteBuffer.wrap(payload).asReadOnlyBuffer());
                 } finally {
                     erase(payload);

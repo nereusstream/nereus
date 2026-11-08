@@ -79,6 +79,32 @@ class PulsarVirtualLedgerChainControllerV1Test {
     }
 
     @Test
+    void newHeadOwnerPreservesTheVisibleLedgerAndFencesItsCreator() {
+        var authority = new FakeAuthority();
+        var controller =
+                new PulsarVirtualLedgerChainControllerV1(SLICE, new FakeAllocator(START, START + 1), authority);
+        var original = controller.open(BINDING, 7).toCompletableFuture().join();
+        authority.head = new HeadSnapshot(version(10), original.node(), 8);
+
+        assertThatThrownBy(
+                        () -> controller.open(BINDING, 7).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(ChainException.class)
+                .rootCause()
+                .extracting(error -> ((ChainException) error).code())
+                .isEqualTo(ChainRejectionCode.STALE_OWNER);
+        var recovered = controller.open(BINDING, 8).toCompletableFuture().join();
+        assertThat(recovered.node()).isEqualTo(original.node());
+
+        var next = controller
+                .sealAndOpenSuccessor(recovered, 4, 8)
+                .toCompletableFuture()
+                .join();
+        assertThat(next.node().virtualLedgerId()).isEqualTo(START + 1);
+        assertThat(next.node().predecessorLedgerId()).hasValue(START);
+        assertThat(next.node().predecessorTerminalEntryId()).isEqualTo(4);
+    }
+
+    @Test
     void reconcilesUnknownMutationOnlyByExactReread() {
         FakeAllocator allocator = new FakeAllocator(START);
         FakeAuthority authority = new FakeAuthority();
@@ -167,6 +193,13 @@ class PulsarVirtualLedgerChainControllerV1Test {
                             @Override
                             public Sha256Digest requireDescriptorDigest(LedgerNode candidate) {
                                 throw new AssertionError("descriptor must not be called");
+                            }
+
+                            @Override
+                            public CompletableFuture<Void> persistCandidate(
+                                    VersionedVirtualLedgerCandidateNodeV1 exactNode, LedgerNode candidate) {
+                                return CompletableFuture.failedFuture(
+                                        new AssertionError("descriptor must not be called"));
                             }
 
                             @Override

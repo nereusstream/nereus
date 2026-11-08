@@ -141,7 +141,8 @@ def fault_proxy(upstream):
                 elif self.command != "GET":
                     return self.reply(405)
                 state = {"hits": rule["hits"] if rule else 0,
-                         "appliedVersion": rule["appliedVersion"] if rule else None}
+                         "appliedVersion": rule["appliedVersion"] if rule else None,
+                         "selectedPath": rule["selectedPath"] if rule else None}
             return self.reply(200, json.dumps(state).encode("ascii"), [("Content-Type", "application/json")])
 
         def relay(self):

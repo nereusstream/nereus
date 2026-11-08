@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -113,27 +114,91 @@ public final class PulsarObjectWalBridgeV1 {
             Objects.requireNonNull(binding, "binding");
             Objects.requireNonNull(recoverySeed, "recoverySeed");
             return chainController.open(binding, ownerEpoch).thenCompose(opened -> {
-                BindingState.requireRecoveryShape(configuration, opened, recoverySeed);
-                ActiveTailRecoveryRequest activeTailRequest =
-                        ActiveTailRecoveryRequest.from(opened.node().binding(), recoverySeed);
-                return verifyRecoveryManifest(opened, recoverySeed).thenCompose(manifestSource -> verifyRecoveryTail(
-                                activeTailRequest)
-                        .thenApply(verifiedTail -> {
-                            verifiedTail.requireExact(activeTailRequest);
-                            BindingState recovered =
-                                    BindingState.recover(configuration, opened, recoverySeed, manifestSource);
-                            synchronized (monitor) {
-                                BindingState previous = bindings.putIfAbsent(binding, recovered);
-                                if (previous != null) {
-                                    throw rejected(
-                                            BridgeRejectionCode.BINDING_ALREADY_ACTIVE, "binding is already active");
-                                }
-                                return recovered.currentFrontiers();
-                            }
-                        }));
+                return verifyLedgerRecovery(opened, recoverySeed)
+                        .thenApply(recovered -> installRecovered(binding, recovered));
             });
         } catch (Throwable error) {
             return failed(error);
+        }
+    }
+
+    /** Recovers one exact Head and every sealed predecessor before admitting native reads or appends. */
+    public CompletionStage<LedgerFrontiers> activateRecoveredChain(
+            PulsarBindingKey binding, long ownerEpoch, ChainRecovery recovery) {
+        Objects.requireNonNull(recovery, "recovery");
+        return chainController.open(binding, ownerEpoch).thenCompose(active -> chainController
+                .readSealedHistory(active, configuration.maxRecoveryLocators())
+                .thenCompose(history -> recovery.recover(active.node(), OptionalLong.empty())
+                        .thenCompose(seed -> verifyLedgerRecovery(active, seed).thenCompose(state -> {
+                            CompletionStage<Void> restored = completed(null);
+                            int[] remaining = {
+                                configuration.maxRecoveryLocators()
+                                        - seed.activeTail().size()
+                            };
+                            for (var sealed : history) {
+                                restored = restored.thenCompose(unused -> recovery.recover(
+                                                sealed.node(), OptionalLong.of(sealed.terminalEntryId()))
+                                        .thenCompose(prior -> {
+                                            remaining[0] -= prior.activeTail().size();
+                                            if (remaining[0] < 0) {
+                                                return failed(rejected(
+                                                        BridgeRejectionCode.RECOVERY_BOUND_EXCEEDED,
+                                                        "Object WAL history exceeds the total locator bound"));
+                                            }
+                                            if (prior.durableThrough() != sealed.terminalEntryId()) {
+                                                return failed(rejected(
+                                                        BridgeRejectionCode.RECOVERY_MAPPING_INVALID,
+                                                        "recovered terminal differs from the successor descriptor"));
+                                            }
+                                            var historical = new OpenedLedger(
+                                                    active.authorityVersion(), sealed.node(), active.ownerEpoch());
+                                            return verifyLedgerState(historical, prior)
+                                                    .thenAccept(ledger ->
+                                                            state.ledgers.put(ledger.virtualLedgerId, ledger));
+                                        }));
+                            }
+                            return restored.thenCompose(unused -> chainController.requireUnchangedHead(active))
+                                    .thenApply(unused -> installRecovered(binding, state));
+                        }))));
+    }
+
+    @FunctionalInterface
+    public interface ChainRecovery {
+        /** Empty terminal denotes the active ledger, whose frontier must come from durable provider recovery. */
+        CompletionStage<RecoverySeed> recover(LedgerNode node, OptionalLong sealedTerminal);
+    }
+
+    private CompletionStage<BindingState> verifyLedgerRecovery(OpenedLedger opened, RecoverySeed seed) {
+        return verifyLedgerState(opened, seed).thenApply(ledger -> BindingState.recover(configuration, opened, ledger));
+    }
+
+    private CompletionStage<LedgerState> verifyLedgerState(OpenedLedger opened, RecoverySeed seed) {
+        var ordered = BindingState.requireRecoveryShape(configuration, opened, seed);
+        var activeTail = ActiveTailRecoveryRequest.from(opened.node().binding(), seed);
+        return verifyRecoveryManifest(opened, seed)
+                .thenCompose(manifestSource -> verifyRecoveryTail(activeTail).thenApply(verified -> {
+                    NavigableMap<Long, ExtentLocator> locators = new TreeMap<>();
+                    ordered.forEach(locator -> locators.put(locator.position().entryId(), locator));
+                    return new LedgerState(
+                            opened.node().virtualLedgerId(),
+                            seed.manifestThrough(),
+                            seed.durableThrough(),
+                            seed.readableThrough(),
+                            seed.manifestGeneration(),
+                            manifestSource.orElse(null),
+                            locators);
+                }));
+    }
+
+    private LedgerFrontiers installRecovered(PulsarBindingKey binding, BindingState recovered) {
+        synchronized (monitor) {
+            if (walRunAdmissionStopped) {
+                throw rejected(BridgeRejectionCode.STALE_OWNER, "Object WAL stopped before recovery completed");
+            }
+            if (bindings.putIfAbsent(binding, recovered) != null) {
+                throw rejected(BridgeRejectionCode.BINDING_ALREADY_ACTIVE, "binding is already active");
+            }
+            return recovered.currentFrontiers();
         }
     }
 
@@ -190,6 +255,20 @@ public final class PulsarObjectWalBridgeV1 {
         }
         return reconcileOrRetainExceptional(plan, publish)
                 .thenCompose(result -> applyPublishResult(plan, result, false));
+    }
+
+    /** Retries only the exact pending plan for this still-current owner. */
+    public CompletionStage<List<MemberAppendResult>> resumePendingEntry(PulsarBindingKey binding, long ownerEpoch) {
+        final String planId;
+        synchronized (monitor) {
+            var state = requireBinding(binding);
+            state.requireOwner(ownerEpoch);
+            planId = state.livePlanId()
+                    .filter(failedPlans::containsKey)
+                    .orElseThrow(() -> rejected(
+                            BridgeRejectionCode.PROVIDER_OUTCOME_UNKNOWN, "Pulsar has no retained append plan"));
+        }
+        return resumeSameEntry(planId);
     }
 
     /** Reconciles and republishes the exact failed plan without changing any Pulsar position. */
@@ -2173,6 +2252,7 @@ public final class PulsarObjectWalBridgeV1 {
         private final Map<String, ProviderCandidate> candidates = new HashMap<>();
         private LocalLifecycle lifecycle = LocalLifecycle.OPEN;
         private int acceptedProviderTasks;
+        private CompletableFuture<Void> providerDrain;
         private boolean checkpointPublishScheduled;
         private Throwable checkpointFailure;
 
@@ -3084,6 +3164,13 @@ public final class PulsarObjectWalBridgeV1 {
                     || frame.coverage1() != locator.position().entryId()) {
                 throw rejected(failureCode, "streamed NWG1 frame differs from the exact Pulsar locator");
             }
+            frame.storedPulsarFrame().ifPresent(stored -> {
+                if (stored.offset() != locator.extentOffset()
+                        || stored.length() != locator.extentLength()
+                        || !stored.digest().toHex().equals(locator.frameSha256())) {
+                    throw rejected(failureCode, "authenticated stored Pulsar frame differs from its exact locator");
+                }
+            });
             observedFrameCount[0] = 1;
         }
 
@@ -3250,11 +3337,30 @@ public final class PulsarObjectWalBridgeV1 {
         }
 
         private void providerTaskFinished() {
+            CompletableFuture<Void> settled;
             synchronized (monitor) {
                 if (acceptedProviderTasks <= 0) {
                     throw new IllegalStateException("Pulsar Provider task accounting underflow");
                 }
                 acceptedProviderTasks--;
+                settled = acceptedProviderTasks == 0 ? providerDrain : null;
+            }
+            if (settled != null) {
+                settled.complete(null);
+            }
+        }
+
+        /** Call after the binding has stopped admission and its last accepted read or append has finished. */
+        public CompletableFuture<Void> stopAndDrainProviderTasks() {
+            drain();
+            synchronized (monitor) {
+                if (providerDrain == null) {
+                    providerDrain = new CompletableFuture<>();
+                    if (acceptedProviderTasks == 0) {
+                        providerDrain.complete(null);
+                    }
+                }
+                return providerDrain.copy();
             }
         }
 
@@ -3676,33 +3782,12 @@ public final class PulsarObjectWalBridgeV1 {
             ledgers.put(current.node().virtualLedgerId(), ledger);
         }
 
-        static BindingState recover(
-                Configuration configuration,
-                OpenedLedger opened,
-                RecoverySeed seed,
-                Optional<ManifestSource> manifestSource) {
-            Objects.requireNonNull(manifestSource, "manifestSource");
-            if ((seed.manifestThrough() >= 0) != manifestSource.isPresent()) {
-                throw rejected(
-                        BridgeRejectionCode.MANIFEST_HANDOFF_NOT_VERIFIED,
-                        "recovery manifest coverage lacks its authority-verified source");
-            }
-            List<ExtentLocator> ordered = requireRecoveryShape(configuration, opened, seed);
-            NavigableMap<Long, ExtentLocator> locators = new TreeMap<>();
-            ordered.forEach(locator -> locators.put(locator.position().entryId(), locator));
-            LedgerState ledger = new LedgerState(
-                    opened.node().virtualLedgerId(),
-                    seed.manifestThrough(),
-                    seed.durableThrough(),
-                    seed.readableThrough(),
-                    seed.manifestGeneration(),
-                    manifestSource.orElse(null),
-                    locators);
-            CompletionTrackerRing completionRing = new CompletionTrackerRing(
-                    configuration.maxCompletionSlotsPerBinding(), opened.node().ownerEpoch(), 0);
-            for (ExtentLocator locator : ordered) {
-                PrePositionReservation reservation = completionRing.reserve(
-                        opened.node().ownerEpoch(), 0, configuration.maxActiveTailLocatorsPerBinding());
+        static BindingState recover(Configuration configuration, OpenedLedger opened, LedgerState ledger) {
+            CompletionTrackerRing completionRing =
+                    new CompletionTrackerRing(configuration.maxCompletionSlotsPerBinding(), opened.ownerEpoch(), 0);
+            for (ExtentLocator locator : ledger.activeTail.values()) {
+                PrePositionReservation reservation =
+                        completionRing.reserve(opened.ownerEpoch(), 0, configuration.maxActiveTailLocatorsPerBinding());
                 CompletionTicket ticket = completionRing.assignAfterPosition(reservation, locator.position());
                 completionRing.installLocator(ticket, locator.position(), locator);
                 completionRing.requireCompletionRelease(ticket, locator.position(), locator);
@@ -3750,7 +3835,7 @@ public final class PulsarObjectWalBridgeV1 {
         }
 
         void requireOwner(long ownerEpoch) {
-            if (current.node().ownerEpoch() != ownerEpoch) {
+            if (current.ownerEpoch() != ownerEpoch) {
                 throw rejected(BridgeRejectionCode.STALE_OWNER, "append owner epoch is stale");
             }
         }
@@ -3767,7 +3852,7 @@ public final class PulsarObjectWalBridgeV1 {
         PrePositionReservation reserveBeforePosition(Configuration configuration) {
             requireQuiescent();
             return completionRing.reserve(
-                    current.node().ownerEpoch(),
+                    current.ownerEpoch(),
                     currentLedger().activeTail.size(),
                     configuration.maxActiveTailLocatorsPerBinding());
         }
@@ -3951,7 +4036,7 @@ public final class PulsarObjectWalBridgeV1 {
                         ledger.manifestGeneration,
                         intervals));
             }
-            return new PulsarObjectWalReadViewV1(binding, current.node().ownerEpoch(), readViewVersion, views);
+            return new PulsarObjectWalReadViewV1(binding, current.ownerEpoch(), readViewVersion, views);
         }
 
         void discardAfterFence(long fencedOwnerEpoch) {

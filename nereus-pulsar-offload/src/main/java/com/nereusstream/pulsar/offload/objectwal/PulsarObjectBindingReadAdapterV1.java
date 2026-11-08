@@ -32,8 +32,11 @@ import com.nereusstream.storage.object.read.BindingReadSourceRefV1;
 import com.nereusstream.storage.object.read.BindingReadSourceRefV1.SourceKind;
 import com.nereusstream.storage.object.read.PulsarBindingReadRouteTableV1;
 import com.nereusstream.storage.object.read.PulsarBindingReadRouteV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -41,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Projects the actual P4 Object-WAL view into one immutable M4 Pulsar publication cell. */
 public final class PulsarObjectBindingReadAdapterV1 {
@@ -83,6 +87,39 @@ public final class PulsarObjectBindingReadAdapterV1 {
                 new TopicBindingId(textDigest("M4-PULSAR-BINDING-ID-V1", binding.topicBindingId())),
                 textDigest("M4-PULSAR-INCARNATION-V1", binding.topicIncarnation()),
                 textDigest("M4-PULSAR-STORAGE-EPOCH-V1", binding.storageEpochId()));
+    }
+
+    /** Local publication binds this exact captured view to one admitted Root and current owner. */
+    public static BindingReadSelector preferredSelector(
+            PulsarObjectWalReadViewV1 view, long readAdmissionEpoch, CapabilityBinding capability) {
+        var commitment = digest("M4-PULSAR-OBJECT-WAL-VIEW-V1", output -> {
+            writeBinding(output, view.binding());
+            output.writeLong(view.ownerEpoch());
+            output.writeLong(readAdmissionEpoch);
+            output.writeLong(view.viewVersion());
+            output.writeInt(view.ledgers().size());
+            for (var ledger : view.ledgers()) {
+                output.writeLong(ledger.virtualLedgerId());
+                output.writeLong(ledger.readableThrough());
+                output.writeInt(ledger.intervals().size());
+                for (var interval : ledger.intervals()) {
+                    var source = sourceRef(view.binding(), interval);
+                    output.write(source.sourceIdentity().bytes().toByteArray());
+                }
+            }
+        });
+        return new BindingReadSelector(
+                bindingIdentity(view.binding()),
+                commitment,
+                view.ownerEpoch(),
+                readAdmissionEpoch,
+                view.viewVersion(),
+                SelectorMode.PREFERRED_ONLY,
+                AdmissionState.ADMITTING,
+                Optional.empty(),
+                capability,
+                List.of(),
+                List.of());
     }
 
     public static BindingReadAuthorityV1 publish(PulsarObjectWalReadViewV1 view, BindingReadSelector selector) {

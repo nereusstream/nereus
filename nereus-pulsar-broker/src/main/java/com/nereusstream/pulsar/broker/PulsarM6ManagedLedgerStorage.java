@@ -23,8 +23,10 @@ import com.nereusstream.domain.protocol.PulsarTopicName;
 import com.nereusstream.metadata.oxia.v2.OxiaV2CapabilityStore;
 import com.nereusstream.metadata.oxia.v2.OxiaV2CapabilityStoreFactory;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
+import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuityState;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1;
+import com.nereusstream.metadata.oxia.v2.retention.OxiaPhysicalMetadataNamespaceV2;
 import com.nereusstream.pulsar.offload.PulsarNativeBindingV1;
 import com.nereusstream.pulsar.offload.PulsarNativeManagedLedgerFactoryV2;
 import com.nereusstream.pulsar.offload.PulsarNativeReadCellBudgetV1;
@@ -39,11 +41,14 @@ import io.oxia.client.api.OxiaClientBuilder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -71,7 +76,7 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 import org.apache.pulsar.metadata.api.extended.NereusOwnershipMetadataStore;
 
-/** Native BookKeeper storage for one explicit Nereus Protocol Cell. Other namespaces use stock storage. */
+/** Native managed-ledger storage for one explicit Nereus Protocol Cell. Other namespaces use stock storage. */
 public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFactory
         implements NereusPulsarManagedLedgerStorage {
     private PulsarM6BookKeeperCellConfig configuration;
@@ -80,6 +85,10 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
     private AsyncOxiaClient cellMetadata;
     private OxiaV2CapabilityStore p1;
     private M5BookKeeperNamespaceAuthorityV2 bookKeeper;
+    private PulsarM6ObjectWalAllocator objectAllocator;
+    private PulsarM6ObjectWalProvider objectProvider;
+    private ThreadPoolExecutor objectIo;
+    private Duration objectTimeout;
     private Map<TopicName, PulsarNativeBindingV1> admittedBindings;
     private CompletableFuture<PulsarNativeReadCellBudgetV1> activeBudget;
     private CompletableFuture<Void> priorDrain = CompletableFuture.completedFuture(null);
@@ -154,6 +163,10 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                 bindings.put(topic, readBinding(topic).toCompletableFuture().get(timeout, TimeUnit.SECONDS));
             }
             admittedBindings = Map.copyOf(bindings);
+            if (configuration.objectWal().isPresent()) {
+                initializeObjectWal(configuration.objectWal().orElseThrow(), Duration.ofSeconds(timeout));
+                return;
+            }
             bookKeeper = M5BookKeeperNamespaceAuthorityV2.connectExisting(
                     configuration.bookKeeperUri(), configuration.bookKeeper());
             var source = bookKeeper
@@ -185,6 +198,53 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
         }
     }
 
+    private void initializeObjectWal(PulsarM6ObjectWalSettings settings, Duration timeout) throws Exception {
+        if (java.net.URI.create(configuration.bookKeeperUri()).getPath().equals(settings.zkLedgerRoot())) {
+            throw new IllegalArgumentException(
+                    "Object WAL compatibility namespace must exclude stock BookKeeper writers");
+        }
+        objectTimeout = timeout;
+        var locked = PulsarM6ObjectWalNamespace.read(settings.zkServers(), settings.zkLedgerRoot(), timeout);
+        if (!locked.proof().equals(settings.namespaceProof())) {
+            throw new IllegalArgumentException(
+                    "Pulsar Object WAL BookKeeper namespace differs from the admission proof");
+        }
+        objectAllocator = new PulsarM6ObjectWalAllocator(
+                cellMetadata,
+                () -> {
+                    if (p1.continuitySnapshot().state() != StoreContinuityState.READY) {
+                        throw new IllegalStateException("Pulsar Object WAL requires ready Oxia continuity");
+                    }
+                },
+                configuration.metadata().authorityRoot(),
+                configuration.cell(),
+                locked,
+                settings.registry(),
+                configuration.bookKeeper().clientArtifactSha256(),
+                settings.selectionBytes(),
+                settings.artifacts());
+        objectAllocator.open().toCompletableFuture().get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        var namespace = OxiaPhysicalMetadataNamespaceV2.connect(cellMetadata, configuration.metadataIdentity())
+                .toCompletableFuture()
+                .get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        objectProvider = PulsarM6ObjectWalProvider.open(settings.provider(), configuration.cell(), namespace, timeout);
+        int maximumTasks = Math.multiplyExact(
+                admittedBindings.size(),
+                Math.addExact(
+                        8,
+                        Math.multiplyExact(
+                                configuration.readLimits().maximumEntries(),
+                                Math.toIntExact(configuration.share().readSlots()))));
+        var ids = new java.util.concurrent.atomic.AtomicInteger();
+        objectIo = new ThreadPoolExecutor(
+                settings.ioThreads(),
+                settings.ioThreads(),
+                0,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(maximumTasks),
+                runnable -> new Thread(runnable, "pulsar-object-wal-provider-" + ids.incrementAndGet()));
+    }
+
     @Override
     protected ManagedLedgerFactoryImpl createManagedLedgerFactory(
             MetadataStoreExtended metadata,
@@ -214,25 +274,32 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
     }
 
     private CompletionStage<PulsarNativeBindingV1> readBinding(TopicName topic) {
-        return PulsarNativeBindingV1.read(
+        var incarnation = incarnation(topic);
+        var read = configuration.objectWal().isPresent()
+                ? PulsarNativeBindingV1.readObjectWal(
                         cellMetadata,
                         configuration.metadataIdentity(),
                         configuration.metadata().authorityRoot(),
-                        incarnation(topic))
-                .thenCompose(binding -> {
-                    var aggregate = binding.authority().aggregate();
-                    if (!aggregate.binding().cellIdentity().equals(configuration.cell())
-                            || aggregate.initialEpoch().storageProfile() != configuration.profile()) {
-                        throw new IllegalArgumentException("Pulsar Binding differs from the admitted BookKeeper Cell");
-                    }
-                    return configuration
-                                    .objectScope()
-                                    .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete)
-                                    .isPresent()
-                            ? binding.requireBookKeeperDeleteAuditEnrollment(configuration.writers())
-                                    .thenApply(unused -> binding)
-                            : CompletableFuture.completedFuture(binding);
-                });
+                        incarnation)
+                : PulsarNativeBindingV1.read(
+                        cellMetadata,
+                        configuration.metadataIdentity(),
+                        configuration.metadata().authorityRoot(),
+                        incarnation);
+        return read.thenCompose(binding -> {
+            var aggregate = binding.authority().aggregate();
+            if (!aggregate.binding().cellIdentity().equals(configuration.cell())
+                    || aggregate.initialEpoch().storageProfile() != configuration.profile()) {
+                throw new IllegalArgumentException("Pulsar Binding differs from the admitted BookKeeper Cell");
+            }
+            return configuration
+                            .objectScope()
+                            .flatMap(PulsarM6AsyncObjectScope.Configuration::bookKeeperDelete)
+                            .isPresent()
+                    ? binding.requireBookKeeperDeleteAuditEnrollment(configuration.writers())
+                            .thenApply(unused -> binding)
+                    : CompletableFuture.completedFuture(binding);
+        });
     }
 
     @Override
@@ -329,6 +396,9 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                         && topicAuthority.isCurrent(captured);
             }
         });
+        if (configuration.objectWal().isPresent()) {
+            return openObjectWal(binding, broker, config, ownership, topicAuthority);
+        }
         return acquireBudget().thenCompose(budget -> {
             var root = configuration.metadata().authorityRoot();
             var aggregate = new M5PulsarAggregateRetirementCoordinatorV1(
@@ -381,6 +451,102 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
                                         throw openFailure(error, cleanup);
                                     })));
         });
+    }
+
+    private CompletionStage<OpenedLedger> openObjectWal(
+            PulsarNativeBindingV1 binding,
+            PulsarService broker,
+            ManagedLedgerConfig config,
+            Supplier<CompletableFuture<Boolean>> ownership,
+            NereusPulsarTopicAuthority authority) {
+        var settings = configuration.objectWal().orElseThrow();
+        var reads = configuration.readLimits();
+        var limits = new PulsarM6ObjectWalTopic.Limits(
+                Math.toIntExact(reads.maximumOwnedEntryBytes()),
+                config.getMaxEntriesPerLedger(),
+                settings.maximumPendingAppends(),
+                settings.maximumPendingBytes(),
+                reads.maximumEntries(),
+                Math.toIntExact(configuration.share().readSlots()));
+        var name = binding.authority().aggregate().binding().incarnationIdentity();
+        var persistence = ((PulsarTopicIncarnationIdentity) name)
+                .persistenceName()
+                .value()
+                .value();
+        java.util.concurrent.Executor ordered =
+                task -> broker.getOrderedExecutor().executeOrdered(persistence, task);
+        synchronized (this) {
+            if (closing) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Pulsar Object WAL Cell is closing"));
+            }
+            activeScopes++;
+        }
+        var released = new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable release = () -> {
+            if (released.compareAndSet(false, true)) {
+                synchronized (this) {
+                    activeScopes--;
+                }
+            }
+        };
+        var installed = new java.util.concurrent.atomic.AtomicReference<PulsarM6ObjectWalTopic>();
+        return CompletableFuture.completedFuture(null)
+                .thenCompose(unused -> ownership.get())
+                .thenCompose(owned -> {
+                    if (!owned) {
+                        return CompletableFuture.<PulsarM6ObjectWalTopic>failedFuture(
+                                new IllegalStateException("Pulsar Object WAL bundle was revoked before open"));
+                    }
+                    return PulsarM6ObjectWalTopic.open(
+                            objectAllocator,
+                            objectProvider,
+                            cellMetadata,
+                            configuration.metadata().authorityRoot(),
+                            binding,
+                            authority,
+                            limits,
+                            objectTimeout,
+                            objectIo,
+                            ordered);
+                })
+                .thenCompose(topic -> {
+                    installed.set(topic);
+                    return PulsarM6ObjectWalCursorStore.open(
+                                    new Oxia09ExactMetadataTransactionStoreV1(cellMetadata),
+                                    configuration.metadata().authorityRoot(),
+                                    topic.chain().incarnation().value(),
+                                    topic.owner())
+                            .thenApply(cursors -> {
+                                var ledger = new PulsarM6ObjectWalManagedLedger(
+                                        persistence,
+                                        topic,
+                                        cursors,
+                                        config,
+                                        reads.maximumEntries(),
+                                        reads.maximumOwnedBatchBytes());
+                                return new OpenedLedger(ledger, authority, ledger::drain, () -> {
+                                    release.run();
+                                    return CompletableFuture.completedFuture(null);
+                                });
+                            });
+                })
+                .exceptionallyCompose(error -> {
+                    var topic = installed.get();
+                    return authority
+                            .closeAsync()
+                            .thenCompose(
+                                    unused -> topic == null ? CompletableFuture.completedFuture(null) : topic.close())
+                            .handle((unused, cleanup) -> {
+                                if (cleanup != null) {
+                                    throw openFailure(error, cleanup);
+                                }
+                                if (unwrap(error).getSuppressed().length != 0) {
+                                    throw new UnsettledOpenException(error);
+                                }
+                                release.run();
+                                throw openFailure(error, null);
+                            });
+                });
     }
 
     private CompletableFuture<FactoryScope> openFactory(
@@ -552,10 +718,17 @@ public final class PulsarM6ManagedLedgerStorage extends ManagedLedgerClientFacto
         }
         try {
             settled.get();
+            if (objectIo != null) {
+                objectIo.shutdown();
+                if (!objectIo.awaitTermination(objectTimeout.toNanos(), TimeUnit.NANOSECONDS)) {
+                    throw new IllegalStateException("Pulsar Object WAL provider work is still active");
+                }
+            }
             try (var stock = (AutoCloseable) super::close;
                     var bk = bookKeeper;
                     var cell = cellMetadata;
-                    var active = p1) {
+                    var active = p1;
+                    var object = objectProvider) {
                 // These providers are closed only after the final Cell actor really drained.
             }
         } catch (InterruptedException interrupted) {

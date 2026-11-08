@@ -14,7 +14,10 @@
 
 package com.nereusstream.metadata.spi.allocator;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.registry.allocator.AllocatorCampaignSelectionV5;
+import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Candidate;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
@@ -35,12 +38,18 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /** Receipt-gated production coordinator. Every dispatched mutation retains an exact typed predecessor. */
 public final class ProductionVirtualLedgerAllocator {
+    private static final String M3_FINAL_TESTED_SOURCE = "e5e53e62865c21845621037bea5f18c092bd4259";
+    private static final Sha256Digest M3_FINAL_SELECTION = Sha256Digest.copyOf(
+            HexFormat.of().parseHex("92c13584eb2ca08e38b299d4facc6e65cab5cd6e4e6b7bec12aaf83356f8e2fe"));
+    private static final String OXIA_ALLOCATOR_STORE =
+            "com.nereusstream.metadata.oxia.v2.allocator.OxiaVirtualLedgerAllocatorStore";
     private final AllocatorModeV1 selectedMode;
     private final int allocatorProtocolVersion;
     private final long selectedRangeSize;
@@ -77,6 +86,47 @@ public final class ProductionVirtualLedgerAllocator {
                 packagedArtifactSha256(AllocatorSelectionReceiptV1.class),
                 packagedArtifactSha256(ProductionVirtualLedgerAllocator.class),
                 packagedArtifactSha256(store.getClass()));
+    }
+
+    /** Package identities supplied by the verified Broker launch, independently of the historical selection. */
+    public record Range64RuntimeArtifacts(Sha256Digest domain, Sha256Digest metadataSpi, Sha256Digest metadataOxia) {
+        public Range64RuntimeArtifacts {
+            if (Objects.requireNonNull(domain, "domain").isZero()
+                    || Objects.requireNonNull(metadataSpi, "metadataSpi").isZero()
+                    || Objects.requireNonNull(metadataOxia, "metadataOxia").isZero()) {
+                throw new IllegalArgumentException("Allocator runtime artifact identity is zero");
+            }
+        }
+    }
+
+    /** The fixed M3 Final selection chooses the range. The M6 launch separately binds the actual running artifacts. */
+    public static ProductionVirtualLedgerAllocator activateFrozenRange64(
+            CanonicalBytes selectionBytes, Range64RuntimeArtifacts admitted, PulsarVirtualLedgerAllocatorStore store) {
+        Objects.requireNonNull(selectionBytes, "M3 Final NARS5 selection");
+        Objects.requireNonNull(admitted, "qualified runtime artifacts");
+        Objects.requireNonNull(store, "actual allocator store");
+        if (!Sha256Digest.hash(selectionBytes).equals(M3_FINAL_SELECTION)) {
+            throw failure(
+                    AllocatorProtocolException.Code.SOURCE_MISMATCH,
+                    "allocator selection is not the exact M3 Final NARS5");
+        }
+        var selection = AllocatorCampaignSelectionV5.decode(selectionBytes);
+        if (!selection.source().nereusCommit().equals(M3_FINAL_TESTED_SOURCE)
+                || selection.selectedCandidate() != Candidate.RANGE_64) {
+            throw failure(
+                    AllocatorProtocolException.Code.SELECTION_NOT_ELIGIBLE,
+                    "M3 Final selection does not authorize RANGE_64");
+        }
+        if (!store.getClass().getName().equals(OXIA_ALLOCATOR_STORE)
+                || !admitted.equals(new Range64RuntimeArtifacts(
+                        packagedArtifactSha256(AllocatorCampaignSelectionV5.class),
+                        packagedArtifactSha256(ProductionVirtualLedgerAllocator.class),
+                        packagedArtifactSha256(store.getClass())))) {
+            throw failure(
+                    AllocatorProtocolException.Code.SOURCE_MISMATCH,
+                    "allocator admission differs from the actual packaged domain/SPI/Oxia artifacts");
+        }
+        return new ProductionVirtualLedgerAllocator(AllocatorEvidenceCandidateV1.range(64), store, true);
     }
 
     static ProductionVirtualLedgerAllocator activateExactArtifacts(

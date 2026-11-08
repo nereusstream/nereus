@@ -30,7 +30,9 @@ import com.nereusstream.metadata.spi.model.CreateMutationOutcome;
 import com.nereusstream.metadata.spi.model.CreateMutationResult;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -82,6 +84,33 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         }
     }
 
+    /** Returns the exact sealed predecessors, newest first, rooted in the opened active ledger. */
+    public CompletionStage<List<SealedLedger>> readSealedHistory(OpenedLedger opened, int maximumNodes) {
+        if (maximumNodes <= 0) {
+            return failed(new IllegalArgumentException("Object WAL history bound must be positive"));
+        }
+        return authority.readSealedHistory(opened, maximumNodes);
+    }
+
+    /** The same durable Head must still be current after provider recovery. */
+    public CompletionStage<Void> requireUnchangedHead(OpenedLedger opened) {
+        return authority.readHead(opened.node().binding()).thenAccept(actual -> {
+            if (!actual.equals(
+                    Optional.of(new HeadSnapshot(opened.authorityVersion(), opened.node(), opened.ownerEpoch())))) {
+                throw rejected(ChainRejectionCode.HEAD_CONFLICT, "Object WAL Head changed during recovery");
+            }
+        });
+    }
+
+    public record SealedLedger(LedgerNode node, long terminalEntryId) {
+        public SealedLedger {
+            Objects.requireNonNull(node, "node");
+            if (terminalEntryId < -1) {
+                throw rejected(ChainRejectionCode.INVALID_TERMINAL_ENTRY, "invalid recovered terminal entry");
+            }
+        }
+    }
+
     /**
      * Atomically seals the current ledger at {@code terminalEntryId} and installs one exact successor head.
      * Allocation exhaustion is propagated and never searches another slice or wraps the ledger ID.
@@ -91,7 +120,7 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         try {
             Objects.requireNonNull(current, "current");
             requireOwnerEpoch(ownerEpoch);
-            if (current.node().ownerEpoch() != ownerEpoch) {
+            if (current.ownerEpoch() != ownerEpoch) {
                 throw rejected(ChainRejectionCode.STALE_OWNER, "owner epoch differs from the opened ledger");
             }
             if (terminalEntryId < -1) {
@@ -113,7 +142,8 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                                 terminalEntryId,
                                 ownerEpoch);
                         return installCandidate(
-                                Optional.of(new HeadSnapshot(current.authorityVersion(), current.node())), candidate);
+                                Optional.of(new HeadSnapshot(current.authorityVersion(), current.node(), ownerEpoch)),
+                                candidate);
                     });
         } catch (Throwable error) {
             return failed(error);
@@ -173,10 +203,10 @@ public final class PulsarVirtualLedgerChainControllerV1 {
             throw rejected(ChainRejectionCode.BINDING_MISMATCH, "head belongs to another Pulsar binding");
         }
         slice.requireContains(snapshot.node().virtualLedgerId());
-        if (snapshot.node().ownerEpoch() != ownerEpoch) {
+        if (snapshot.ownerEpoch() != ownerEpoch) {
             throw rejected(ChainRejectionCode.STALE_OWNER, "durable head belongs to another owner epoch");
         }
-        return new OpenedLedger(snapshot.authorityVersion(), snapshot.node());
+        return new OpenedLedger(snapshot.authorityVersion(), snapshot.node(), ownerEpoch);
     }
 
     private static void requireOwnerEpoch(long ownerEpoch) {
@@ -243,10 +273,17 @@ public final class PulsarVirtualLedgerChainControllerV1 {
     }
 
     /** Current append-admitting ledger and the exact CAS version that installed it. */
-    public record OpenedLedger(MetadataVersion authorityVersion, LedgerNode node) {
+    public record OpenedLedger(MetadataVersion authorityVersion, LedgerNode node, long ownerEpoch) {
+        public OpenedLedger(MetadataVersion authorityVersion, LedgerNode node) {
+            this(authorityVersion, node, node.ownerEpoch());
+        }
+
         public OpenedLedger {
             Objects.requireNonNull(authorityVersion, "authorityVersion");
             Objects.requireNonNull(node, "node");
+            if (ownerEpoch < node.ownerEpoch()) {
+                throw new IllegalArgumentException("Active owner predates the immutable ledger creator");
+            }
         }
     }
 
@@ -292,10 +329,17 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         }
     }
 
-    public record HeadSnapshot(MetadataVersion authorityVersion, LedgerNode node) {
+    public record HeadSnapshot(MetadataVersion authorityVersion, LedgerNode node, long ownerEpoch) {
+        public HeadSnapshot(MetadataVersion authorityVersion, LedgerNode node) {
+            this(authorityVersion, node, node.ownerEpoch());
+        }
+
         public HeadSnapshot {
             Objects.requireNonNull(authorityVersion, "authorityVersion");
             Objects.requireNonNull(node, "node");
+            if (ownerEpoch < node.ownerEpoch()) {
+                throw new IllegalArgumentException("Head owner predates the immutable ledger creator");
+            }
         }
     }
 
@@ -320,6 +364,14 @@ public final class PulsarVirtualLedgerChainControllerV1 {
 
     public interface LedgerChainAuthority {
         CompletionStage<Optional<HeadSnapshot>> readHead(PulsarBindingKey binding);
+
+        default CompletionStage<List<SealedLedger>> readSealedHistory(OpenedLedger opened, int maximumNodes) {
+            return opened.node().predecessorLedgerId().isEmpty()
+                    ? completed(List.of())
+                    : failed(rejected(
+                            ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
+                            "sealed predecessor authority is unavailable"));
+        }
 
         /**
          * Atomically installs the first head when {@code exactPredecessor} is empty, or seals the exact predecessor and
@@ -346,15 +398,19 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         CompletionStage<NvBindingContext> load(PulsarBindingKey binding);
     }
 
-    /**
-     * Projects an already-authoritative ManagedLedger descriptor into ADR 0091's descriptor digest and back. This
-     * adapter never persists a second Pulsar chain row: NVAH1/NVAN1 remain the only chain authority.
-     */
+    /** The immutable descriptor is bound by NVAN1. Only the NVAH1 pointer can make a candidate visible. */
     public interface NvLedgerDescriptorAuthority {
         Sha256Digest requireDescriptorDigest(LedgerNode candidate);
 
+        CompletionStage<Void> persistCandidate(VersionedVirtualLedgerCandidateNodeV1 exactNode, LedgerNode candidate);
+
         CompletionStage<ResolvedNvHead> resolveVisibleHead(
                 PulsarBindingKey binding, VersionedManagedLedgerAllocatorHeadV1 exactHead);
+
+        default CompletionStage<ResolvedNvHead> resolvePredecessor(ResolvedNvHead child) {
+            return failed(rejected(
+                    ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH, "NVAN1 predecessor lookup is unavailable"));
+        }
     }
 
     /** Stable operation identity supplied by the owning allocator workflow, not derived from a transient future. */
@@ -421,16 +477,28 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                                 "one binding already owns an unpublished NVAN candidate allocation");
                     }
                 }
-                return loadAuthority(binding, ownerEpoch, true)
-                        .thenCompose(this::prepareUsableGrant)
+                return loadAuthority(binding, ownerEpoch).thenCompose(original -> prepareUsableGrant(original)
+                        .thenCompose(this::settleOccupiedCursor)
                         .thenApply(state -> {
+                            if (!state.head()
+                                    .value()
+                                    .visibleChainHead()
+                                    .equals(original.head().value().visibleChainHead())) {
+                                throw rejected(
+                                        ChainRejectionCode.HEAD_CONFLICT,
+                                        "Grant preparation changed the original visible chain head");
+                            }
                             long ledgerId = nextLedgerId(state);
                             fixedSlice.requireContains(ledgerId);
                             synchronized (monitor) {
                                 if (pending.putIfAbsent(
                                                 binding,
                                                 new PendingNvAllocation(
-                                                        state.context(), state.cell(), state.head(), ledgerId))
+                                                        state.context(),
+                                                        state.cell(),
+                                                        state.head(),
+                                                        original.head().metadataVersion(),
+                                                        ledgerId))
                                         != null) {
                                     throw rejected(
                                             ChainRejectionCode.ALLOCATION_ALREADY_PENDING,
@@ -438,7 +506,7 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                                 }
                             }
                             return ledgerId;
-                        });
+                        }));
             } catch (Throwable error) {
                 return failed(error);
             }
@@ -540,8 +608,7 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                     });
         }
 
-        private CompletionStage<AuthorityState> loadAuthority(
-                PulsarBindingKey binding, long ownerEpoch, boolean createHead) {
+        private CompletionStage<AuthorityState> loadAuthority(PulsarBindingKey binding, long ownerEpoch) {
             return contexts.load(binding)
                     .thenCompose(context -> {
                         requireContext(binding, context);
@@ -549,32 +616,19 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                         var assignment = context.currentSliceView().value().assignment();
                         return store.readCell(
                                         assignment.ledgerIdCompatibilityNamespaceId(), assignment.sliceAssignmentId())
-                                .thenCompose(cell -> cell.isPresent()
-                                        ? completed(cell.orElseThrow())
-                                        : requireExactCreate(allocator.createCell(context.currentSliceView()), "NVAC1"))
+                                .thenApply(cell -> cell.orElseThrow(() -> rejected(
+                                        ChainRejectionCode.MUTATION_NOT_RECONCILED,
+                                        "NV allocator Cell must already be provisioned")))
                                 .thenCompose(cell -> store.readHead(
                                                 assignment.ledgerIdCompatibilityNamespaceId(),
                                                 assignment.sliceAssignmentId(),
                                                 context.managedLedgerIncarnation())
-                                        .thenCompose(head -> {
-                                            if (head.isPresent()) {
-                                                return completed(new AuthorityState(context, cell, head.orElseThrow()));
-                                            }
-                                            if (!createHead) {
-                                                return failed(rejected(
+                                        .thenApply(head -> new AuthorityState(
+                                                context,
+                                                cell,
+                                                head.orElseThrow(() -> rejected(
                                                         ChainRejectionCode.MUTATION_NOT_RECONCILED,
-                                                        "NV allocator Head is absent"));
-                                            }
-                                            return requireExactCreate(
-                                                            allocator.createHead(
-                                                                    cell,
-                                                                    context.currentSliceView(),
-                                                                    context.managedLedgerIncarnation(),
-                                                                    ownerEpoch),
-                                                            "NVAH1")
-                                                    .thenApply(createdHead ->
-                                                            new AuthorityState(context, cell, createdHead));
-                                        }));
+                                                        "NV allocator Head must already be provisioned")))));
                     })
                     .thenApply(state -> {
                         if (state.head().value().ownerEpoch() != ownerEpoch) {
@@ -585,15 +639,22 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         }
 
         private CompletionStage<AuthorityState> prepareUsableGrant(AuthorityState state) {
-            if (hasUsableInstalledRange(state.head())) {
-                return completed(state);
+            if (state.cell().value().mode() != AllocatorModeV1.RANGE_LEASED) {
+                return reserveAndInstall(state);
             }
-            if (installedReservationExhausted(state.cell(), state.head())) {
-                return requireExactCas(allocator.clearReservation(state.cell(), state.head()), "NVAC1 clear")
-                        .thenCompose(cleared ->
-                                reserveAndInstall(new AuthorityState(state.context(), cleared, state.head())));
+            var reservation = state.cell().value().reservation();
+            if (reservation.isPresent()
+                    && reservation
+                            .orElseThrow()
+                            .managedLedgerIncarnation()
+                            .equals(state.head().value().managedLedgerIncarnation())) {
+                var exact = reservation.orElseThrow();
+                if (state.head().value().grantId() != exact.grantId()) {
+                    return installAndClearRange(state).thenCompose(this::prepareUsableGrant);
+                }
+                return clearInstalledRange(state).thenCompose(this::prepareUsableGrant);
             }
-            return reserveAndInstall(state);
+            return hasUsableInstalledRange(state.head()) ? completed(state) : reserveAndInstall(state);
         }
 
         private CompletionStage<AuthorityState> reserveAndInstall(AuthorityState state) {
@@ -613,17 +674,60 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                                     state.cell(), state.head(), state.context().currentSliceView(), requestId),
                             "NVAC1 reserve")
                     .thenCompose(reservedCell -> {
-                        if (reservedCell.value().mode() == AllocatorModeV1.STRICT_SERIALIZED) {
-                            return completed(new AuthorityState(state.context(), reservedCell, state.head()));
+                        var reserved = new AuthorityState(state.context(), reservedCell, state.head());
+                        return reservedCell.value().mode() == AllocatorModeV1.STRICT_SERIALIZED
+                                ? completed(reserved)
+                                : installAndClearRange(reserved);
+                    });
+        }
+
+        private CompletionStage<AuthorityState> installAndClearRange(AuthorityState reserved) {
+            return requireExactCas(
+                            allocator.installRangeReservedGrant(
+                                    reserved.cell(),
+                                    reserved.head(),
+                                    reserved.context().currentSliceView()),
+                            "NVAH1 range install")
+                    .thenCompose(
+                            head -> clearInstalledRange(new AuthorityState(reserved.context(), reserved.cell(), head)));
+        }
+
+        private CompletionStage<AuthorityState> clearInstalledRange(AuthorityState state) {
+            return requireExactCas(allocator.clearReservation(state.cell(), state.head()), "NVAC1 range clear")
+                    .thenApply(cleared -> new AuthorityState(state.context(), cleared, state.head()));
+        }
+
+        /** Only the exact stale node at the occupied cursor can be consumed; no node is rewritten or removed. */
+        private CompletionStage<AuthorityState> settleOccupiedCursor(AuthorityState state) {
+            if (state.cell().value().mode() != AllocatorModeV1.RANGE_LEASED) {
+                return completed(state);
+            }
+            var assignment = state.context().currentSliceView().value().assignment();
+            return store.readNode(
+                            assignment.ledgerIdCompatibilityNamespaceId(),
+                            assignment.sliceAssignmentId(),
+                            state.context().managedLedgerIncarnation(),
+                            state.head().value().nextLedgerId())
+                    .thenCompose(found -> {
+                        if (found.isEmpty()) {
+                            return completed(state);
+                        }
+                        var occupied = found.orElseThrow();
+                        if (occupied.value().creatorOwnerEpoch()
+                                >= state.head().value().ownerEpoch()) {
+                            return failed(rejected(
+                                    ChainRejectionCode.MUTATION_NOT_RECONCILED,
+                                    "current Object WAL allocator cursor has an unresolved same-owner candidate"));
                         }
                         return requireExactCas(
-                                        allocator.installRangeReservedGrant(
-                                                reservedCell,
+                                        allocator.burnStaleCandidate(
+                                                state.cell(),
                                                 state.head(),
+                                                occupied,
                                                 state.context().currentSliceView()),
-                                        "NVAH1 range install")
-                                .thenApply(installedHead ->
-                                        new AuthorityState(state.context(), reservedCell, installedHead));
+                                        "NVAH1 burn stale candidate")
+                                .thenCompose(burned ->
+                                        prepareUsableGrant(new AuthorityState(state.context(), state.cell(), burned)));
                     });
         }
 
@@ -640,12 +744,13 @@ public final class PulsarVirtualLedgerChainControllerV1 {
             VersionedVirtualLedgerCandidateNodeV1 exactNode =
                     created.exactSnapshot().orElseThrow();
             requireExactNode(allocation, logicalCandidate, exactNode);
-            return allocator
-                    .publishCandidate(
+            return descriptors
+                    .persistCandidate(exactNode, logicalCandidate)
+                    .thenCompose(unused -> allocator.publishCandidate(
                             allocation.cell(),
                             allocation.head(),
                             exactNode,
-                            allocation.context().currentSliceView())
+                            allocation.context().currentSliceView()))
                     .thenCompose(published -> finishPublishedHead(allocation, logicalCandidate, exactNode, published));
         }
 
@@ -684,22 +789,106 @@ public final class PulsarVirtualLedgerChainControllerV1 {
             });
         }
 
+        @Override
+        public CompletionStage<List<SealedLedger>> readSealedHistory(OpenedLedger opened, int maximumNodes) {
+            PulsarBindingKey binding = opened.node().binding();
+            return contexts.load(binding).thenCompose(context -> {
+                requireContext(binding, context);
+                requireFixedGeometry(context.currentSliceView());
+                var assignment = context.currentSliceView().value().assignment();
+                return store.readHead(
+                                assignment.ledgerIdCompatibilityNamespaceId(),
+                                assignment.sliceAssignmentId(),
+                                context.managedLedgerIncarnation())
+                        .thenCompose(found -> {
+                            var head = found.orElseThrow(
+                                    () -> rejected(ChainRejectionCode.HEAD_CONFLICT, "Object WAL Head is absent"));
+                            if (!head.metadataVersion().equals(opened.authorityVersion())
+                                    || head.value().ownerEpoch() != opened.ownerEpoch()) {
+                                return failed(rejected(
+                                        ChainRejectionCode.HEAD_CONFLICT,
+                                        "Object WAL Head changed before reading its history"));
+                            }
+                            return descriptors.resolveVisibleHead(binding, head).thenCompose(active -> {
+                                if (!active.exactNode()
+                                                .value()
+                                                .pointer()
+                                                .equals(head.value().visibleChainHead())
+                                        || !active.ledgerNode().equals(opened.node())) {
+                                    return failed(rejected(
+                                            ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
+                                            "Object WAL lineage is not rooted in its active Head"));
+                                }
+                                requireLogicalNode(binding, active);
+                                return readPredecessors(binding, active, maximumNodes, new ArrayList<>());
+                            });
+                        });
+            });
+        }
+
+        private CompletionStage<List<SealedLedger>> readPredecessors(
+                PulsarBindingKey binding, ResolvedNvHead child, int remaining, List<SealedLedger> history) {
+            var expected = child.exactNode().value().expectedPredecessor();
+            if (expected.isAbsent()) {
+                if (child.ledgerNode().predecessorLedgerId().isPresent()) {
+                    return failed(rejected(
+                            ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
+                            "logical predecessor differs from the root NVAN1"));
+                }
+                return completed(List.copyOf(history));
+            }
+            if (remaining == 0) {
+                return failed(rejected(
+                        ChainRejectionCode.HISTORY_BOUND_EXCEEDED,
+                        "Object WAL ledger history exceeds its recovery bound"));
+            }
+            return descriptors.resolvePredecessor(child).thenCompose(parent -> {
+                requireLogicalNode(binding, parent);
+                if (!parent.exactNode().value().pointer().equals(expected)
+                        || !child.ledgerNode()
+                                .predecessorLedgerId()
+                                .equals(OptionalLong.of(parent.ledgerNode().virtualLedgerId()))
+                        || parent.ledgerNode().ownerEpoch() > child.ledgerNode().ownerEpoch()) {
+                    throw rejected(
+                            ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
+                            "typed predecessor pointer or logical predecessor differs");
+                }
+                history.add(
+                        new SealedLedger(parent.ledgerNode(), child.ledgerNode().predecessorTerminalEntryId()));
+                return readPredecessors(binding, parent, remaining - 1, history);
+            });
+        }
+
+        private void requireLogicalNode(PulsarBindingKey binding, ResolvedNvHead resolved) {
+            VirtualLedgerCandidateNodeV1 node = resolved.exactNode().value();
+            LedgerNode logical = resolved.ledgerNode();
+            if (!logical.binding().equals(binding)
+                    || logical.virtualLedgerId() != node.ledgerId()
+                    || logical.ownerEpoch() != node.creatorOwnerEpoch()
+                    || !descriptors.requireDescriptorDigest(logical).equals(node.ledgerDescriptorDigest())) {
+                throw rejected(
+                        ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
+                        "resolved ManagedLedger descriptor differs from exact NVAN1 authority");
+            }
+            fixedSlice.requireContains(logical.virtualLedgerId());
+        }
+
         private CompletionStage<HeadSnapshot> resolveExactHead(
                 PulsarBindingKey binding, VersionedManagedLedgerAllocatorHeadV1 exactHead) {
             return descriptors.resolveVisibleHead(binding, exactHead).thenApply(resolved -> {
-                VirtualLedgerCandidateNodeV1 node = resolved.exactNode().value();
-                LedgerNode logical = resolved.ledgerNode();
-                if (!logical.binding().equals(binding)
-                        || logical.virtualLedgerId() != node.ledgerId()
-                        || logical.ownerEpoch() != node.creatorOwnerEpoch()
-                        || !exactHead.value().visibleChainHead().equals(node.pointer())
-                        || !descriptors.requireDescriptorDigest(logical).equals(node.ledgerDescriptorDigest())) {
+                requireLogicalNode(binding, resolved);
+                if (!exactHead
+                        .value()
+                        .visibleChainHead()
+                        .equals(resolved.exactNode().value().pointer())) {
                     throw rejected(
                             ChainRejectionCode.DESCRIPTOR_AUTHORITY_MISMATCH,
-                            "resolved ManagedLedger descriptor differs from exact NVAH1/NVAN1 authority");
+                            "resolved NVAN1 pointer differs from exact NVAH1 authority");
                 }
-                fixedSlice.requireContains(logical.virtualLedgerId());
-                return new HeadSnapshot(exactHead.metadataVersion(), logical);
+                return new HeadSnapshot(
+                        exactHead.metadataVersion(),
+                        resolved.ledgerNode(),
+                        exactHead.value().ownerEpoch());
             });
         }
 
@@ -717,7 +906,8 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                 throw rejected(ChainRejectionCode.HEAD_CONFLICT, "logical predecessor differs from NVAH1");
             }
             exactPredecessor.ifPresent(predecessor -> {
-                if (!predecessor.authorityVersion().equals(allocation.head().metadataVersion())
+                if (!predecessor.authorityVersion().equals(allocation.originalHeadVersion())
+                        || predecessor.ownerEpoch() != allocation.head().value().ownerEpoch()
                         || !candidate
                                 .predecessorLedgerId()
                                 .equals(OptionalLong.of(predecessor.node().virtualLedgerId()))) {
@@ -807,21 +997,6 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                     : MutationKind.EXISTING_EXACT;
         }
 
-        private static <T> CompletionStage<T> requireExactCreate(
-                CompletionStage<CreateMutationResult<T>> stage, String authorityKind) {
-            return stage.thenApply(result -> {
-                if (result.outcome() == CreateMutationOutcome.DEFINITIVE_CONFLICT) {
-                    throw rejected(ChainRejectionCode.HEAD_CONFLICT, authorityKind + " create conflicted");
-                }
-                if (result.outcome() == CreateMutationOutcome.INDETERMINATE) {
-                    throw rejected(
-                            ChainRejectionCode.MUTATION_NOT_RECONCILED,
-                            authorityKind + " create outcome is indeterminate");
-                }
-                return result.exactSnapshot().orElseThrow();
-            });
-        }
-
         private static <T> CompletionStage<T> requireExactCas(
                 CompletionStage<ConditionalCasResult<T>> stage, String authorityKind) {
             return stage.thenApply(result -> {
@@ -845,6 +1020,7 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                 NvBindingContext context,
                 VersionedAllocatorCellStateV1 cell,
                 VersionedManagedLedgerAllocatorHeadV1 head,
+                MetadataVersion originalHeadVersion,
                 long ledgerId,
                 Optional<LedgerNode> logicalCandidate,
                 Optional<Sha256Digest> descriptorDigest) {
@@ -852,14 +1028,16 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                     NvBindingContext context,
                     VersionedAllocatorCellStateV1 cell,
                     VersionedManagedLedgerAllocatorHeadV1 head,
+                    MetadataVersion originalHeadVersion,
                     long ledgerId) {
-                this(context, cell, head, ledgerId, Optional.empty(), Optional.empty());
+                this(context, cell, head, originalHeadVersion, ledgerId, Optional.empty(), Optional.empty());
             }
 
             private PendingNvAllocation {
                 Objects.requireNonNull(context, "context");
                 Objects.requireNonNull(cell, "cell");
                 Objects.requireNonNull(head, "head");
+                Objects.requireNonNull(originalHeadVersion, "originalHeadVersion");
                 Objects.requireNonNull(logicalCandidate, "logicalCandidate");
                 Objects.requireNonNull(descriptorDigest, "descriptorDigest");
                 if (logicalCandidate.isPresent() != descriptorDigest.isPresent()) {
@@ -876,7 +1054,13 @@ public final class PulsarVirtualLedgerChainControllerV1 {
                             "response-loss redrive changed the exact NV candidate or descriptor digest");
                 }
                 return new PendingNvAllocation(
-                        context, cell, head, ledgerId, Optional.of(candidate), Optional.of(digest));
+                        context,
+                        cell,
+                        head,
+                        originalHeadVersion,
+                        ledgerId,
+                        Optional.of(candidate),
+                        Optional.of(digest));
             }
 
             private boolean matchesPublished(LedgerNode observed) {
@@ -896,7 +1080,8 @@ public final class PulsarVirtualLedgerChainControllerV1 {
         MUTATION_NOT_RECONCILED,
         ALLOCATION_ALREADY_PENDING,
         ALLOCATION_NOT_PENDING,
-        DESCRIPTOR_AUTHORITY_MISMATCH
+        DESCRIPTOR_AUTHORITY_MISMATCH,
+        HISTORY_BOUND_EXCEEDED
     }
 
     public static final class ChainException extends IllegalStateException {

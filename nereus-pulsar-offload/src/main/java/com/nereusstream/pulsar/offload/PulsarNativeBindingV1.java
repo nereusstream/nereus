@@ -195,18 +195,18 @@ public final class PulsarNativeBindingV1 {
             MetadataNamespaceIdentityV2 metadataNamespace,
             String authorityRoot,
             PulsarTopicIncarnationIdentity incarnation,
-            PulsarActiveTopicAuthority authority) {
+            PulsarActiveTopicAuthority authority,
+            java.util.function.Predicate<StorageProfileV1> acceptsProfile) {
         this.client = client;
         this.metadataNamespace = metadataNamespace;
         this.authorityRoot = authorityRoot;
         this.incarnation = incarnation;
         this.authority = authority;
         if (!authority.aggregate().binding().incarnationIdentity().equals(incarnation)
-                || !isNativeBookKeeperProfile(
-                        authority.aggregate().initialEpoch().storageProfile())
+                || !acceptsProfile.test(authority.aggregate().initialEpoch().storageProfile())
                 || authority.selector().value().generation().value()
                         != incarnation.bindingGeneration().value()) {
-            throw new IllegalArgumentException("native offload Binding differs from its P1 incarnation/profile");
+            throw new IllegalArgumentException("native Binding differs from its P1 incarnation/profile");
         }
         bindingIdentity = new BindingIdentity(
                 authority.aggregate().binding().bindingId(),
@@ -356,6 +356,34 @@ public final class PulsarNativeBindingV1 {
             MetadataNamespaceIdentityV2 metadataNamespace,
             String authorityRoot,
             PulsarTopicIncarnationIdentity incarnation) {
+        return readExact(
+                client,
+                metadataNamespace,
+                authorityRoot,
+                incarnation,
+                PulsarNativeBindingV1::isNativeBookKeeperProfile);
+    }
+
+    /** Object WAL reuses the same exact P1 Binding capture and admits only its own Storage Epoch profile. */
+    public static CompletionStage<PulsarNativeBindingV1> readObjectWal(
+            AsyncOxiaClient client,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            String authorityRoot,
+            PulsarTopicIncarnationIdentity incarnation) {
+        return readExact(
+                client,
+                metadataNamespace,
+                authorityRoot,
+                incarnation,
+                profile -> profile == StorageProfileV1.OBJECT_WAL);
+    }
+
+    private static CompletionStage<PulsarNativeBindingV1> readExact(
+            AsyncOxiaClient client,
+            MetadataNamespaceIdentityV2 metadataNamespace,
+            String authorityRoot,
+            PulsarTopicIncarnationIdentity incarnation,
+            java.util.function.Predicate<StorageProfileV1> acceptsProfile) {
         try {
             Objects.requireNonNull(client, "client");
             Objects.requireNonNull(incarnation, "incarnation");
@@ -391,7 +419,8 @@ public final class PulsarNativeBindingV1 {
                                                                 metadataNamespace,
                                                                 authorityRoot,
                                                                 incarnation,
-                                                                active));
+                                                                active,
+                                                                acceptsProfile));
                                             });
                                 });
                             }));
