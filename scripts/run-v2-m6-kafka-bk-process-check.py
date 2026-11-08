@@ -27,7 +27,7 @@ N1_REPOSITORY = ROOT / "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b
 DEVELOPMENT_VERSION = "0.2.0-SNAPSHOT"
 ARTIFACT_MODULES = (
     "nereus-storage-api", "nereus-metadata-spi", "nereus-storage-object", "nereus-storage-object-s3",
-    "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-metadata-oxia",
+    "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper", "nereus-metadata-oxia", "nereus-storage-object-vault",
 )
 CASES = {
     "kafka.server.nereus.KafkaBookKeeperAckRealTest": {

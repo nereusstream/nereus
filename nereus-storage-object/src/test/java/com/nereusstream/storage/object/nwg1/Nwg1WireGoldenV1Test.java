@@ -122,6 +122,22 @@ final class Nwg1WireGoldenV1Test {
     }
 
     @Test
+    void reservesTheExactBytesOfTheNativeKafkaGoldenBeforeOffsetAssignment() {
+        var vector = Nwg1GoldenCorpusV1.vectors().stream()
+                .filter(value -> value.id().equals("NWG1_KAFKA_MIN_ZERO_RECORD_NONE_V1"))
+                .findFirst()
+                .orElseThrow();
+        var plan = vector.plan();
+        assertThat(GroupEncodingPlanV1.kafkaSingleUncompressedBodyLimit(
+                        plan.bindings().getFirst().nti1Bytes().length,
+                        plan.frames().stream()
+                                .map(GroupEncodingPlanV1.PlannedFrame::decodedPayloadLength)
+                                .toList(),
+                        com.nereusstream.storage.object.control.Nwg1RootAdmissionCaps.formatHardCaps()))
+                .isEqualTo(vector.sealed().body().length);
+    }
+
+    @Test
     void authenticatedPrefixAndSelectedAppendUnitRangesMatchEveryGolden() throws IOException {
         for (var vector : Nwg1GoldenCorpusV1.vectors()) {
             byte[] body = vector.sealed().body();

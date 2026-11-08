@@ -70,6 +70,8 @@ public final class WalRunObjectSession implements AutoCloseable {
     private final Nwg1RootAuthorityV1 nwg1RootAuthority;
     private final boolean recoveredCurrentRoot;
     private boolean recoveredRowsReleased;
+    private WalCheckpointHeadV1 recoveredFinalHead;
+    private RecoveredProtocolClosure recoveredProtocolClosure;
     private volatile State state = State.OPEN;
     private int activeIo;
     private final java.util.Set<WalCheckpointPublisher> checkpointPublishers = new java.util.HashSet<>();
@@ -105,6 +107,48 @@ public final class WalRunObjectSession implements AutoCloseable {
             requireCheckpointAdmission();
         }
         return acquireIo();
+    }
+
+    /**
+     * Allows one exact final Kafka checkpoint Object after recovered physical rows are checkpointed. No NWG1
+     * sequence admission is restored. The caller holds the durable native recovery owner fence.
+     */
+    public synchronized RecoveredProtocolClosure prepareRecoveredProtocolClosure(
+            WalCheckpointHeadV1 exactPhysicalHead, ObjectIdentity exactProtocolObject) {
+        requireRecoveredCurrentRoot();
+        requireOpen();
+        requireKafkaProtocolIdentity(exactProtocolObject);
+        if (runtime.state() != WalRunRuntime.State.STOPPING
+                || !Objects.requireNonNull(exactPhysicalHead, "exactPhysicalHead")
+                        .equals(recoveredFinalHead)) {
+            throw new IllegalStateException("recovered Kafka checkpoint requires the final selected physical Head");
+        }
+        if (recoveredProtocolClosure == null) {
+            recoveredProtocolClosure = new RecoveredProtocolClosure(exactProtocolObject);
+        } else if (!recoveredProtocolClosure.object.equals(exactProtocolObject)) {
+            throw new IllegalStateException("recovered protocol closure retains another exact candidate");
+        }
+        return recoveredProtocolClosure;
+    }
+
+    public static final class RecoveredProtocolClosure {
+        private final ObjectIdentity object;
+
+        private RecoveredProtocolClosure(ObjectIdentity object) {
+            this.object = object;
+        }
+    }
+
+    public synchronized IoLease acquireRecoveredProtocolMutationIo(RecoveredProtocolClosure closure) {
+        requireRecoveredProtocolAdmission(closure);
+        return acquireIo();
+    }
+
+    private void requireRecoveredProtocolAdmission(RecoveredProtocolClosure closure) {
+        requireOpen();
+        if (closure == null || closure != recoveredProtocolClosure || runtime.state() != WalRunRuntime.State.STOPPING) {
+            throw new IllegalStateException("stale or foreign recovered Kafka checkpoint closure");
+        }
     }
 
     synchronized IoLease acquireIo() {
@@ -395,10 +439,22 @@ public final class WalRunObjectSession implements AutoCloseable {
 
     public ProviderObjectResult conditionalCreateKafkaProtocolObject(ValidatedKafkaProtocolObject candidate)
             throws IOException {
+        return conditionalCreateKafkaProtocolObject(candidate, null);
+    }
+
+    public ProviderObjectResult conditionalCreateKafkaProtocolObject(
+            ValidatedKafkaProtocolObject candidate, RecoveredProtocolClosure closure) throws IOException {
         IoLease lease;
         synchronized (this) {
-            requireCheckpointAdmission();
             Objects.requireNonNull(candidate, "candidate");
+            if (closure == null) {
+                requireCheckpointAdmission();
+            } else {
+                requireRecoveredProtocolAdmission(closure);
+                if (!closure.object.equals(candidate.identity)) {
+                    throw new IllegalArgumentException("recovered Kafka checkpoint differs from its exact candidate");
+                }
+            }
             if (candidate.owner != this) {
                 throw new IllegalArgumentException("Kafka protocol Object token belongs to another WalRun session");
             }
@@ -533,6 +589,98 @@ public final class WalRunObjectSession implements AutoCloseable {
     public synchronized LaneSequenceVector sealRuntime() {
         requireUsable();
         return runtime.seal();
+    }
+
+    synchronized void requireRecoveredClosureHead(WalCheckpointHeadV1 expected) {
+        requireRecoveredCurrentRoot();
+        if (runtime.state() != WalRunRuntime.State.STOPPING
+                || recoveredRowsReleased
+                || !recoveredCut.physicalHead().equals(expected)) {
+            throw new IllegalStateException("physical checkpoint closure requires the unconsumed authenticated cut");
+        }
+    }
+
+    /**
+     * Fences the previous publisher and checkpoints every already authenticated recovered extent. The caller must
+     * keep the native owner exclusion until the selected Head has been sealed; no sequence can be allocated here.
+     */
+    public synchronized WalCheckpointHeadV1 checkpointRecoveredPhysicalRows(
+            CanonicalControlMetadataStore metadata, long publisherEpoch) throws IOException {
+        requireRecoveredCurrentRoot();
+        var before = recoveredCut.physicalHead();
+        requireRecoveredClosureHead(before);
+        recovery.chargeControlMetadata(1024 * 1024);
+        var existingSeal = metadata.get(WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch()));
+        if (existingSeal.isPresent()) {
+            return retainSealedRecoveredHead(before, WalRunControlCodec.decodeSeal(existingSeal.orElseThrow()));
+        }
+        try (var publisher = WalCheckpointPublisher.forRecoveredClosure(metadata, this, before)) {
+            if (publisherEpoch > before.publisherEpoch()) {
+                publisher.takeover(publisherEpoch);
+            }
+            if (publisher.head().publisherEpoch() != publisherEpoch) {
+                throw new IllegalStateException("recovered physical publisher epoch was not selected");
+            }
+            var policy = root.checkpointPolicy();
+            consumeRecoveredPhysicalRows(row -> {
+                if (row.laneSequence() <= publisher.head().coveredThrough().get(row.laneId())) {
+                    return;
+                }
+                if (publisher.uncoveredExtentCount()
+                                >= Math.min(policy.maxUncheckpointedExtents(), policy.maxRowsPerPage())
+                        || row.bodyLength() > policy.maxUncheckpointedBytes() - publisher.uncoveredBodyBytes()) {
+                    publisher.flush();
+                }
+                publisher.enqueue(new ProviderResolvedExtentDescriptor(rootSha256, row, root.openedAtMillis()));
+            });
+            publisher.flush();
+            publisher.requireFinalCoverage(runtime.resolvedVector());
+            recoveredFinalHead = publisher.head();
+            return recoveredFinalHead;
+        }
+    }
+
+    private WalCheckpointHeadV1 retainSealedRecoveredHead(WalCheckpointHeadV1 before, WalRunSealRecord seal)
+            throws IOException {
+        if (!seal.root().rootSha256().equals(rootSha256)
+                || !seal.finalCheckpointHeadKey().equals(recoveredCut.physicalHeadKey())
+                || !seal.finalCheckpointHeadSha256().equals(recoveredCut.physicalHeadSha256())
+                || !seal.terminalSequence().equals(runtime.resolvedVector())
+                || seal.aggregateExtentCount() != runtime.resolvedExtentCount()
+                || seal.aggregateCanonicalBodyBytes() != runtime.resolvedCanonicalBodyBytes()) {
+            throw new IllegalStateException("existing Seal differs from the authenticated recovered physical cut");
+        }
+        consumeRecoveredPhysicalRows(ignored -> {});
+        recoveredFinalHead = before;
+        return recoveredFinalHead;
+    }
+
+    /** Closes the exact recovered vector only after all actual checkpoint and protocol work has ended. */
+    public synchronized WalRunTerminalClosureProofV1 sealRecovered(
+            WalRunLifecycleManager lifecycle, WalCheckpointHeadV1 finalHead) {
+        requireRecoveredCurrentRoot();
+        if (!Objects.requireNonNull(finalHead, "finalHead").equals(recoveredFinalHead)
+                || !finalHead.rootSha256().equals(rootSha256)
+                || finalHead.shardRunEpoch() != root.shardRunEpoch()
+                || !finalHead.coveredThrough().equals(runtime.resolvedVector())) {
+            throw new IllegalStateException("physical Seal differs from the exact checkpointed recovered vector");
+        }
+        sealRuntime();
+        drain();
+        requireTerminalClosable();
+        var reference = new WalRunReference(
+                WalRunControlKeys.rootKey(root.shardId(), root.shardRunEpoch()),
+                rootSha256,
+                root.shardId(),
+                root.shardRunEpoch());
+        var seal = new WalRunSealRecord(
+                reference,
+                finalHead.coveredThrough(),
+                WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch()),
+                Sha256Digest.hash(WalRunControlCodec.encodeCheckpointHead(finalHead)),
+                runtime.resolvedExtentCount(),
+                runtime.resolvedCanonicalBodyBytes());
+        return lifecycle.publishSeal(WalRunControlKeys.sealKey(root.shardId(), root.shardRunEpoch()), seal, this);
     }
 
     public synchronized WalRunRuntime.State runtimeState() {
@@ -1130,6 +1278,10 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     private ObjectWalLeafKeyV1 requireNwg1LeafIdentity(ObjectIdentity identity) {
+        return requireNwg1LeafIdentity(root, identity);
+    }
+
+    static ObjectWalLeafKeyV1 requireNwg1LeafIdentity(WalRunRootRecord root, ObjectIdentity identity) {
         Objects.requireNonNull(identity, "identity");
         ObjectWalLeafKeyV1 leaf = ObjectWalLeafKeyV1.parseFull(root.providerConfiguration(), identity.key());
         if (leaf.bodyLength() != identity.bodyLength() || !leaf.objectSha256().equals(identity.bodySha256())) {
@@ -1138,7 +1290,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         return leaf;
     }
 
-    private static void requirePrefixIdentity(Nwg1ObjectReaderV1.AuthenticatedPrefix prefix, ObjectWalLeafKeyV1 leaf) {
+    static void requirePrefixIdentity(Nwg1ObjectReaderV1.AuthenticatedPrefix prefix, ObjectWalLeafKeyV1 leaf) {
         if (prefix.header().laneId() != leaf.laneId().code()
                 || prefix.header().laneSequence() != leaf.laneSequence()
                 || prefix.header().directoryPrefixEnd() != leaf.directoryPrefixEnd()
@@ -1148,6 +1300,10 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     private void requirePrefixWithinRootCaps(Nwg1ObjectReaderV1.AuthenticatedPrefix prefix) {
+        requirePrefixWithinRootCaps(root, prefix);
+    }
+
+    static void requirePrefixWithinRootCaps(WalRunRootRecord root, Nwg1ObjectReaderV1.AuthenticatedPrefix prefix) {
         Nwg1RootAdmissionCaps caps = root.nwg1AdmissionCaps();
         if (prefix.header().canonicalBodyLength() > caps.maxCanonicalBodyBytes()
                 || prefix.header().directoryPrefixEnd() > caps.maxDirectoryPrefixBytes()

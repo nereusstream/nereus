@@ -14,7 +14,8 @@ import threading
 import urllib.parse
 
 CONTROL = "/__nereus_m6_object_fault"
-MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable", "put-response-lost"}
+LOST_PUT_MODES = {"put-response-lost", "first-put-response-lost"}
+MODES = {"denied", "unavailable", "corrupt", "held", "observe", "bucket-unavailable"} | LOST_PUT_MODES
 MAX_BYTES = 65 * 1024 * 1024
 HOP_HEADERS = {"connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer",
                "transfer-encoding", "upgrade"}
@@ -116,18 +117,18 @@ def fault_proxy(upstream):
                             or data["mode"] not in MODES or not data["path"].startswith("/") or not data["version"]):
                         return self.reply(400)
                     whole_bucket = data["mode"] == "bucket-unavailable"
-                    lost_put = data["mode"] == "put-response-lost"
+                    lost_put = data["mode"] in LOST_PUT_MODES
                     if (whole_bucket and (data["version"] != "*" or not data["path"].endswith("/")
                                           or data["path"].count("/") != 2 or data["path"] == "//")
                             or lost_put and (data["version"] != "*" or data["path"].count("/") < 2
-                                             or data["path"].endswith("/"))
+                                             or data["path"].endswith("/") != (data["mode"] == "first-put-response-lost"))
                             or not whole_bucket and not lost_put and data["version"] == "*"):
                         return self.reply(400)
                     if rule is not None:
                         rule["release"].set()
-                    rule = dict(data, hits=0, appliedVersion=None, release=threading.Event())
+                    rule = dict(data, hits=0, appliedVersion=None, selectedPath=None, release=threading.Event())
                 elif self.command == "PATCH":
-                    if rule is None or rule["mode"] != "put-response-lost" or rule["appliedVersion"] is None:
+                    if rule is None or rule["mode"] not in LOST_PUT_MODES or rule["appliedVersion"] is None:
                         return self.reply(409)
                     rule["release"].set()
                 elif self.command == "DELETE":
@@ -148,9 +149,14 @@ def fault_proxy(upstream):
             path = urllib.parse.unquote(url.path)
             with lock:
                 fault = None
+                if (rule and rule["mode"] == "first-put-response-lost" and self.command == "PUT"
+                        and rule["selectedPath"] is None and path.startswith(rule["path"]) and path.endswith(".nwg")):
+                    rule["selectedPath"] = path
                 if rule and (rule["mode"] == "bucket-unavailable" and
                              (path == rule["path"][:-1] or path.startswith(rule["path"]))
                              or rule["mode"] == "put-response-lost" and self.command == "PUT" and path == rule["path"]
+                             or rule["mode"] == "first-put-response-lost" and self.command == "PUT"
+                             and path == rule["selectedPath"]
                              or self.command == "GET" and version == [rule["version"]] and path == rule["path"]):
                     fault = rule
                     fault["hits"] += 1
@@ -187,7 +193,7 @@ def fault_proxy(upstream):
                             pass
                 if conn is not None:
                     conn.close()
-            if mode == "put-response-lost":
+            if mode in LOST_PUT_MODES:
                 if response.status == 200:
                     with lock:
                         fault["appliedVersion"] = response.getheader("x-amz-version-id")

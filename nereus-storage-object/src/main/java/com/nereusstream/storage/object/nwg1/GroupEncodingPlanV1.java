@@ -337,12 +337,53 @@ public final class GroupEncodingPlanV1 {
     }
 
     int predictedDirectoryLength() {
-        int unitWidth = protocolKind == 1 ? 104 : 96;
+        int unitWidth = protocolKind == Nwg1ConstantsV1.PROTOCOL_KAFKA
+                ? Nwg1ConstantsV1.KAFKA_APPEND_UNIT_ROW_BYTES
+                : Nwg1ConstantsV1.PULSAR_APPEND_UNIT_ROW_BYTES;
         int nti = bindings.stream()
                 .mapToInt(binding -> binding.nti1Bytes().length)
                 .sum();
-        return Math.toIntExact(
-                36L + 116L * bindings.size() + (long) unitWidth * appendUnits.size() + 48L * frames.size() + nti);
+        return directoryLength(bindings.size(), unitWidth, appendUnits.size(), frames.size(), nti);
+    }
+
+    /** A native Kafka append can charge its maximum frame bytes before any offset or sequence is assigned. */
+    public static long kafkaSingleUncompressedBodyLimit(
+            int topicIdentityBytes, List<Integer> maximumFrameBytes, Nwg1RootAdmissionCaps caps) {
+        Objects.requireNonNull(caps, "caps");
+        var frames = List.copyOf(maximumFrameBytes);
+        if (topicIdentityBytes <= 0
+                || topicIdentityBytes > Nwg1ConstantsV1.MAX_NTI1_BYTES
+                || frames.isEmpty()
+                || frames.size() > caps.maxFrames()) {
+            throw new IllegalArgumentException("native Kafka Object append inventory exceeds the Root cap");
+        }
+        int directory =
+                directoryLength(1, Nwg1ConstantsV1.KAFKA_APPEND_UNIT_ROW_BYTES, 1, frames.size(), topicIdentityBytes);
+        long prefix = Nwg1ConstantsV1.HEADER_BYTES + (long) directory + Nwg1ConstantsV1.GCM_TAG_BYTES;
+        long decoded = 0;
+        for (int size : frames) {
+            if (size <= 0 || size > caps.maxDecodedFrameBytes()) {
+                throw new IllegalArgumentException("native Kafka Object frame exceeds the Root cap");
+            }
+            decoded = Math.addExact(decoded, size);
+        }
+        long body = Math.addExact(prefix, Math.addExact(decoded, (long) frames.size() * Nwg1ConstantsV1.GCM_TAG_BYTES));
+        if (directory > caps.maxDirectoryPlaintextBytes()
+                || prefix > caps.maxDirectoryPrefixBytes()
+                || decoded > caps.maxDecodedAppendUnitBytes()
+                || body > caps.maxCanonicalBodyBytes()) {
+            throw new IllegalArgumentException("native Kafka Object append bytes exceed the Root cap");
+        }
+        return body;
+    }
+
+    private static int directoryLength(int bindings, int unitWidth, int units, int frames, int nti) {
+        return Math.toIntExact((long) Nwg1ConstantsV1.DIRECTORY_PREAMBLE_BYTES
+                + Integer.BYTES
+                + (long) Nwg1ConstantsV1.BINDING_ROW_BYTES * bindings
+                + (long) unitWidth * units
+                + (long) Nwg1ConstantsV1.FRAME_ROW_BYTES * frames
+                + nti);
     }
 
     long actualPayloadBytes() {

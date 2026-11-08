@@ -42,6 +42,13 @@ public interface ObjectProviderTransport {
         return ConditionalCreateResponse.outcome(putIfAbsent(identity, body));
     }
 
+    /**
+     * Lets a transport which holds a separate dispatch fence settle it after C1 verifies an uncertain create.
+     * Implementations may reject a negative observation when the original request can still arrive.
+     */
+    default void requireUncertainCreateTerminalProof(ObjectIdentity identity, boolean exactObjectPresent)
+            throws IOException {}
+
     StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException;
 
     StreamingObject getRange(String key, long inclusiveStart, long exclusiveEnd, Optional<CanonicalBytes> versionToken)

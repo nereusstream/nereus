@@ -248,6 +248,10 @@ public final class C1ObjectProviderSession implements AutoCloseable {
             boolean exactKeyListed =
                     inventory.objects().stream().anyMatch(value -> value.key().equals(identity.key()));
             Verification verification = verifyFullObject(identity);
+            if (verification.kind() == VerificationKind.EXACT
+                    || (verification.kind() == VerificationKind.NOT_FOUND && !exactKeyListed)) {
+                transport.requireUncertainCreateTerminalProof(identity, verification.kind() == VerificationKind.EXACT);
+            }
             ProviderObjectResult resolved =
                     switch (verification.kind()) {
                         case EXACT -> verifiedPersistenceResult(identity, verification.versionToken());

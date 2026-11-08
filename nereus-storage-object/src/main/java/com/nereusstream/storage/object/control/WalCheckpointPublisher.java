@@ -31,6 +31,12 @@ import java.util.concurrent.TimeUnit;
 
 /** Bounded single-candidate physical checkpoint combiner. It is asynchronous and outside append ACK. */
 public final class WalCheckpointPublisher implements AutoCloseable {
+    private enum Mode {
+        FRESH,
+        RECOVERED_CLOSURE,
+        ISOLATED_FIXTURE
+    }
+
     private static final long MAX_CONTROL_METADATA_BYTES = 1024L * 1024;
     private static final Comparator<ProviderResolvedExtentDescriptor> ORDER = Comparator.comparingInt(
                     (ProviderResolvedExtentDescriptor value) ->
@@ -58,6 +64,7 @@ public final class WalCheckpointPublisher implements AutoCloseable {
     private ScheduledFuture<?> scheduled;
     private long scheduleIdentity;
     private final boolean backgroundEnabled;
+    private final Mode mode;
 
     WalCheckpointPublisher(
             CanonicalControlMetadataStore metadata,
@@ -65,7 +72,7 @@ public final class WalCheckpointPublisher implements AutoCloseable {
             String pageKeyPrefix,
             WalRunRootRecord root,
             WalCheckpointHeadV1 initialHead) {
-        this(metadata, headKey, pageKeyPrefix, root, initialHead, null, true);
+        this(metadata, headKey, pageKeyPrefix, root, initialHead, null, Mode.ISOLATED_FIXTURE);
     }
 
     /** Production constructor: all adoption/reconciliation reads consume the sole Root-owned recovery budget. */
@@ -76,7 +83,21 @@ public final class WalCheckpointPublisher implements AutoCloseable {
             WalRunRootRecord root,
             WalCheckpointHeadV1 initialHead,
             WalRunObjectSession objectSession) {
-        this(metadata, headKey, pageKeyPrefix, root, initialHead, objectSession, false);
+        this(metadata, headKey, pageKeyPrefix, root, initialHead, objectSession, Mode.FRESH);
+    }
+
+    static WalCheckpointPublisher forRecoveredClosure(
+            CanonicalControlMetadataStore metadata, WalRunObjectSession session, WalCheckpointHeadV1 verifiedHead) {
+        var root = session.rootRecord();
+        session.requireRecoveredClosureHead(verifiedHead);
+        return new WalCheckpointPublisher(
+                metadata,
+                WalRunControlKeys.checkpointHeadKey(root.shardId(), root.shardRunEpoch()),
+                WalRunControlKeys.checkpointPagePrefix(root.shardId(), root.shardRunEpoch()),
+                root,
+                verifiedHead,
+                session,
+                Mode.RECOVERED_CLOSURE);
     }
 
     private WalCheckpointPublisher(
@@ -86,11 +107,12 @@ public final class WalCheckpointPublisher implements AutoCloseable {
             WalRunRootRecord root,
             WalCheckpointHeadV1 initialHead,
             WalRunObjectSession objectSession,
-            boolean isolatedTestFixture) {
+            Mode mode) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.root = Objects.requireNonNull(root, "root");
+        this.mode = mode;
         this.objectSession =
-                isolatedTestFixture ? objectSession : Objects.requireNonNull(objectSession, "objectSession");
+                mode == Mode.ISOLATED_FIXTURE ? objectSession : Objects.requireNonNull(objectSession, "objectSession");
         if (objectSession != null
                 && (!objectSession.rootSha256().equals(WalRunControlCodec.rootSha256(root))
                         || !objectSession.rootRecord().equals(root))) {
@@ -102,10 +124,10 @@ public final class WalCheckpointPublisher implements AutoCloseable {
         this.pageKeyPrefix = pageKeyPrefix;
         this.rootSha256 = WalRunControlCodec.rootSha256(root);
         this.head = Objects.requireNonNull(initialHead, "initialHead");
-        backgroundEnabled = !isolatedTestFixture;
-        initialized = isolatedTestFixture || initialHead.pageOrdinal() >= 0;
+        backgroundEnabled = mode == Mode.FRESH;
+        initialized = mode != Mode.FRESH || initialHead.pageOrdinal() >= 0;
         requireHeadForRoot(initialHead);
-        if (initialHead.pageOrdinal() >= 0) {
+        if (initialHead.pageOrdinal() >= 0 && mode != Mode.RECOVERED_CLOSURE) {
             if (objectSession != null) {
                 objectSession.requireRecoveredCurrentRoot();
             }
@@ -511,7 +533,9 @@ public final class WalCheckpointPublisher implements AutoCloseable {
     public void takeover(long newPublisherEpoch) {
         synchronized (this) {
             requireLive();
-            if (objectSession != null) {
+            if (mode == Mode.RECOVERED_CLOSURE) {
+                objectSession.requireRecoveredCurrentRoot();
+            } else if (objectSession != null) {
                 objectSession.requireCheckpointAdmission();
             }
             if (ioInFlight) {

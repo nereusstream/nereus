@@ -9,6 +9,10 @@ import org.gradle.api.tasks.testing.Test
 
 def output = Path.of(System.getProperty('nereus.m6.kafkaRuntimeCapture'))
 def objectFixture = Boolean.getBoolean('nereus.m6.kafkaObjectRuntimeCapture')
+def walFixture = Boolean.getBoolean('nereus.m6.kafkaObjectWalRuntimeCapture')
+if (objectFixture && walFixture) {
+    throw new GradleException('M6 Kafka runtime capture requires one exact profile')
+}
 
 def identify = { Path path ->
     if (path.toRealPath() != path || !Files.isRegularFile(path)) {
@@ -35,13 +39,15 @@ gradle.projectsEvaluated {
         throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
     }
     def core = gradle.rootProject.project(':core')
-    def objectProcessTask = 'nereusKafkaAsyncObjectProcessRealTest'
-    def testTasks = objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', objectProcessTask]
-        : ['nereusBookKeeperOwnerRelocationRealTest']
+    def processTask = walFixture ? 'nereusKafkaObjectWalProcessRealTest'
+        : objectFixture ? 'nereusKafkaAsyncObjectProcessRealTest' : 'nereusBookKeeperOwnerRelocationRealTest'
+    def testTasks = walFixture ? ['nereusObjectWalAdapterRealTest', processTask]
+        : objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', processTask]
+        : [processTask]
     testTasks.each { task ->
         core.tasks.named(task, Test).configure { test ->
-            def target = objectFixture ? output.resolveSibling(task + '-runtime.json') : output
-            def launchesProcess = !objectFixture || task == objectProcessTask
+            def target = objectFixture || walFixture ? output.resolveSibling(task + '-runtime.json') : output
+            def launchesProcess = task == processTask
             if (launchesProcess) {
                 test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
             }

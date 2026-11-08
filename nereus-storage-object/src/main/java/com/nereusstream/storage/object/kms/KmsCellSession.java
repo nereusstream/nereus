@@ -19,6 +19,7 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
 import com.nereusstream.storage.object.control.WalLaneId;
 import com.nereusstream.storage.object.control.WalRunObjectSession;
+import com.nereusstream.storage.object.control.WalRunReference;
 import com.nereusstream.storage.object.control.WalRunRootRecord;
 import com.nereusstream.storage.object.nwg1.GroupEncodingPlanV1;
 import com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1;
@@ -38,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
 /**
  * Cell-local bounded multi-run key cache. Each retired admission generation retains its CLOSED run identities
@@ -55,6 +57,7 @@ public final class KmsCellSession implements AutoCloseable {
         NEW_ROOT,
         RECOVERY,
         WAL_RUN,
+        HISTORICAL_READ,
         CLOSED
     }
 
@@ -177,7 +180,7 @@ public final class KmsCellSession implements AutoCloseable {
         } catch (RuntimeException | Error failure) {
             admission.failKeyLoad(runIdentity, loading, failure);
             synchronized (budget) {
-                admission.releaseUnpublishedNewRunKey(runIdentity);
+                admission.releaseWithoutWriteAuthority(runIdentity, RunLifecycleOwner.NEW_ROOT);
             }
             throw failure;
         }
@@ -483,6 +486,33 @@ public final class KmsCellSession implements AutoCloseable {
         return providerScopeId;
     }
 
+    /** Shares the normal Cell key and operation budget without granting historical write authority. */
+    public HistoricalReadLease openHistoricalReader(
+            WalRunLineageRecovery.RecoveredLineage lineage, WalRunReference reference) {
+        var verified = Objects.requireNonNull(lineage, "lineage").requireSealedPredecessor(reference);
+        synchronized (budget) {
+            return forRunAdmission().openHistoricalInGeneration(verified.root(), reference);
+        }
+    }
+
+    private HistoricalReadLease openHistoricalInGeneration(WalRunRootRecord root, WalRunReference reference) {
+        var identity = new RunKeyCacheIdentity(reference.shardId(), reference.shardRunEpoch());
+        requireOpen();
+        requireRawRunOwner(identity);
+        requireRunIdle(identity);
+        requireTransferHistoryCapacity();
+        requireExactKmsAuthority(identity, root.wrappedRunKey(), reference.rootSha256(), root.providerScopeId());
+        var cached = cache.get(identity);
+        if (cached == null) {
+            requireCacheCapacity();
+            budget.runSlots++;
+        } else {
+            requireCachedEnvelope(cached, root.wrappedRunKey());
+        }
+        runOwners.put(identity, RunLifecycleOwner.HISTORICAL_READ);
+        return new HistoricalReadLease(identity, root, reference.rootSha256());
+    }
+
     private void requireRawRunOwner(RunKeyCacheIdentity runIdentity) {
         Objects.requireNonNull(runIdentity, "runIdentity");
         for (var generation : budget.generations) {
@@ -538,7 +568,8 @@ public final class KmsCellSession implements AutoCloseable {
     private static boolean isLiveLeaseOwner(RunLifecycleOwner owner) {
         return owner == RunLifecycleOwner.NEW_ROOT
                 || owner == RunLifecycleOwner.RECOVERY
-                || owner == RunLifecycleOwner.WAL_RUN;
+                || owner == RunLifecycleOwner.WAL_RUN
+                || owner == RunLifecycleOwner.HISTORICAL_READ;
     }
 
     private void requireNoLiveRunLeases() {
@@ -561,9 +592,9 @@ public final class KmsCellSession implements AutoCloseable {
         finishRetiredGeneration();
     }
 
-    private void releaseUnpublishedNewRunKey(RunKeyCacheIdentity runIdentity) {
-        if (runOwners.get(runIdentity) != RunLifecycleOwner.NEW_ROOT) {
-            throw new IllegalStateException("new run key no longer owns its exact cache identity");
+    private void releaseWithoutWriteAuthority(RunKeyCacheIdentity runIdentity, RunLifecycleOwner expectedOwner) {
+        if (runOwners.get(runIdentity) != expectedOwner) {
+            throw new IllegalStateException("KMS run lease no longer owns its exact cache identity");
         }
         requireRunIdle(runIdentity);
         CachedRunKey removed = cache.remove(runIdentity);
@@ -920,9 +951,78 @@ public final class KmsCellSession implements AutoCloseable {
                 if (publicationAttempted) {
                     closeRunLease(runIdentity, RunLifecycleOwner.NEW_ROOT);
                 } else {
-                    releaseUnpublishedNewRunKey(runIdentity);
+                    releaseWithoutWriteAuthority(runIdentity, RunLifecycleOwner.NEW_ROOT);
                 }
                 closed = true;
+            }
+        }
+    }
+
+    /** Sealed predecessor keys can only authenticate and decode immutable Objects. */
+    public final class HistoricalReadLease implements AutoCloseable {
+        private final RunKeyCacheIdentity identity;
+        private final WalRunRootRecord root;
+        private final Sha256Digest rootSha;
+        private boolean closed;
+
+        private HistoricalReadLease(RunKeyCacheIdentity identity, WalRunRootRecord root, Sha256Digest rootSha) {
+            this.identity = identity;
+            this.root = root;
+            this.rootSha = rootSha;
+        }
+
+        public Nwg1ObjectReaderV1.VerifiedAppendUnit readAppendUnit(
+                byte[] exactPrefix,
+                long expectedBodyLength,
+                Nwg1VerificationContextV1 verification,
+                Consumer<Nwg1ObjectReaderV1.AuthenticatedPrefix> requireExactPrefix,
+                Nwg1ObjectReaderV1.ExactFrameSource frames,
+                long frameOrdinal,
+                Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
+                throws IOException {
+            requireVerification(verification);
+            KeyOperation operation;
+            synchronized (budget) {
+                if (closed) {
+                    throw new IllegalStateException("historical KMS read lease is closed");
+                }
+                operation = beginOperation(identity, RunLifecycleOwner.HISTORICAL_READ);
+            }
+            try (operation) {
+                operation.key = loadKeyCopy(operation, root.wrappedRunKey());
+                var prefix = Nwg1ObjectReaderV1.readAuthenticatedPrefix(
+                        exactPrefix, expectedBodyLength, verification, operation.key);
+                if (prefix.header().shardId() != identity.shardId()
+                        || prefix.header().shardRunEpoch() != identity.shardRunEpoch()) {
+                    throw new IllegalArgumentException("historical NWG1 prefix differs from its sealed Root");
+                }
+                requireExactPrefix.accept(prefix);
+                var read = Nwg1ObjectReaderV1.readSelectedAppendUnitStreaming(
+                        prefix, frames, frameOrdinal, verification, operation.key, consumer);
+                operation.requireResultUsable();
+                return read;
+            }
+        }
+
+        private void requireVerification(Nwg1VerificationContextV1 verification) {
+            if (!root.protocolCellIdentity().equals(verification.protocolCell())
+                    || !Arrays.equals(rootSha.bytes().toByteArray(), verification.walRunRootSha256())
+                    || !Arrays.equals(
+                            providerScopeId.digest().bytes().toByteArray(), verification.cellProviderScopeId())
+                    || !Arrays.equals(
+                            root.wrappedRunKey().framedBytes().toByteArray(),
+                            verification.envelope().framedBytes())) {
+                throw new IllegalArgumentException("historical NWG1 verification differs from its sealed Root");
+            }
+        }
+
+        @Override
+        public void close() {
+            synchronized (budget) {
+                if (!closed) {
+                    releaseWithoutWriteAuthority(identity, RunLifecycleOwner.HISTORICAL_READ);
+                    closed = true;
+                }
             }
         }
     }

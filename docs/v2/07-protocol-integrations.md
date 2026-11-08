@@ -197,9 +197,10 @@ receipt is inherited as V2 parity evidence.
 
 This is the accepted integration target after M5. In the focused native Kafka path, a BK-only deployment admits
 `BOOKKEEPER_WAL_ONLY`; an async Object deployment also admits `BOOKKEEPER_WAL_ASYNC_OBJECT` with a qualified
-Object provider. An explicit unadmitted profile fails CreateTopics, including validate-only, without creating a
-Binding. Each Broker checks the persisted Binding and Storage Epoch before opening its storage route. Kafka
-`OBJECT_WAL` remains rejected. Focused coverage does not promote a row or grant deployment authority.
+Object provider. The bounded Object WAL path admits `OBJECT_WAL` and BK-only bindings with a qualified Object
+provider and Vault Transit key. An explicit unadmitted profile fails CreateTopics, including validate-only, without
+creating a Binding. Each Broker checks the persisted Binding and Storage Epoch before opening its storage route.
+Focused coverage does not promote a row or grant deployment authority.
 Kafka rows require fresh feature-2 bootstrap and RF=1/minISR=1. The existing no-online-migration boundary applies to
 both protocols.
 

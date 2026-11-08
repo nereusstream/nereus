@@ -361,6 +361,29 @@ public final class KafkaObjectAuthorizationV1 {
         throw new Unknown("Object close could not fix a bounded prefix");
     }
 
+    /** Records an empty closed genesis after the original physical dispatch gate has been durably closed. */
+    public ClosedHistory closeAbsentGenesis(KafkaPartitionFenceV1 fence) {
+        var before = read(fence);
+        if (before.isPresent()) {
+            if (!before.orElseThrow().fence().equals(fence)) {
+                throw new Fenced("Object genesis authorization belongs to another Owner");
+            }
+            return close(fence);
+        }
+        var empty = new Head(1, fence, true, 0, 0, List.of(), 0, Optional.empty(), Optional.empty(), 1, bounds);
+        var candidate = encode(empty);
+        putExact(recordKey(fence, Sha256Digest.hash(candidate)), candidate);
+        if (metadata.compareAndSet(headKey(fence), Optional.empty(), candidate) == ControlMutationOutcome.APPLIED
+                || metadata.get(headKey(fence)).equals(Optional.of(candidate))) {
+            return new ClosedHistory(empty, candidate);
+        }
+        var observed = read(fence).orElseThrow(() -> new Unknown("Object genesis close is unresolved"));
+        if (!observed.fence().equals(fence)) {
+            throw new Fenced("Object genesis authorization selected another Owner");
+        }
+        return close(fence);
+    }
+
     public ClosedHistory readClosed(KafkaPartitionFenceV1 fence) {
         CanonicalBytes bytes = metadata.get(headKey(fence)).orElseThrow();
         Head head = decodeChecked(bytes);

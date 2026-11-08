@@ -1288,6 +1288,8 @@ GroupEncodingPlanV1 已支持 NONE，以及只在更小时采用并验证往返�
 
 采用现有里程碑，不新增一套平行项目框架。下面 T1–T5 保留最初实施拆分；M5 后按页首第 0 批修订所链接的
 M6-1 至 M6-4、M7、M8 顺序推进，不能重放旧批次的提交、清理或整体验收操作。
+Kafka Object WAL 的实际入口、独立进程验证方式及仍待验收的边界见
+[M6 进程集成与验收](../08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance)。
 
 | 批次 | 具体交付 | 依赖与出口 |
 | --- | --- | --- |

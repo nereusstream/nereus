@@ -286,6 +286,8 @@ public final class WalRunLineageRecovery {
         }
     }
 
+    public record SealedPredecessor(WalRunRootRecord root, WalRunSealRecord seal) {}
+
     /**
      * One-use authority that carries the only live current-Root budget from lineage into owner-open tail recovery.
      * It cannot be constructed outside this verifier and never exposes the budget outside the recovery package.
@@ -309,6 +311,22 @@ public final class WalRunLineageRecovery {
 
         public List<RecoveredRun> runs() {
             return runs;
+        }
+
+        /** A retained predecessor was verified against the exact immutable Seal named by its successor. */
+        public SealedPredecessor requireSealedPredecessor(WalRunReference reference) {
+            Objects.requireNonNull(reference, "reference");
+            for (int index = 1; index < runs.size(); index++) {
+                var selected = runs.get(index);
+                if (selected.reference().equals(reference)) {
+                    var seal = runs.get(index - 1)
+                            .predecessorSeal()
+                            .filter(value -> value.root().equals(reference))
+                            .orElseThrow(() -> new IllegalStateException("verified historical Root has no exact Seal"));
+                    return new SealedPredecessor(selected.root(), seal);
+                }
+            }
+            throw new IllegalArgumentException("historical Object reader requires a verified sealed predecessor");
         }
 
         /**

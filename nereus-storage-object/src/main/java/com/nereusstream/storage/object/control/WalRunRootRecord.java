@@ -148,6 +148,61 @@ public record WalRunRootRecord(
         }
     }
 
+    /** Derives an envelope for a native Root, including checkpoint pages published with fewer rows than their cap. */
+    public static RecoveryEnvelopeLimits boundedRecoveryEnvelope(
+            ProtocolKindV1 protocolKind,
+            WalRunBounds bounds,
+            Nwg1RootAdmissionCaps caps,
+            WalCheckpointPolicy checkpointPolicy,
+            ObjectProviderRootConfiguration provider,
+            int maximumConcurrency,
+            int maximumRetries,
+            long maximumWallTimeNanos) {
+        int liveRoots = Math.incrementExact(bounds.maxRecoverablePredecessorRuns());
+        var required = recoveryRequirements(protocolKind, bounds, caps, checkpointPolicy, provider, liveRoots);
+        long fullyPackedPages = ceilingDivide(bounds.maxExtentCount(), checkpointPolicy.maxRowsPerPage());
+        long partialPageAllowance = Math.multiplyExact(
+                Math.multiplyExact(
+                        bounds.maxExtentCount() - fullyPackedPages, checkpointPolicy.maxCanonicalPageBytes()),
+                liveRoots);
+        // The native owner selects terminal protocol/physical Heads and verifies the final page chain
+        // after the physical seal. Those reads also charge the same live owner-open envelope.
+        long terminalClosureAllowance = protocolKind == ProtocolKindV1.KAFKA
+                ? Math.addExact(
+                        10 * MAX_CONTROL_METADATA_BYTES,
+                        Math.multiplyExact(bounds.maxExtentCount(), checkpointPolicy.maxCanonicalPageBytes()))
+                : 0;
+        return new RecoveryEnvelopeLimits(
+                liveRoots,
+                bounds.maxRecoverablePredecessorRuns(),
+                Math.toIntExact(required.listPages()),
+                required.listedKeys(),
+                required.listedKeyBytes(),
+                0,
+                Math.toIntExact(required.rangeRequests()),
+                Math.toIntExact(required.fullGets()),
+                Math.addExact(Math.addExact(required.canonicalBytes(), partialPageAllowance), terminalClosureAllowance),
+                required.contexts(),
+                required.frames(),
+                required.commitSets(),
+                required.workingMemory(),
+                maximumConcurrency,
+                maximumRetries,
+                maximumWallTimeNanos);
+    }
+
+    private record RecoveryRequirements(
+            long listPages,
+            long listedKeys,
+            long listedKeyBytes,
+            long rangeRequests,
+            long fullGets,
+            long canonicalBytes,
+            long contexts,
+            long frames,
+            long commitSets,
+            long workingMemory) {}
+
     private static void requireWorstCaseRecoveryClosure(
             ProtocolKindV1 protocolKind,
             WalRunBounds bounds,
@@ -155,6 +210,46 @@ public record WalRunRootRecord(
             WalCheckpointPolicy checkpointPolicy,
             ObjectProviderRootConfiguration provider,
             RecoveryEnvelopeLimits recovery) {
+        var required =
+                recoveryRequirements(protocolKind, bounds, caps, checkpointPolicy, provider, recovery.maxLiveRoots());
+        if (recovery.maxRangeGetRequests() < required.rangeRequests()
+                || recovery.maxListedKeys() < required.listedKeys()) {
+            throw new IllegalArgumentException(
+                    "recovery request/key envelope cannot cover every admitted extent and protocol Object");
+        }
+        if (recovery.maxFullGetRequests() < required.fullGets()) {
+            throw new IllegalArgumentException(
+                    "recovery full-GET envelope cannot reconcile every lazy-lane candidate and protocol Object");
+        }
+        if (recovery.maxListPages() < required.listPages()) {
+            throw new IllegalArgumentException(
+                    "recovery LIST-page envelope cannot cover all lazy lanes and the protocol Object");
+        }
+        if (recovery.maxListedKeyBytes() < required.listedKeyBytes()) {
+            throw new IllegalArgumentException("recovery listed-key byte envelope cannot cover every extent key");
+        }
+        if (recovery.maxCanonicalBodyBytes() < required.canonicalBytes()) {
+            throw new IllegalArgumentException(
+                    "recovery canonical-byte envelope cannot cover current-pointer retained lineage/control closure");
+        }
+        if (recovery.maxDecodedContexts() < required.contexts()
+                || recovery.maxDecodedFrames() < required.frames()
+                || recovery.maxDecodedCommitSets() < required.commitSets()) {
+            throw new IllegalArgumentException("recovery decode envelope cannot cover the maximum admitted inventory");
+        }
+        if (recovery.maxWorkingMemoryBytes() < required.workingMemory() || recovery.maxConcurrency() < 1) {
+            throw new IllegalArgumentException(
+                    "recovery memory/concurrency cannot hold compact spool plus one live stream");
+        }
+    }
+
+    private static RecoveryRequirements recoveryRequirements(
+            ProtocolKindV1 protocolKind,
+            WalRunBounds bounds,
+            Nwg1RootAdmissionCaps caps,
+            WalCheckpointPolicy checkpointPolicy,
+            ObjectProviderRootConfiguration provider,
+            int maxLiveRoots) {
         long extentCount = bounds.maxExtentCount();
         long protocolObjectCount = protocolKind == ProtocolKindV1.KAFKA ? 1 : 0;
         // reserveRemainingList() temporarily charges at least one key for an empty terminal probe and then
@@ -164,39 +259,23 @@ public record WalRunRootRecord(
         long requiredListedKeys =
                 Math.addExact(Math.addExact(extentCount, reusableLaneProbeCount), protocolObjectCount);
         long requiredRangeGetRequests = Math.multiplyExact(extentCount, Math.addExact((long) caps.maxFrames(), 1L));
-        if (recovery.maxRangeGetRequests() < requiredRangeGetRequests
-                || recovery.maxListedKeys() < requiredListedKeys) {
-            throw new IllegalArgumentException(
-                    "recovery request/key envelope cannot cover every admitted extent and protocol Object");
-        }
         long pendingCandidateCount = Math.min(3L, extentCount);
         long completeProtocolObjectCount = Math.multiplyExact(
                 protocolObjectCount, Math.addExact((long) bounds.maxRecoverablePredecessorRuns(), 1L));
         long requiredFullGets = Math.addExact(pendingCandidateCount, completeProtocolObjectCount);
-        if (recovery.maxFullGetRequests() < requiredFullGets) {
-            throw new IllegalArgumentException(
-                    "recovery full-GET envelope cannot reconcile every lazy-lane candidate and protocol Object");
-        }
         long listDataPages = ceilingDivide(extentCount, provider.maxListPageKeys());
         // The lane term is exact for three permanent prefixes. Kafka additionally reserves one exact-key LIST for one
         // unresolved content-addressed NWKCP1 candidate; family-prefix inventory is forbidden.
         long requiredListPages = Math.addExact(Math.addExact(listDataPages, 2), protocolObjectCount);
-        if (recovery.maxListPages() < requiredListPages) {
-            throw new IllegalArgumentException(
-                    "recovery LIST-page envelope cannot cover all lazy lanes and the protocol Object");
-        }
         long maximumLeafKeyBytes = ObjectWalLeafKeyV1.maximumFullKeyBytes(provider);
         long requiredListedKeyBytes = Math.addExact(
                 Math.multiplyExact(Math.addExact(extentCount, reusableLaneProbeCount), maximumLeafKeyBytes),
                 Math.multiplyExact(protocolObjectCount, MAX_PROVIDER_OBJECT_KEY_BYTES));
-        if (recovery.maxListedKeyBytes() < requiredListedKeyBytes) {
-            throw new IllegalArgumentException("recovery listed-key byte envelope cannot cover every extent key");
-        }
         // Pointer/current Root bootstrap plus the complete retained predecessor control closure.  Roots themselves
         // are covered by maxLiveRoots; every predecessor additionally retains one Seal, final physical Head,
         // bounded physical page chain, and (Kafka only) terminal protocol Head.
         long pointerControlBytes = MAX_CONTROL_METADATA_BYTES;
-        long rootControlBytes = Math.multiplyExact(recovery.maxLiveRoots(), MAX_CONTROL_METADATA_BYTES);
+        long rootControlBytes = Math.multiplyExact(maxLiveRoots, MAX_CONTROL_METADATA_BYTES);
         long maxCheckpointPagesPerPredecessor = ceilingDivide(extentCount, checkpointPolicy.maxRowsPerPage());
         long checkpointPageBytes =
                 Math.multiplyExact(maxCheckpointPagesPerPredecessor, checkpointPolicy.maxCanonicalPageBytes());
@@ -225,15 +304,6 @@ public record WalRunRootRecord(
                                         Math.addExact(currentPhysicalControlBytes, currentProtocolControlBytes))),
                         rangeRecoveryBytes),
                 Math.addExact(pendingCandidateBytes, protocolCheckpointBytes));
-        if (recovery.maxCanonicalBodyBytes() < requiredCanonicalBytes) {
-            throw new IllegalArgumentException(
-                    "recovery canonical-byte envelope cannot cover current-pointer retained lineage/control closure");
-        }
-        if (recovery.maxDecodedContexts() < Math.multiplyExact(extentCount, caps.maxBindingContexts())
-                || recovery.maxDecodedFrames() < Math.multiplyExact(extentCount, caps.maxFrames())
-                || recovery.maxDecodedCommitSets() < Math.multiplyExact(extentCount, caps.maxAppendUnits())) {
-            throw new IllegalArgumentException("recovery decode envelope cannot cover the maximum admitted inventory");
-        }
         // Owner-open holds one exact proof-NONE checkpoint-row spool while it streams exactly one physical page,
         // authenticated prefix, frame, or complete LIST materialization through the same composite lease. Kafka
         // protocol Objects are verified earlier in the lineage pass and are therefore a sequential, not additive,
@@ -247,11 +317,17 @@ public record WalRunRootRecord(
                                 Math.addExact(caps.maxDecodedFrameBytes(), 256),
                                 Math.max(caps.maxStoredFrameBytes(), requiredListedKeyBytes))));
         long physicalWorkingMemory = Math.addExact(compactSpoolBytes, physicalTransientBytes);
-        long minimumWorkingMemory = Math.max(physicalWorkingMemory, singleProtocolCheckpointBytes);
-        if (recovery.maxWorkingMemoryBytes() < minimumWorkingMemory || recovery.maxConcurrency() < 1) {
-            throw new IllegalArgumentException(
-                    "recovery memory/concurrency cannot hold compact spool plus one live stream");
-        }
+        return new RecoveryRequirements(
+                requiredListPages,
+                requiredListedKeys,
+                requiredListedKeyBytes,
+                requiredRangeGetRequests,
+                requiredFullGets,
+                requiredCanonicalBytes,
+                Math.multiplyExact(extentCount, caps.maxBindingContexts()),
+                Math.multiplyExact(extentCount, caps.maxFrames()),
+                Math.multiplyExact(extentCount, caps.maxAppendUnits()),
+                Math.max(physicalWorkingMemory, singleProtocolCheckpointBytes));
     }
 
     private static long ceilingDivide(long value, long divisor) {

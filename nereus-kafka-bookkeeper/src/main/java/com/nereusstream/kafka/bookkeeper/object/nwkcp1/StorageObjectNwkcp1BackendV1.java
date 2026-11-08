@@ -40,14 +40,24 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
     private final CanonicalControlMetadataStore metadata;
     private final String objectPrefix;
     private final String controlHeadKey;
+    private final WalRunObjectSession.RecoveredProtocolClosure recoveredClosure;
     private PendingHeadCas pendingHeadCas;
 
     public StorageObjectNwkcp1BackendV1(
             WalRunObjectSession objectSession, CanonicalControlMetadataStore metadata, String objectPrefix) {
+        this(objectSession, metadata, objectPrefix, null);
+    }
+
+    public StorageObjectNwkcp1BackendV1(
+            WalRunObjectSession objectSession,
+            CanonicalControlMetadataStore metadata,
+            String objectPrefix,
+            WalRunObjectSession.RecoveredProtocolClosure recoveredClosure) {
         this.objectSession = Objects.requireNonNull(objectSession, "objectSession");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         Nwkcp1ObjectKeyV1.headKey(objectPrefix);
         this.objectPrefix = objectPrefix;
+        this.recoveredClosure = recoveredClosure;
         var root = objectSession.rootRecord();
         if (!objectPrefix.startsWith(root.providerConfiguration().exclusiveNamespacePrefix() + "/")) {
             throw new IllegalArgumentException("NWKCP1 Object prefix escapes its Root namespace");
@@ -68,7 +78,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
         if (pendingHeadCas != null) {
             throw new KafkaObjectCheckpointException("retain and reconcile the original unresolved Head CAS");
         }
-        try (var ignored = objectSession.acquireProtocolMutationIo(false)) {
+        try (var ignored = acquirePublicationIo(false)) {
             // Admission and each actual I/O independently share the original owner lifecycle.
         }
     }
@@ -89,7 +99,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
             ProviderObjectOutcome outcome;
             try {
                 outcome = objectSession
-                        .conditionalCreateKafkaProtocolObject(validated)
+                        .conditionalCreateKafkaProtocolObject(validated, recoveredClosure)
                         .outcome();
             } catch (IOException failure) {
                 try {
@@ -217,8 +227,7 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
                 if (pendingHeadCas == null) {
                     var head = KafkaProtocolCheckpointHeadCodecV1.decode(
                             objectPrefix, objectSession.rootSha256(), replacement);
-                    var io = objectSession.acquireProtocolMutationIo(
-                            head.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL);
+                    var io = acquirePublicationIo(head.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL);
                     try {
                         objectSession.chargeRecoveryControlMetadata(replacement.length());
                         long bytes = Math.addExact(
@@ -241,6 +250,12 @@ public final class StorageObjectNwkcp1BackendV1 implements Nwkcp1BackendV1 {
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private WalRunObjectSession.IoLease acquirePublicationIo(boolean terminal) {
+        return terminal || recoveredClosure == null
+                ? objectSession.acquireProtocolMutationIo(terminal)
+                : objectSession.acquireRecoveredProtocolMutationIo(recoveredClosure);
     }
 
     /** Retries only the original accepted candidate, including after ordinary admission has stopped. */

@@ -20,9 +20,11 @@ import com.nereusstream.domain.protocol.ProtocolKindV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointPublicationV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStoreV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.storage.object.control.TerminalProtocolCheckpointBindingV1;
 import com.nereusstream.storage.object.control.TerminalProtocolCheckpointVerifierV1;
 import com.nereusstream.storage.object.control.WalRunControlCodec;
+import com.nereusstream.storage.object.control.WalRunControlKeys;
 import com.nereusstream.storage.object.control.WalRunProtocolTerminalizerV1;
 import com.nereusstream.storage.object.control.WalRunRootRecord;
 import com.nereusstream.storage.object.control.WalRunSealRecord;
@@ -39,7 +41,7 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
         implements KafkaProtocolCheckpointStoreV1, WalRunProtocolTerminalizerV1, TerminalProtocolCheckpointVerifierV1 {
     private final String walRunPrefix;
     private final Sha256Digest rootSha;
-    private final com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1 expectedRunBinding;
+    private final Nbke2RunBindingV1 expectedRunBinding;
     private long publisherEpoch;
     private final Nwkcp1BackendV1 backend;
     private boolean publicationInFlight;
@@ -198,30 +200,59 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
             TerminalProtocolCheckpointBindingV1 binding,
             CanonicalBytes exactTerminalHeadValue,
             TerminalProtocolCheckpointVerifierV1.RecoveryContext recoveryContext) {
-        Objects.requireNonNull(predecessorRoot, "predecessorRoot");
-        Objects.requireNonNull(predecessorSeal, "predecessorSeal");
-        Objects.requireNonNull(binding, "binding");
-        Objects.requireNonNull(exactTerminalHeadValue, "exactTerminalHeadValue");
-        Objects.requireNonNull(recoveryContext, "recoveryContext");
-        String expectedKey = backend.protocolHeadKey(walRunPrefix);
-        Sha256Digest expectedRoot = WalRunControlCodec.rootSha256(predecessorRoot);
-        if (binding.protocolKind() != ProtocolKindV1.KAFKA
-                || !binding.terminalHeadKey().equals(expectedKey)
-                || !Sha256Digest.hash(exactTerminalHeadValue).equals(binding.terminalHeadValueSha256())
-                || !predecessorSeal.root().rootSha256().equals(expectedRoot)
-                || !expectedRoot.equals(rootSha)
-                || !WalRunControlCodec.rootSha256(recoveryContext.protocolObjectRoot())
-                        .equals(expectedRoot)) {
-            throw new IllegalStateException("terminal Kafka Head binding differs from the predecessor Root/Seal");
+        new SelectedRun(walRunPrefix, rootSha, expectedRunBinding, backend.protocolHeadKey(walRunPrefix))
+                .verifyTerminal(predecessorRoot, predecessorSeal, binding, exactTerminalHeadValue, recoveryContext);
+    }
+
+    /** Cold lineage verification has no dependency on a live predecessor writer or its Provider/KMS leases. */
+    public static TerminalProtocolCheckpointVerifierV1 terminalVerifier(
+            WalRunRootRecord root, String walRunPrefix, Nbke2RunBindingV1 expectedRunBinding) {
+        Nwkcp1ObjectKeyV1.headKey(walRunPrefix);
+        if (!walRunPrefix.startsWith(root.providerConfiguration().exclusiveNamespacePrefix() + "/")
+                || !root.providerScopeId().equals(expectedRunBinding.providerScopeId())) {
+            throw new IllegalArgumentException("Kafka terminal verifier differs from the admitted Root namespace");
         }
-        KafkaProtocolCheckpointHeadV1 head =
-                KafkaProtocolCheckpointHeadCodecV1.decode(walRunPrefix, rootSha, exactTerminalHeadValue);
-        if (head.state() != KafkaProtocolCheckpointHeadStateV1.TERMINAL) {
-            throw new IllegalStateException("successor predecessor binding selected a non-terminal Kafka Head");
+        return new SelectedRun(
+                walRunPrefix,
+                WalRunControlCodec.rootSha256(root),
+                expectedRunBinding,
+                WalRunControlKeys.kafkaProtocolCheckpointHeadKey(root.shardId(), root.shardRunEpoch()));
+    }
+
+    private record SelectedRun(
+            String prefix, Sha256Digest rootSha, Nbke2RunBindingV1 expectedRunBinding, String headKey)
+            implements TerminalProtocolCheckpointVerifierV1 {
+        @Override
+        public void verifyTerminal(
+                WalRunRootRecord predecessorRoot,
+                WalRunSealRecord predecessorSeal,
+                TerminalProtocolCheckpointBindingV1 binding,
+                CanonicalBytes exactTerminalHeadValue,
+                RecoveryContext recoveryContext) {
+            Objects.requireNonNull(predecessorRoot, "predecessorRoot");
+            Objects.requireNonNull(predecessorSeal, "predecessorSeal");
+            Objects.requireNonNull(binding, "binding");
+            Objects.requireNonNull(exactTerminalHeadValue, "exactTerminalHeadValue");
+            Objects.requireNonNull(recoveryContext, "recoveryContext");
+            Sha256Digest expectedRoot = WalRunControlCodec.rootSha256(predecessorRoot);
+            if (binding.protocolKind() != ProtocolKindV1.KAFKA
+                    || !binding.terminalHeadKey().equals(headKey)
+                    || !Sha256Digest.hash(exactTerminalHeadValue).equals(binding.terminalHeadValueSha256())
+                    || !predecessorSeal.root().rootSha256().equals(expectedRoot)
+                    || !expectedRoot.equals(rootSha)
+                    || !WalRunControlCodec.rootSha256(recoveryContext.protocolObjectRoot())
+                            .equals(expectedRoot)) {
+                throw new IllegalStateException("terminal Kafka Head binding differs from the predecessor Root/Seal");
+            }
+            KafkaProtocolCheckpointHeadV1 head =
+                    KafkaProtocolCheckpointHeadCodecV1.decode(prefix, rootSha, exactTerminalHeadValue);
+            if (head.state() != KafkaProtocolCheckpointHeadStateV1.TERMINAL) {
+                throw new IllegalStateException("successor predecessor binding selected a non-terminal Kafka Head");
+            }
+            CanonicalBytes selected = recoveryContext.readVerifiedProtocolObject(new ObjectIdentity(
+                    head.checkpointObjectKey(), head.checkpointObjectLength(), head.checkpointObjectDigest()));
+            requireSelectedObject(prefix, rootSha, expectedRunBinding, head, selected);
         }
-        CanonicalBytes selected = recoveryContext.readVerifiedProtocolObject(new ObjectIdentity(
-                head.checkpointObjectKey(), head.checkpointObjectLength(), head.checkpointObjectDigest()));
-        requireSelectedObject(head, selected);
     }
 
     public CompletionStage<Optional<KafkaProtocolCheckpointHeadV1>> currentHead() {
@@ -324,6 +355,15 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
 
     private KafkaProtocolCheckpointStateV1 requireSelectedObject(
             KafkaProtocolCheckpointHeadV1 head, CanonicalBytes body) {
+        return requireSelectedObject(walRunPrefix, rootSha, expectedRunBinding, head, body);
+    }
+
+    private static KafkaProtocolCheckpointStateV1 requireSelectedObject(
+            String walRunPrefix,
+            Sha256Digest rootSha,
+            Nbke2RunBindingV1 expectedRunBinding,
+            KafkaProtocolCheckpointHeadV1 head,
+            CanonicalBytes body) {
         Nwkcp1ObjectV1 object = Nwkcp1CodecV1.decodeVerified(
                 walRunPrefix,
                 head.checkpointObjectKey(),

@@ -363,6 +363,16 @@ reconciliation and replay retain the same immutable version and birth credit. Th
 actual test and process runtimes, and separate process configurations and logs. This is focused evidence and does not
 promote M6 scenarios.
 
+The focused Kafka Object WAL fixture runs with `python3 scripts/run-v2-m6-kafka-object-wal-check.py
+--kafka-root <checkout> --kafka-java-home <jdk17> --output <new-absolute-path-outside-checkouts>`.
+It uses real BK, Oxia, MinIO and Vault Transit, builds the current SDK jars and records the separate adapter test
+and Kafka production process runtimes. The native route persists the exact Object before selecting its Kafka
+authorization grant and publishing the coherent cut. On takeover it closes the prior grant Head and dispatch gate,
+verifies the old Root and physical tail, seals the selected Kafka checkpoint, and only then opens a successor.
+The cold Broker reads retained sources with the original writer context and Vault-wrapped keys. An armed write
+with an unknown outcome prevents takeover from using absence as proof. This path has bounded Root and recovery
+budgets; automatic rollover and the aggregate profile and scenario exit are still open.
+
 ### Planned aggregate boundaries
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and

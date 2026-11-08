@@ -218,7 +218,7 @@ alone or expose bytes while producer state remains behind.
 
 ## Hot-path contract
 
-Normal append must report both of these as zero:
+Normal BookKeeper-primary append must report both of these as zero:
 
 - remote control-metadata reads;
 - remote control-metadata mutations.
@@ -229,7 +229,10 @@ append path.
 
 Object-WAL admission also proves every still-recoverable run remains within the cumulative worst-case recovery
 envelope. Approaching a run or recovery bound triggers rollover/backpressure before another ACK; fallback never resets
-the envelope. This correctness-driven availability cost is explicit and does not permit a per-group metadata mutation.
+the envelope. Checking that envelope is local. The native Kafka Object WAL route separately charges the exact
+dispatch arm and settlement, the Kafka grant Head selection, and any reads and compare-and-set attempts needed to
+reconcile uncertain responses. Those control operations occur on the ACK path; physical checkpoint publication is
+accounted separately.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
 `V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
