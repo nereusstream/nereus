@@ -444,6 +444,11 @@ Broker restores Kafka state from the verified predecessor checkpoint and the aut
 confirms the existing terminal Head. A separate fault removes its selected NWKCP1 version from fixture MinIO.
 The Broker recreates the same canonical bytes under a new immutable Provider version while preserving the
 original Oxia terminal Head version.
+A separate native read test holds an original MinIO Range GET across client disconnect and Broker shutdown.
+The protocol Head stays at its original revision until the read drains. The focused runner binds that case
+and the loaded read classes before launching the compaction fixture. The latter keeps the original physical
+quota until it verifies partial birth reservations and an empty Object output namespace, then admits the
+remaining exact metadata charge. It checks the selected compacted values through two Broker takeovers.
 A second Controller reassignment supersedes a recovering Broker while its exact Oxia physical checkpoint page
 response is held. The latest Owner recovers on the original Broker and appends before the old response is
 released. Releasing it leaves the superseded Broker unwritable and both old-Run Heads at their exact versions.
@@ -470,6 +475,8 @@ each exact case inventory, source tuple, backend outputs and launch files. Every
 the native runners must match the frozen declaration, including the Compose plugin executable resolved by Docker.
 A Gradle task's generated Manifest is checked against the exact JAR retained by digest when that task finishes.
 Later builds can reuse the working path while the earlier archive remains verifiable.
+A Kafka runtime JAR built under the checkout must match the retained archive produced before that invocation's
+native test task. The verifier uses the runtime capture and the original Gradle task output for that invocation.
 A Kafka dependency built into the fresh development
 repository can also appear in the Gradle cache if its bytes match the published artifact. The transient Pulsar
 Object WAL credentials are represented by their launch-time identities. The process suite plan is still incomplete.

@@ -333,6 +333,14 @@ For the current Run with a terminal Head, the recovered state must encode to the
 After bounded exact absence proof, the recovery Owner may conditionally create those same bytes and reread the
 Object before it completes the handoff. The existing terminal Head continues to select that identity.
 
+The Kafka Broker can stage an authorized, sealed NWG1 prefix through the M5 semantic compactor. Each input binds
+the full Object SHA-256 and immutable Provider version to the original authorization grant and Kafka checkpoint.
+The materializer reserves the complete output inventory before dispatching the data Object or indexes. The
+Binding's durable selector chooses the verified generation, and one Fetch captures that generation with its
+coherent Kafka frontiers and raw suffix. Cold recovery verifies the selected manifest, exact Object versions,
+birth credits and physical membership before serving the prefix. The sealed raw grants remain protected for
+independent protocol recovery.
+
 M3 implementation evidence uses two closed, parser-checked TSV artifacts rather than an opaque receipt attachment.
 The WalRun recovery manifest binds the exact control wire, lazy-lane, checkpoint publication/recovery, Seal/successor,
 lineage, bounded-tail, and Provider/KMS-session test identities. The NWKCP1 protocol fixture is emitted by the
