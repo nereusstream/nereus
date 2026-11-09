@@ -49,6 +49,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Builds Kafka state from the closed grant prefix while common recovery verifies every physical append unit. */
 public final class KafkaObjectAuthorizedOwnerOpenV1 implements OwnerOpenRecoveryCoordinator.ProtocolRecoveryHandler {
@@ -78,6 +79,15 @@ public final class KafkaObjectAuthorizedOwnerOpenV1 implements OwnerOpenRecovery
             KafkaObjectAuthorizationV1 authority,
             KafkaObjectAuthorizationV1.ClosedHistory closed,
             KafkaPartitionFenceV1 origin) {
+        this(root, authority, closed, origin, Optional.empty());
+    }
+
+    public KafkaObjectAuthorizedOwnerOpenV1(
+            WalRunRootRecord root,
+            KafkaObjectAuthorizationV1 authority,
+            KafkaObjectAuthorizationV1.ClosedHistory closed,
+            KafkaPartitionFenceV1 origin,
+            Optional<ObjectKafkaProtocolCheckpointStoreV1.VerifiedTerminalCheckpoint> predecessorCheckpoint) {
         this.root = Objects.requireNonNull(root, "root");
         this.rootSha = WalRunControlCodec.rootSha256(root);
         this.authority = Objects.requireNonNull(authority, "authority");
@@ -91,8 +101,19 @@ public final class KafkaObjectAuthorizedOwnerOpenV1 implements OwnerOpenRecovery
                 || origin.kafkaLeaderEpoch() < head.fence().kafkaLeaderEpoch()) {
             throw new IllegalArgumentException("closed Object WAL authorization differs from the physical origin");
         }
-        var checkpoint = authority.checkpoint(closed);
-        next = head.checkpointEnd();
+        var checkpoint = authority.checkpointForOwnerReplay(closed);
+        if (checkpoint.isEmpty() && root.predecessor().isPresent()) {
+            checkpoint = Optional.of(predecessorCheckpoint
+                    .orElseThrow(
+                            () -> new IllegalStateException("Kafka replay lacks the verified predecessor checkpoint"))
+                    .requirePredecessorOf(root));
+        }
+        next = checkpoint
+                .map(state -> state.vector().recoveryCoveredThrough())
+                .orElseGet(() -> head.checkpoint().isPresent() ? 0L : head.startOffset());
+        if (next < head.startOffset() || next > head.endOffset()) {
+            throw new IllegalStateException("Kafka replay checkpoint is outside the exact retained authorization");
+        }
         producers = checkpoint
                 .map(KafkaProtocolCheckpointStateV1::producerState)
                 .orElseGet(KafkaCommittedProducerStateV1::empty);

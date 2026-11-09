@@ -22,6 +22,7 @@ import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.domain.protocol.KafkaTopicIncarnationIdentity;
 import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1CodecV1;
+import com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1DecodingException;
 import com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1ObjectV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
@@ -559,15 +560,35 @@ public final class KafkaObjectAuthorizationV1 {
     }
 
     public Optional<KafkaProtocolCheckpointStateV1> checkpoint(ClosedHistory closed) {
+        return readCheckpoint(closed, false);
+    }
+
+    /** A missing or unreadable body may be replaced only by verified, bounded Owner replay. */
+    public Optional<KafkaProtocolCheckpointStateV1> checkpointForOwnerReplay(ClosedHistory closed) {
+        return readCheckpoint(closed, true);
+    }
+
+    private Optional<KafkaProtocolCheckpointStateV1> readCheckpoint(ClosedHistory closed, boolean allowUnavailable) {
         if (closed.head.checkpoint().isEmpty()) {
             return Optional.empty();
         }
         Sha256Digest sha = closed.head.checkpoint().orElseThrow();
-        CanonicalBytes body = metadata.get(recordKey(closed.head.fence(), sha)).orElseThrow();
-        if (!Sha256Digest.hash(body).equals(sha)) {
-            throw new IllegalStateException("Object checkpoint identity differs");
+        CanonicalBytes body = metadata.get(recordKey(closed.head.fence(), sha)).orElse(null);
+        if (body == null || !Sha256Digest.hash(body).equals(sha)) {
+            if (allowUnavailable) {
+                return Optional.empty();
+            }
+            throw new IllegalStateException("selected Object checkpoint is absent or has a different digest");
         }
-        var object = Nwkcp1CodecV1.decode(body);
+        Nwkcp1ObjectV1 object;
+        try {
+            object = Nwkcp1CodecV1.decode(body);
+        } catch (Nwkcp1DecodingException invalid) {
+            if (allowUnavailable) {
+                return Optional.empty();
+            }
+            throw invalid;
+        }
         if (object.rows().size() != 1
                 || object.rows().get(0).vector().recoveryCoveredThrough() != closed.head.checkpointEnd()) {
             throw new IllegalStateException("Object checkpoint differs from selected common coverage");
