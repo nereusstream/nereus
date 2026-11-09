@@ -490,18 +490,24 @@ public final class KmsCellSession implements AutoCloseable {
     public HistoricalReadLease openHistoricalReader(
             WalRunLineageRecovery.RecoveredLineage lineage, WalRunReference reference) {
         var verified = Objects.requireNonNull(lineage, "lineage").requireSealedPredecessor(reference);
+        var identity = new RunKeyCacheIdentity(reference.shardId(), reference.shardRunEpoch());
         synchronized (budget) {
-            return forRunAdmission().openHistoricalInGeneration(verified.root(), reference);
+            requireCellBudgetOpen();
+            var current = budget.current;
+            var admission = current.runOwners.get(identity) == RunLifecycleOwner.CLOSED ? current : forRunAdmission();
+            return admission.openHistoricalInGeneration(identity, verified.root(), reference.rootSha256());
         }
     }
 
-    private HistoricalReadLease openHistoricalInGeneration(WalRunRootRecord root, WalRunReference reference) {
-        var identity = new RunKeyCacheIdentity(reference.shardId(), reference.shardRunEpoch());
+    private HistoricalReadLease openHistoricalInGeneration(
+            RunKeyCacheIdentity identity, WalRunRootRecord root, Sha256Digest rootSha256) {
         requireOpen();
-        requireRawRunOwner(identity);
+        boolean preserveWriteFence = requireRunOwner(identity, true);
         requireRunIdle(identity);
-        requireTransferHistoryCapacity();
-        requireExactKmsAuthority(identity, root.wrappedRunKey(), reference.rootSha256(), root.providerScopeId());
+        if (runOwners.get(identity) != RunLifecycleOwner.CLOSED) {
+            requireTransferHistoryCapacity();
+        }
+        requireExactKmsAuthority(identity, root.wrappedRunKey(), rootSha256, root.providerScopeId());
         var cached = cache.get(identity);
         if (cached == null) {
             requireCacheCapacity();
@@ -510,21 +516,29 @@ public final class KmsCellSession implements AutoCloseable {
             requireCachedEnvelope(cached, root.wrappedRunKey());
         }
         runOwners.put(identity, RunLifecycleOwner.HISTORICAL_READ);
-        return new HistoricalReadLease(identity, root, reference.rootSha256());
+        return new HistoricalReadLease(identity, root, rootSha256, preserveWriteFence);
     }
 
     private void requireRawRunOwner(RunKeyCacheIdentity runIdentity) {
+        requireRunOwner(runIdentity, false);
+    }
+
+    private boolean requireRunOwner(RunKeyCacheIdentity runIdentity, boolean historicalRead) {
         Objects.requireNonNull(runIdentity, "runIdentity");
+        boolean preserveWriteFence = false;
         for (var generation : budget.generations) {
             var owner = generation.runOwners.get(runIdentity);
-            if (owner != null
+            boolean closedWriteOwner = historicalRead && owner == RunLifecycleOwner.CLOSED;
+            if (owner != null && !closedWriteOwner
                     || generation != this
                             && (generation.cache.containsKey(runIdentity)
                                     || generation.pending.containsKey(runIdentity)
                                     || generation.operations.containsKey(runIdentity))) {
                 throw new IllegalStateException("KMS run authority was transferred or retired: " + owner);
             }
+            preserveWriteFence |= closedWriteOwner;
         }
+        return preserveWriteFence;
     }
 
     private void requireTransferHistoryCapacity() {
@@ -963,12 +977,15 @@ public final class KmsCellSession implements AutoCloseable {
         private final RunKeyCacheIdentity identity;
         private final WalRunRootRecord root;
         private final Sha256Digest rootSha;
+        private final boolean preserveWriteFence;
         private boolean closed;
 
-        private HistoricalReadLease(RunKeyCacheIdentity identity, WalRunRootRecord root, Sha256Digest rootSha) {
+        private HistoricalReadLease(
+                RunKeyCacheIdentity identity, WalRunRootRecord root, Sha256Digest rootSha, boolean preserveWriteFence) {
             this.identity = identity;
             this.root = root;
             this.rootSha = rootSha;
+            this.preserveWriteFence = preserveWriteFence;
         }
 
         public Nwg1ObjectReaderV1.VerifiedAppendUnit readAppendUnit(
@@ -1020,7 +1037,12 @@ public final class KmsCellSession implements AutoCloseable {
         public void close() {
             synchronized (budget) {
                 if (!closed) {
-                    releaseWithoutWriteAuthority(identity, RunLifecycleOwner.HISTORICAL_READ);
+                    // A sealed predecessor can be read again while its former write authority stays fenced.
+                    if (preserveWriteFence) {
+                        closeRunLease(identity, RunLifecycleOwner.HISTORICAL_READ);
+                    } else {
+                        releaseWithoutWriteAuthority(identity, RunLifecycleOwner.HISTORICAL_READ);
+                    }
                     closed = true;
                 }
             }
