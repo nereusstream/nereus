@@ -116,6 +116,13 @@ def run(command, cwd, log_path):
 def require_runtime_tools(runtime):
     declared = {path.resolve(strict=True) for path in runtime.values()}
     tools = {"python3": sys.executable, **{name: shutil.which(name) for name in ("bash", "git", "rg", "docker")}}
+    SOURCE.require(tools["docker"], "Docker is required by the native M6 backends")
+    plugins = json.loads(subprocess.check_output(
+        [tools["docker"], "info", "--format", "{{json .ClientInfo.Plugins}}"], text=True))
+    SOURCE.require(isinstance(plugins, list), "Docker did not identify its installed CLI plugins")
+    compose = [plugin.get("Path") for plugin in plugins if plugin.get("Name") == "compose"]
+    SOURCE.require(len(compose) == 1 and compose[0], "Docker did not identify one active Compose executable")
+    tools["docker compose"] = compose[0]
     java_home = os.environ.get("JAVA_HOME")
     for name in ("java", "javac"):
         tools[name] = str(Path(java_home) / "bin" / name) if java_home else shutil.which(name)
@@ -442,11 +449,11 @@ def execute(args):
     out = args.output.absolute()
     declaration = args.runtime_manifest.resolve(strict=True)
     runtime, hashes = SOURCE.runtime_manifest(declaration)
-    require_runtime_tools(runtime)
     SOURCE.require(SOURCE.outside(out, [*roots.values(), *runtime.values()]),
                    "M6 output overlaps an execution input")
 
     def capture():
+        require_runtime_tools(runtime)
         snapshot = SOURCE.capture(roots, out, None, runtime, args.runtime_byte_budget)
         SOURCE.require(all(snapshot["runtimeInputs"][key]["sha256"] == expected
                            for key, expected in hashes.items()), "declared runtime dependency changed")
