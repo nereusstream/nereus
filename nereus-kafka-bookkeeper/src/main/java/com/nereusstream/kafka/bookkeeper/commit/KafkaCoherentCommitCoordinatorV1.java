@@ -503,12 +503,20 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
     public synchronized KafkaProtocolCheckpointStateV1 captureRecoveryCheckpoint(
             KafkaCoherentProtocolSnapshotV1 snapshot) {
         requireProfile(StorageProfile.BOOKKEEPER);
-        Objects.requireNonNull(snapshot, "snapshot");
-        if (!publicationCell.capture().equals(snapshot.root())) {
+        return resolveRecoveryCheckpoint(snapshot.root());
+    }
+
+    public synchronized KafkaProtocolCheckpointStateV1 captureRecoveryCheckpoint(
+            KafkaObjectCoherentProtocolSnapshotV1 snapshot) {
+        requireProfile(StorageProfile.OBJECT);
+        return resolveRecoveryCheckpoint(snapshot.root());
+    }
+
+    private KafkaProtocolCheckpointStateV1 resolveRecoveryCheckpoint(KafkaPartitionProtocolStateV1 root) {
+        if (!publicationCell.capture().equals(root)) {
             throw new IllegalStateException("recovery checkpoint capture names a superseded coherent root");
         }
-        return repository.resolve(
-                snapshot.root().references().checkpointVector(), KafkaProtocolCheckpointStateV1.class);
+        return repository.resolve(root.references().checkpointVector(), KafkaProtocolCheckpointStateV1.class);
     }
 
     /** The existing K1 component identity, including the exact vector and any checkpoint source locators. */

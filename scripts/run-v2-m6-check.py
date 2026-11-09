@@ -209,6 +209,26 @@ def kafka_test_runs(result, output):
     return [(output / task if nested else output, task, test) for task, test in result["tests"].items()]
 
 
+def verify_object_wal_read_qualification(output, started, result):
+    drain = "nereusKafkaObjectWalReadDrainRealTest"
+    process = "nereusKafkaObjectWalProcessRealTest"
+    expected = f"{drain}/object-wal-read-qualification.json"
+    descriptor = result["readQualification"]
+    SOURCE.require(descriptor["name"] == expected, "Kafka Object WAL read qualification path differs")
+    path = verify_attachment(output, started, expected, {key: value for key, value in descriptor.items() if key != "name"})
+    qualification = read(path)
+    SOURCE.require(qualification["schema"] == "NEREUS_V2_M6_KAFKA_OBJECT_WAL_READ_QUALIFICATION_V1"
+                   and qualification["promotionEligible"] is False
+                   and qualification["sourceCheckout"] == result["sourceCheckout"]
+                   and qualification["sourceTrees"] == result["sourceTrees"],
+                   "Kafka Object WAL read qualification source identity differs")
+    original = result["tests"][drain]
+    SOURCE.require(qualification["evidence"] == {
+        original[key]["name"]: original[key]["sha256"] for key in ("runtime", "xml")
+    } and f"-Pv2M6ObjectWalReadAdmissionFile={path}" in result["tests"][process]["command"],
+        "Kafka Object WAL process did not consume the exact read qualification")
+
+
 def verify_kafka_runtime(result_file, roots, output, frozen):
     result = read(result_file)
     captures = []
@@ -326,6 +346,8 @@ def verify_kafka_result(output, started, profile, expected, sources):
     else:
         if profile != "kafka-object-wal":
             verify_named(output, result["m4Qualification"], "path")
+        else:
+            verify_object_wal_read_qualification(output, started, result)
         if profile == "kafka-bookkeeper-wal-async-object":
             verify_attachment_map(output, started, result["backendFiles"])
             verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
@@ -335,7 +357,7 @@ def verify_kafka_result(output, started, profile, expected, sources):
                 verify_attachment_map(directory, started, test["backendFiles"])
             if test.get("processLogs"):
                 verify_attachment_map(directory / "kafka-process-logs", started, test["processLogs"])
-                process_attached = True
+                process_attached |= task == "nereusKafkaObjectWalProcessRealTest"
             verify_named(directory, test["runtime"], "name")
             xml = test["xml"]
             path = (directory / SOURCE.INPUTS.relative(xml["name"])).relative_to(output)

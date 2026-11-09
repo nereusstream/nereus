@@ -24,6 +24,7 @@ import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectActiveTailStateV
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaReadIsolationV1;
+import com.nereusstream.kafka.bookkeeper.read.KafkaObjectMaterializedPrefixV1;
 import com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -95,10 +96,7 @@ public final class KafkaObjectNativeFetchV1 {
         if (maximumBytes < 0 || hardMaximumBytes <= 0) {
             throw new IllegalArgumentException("invalid native Object WAL Fetch bytes");
         }
-        var frontiers = captured.root().frontiers();
-        if (offset < frontiers.trimStartOffset() || offset > frontiers.readableEndOffset()) {
-            throw new IllegalArgumentException("native Object WAL Fetch is outside its captured readable prefix");
-        }
+        requireReadableOffset(captured, offset);
         long end = captured.root().readUpperBound(isolation);
         if (end <= offset || maximumBytes == 0) {
             return new PositionedResult(new Result(List.of(), List.of(), 0), Optional.empty());
@@ -129,16 +127,96 @@ public final class KafkaObjectNativeFetchV1 {
             throw new IOException("native Object WAL captured prefix lacks a readable extent");
         }
         long returnedEnd = collected.next;
-        var aborted = isolation == KafkaReadIsolationV1.READ_COMMITTED && !collected.batches.isEmpty()
-                ? captured.transactionState().abortedTransactions().stream()
-                        .filter(txn -> txn.markerEndOffsetExclusive() > offset && txn.firstOffset() < returnedEnd)
-                        .toList()
-                : List.<CompletedTransactionV1>of();
+        var aborted = abortedTransactions(captured, isolation, collected.batches, offset, returnedEnd);
         var root = captured.root();
         var next = returnedEnd > offset && returnedEnd < end
                 ? Optional.of(new Cursor(root.fence(), root.stateVersion(), returnedEnd, index))
                 : Optional.<Cursor>empty();
         return new PositionedResult(new Result(collected.batches, aborted, collected.bytes), next);
+    }
+
+    /** Reads one already-selected semantic prefix and the raw suffix of the same coherent cut. */
+    public static PositionedResult readMaterialized(
+            KafkaObjectCoherentProtocolSnapshotV1 captured,
+            KafkaObjectMaterializedPrefixV1 prefix,
+            Sources sources,
+            long offset,
+            int maximumBytes,
+            int hardMaximumBytes,
+            boolean minOneMessage,
+            KafkaReadIsolationV1 isolation,
+            Cursor cursor)
+            throws IOException {
+        var coverage = prefix.coverage();
+        var prefixEnd = coverage.exclusiveEnd();
+        long isolationEnd = captured.root().readUpperBound(isolation);
+        if (offset >= prefixEnd || offset >= isolationEnd || maximumBytes == 0) {
+            return readPositioned(
+                    captured, sources, offset, maximumBytes, hardMaximumBytes, minOneMessage, isolation, cursor);
+        }
+        requireReadableOffset(captured, offset);
+        if (maximumBytes < 0 || hardMaximumBytes <= 0) {
+            throw new IllegalArgumentException("invalid native Object WAL Fetch bytes");
+        }
+        if (coverage.inclusiveStart() > offset
+                || prefixEnd > captured.root().frontiers().durableEndOffset()
+                || prefix.rawFallbackEquivalent()) {
+            throw new IOException("selected native Object WAL prefix differs from its coherent cut");
+        }
+        int soft = Math.min(maximumBytes, hardMaximumBytes);
+        var selected = prefix.read(offset, isolationEnd, soft);
+        var batches = new ArrayList<Batch>(selected.batches().size());
+        int bytes = 0;
+        boolean tailAllowed = selected.canReadTail();
+        for (var batch : selected.batches()) {
+            int length = batch.rawAssignedRecordBatch().length();
+            if (length > hardMaximumBytes - bytes || length > soft - bytes && !(batches.isEmpty() && minOneMessage)) {
+                tailAllowed = false;
+                break;
+            }
+            batches.add(new Batch(batch.startOffset(), batch.endOffsetExclusive(), batch.rawAssignedRecordBatch()));
+            bytes = Math.addExact(bytes, length);
+        }
+        Optional<Cursor> next = Optional.empty();
+        if (tailAllowed && bytes < soft) {
+            var tail = readPositioned(
+                    captured,
+                    sources,
+                    prefixEnd,
+                    soft - bytes,
+                    hardMaximumBytes - bytes,
+                    batches.isEmpty() && minOneMessage,
+                    isolation,
+                    cursor);
+            batches.addAll(tail.result().batches());
+            bytes = Math.addExact(bytes, tail.result().bytes());
+            next = tail.nextCursor();
+        }
+        long returnedEnd =
+                batches.isEmpty() ? offset : batches.get(batches.size() - 1).endOffsetExclusive();
+        return new PositionedResult(
+                new Result(batches, abortedTransactions(captured, isolation, batches, offset, returnedEnd), bytes),
+                next);
+    }
+
+    private static void requireReadableOffset(KafkaObjectCoherentProtocolSnapshotV1 captured, long offset) {
+        var frontiers = captured.root().frontiers();
+        if (offset < frontiers.trimStartOffset() || offset > frontiers.readableEndOffset()) {
+            throw new IllegalArgumentException("native Object WAL Fetch is outside its captured readable prefix");
+        }
+    }
+
+    private static List<CompletedTransactionV1> abortedTransactions(
+            KafkaObjectCoherentProtocolSnapshotV1 captured,
+            KafkaReadIsolationV1 isolation,
+            List<Batch> batches,
+            long offset,
+            long returnedEnd) {
+        return isolation == KafkaReadIsolationV1.READ_COMMITTED && !batches.isEmpty()
+                ? captured.transactionState().abortedTransactions().stream()
+                        .filter(txn -> txn.markerEndOffsetExclusive() > offset && txn.firstOffset() < returnedEnd)
+                        .toList()
+                : List.of();
     }
 
     private static int startIndex(

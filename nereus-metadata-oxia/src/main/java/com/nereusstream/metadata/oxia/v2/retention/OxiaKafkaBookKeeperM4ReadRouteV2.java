@@ -68,21 +68,35 @@ public final class OxiaKafkaBookKeeperM4ReadRouteV2 {
 
     public OxiaKafkaBookKeeperM4ReadRouteV2(
             AsyncOxiaClient client, MetadataNamespaceIdentityV2 namespace, KafkaRunRootRecordV2.Scope scope) {
+        this(
+                client,
+                namespace,
+                scope.partition(),
+                new BindingIdentity(
+                        scope.bindingId(),
+                        Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(scope.topic())),
+                        scope.storageEpoch().digest()));
+    }
+
+    /** The Object WAL Binding uses the same Kafka Cell capacity and exact M4/M5 metadata route. */
+    public static OxiaKafkaBookKeeperM4ReadRouteV2 forObjectWal(
+            AsyncOxiaClient client, MetadataNamespaceIdentityV2 namespace, int partition, BindingIdentity binding) {
+        return new OxiaKafkaBookKeeperM4ReadRouteV2(client, namespace, partition, binding);
+    }
+
+    private OxiaKafkaBookKeeperM4ReadRouteV2(
+            AsyncOxiaClient client, MetadataNamespaceIdentityV2 namespace, int partition, BindingIdentity binding) {
         this.namespace = Objects.requireNonNull(namespace, "namespace");
-        Objects.requireNonNull(scope, "scope");
         this.client = Objects.requireNonNull(client, "client");
-        partition = scope.partition();
+        this.partition = partition;
         cellAuthorityRoot = "/nereus/cells/kafka_bk_" + namespace.instanceId().toHex();
-        binding = new BindingIdentity(
-                scope.bindingId(),
-                Sha256Digest.hash(TopicIncarnationIdentityCodecV1.encode(scope.topic())),
-                scope.storageEpoch().digest());
-        bindingRoute = new OxiaBindingLifecycleMetadataStoreV2(client, cellAuthorityRoot, scope.partition(), binding);
-        keys = new M4ReadControlKeysV1(scope.partition(), binding);
+        this.binding = Objects.requireNonNull(binding, "binding");
+        bindingRoute = new OxiaBindingLifecycleMetadataStoreV2(client, cellAuthorityRoot, partition, binding);
+        keys = new M4ReadControlKeysV1(partition, binding);
         selectorKey = keys.selector();
         rawBindingControl = bindingRoute.rawControlMetadata();
-        control = new M4ReadControlCoordinatorV1(rawBindingControl, scope.partition(), binding);
-        workers = new M5MaterializationWorkerCoordinatorV1(rawBindingControl, scope.partition(), binding);
+        control = new M4ReadControlCoordinatorV1(rawBindingControl, partition, binding);
+        workers = new M5MaterializationWorkerCoordinatorV1(rawBindingControl, partition, binding);
     }
 
     public Optional<BindingReadSelector> readSelector() {

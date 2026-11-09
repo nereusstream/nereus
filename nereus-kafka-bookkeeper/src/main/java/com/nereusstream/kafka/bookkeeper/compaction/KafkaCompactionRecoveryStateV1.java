@@ -23,7 +23,9 @@ import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaRecoveryCheckpointVecto
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentCommitCoordinatorV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
+import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectCoherentProtocolSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
+import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionProtocolStateV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.MaterializationSourceCut;
 import java.util.Objects;
 
@@ -46,16 +48,24 @@ public record KafkaCompactionRecoveryStateV1(
     /** Requires the actual resolved checkpoint named by the supplied coherent cut; never reconstructs it from data. */
     public static KafkaCompactionRecoveryStateV1 capture(
             KafkaCoherentProtocolSnapshotV1 snapshot, KafkaProtocolCheckpointStateV1 checkpoint) {
-        Objects.requireNonNull(snapshot, "snapshot");
+        return capture(snapshot.root(), checkpoint);
+    }
+
+    public static KafkaCompactionRecoveryStateV1 capture(
+            KafkaObjectCoherentProtocolSnapshotV1 snapshot, KafkaProtocolCheckpointStateV1 checkpoint) {
+        return capture(snapshot.root(), checkpoint);
+    }
+
+    private static KafkaCompactionRecoveryStateV1 capture(
+            KafkaPartitionProtocolStateV1 root, KafkaProtocolCheckpointStateV1 checkpoint) {
         Objects.requireNonNull(checkpoint, "checkpoint");
         var vector = checkpoint.vector();
-        var fence = snapshot.root().fence();
+        var fence = root.fence();
         var binding = vector.runBinding();
         var digest = KafkaCoherentCommitCoordinatorV1.recoveryCheckpointContentDigest(checkpoint);
         if (!vector.isAlignedCompoundCheckpoint()
-                || vector.recoveryCoveredThrough() > snapshot.root().frontiers().durableEndOffset()
-                || !digest.equals(
-                        snapshot.root().references().checkpointVector().contentDigest())
+                || vector.recoveryCoveredThrough() > root.frontiers().durableEndOffset()
+                || !digest.equals(root.references().checkpointVector().contentDigest())
                 || !samePartition(fence, binding)
                 || binding.creatorOwnerEpoch() > fence.ownerEpoch()
                 || binding.kafkaLeaderEpoch() > fence.kafkaLeaderEpoch()) {

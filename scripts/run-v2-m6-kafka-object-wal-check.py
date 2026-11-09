@@ -11,6 +11,7 @@ import secrets
 import subprocess
 import time
 import urllib.request
+from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parent.parent
 ASYNC_RUNNER = ROOT / "scripts/run-v2-m6-kafka-async-object-check.py"
@@ -22,6 +23,20 @@ VAULT_REF = "hashicorp/vault@sha256:268bb80aa9c6d13d65fcfa05c0c268caca068952240a
 VAULT_ID = "sha256:ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
 PROCESS_TASK = "nereusKafkaObjectWalProcessRealTest"
 READ_DRAIN_TASK = "nereusKafkaObjectWalReadDrainRealTest"
+READ_QUALIFICATION = "object-wal-read-qualification.json"
+READ_CLASSES = (
+    "kafka.server.nereus.NereusKafkaObjectWalPartition",
+    "kafka.server.nereus.NereusKafkaObjectWalPartition$ReadView",
+    "kafka.server.nereus.NereusKafkaObjectWalPartition$Source",
+    "kafka.server.nereus.NereusKafkaObjectProvider",
+    "com.nereusstream.storage.object.control.WalRunObjectSession",
+    "com.nereusstream.storage.object.control.WalRunHistoricalObjectReaderV1",
+    "com.nereusstream.kafka.bookkeeper.broker.KafkaObjectNativeFetchV1",
+    "com.nereusstream.kafka.bookkeeper.broker.KafkaObjectNativeFetchV1$Collect",
+    "com.nereusstream.kafka.bookkeeper.read.KafkaObjectMaterializedPrefixV1",
+    "com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1",
+    "com.nereusstream.metadata.oxia.v2.retention.OxiaKafkaBookKeeperM4ReadRouteV2",
+)
 CASES = {
     "nereusObjectWalAdapterRealTest": (
         "kafka.server.nereus.KafkaObjectWalAdapterRealTest",
@@ -137,7 +152,7 @@ def process_logs(out, started, task):
     return result
 
 
-def run_task(task, kafka, java, out, repository, artifacts):
+def run_task(task, kafka, java, out, repository, artifacts, read_qualification=None):
     out.mkdir()
     with (vault(out) as (vault_url, token), ASYNC.minio(out) as (minio, _), BK.bookkeeper_oxia(out) as oxia,
           ASYNC.PROXY.fault_proxy(minio) as (relay, control, fault_token)):
@@ -156,6 +171,9 @@ def run_task(task, kafka, java, out, repository, artifacts):
             f"-Pv2M6VaultEndpoint={vault_url}", f"-Pv2M6VaultTokenFile={token}",
             f"-Pv2M6ObjectWalProcessEvidenceDir={out / 'kafka-process-logs'}", ":core:" + task,
         ]
+        if read_qualification is not None:
+            M6.require(task == PROCESS_TASK, "read qualification can only be used by the Object WAL process suite")
+            command.insert(-1, f"-Pv2M6ObjectWalReadAdmissionFile={read_qualification}")
         command = M6.gradle_command(command, out / "gradle.log")
         started = time.time_ns()
         env = dict(os.environ, JAVA_HOME=str(java), PATH=str(java / "bin") + os.pathsep + os.environ["PATH"],
@@ -175,6 +193,38 @@ def run_task(task, kafka, java, out, repository, artifacts):
                          for name in ("backend.json", "bookkeeper.log", "oxia.log", "minio.json",
                                       "minio.log", "minio-fault-relay.json", "vault.json", "gradle.log")},
     }
+
+
+def qualify_reads(output, checked, commits, trees):
+    names = [checked[key]["name"] for key in ("xml", "runtime")]
+    runtime = json.loads((output / checked["runtime"]["name"]).read_bytes())
+    classes = {}
+    for name in READ_CLASSES:
+        member = name.replace(".", "/") + ".class"
+        matches = []
+        for entry in map(Path, runtime["processClasspath"]):
+            if entry.is_dir():
+                source = entry / member
+                expected = runtime["files"].get(str(source))
+                if expected is not None:
+                    M6.require(M6.file_identity(source)["sha256"] == expected["sha256"],
+                               f"loaded Kafka read class changed: {source}")
+                    matches.append(expected["sha256"])
+            elif entry.suffix == ".jar":
+                with ZipFile(entry) as archive:
+                    if member in archive.namelist():
+                        M6.require(M6.file_identity(entry)["sha256"] == runtime["files"][str(entry)]["sha256"],
+                                   f"loaded Kafka read artifact changed: {entry}")
+                        matches.append(M6.INPUTS.digest(archive.read(member)))
+        M6.require(len(matches) == 1, f"missing or ambiguous Kafka Object WAL read class: {name}")
+        classes[name] = matches[0]
+    receipt = output / READ_QUALIFICATION
+    receipt.write_bytes(M6.INPUTS.canonical({
+        "schema": "NEREUS_V2_M6_KAFKA_OBJECT_WAL_READ_QUALIFICATION_V1", "promotionEligible": False,
+        "sourceCheckout": commits, "sourceTrees": trees, "loadedReadClasses": classes,
+        "evidence": {name: M6.file_identity(output / name)["sha256"] for name in names},
+    }))
+    return receipt
 
 
 def run(kafka, java, out):
@@ -200,7 +250,13 @@ def run(kafka, java, out):
     artifacts.update({M4.only_jar(BK.OXIA_CLIENT / "io/github/oxia-db", name).name: sha for name, sha in locked.items()})
     domain = M4.only_jar(BK.N1_REPOSITORY / "com/nereusstream", "nereus-domain")
     artifacts[domain.name] = M6.file_identity(domain, tracked[domain.relative_to(ROOT).as_posix()])["sha256"]
-    tests = {task: run_task(task, kafka, java, out / task, repository, artifacts) for task in CASES}
+    tests = {}
+    qualification = None
+    for task in CASES:
+        tests[task] = run_task(task, kafka, java, out / task, repository, artifacts,
+                               qualification if task == PROCESS_TASK else None)
+        if task == READ_DRAIN_TASK:
+            qualification = qualify_reads(out / task, tests[task], commits, trees)
     M6.require(BK.repository_files(repository) == repository_inputs
                and all(M6.clean_commit(root) == commits[name] for name, root in (("nereus", ROOT), ("kafka", kafka))),
                "Kafka Object WAL execution inputs changed")
@@ -208,6 +264,7 @@ def run(kafka, java, out):
         "kind": "FOCUSED_KAFKA_OBJECT_WAL_CHECK", "promotionEligible": False,
         "sourceCheckout": commits, "sourceTrees": trees, "tests": tests,
         "executorInputs": executor_inputs, "repositoryInputs": repository_inputs,
+        "readQualification": {"name": f"{READ_DRAIN_TASK}/{READ_QUALIFICATION}", **M6.file_identity(qualification)},
     }))
     print(f"{len(CASES)} native Kafka Object WAL checks passed: {out}")
 
