@@ -436,6 +436,9 @@ after takeover. It records actual PUT, LIST and full GET attempts for the origin
 version is selected by the grant. A separate Broker test loses the original applied Oxia grant CAS response,
 holds the exact reconciliation read and checks that Produce stays pending. The same test holds an applied physical
 checkpoint page response, observes the Produce ACK and then verifies publication of the checkpoint Head.
+The dual-Broker test also loses the applied terminal protocol Head CAS response during shutdown. Shutdown
+waits for the exact Oxia version to be reread, with one terminal write. The original Broker then reacquires the
+partition and reads the complete authorized prefix through the sealed predecessors.
 An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
 stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
 In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
@@ -454,7 +457,8 @@ the affected regression gates from the declared source and runtime inputs. It re
 until the committed suite plan and all required runners exist. The Pulsar profiles use their source-owned process
 runners directly. The Kafka profiles use the same focused runners and raw JUnit attachments. The aggregate checks
 each exact case inventory, source tuple, backend outputs and launch files. Every external runtime file observed by
-the native runners must match the frozen declaration. A Kafka dependency built into the fresh development
+the native runners must match the frozen declaration, including the Compose plugin executable resolved by Docker.
+A Kafka dependency built into the fresh development
 repository can also appear in the Gradle cache if its bytes match the published artifact. The transient Pulsar
 Object WAL credentials are represented by their launch-time identities. The process suite plan is still incomplete.
 `v2M7Check`, `v2M8Check` and `v2FinalCheck` remain design targets. The mandatory boundaries are:

@@ -355,6 +355,10 @@ SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owne
 records. Physical group identity allocation remains local; Kafka's post-upload durable authorization CAS performs
 metadata-service I/O and belongs to ACK.
 
+A Cell can reopen a sealed predecessor through its historical read lease after the former write lease drains.
+The reader uses the same Cell key and operation budget and keeps the former write authority fenced during and
+after the read lease.
+
 Acknowledged group objects remain directly readable through the published owner-local active-tail view. Takeover first
 recovers physical inventory, then may publish Binding views independently; unrelated typed gaps do not block B. A new
 append still waits for its lane's physical recovery condition. Materialization creates a preferred read generation but
