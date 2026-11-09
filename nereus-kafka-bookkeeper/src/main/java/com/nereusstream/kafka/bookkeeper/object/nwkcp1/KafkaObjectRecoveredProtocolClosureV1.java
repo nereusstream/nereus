@@ -14,6 +14,7 @@
 
 package com.nereusstream.kafka.bookkeeper.object.nwkcp1;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.kafka.bookkeeper.broker.KafkaObjectNativeAppendV1;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.WalCheckpointHeadV1;
@@ -21,6 +22,9 @@ import com.nereusstream.storage.object.control.WalRunLifecycleManager;
 import com.nereusstream.storage.object.control.WalRunObjectSession;
 import com.nereusstream.storage.object.control.WalRunPredecessor;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
+import com.nereusstream.storage.object.provider.ProviderObjectOutcome;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +56,7 @@ public final class KafkaObjectRecoveredProtocolClosureV1 {
         var probe = new ObjectKafkaProtocolCheckpointStoreV1(prefix, context, currentOwnerEpoch, backend);
         var selected = probe.currentHead().toCompletableFuture().join();
         var store = selectPublisher(prefix, context, backend, probe, selected, currentOwnerEpoch);
+        Optional<CanonicalBytes> verifiedTerminal = Optional.empty();
         if (selected.filter(head -> head.state() == KafkaProtocolCheckpointHeadStateV1.TERMINAL)
                 .isPresent()) {
             var terminal = selected.orElseThrow();
@@ -60,12 +65,47 @@ public final class KafkaObjectRecoveredProtocolClosureV1 {
                     || !terminal.checkpointObjectDigest().equals(encoded.digest())) {
                 throw new IllegalStateException("existing terminal NWKCP1 differs from the recovered Kafka cut");
             }
+            verifiedTerminal = Optional.of(readOrRestoreTerminalObject(restored, backend, encoded));
         } else {
             store.publish(state).toCompletableFuture().join();
         }
         var seal = restored.sealRecovered(new WalRunLifecycleManager(metadata), physical);
-        var terminal = store.terminalize(seal).toCompletableFuture().join();
+        var terminal = (verifiedTerminal.isPresent()
+                        ? store.terminalizeRecovered(seal, selected.orElseThrow(), verifiedTerminal.orElseThrow())
+                        : store.terminalize(seal))
+                .toCompletableFuture()
+                .join();
         return new WalRunPredecessor(seal.root(), seal.sealKey(), seal.sealSha256(), Optional.of(terminal));
+    }
+
+    private static CanonicalBytes readOrRestoreTerminalObject(
+            WalRunObjectSession restored, StorageObjectNwkcp1BackendV1 backend, Nwkcp1EncodedObjectV1 encoded) {
+        var identity = new ObjectIdentity(encoded.key(), encoded.length(), encoded.digest());
+        try {
+            return restored.readVerifiedProtocolObject(identity);
+        } catch (IOException readFailure) {
+            restored.enterRecoveryFallback();
+            try {
+                if (restored.reconcileUnknownProtocolObject(identity).outcome()
+                        != ProviderObjectOutcome.DEFINITIVELY_NOT_APPLIED) {
+                    throw new UncheckedIOException(readFailure);
+                }
+            } catch (IOException absenceFailure) {
+                readFailure.addSuppressed(absenceFailure);
+                throw new UncheckedIOException(readFailure);
+            }
+        }
+        var created = backend.conditionalCreateObject(encoded.key(), encoded.body(), encoded.digest())
+                .toCompletableFuture()
+                .join();
+        if (created.createdToken().isEmpty()) {
+            throw new KafkaObjectCheckpointException("recreated terminal NWKCP1 did not converge to its exact bytes");
+        }
+        try {
+            return restored.readVerifiedProtocolObject(identity);
+        } catch (IOException readFailure) {
+            throw new UncheckedIOException(readFailure);
+        }
     }
 
     private static ObjectKafkaProtocolCheckpointStoreV1 selectPublisher(

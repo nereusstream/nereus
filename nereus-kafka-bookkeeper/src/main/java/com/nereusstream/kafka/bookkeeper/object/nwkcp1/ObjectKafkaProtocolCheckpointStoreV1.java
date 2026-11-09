@@ -155,6 +155,18 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
 
     @Override
     public CompletionStage<TerminalProtocolCheckpointBindingV1> terminalize(WalRunTerminalClosureProofV1 closureProof) {
+        return terminalize(closureProof, Optional.empty());
+    }
+
+    CompletionStage<TerminalProtocolCheckpointBindingV1> terminalizeRecovered(
+            WalRunTerminalClosureProofV1 closureProof, KafkaProtocolCheckpointHeadV1 head, CanonicalBytes exactObject) {
+        return terminalize(closureProof, Optional.of(new RecoveredTerminalObject(head, exactObject)));
+    }
+
+    private record RecoveredTerminalObject(KafkaProtocolCheckpointHeadV1 head, CanonicalBytes exactBody) {}
+
+    private CompletionStage<TerminalProtocolCheckpointBindingV1> terminalize(
+            WalRunTerminalClosureProofV1 closureProof, Optional<RecoveredTerminalObject> recovered) {
         Objects.requireNonNull(closureProof, "closureProof");
         if (!closureProof.root().rootSha256().equals(rootSha)) {
             return CompletableFuture.failedFuture(
@@ -171,9 +183,21 @@ public final class ObjectKafkaProtocolCheckpointStoreV1
                 if (before.publisherEpoch() != publisherEpoch) {
                     throw new KafkaObjectCheckpointException("stale publisher cannot terminate the checkpoint Head");
                 }
-                Nwkcp1BackendV1.SelectedObjectToken selectedToken =
-                        backend.selectObjectFromHead(headKey, currentBytes, Sha256Digest.hash(currentBytes));
-                return backend.readSelectedObject(selectedToken, false).thenCompose(body -> {
+                CompletionStage<Optional<CanonicalBytes>> selectedObject;
+                if (recovered.isPresent()) {
+                    var verified = recovered.orElseThrow();
+                    if (before.state() != KafkaProtocolCheckpointHeadStateV1.TERMINAL
+                            || !before.equals(verified.head())) {
+                        throw new KafkaObjectCheckpointException(
+                                "recovered Kafka terminal Head changed during verification");
+                    }
+                    selectedObject = CompletableFuture.completedFuture(Optional.of(verified.exactBody()));
+                } else {
+                    var selectedToken =
+                            backend.selectObjectFromHead(headKey, currentBytes, Sha256Digest.hash(currentBytes));
+                    selectedObject = backend.readSelectedObject(selectedToken, false);
+                }
+                return selectedObject.thenCompose(body -> {
                     KafkaProtocolCheckpointStateV1 finalState = requireSelectedObject(
                             before,
                             body.orElseThrow(() ->
