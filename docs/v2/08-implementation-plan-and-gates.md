@@ -446,6 +446,8 @@ The Broker recreates the same canonical bytes under a new immutable Provider ver
 original Oxia terminal Head version.
 An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
 stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
+The end-of-log multi-partition Fetch also waits with the S3 relay set to reject bucket traffic. Deleting one
+partition completes the Fetch and the relay records zero requests during that window.
 In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
 immutable version in its terminal Head before its replacement resumes. A live Owner rolls the physical run before
 admitting new positions at its count or age bound. At the extent limit the process check holds a real S3 Range GET
