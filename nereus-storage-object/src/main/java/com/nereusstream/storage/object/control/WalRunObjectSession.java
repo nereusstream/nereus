@@ -824,10 +824,7 @@ public final class WalRunObjectSession implements AutoCloseable {
         }
         return kms.readSelectedAppendUnitStreaming(
                 extent.prefix,
-                (range, ignored) -> Arrays.copyOfRange(
-                        extent.exactBody,
-                        Math.toIntExact(range.inclusiveStart()),
-                        Math.toIntExact(range.exclusiveEnd())),
+                bufferedNwg1Frames(extent.exactBody),
                 selectedFrameOrdinal,
                 verificationContext,
                 Objects.requireNonNull(consumer, "consumer"));
@@ -860,6 +857,44 @@ public final class WalRunObjectSession implements AutoCloseable {
                     Objects.requireNonNull(consumer, "consumer"));
             return new VerifiedRoutineNwg1AppendUnit(prefix, appendUnit);
         }
+    }
+
+    /** Authenticates the exact full body staged by the caller for materialization from this sealed Run. */
+    public Nwg1ObjectReaderV1.VerifiedAppendUnit captureSealedNwg1AppendUnit(
+            ObjectIdentity identity,
+            CanonicalBytes canonicalBody,
+            Nwg1VerificationContextV1 verification,
+            long selectedFrameOrdinal,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
+            throws IOException {
+        Objects.requireNonNull(consumer, "consumer");
+        try (var lease = acquireIo()) {
+            if (runtime.state() != WalRunRuntime.State.SEALED) {
+                throw new IllegalStateException("materialization requires a sealed WalRun");
+            }
+            requireVerificationContext(verification);
+            var leaf = requireNwg1LeafIdentity(identity);
+            byte[] body = requireMaterializationBody(identity, canonicalBody);
+            var prefix = kms.readAuthenticatedPrefix(
+                    Arrays.copyOfRange(body, 0, leaf.directoryPrefixEnd()), identity.bodyLength(), verification);
+            requirePrefixIdentity(prefix, leaf);
+            requirePrefixWithinRootCaps(prefix);
+            return kms.readSelectedAppendUnitStreaming(
+                    prefix, bufferedNwg1Frames(body), selectedFrameOrdinal, verification, consumer);
+        }
+    }
+
+    static Nwg1ObjectReaderV1.ExactFrameSource bufferedNwg1Frames(byte[] exactBody) {
+        return (range, ignored) -> Arrays.copyOfRange(
+                exactBody, Math.toIntExact(range.inclusiveStart()), Math.toIntExact(range.exclusiveEnd()));
+    }
+
+    static byte[] requireMaterializationBody(ObjectIdentity identity, CanonicalBytes canonicalBody) throws IOException {
+        if (canonicalBody.length() != identity.bodyLength()
+                || !Sha256Digest.hash(canonicalBody).equals(identity.bodySha256())) {
+            throw new IOException("materialization body differs from the exact Object identity");
+        }
+        return canonicalBody.toByteArray();
     }
 
     /** Authenticated transfer reads use the retiring Root's existing envelope, including cross-Run suffixes. */

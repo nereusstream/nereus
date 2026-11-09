@@ -16,7 +16,9 @@
 
 package com.nereusstream.kafka.bookkeeper.broker;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectAuthorizationV1.Grant;
 import com.nereusstream.kafka.bookkeeper.object.publication.KafkaObjectExtentLocatorV1;
 import com.nereusstream.storage.object.control.ObjectProviderRootConfiguration;
 import com.nereusstream.storage.object.control.ObjectWalLeafKeyV1;
@@ -27,6 +29,7 @@ import com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1;
 import com.nereusstream.storage.object.nwg1.Nwg1VerificationContextV1;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
 import java.io.IOException;
+import java.util.Arrays;
 
 /** Reads a selected complete native commit set using its exact immutable locator and original Root. */
 public final class KafkaObjectNativeExtentV1 {
@@ -54,6 +57,51 @@ public final class KafkaObjectNativeExtentV1 {
             throws IOException {
         var identity = identity(reader.rootRecord().providerConfiguration(), reader.rootSha256(), locator);
         requireLocator(reader.readAppendUnit(identity, verification, locator.firstDirectoryRow(), consume), locator);
+    }
+
+    public static void capture(
+            WalRunObjectSession session,
+            Nwg1VerificationContextV1 verification,
+            Grant grant,
+            CanonicalBytes canonicalBody,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consume)
+            throws IOException {
+        var locator = grant.locator();
+        requireGrantObject(session.rootRecord().providerConfiguration(), session.rootSha256(), grant);
+        verifyMaterializationCapture(
+                session.captureSealedNwg1AppendUnit(
+                        grant.object(), canonicalBody, verification, locator.firstDirectoryRow(), consume),
+                grant);
+    }
+
+    public static void capture(
+            WalRunHistoricalObjectReaderV1 reader,
+            Nwg1VerificationContextV1 verification,
+            Grant grant,
+            CanonicalBytes canonicalBody,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consume)
+            throws IOException {
+        var locator = grant.locator();
+        requireGrantObject(reader.rootRecord().providerConfiguration(), reader.rootSha256(), grant);
+        verifyMaterializationCapture(
+                reader.captureSealedNwg1AppendUnit(
+                        grant.object(), canonicalBody, verification, locator.firstDirectoryRow(), consume),
+                grant);
+    }
+
+    private static void requireGrantObject(ObjectProviderRootConfiguration provider, Sha256Digest root, Grant grant) {
+        if (!grant.object().equals(identity(provider, root, grant.locator()))) {
+            throw new IllegalArgumentException("Kafka materialization grant differs from its exact Object identity");
+        }
+    }
+
+    private static void verifyMaterializationCapture(Nwg1ObjectReaderV1.VerifiedAppendUnit unit, Grant grant)
+            throws IOException {
+        requireLocator(unit, grant.locator());
+        if (!Arrays.equals(unit.appendCommitSetId(), grant.commitSetId().toByteArray())
+                || !Sha256Digest.copyOf(unit.assignedPayloadSha256()).equals(grant.payloadSha())) {
+            throw new IOException("Kafka materialization input differs from its exact authorized commit");
+        }
     }
 
     private static ObjectIdentity identity(

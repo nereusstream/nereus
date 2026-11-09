@@ -14,6 +14,7 @@
 
 package com.nereusstream.storage.object.control;
 
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.storage.object.kms.KmsCellSession;
 import com.nereusstream.storage.object.nwg1.Nwg1ObjectReaderV1;
@@ -22,6 +23,7 @@ import com.nereusstream.storage.object.provider.C1ObjectProviderSession;
 import com.nereusstream.storage.object.provider.ObjectIdentity;
 import com.nereusstream.storage.object.recovery.WalRunLineageRecovery;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -71,6 +73,63 @@ public final class WalRunHistoricalObjectReaderV1 implements AutoCloseable {
             long selectedFrameOrdinal,
             Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
             throws IOException {
+        var leaf = requireSealedSource(identity);
+        var bytes = provider.readDirectoryPrefix(identity, leaf.directoryPrefixEnd(), Optional.empty());
+        return readSelected(
+                identity,
+                verification,
+                selectedFrameOrdinal,
+                consumer,
+                leaf,
+                bytes.toByteArray(),
+                (range, ignored) -> provider.readExactRange(
+                                identity, range.inclusiveStart(), range.exclusiveEnd(), Optional.empty())
+                        .toByteArray());
+    }
+
+    public synchronized Nwg1ObjectReaderV1.VerifiedAppendUnit captureSealedNwg1AppendUnit(
+            ObjectIdentity identity,
+            CanonicalBytes canonicalBody,
+            Nwg1VerificationContextV1 verification,
+            long selectedFrameOrdinal,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer)
+            throws IOException {
+        Objects.requireNonNull(consumer, "consumer");
+        var leaf = requireSealedSource(identity);
+        byte[] body = WalRunObjectSession.requireMaterializationBody(identity, canonicalBody);
+        return readSelected(
+                identity,
+                verification,
+                selectedFrameOrdinal,
+                consumer,
+                leaf,
+                Arrays.copyOfRange(body, 0, leaf.directoryPrefixEnd()),
+                WalRunObjectSession.bufferedNwg1Frames(body));
+    }
+
+    private Nwg1ObjectReaderV1.VerifiedAppendUnit readSelected(
+            ObjectIdentity identity,
+            Nwg1VerificationContextV1 verification,
+            long selectedFrameOrdinal,
+            Nwg1ObjectReaderV1.VerifiedFrameConsumer consumer,
+            ObjectWalLeafKeyV1 leaf,
+            byte[] exactPrefix,
+            Nwg1ObjectReaderV1.ExactFrameSource frames)
+            throws IOException {
+        return kms.readAppendUnit(
+                exactPrefix,
+                identity.bodyLength(),
+                verification,
+                prefix -> {
+                    WalRunObjectSession.requirePrefixIdentity(prefix, leaf);
+                    WalRunObjectSession.requirePrefixWithinRootCaps(root, prefix);
+                },
+                frames,
+                selectedFrameOrdinal,
+                Objects.requireNonNull(consumer, "consumer"));
+    }
+
+    private ObjectWalLeafKeyV1 requireSealedSource(ObjectIdentity identity) {
         if (closed) {
             throw new IllegalStateException("historical Object reader is closed");
         }
@@ -78,20 +137,7 @@ public final class WalRunHistoricalObjectReaderV1 implements AutoCloseable {
         if (leaf.laneSequence() > seal.terminalSequence().get(leaf.laneId())) {
             throw new IllegalArgumentException("historical Object locator lies beyond the sealed lane");
         }
-        var bytes = provider.readDirectoryPrefix(identity, leaf.directoryPrefixEnd(), Optional.empty());
-        return kms.readAppendUnit(
-                bytes.toByteArray(),
-                identity.bodyLength(),
-                verification,
-                prefix -> {
-                    WalRunObjectSession.requirePrefixIdentity(prefix, leaf);
-                    WalRunObjectSession.requirePrefixWithinRootCaps(root, prefix);
-                },
-                (range, ignored) -> provider.readExactRange(
-                                identity, range.inclusiveStart(), range.exclusiveEnd(), Optional.empty())
-                        .toByteArray(),
-                selectedFrameOrdinal,
-                Objects.requireNonNull(consumer, "consumer"));
+        return leaf;
     }
 
     @Override
