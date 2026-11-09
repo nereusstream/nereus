@@ -207,6 +207,7 @@ def capture(roots, output, historical_paths, runtime, runtime_budget):
 BUILD_EVIDENCE_ROOT = "NEREUS_M6_BUILD_EVIDENCE_ROOT"
 BUILD_PLAN_SUFFIX = ".build-plan.json"
 BUILD_TRACE_SUFFIX = ".build-inputs.jsonl"
+BUILD_ARCHIVE_DIRECTORY = "gradle-archives"
 
 
 def gradle_command(command, log):
@@ -220,7 +221,8 @@ def gradle_command(command, log):
     trace = log.with_suffix(BUILD_TRACE_SUFFIX)
     require(not trace.exists() and not trace.is_symlink(), f"Gradle evidence already exists: {trace}")
     script = Path(__file__).resolve().parent.parent / "config/v2/m6/capture-build-inputs.init.gradle"
-    flags = ["--init-script", str(script), f"-Dnereus.m6.buildInputCapture={trace}"]
+    flags = ["--init-script", str(script), f"-Dnereus.m6.buildInputCapture={trace}",
+             f"-Dnereus.m6.buildArchiveDirectory={root / BUILD_ARCHIVE_DIRECTORY}"]
     flags.extend(flag for flag in ("--no-build-cache", "--rerun-tasks") if flag not in command)
     actual = [command[0], *flags, *command[1:]]
     with log.with_suffix(BUILD_PLAN_SUFFIX).open("xb") as plan:

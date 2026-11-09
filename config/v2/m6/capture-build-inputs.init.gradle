@@ -10,6 +10,7 @@ import java.security.MessageDigest
 import java.nio.file.attribute.BasicFileAttributes
 
 def output = Path.of(System.getProperty("nereus.m6.buildInputCapture"))
+def archiveDirectory = Path.of(System.getProperty("nereus.m6.buildArchiveDirectory"))
 def seen = new java.util.concurrent.ConcurrentHashMap()
 def tasks = new java.util.concurrent.ConcurrentHashMap()
 
@@ -55,6 +56,22 @@ def inventory = { Collection<File> files ->
         }
     }
     return result
+}
+
+def retainArchive = { Path archive, Map expected ->
+    Path retained = archiveDirectory.resolve(expected.sha256 + ".jar")
+    synchronized (retained.toString().intern()) {
+        Files.createDirectories(archiveDirectory)
+        if (archiveDirectory.toRealPath() != archiveDirectory) {
+            throw new GradleException("Redirected M6 Gradle archive directory: " + archiveDirectory)
+        }
+        if (!Files.exists(retained, LinkOption.NOFOLLOW_LINKS)) {
+            Files.copy(archive, retained)
+        }
+        if (identity(retained) != expected) {
+            throw new GradleException("Gradle archive changed during capture: " + archive)
+        }
+    }
 }
 
 def emit = { Map row ->
@@ -112,8 +129,17 @@ gradle.taskGraph.afterTask { Task task, state ->
         files.add(new File(task.repository.url))
     }
     def inputs = tasks.remove(task)
+    def outputs = state.failure == null ? inventory(files) : [:]
+    if (work && inputs.jarManifest != null && inputs.files[inputs.jarManifest]?.sha256 != null) {
+        Path archive = task.archiveFile.get().asFile.toPath().toAbsolutePath().normalize()
+        def expected = outputs[archive.toString()]
+        if (expected?.sha256 == null || !archive.toString().endsWith(".jar")) {
+            throw new GradleException("Missing exact produced JAR for generated manifest: " + task.path)
+        }
+        retainArchive(archive, expected)
+    }
     emit([event: "task", build: task.project.rootProject.projectDir.toString(), task: task.path,
           produced: work, skip: state.skipMessage, inputs: inputs.files,
           protoSources: inputs.protoSources, jarManifest: inputs.jarManifest,
-          outputs: state.failure == null ? inventory(files) : [:]])
+          outputs: outputs])
 }

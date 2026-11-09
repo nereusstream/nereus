@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
+import zipfile
 
 
 spec = importlib.util.spec_from_file_location(
@@ -162,6 +163,38 @@ class ExecutionInputsTest(unittest.TestCase):
         consumer["inputs"] = {str(self.runtime): {"absent": True}}
         trace.write_bytes(b"".join(M6.INPUTS.canonical(row) for row in (config, task, consumer)))
         with self.assertRaisesRegex(M6.InputError, "missing frozen Gradle input"):
+            BUILD.verify([trace], frozen, self.roots, self.output, M6.file_identity, M6.require)
+
+    def test_gradle_manifest_requires_the_exact_original_archive_after_a_rebuild(self):
+        frozen = self.capture()
+        archives = self.output / M6.BUILD_ARCHIVE_DIRECTORY
+        archives.mkdir(parents=True)
+        trace = self.output / "build.jsonl"
+        archive = self.root / "build" / "fixture.jar"
+        archive.parent.mkdir()
+        manifest = archive.parent / "MANIFEST.MF"
+        manifest.write_bytes(b"Manifest-Version: 1.0\r\n\r\n")
+
+        def write_archive(path, body):
+            with zipfile.ZipFile(path, "w") as jar:
+                jar.writestr("META-INF/MANIFEST.MF", manifest.read_bytes())
+                jar.writestr("resource.txt", body)
+
+        write_archive(archive, b"first Gradle invocation")
+        original = M6.file_identity(archive)
+        retained = archives / (original["sha256"] + ".jar")
+        retained.write_bytes(archive.read_bytes())
+        trace.write_bytes(b"".join(M6.INPUTS.canonical(row) for row in (
+            {"event": "gradle", "build": str(self.root), "files": {}},
+            {"event": "task", "build": str(self.root), "task": ":jar", "produced": True,
+             "inputs": {str(manifest): M6.file_identity(manifest)}, "jarManifest": str(manifest),
+             "outputs": {str(archive): original}},
+        )))
+        write_archive(archive, b"later Gradle invocation")
+        self.assertEqual(1, BUILD.verify(
+            [trace], frozen, self.roots, self.output, M6.file_identity, M6.require)[trace.name]["tasks"])
+        retained.write_bytes(archive.read_bytes())
+        with self.assertRaisesRegex(M6.InputError, "Gradle consumed an unbound file"):
             BUILD.verify([trace], frozen, self.roots, self.output, M6.file_identity, M6.require)
 
     def test_tracked_symlink_requires_a_declared_in_tree_target(self):

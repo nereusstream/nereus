@@ -4,6 +4,7 @@ from collections import defaultdict
 import hashlib
 import json
 from pathlib import Path
+import re
 import zipfile
 
 
@@ -38,12 +39,17 @@ def archive_entry(archive, path, wanted, matches):
         return False
 
 
-def generated_input(name, wanted, row, matches):
+def generated_input(name, wanted, row, matches, archive_directory):
     # Gradle's Jar task includes its generated manifest in the input collection.
     # The task must run and place the same manifest into a produced archive.
     if row.get("jarManifest") == name and row["produced"]:
-        return any(archive_entry(Path(archive), "META-INF/MANIFEST.MF", wanted, matches)
-                   for archive in row["outputs"] if archive.endswith(".jar"))
+        for path, archive in row["outputs"].items():
+            if path.endswith(".jar") and re.fullmatch(r"[0-9a-f]{64}", archive.get("sha256", "")):
+                retained = archive_directory / (archive["sha256"] + ".jar")
+                if archive_entry(retained, "META-INF/MANIFEST.MF", wanted,
+                                 lambda path: matches(path, identity(archive))):
+                    return True
+        return False
     # ProtobufExtract exposes both its source archives and the expanded proto entries.
     prefix = "/build/tmp/.cache/expanded/zip_"
     if prefix not in name or not name.endswith(".proto"):
@@ -67,18 +73,20 @@ def cached_publication(path, wanted, repository, published):
     return wanted in published.get((directory, suffix), ())
 
 
-def verify(traces, frozen, roots, output, file_identity, require, repositories=None):
+def verify(traces, frozen, roots, output, file_identity, require, repositories=None, archive_directory=None):
+    if archive_directory is None:
+        archive_directory = output / "gradle-archives"
     immutable = known_files(frozen, roots)
     generated = {}
     published = defaultdict(set)
     results = {}
     current_archive = {}
 
-    def matches(archive):
+    def matches(archive, expected=None):
         if archive not in current_archive:
             current_archive[archive] = identity(file_identity(archive))
-        return current_archive[archive] == (archive_outputs.get(str(archive)) or immutable.get(str(archive))
-                                           or generated.get(str(archive)))
+        return current_archive[archive] == (expected or archive_outputs.get(str(archive))
+                                           or immutable.get(str(archive)) or generated.get(str(archive)))
 
     def produced_path(path):
         return path.is_relative_to(output) or any(path.is_relative_to(root)
@@ -113,7 +121,7 @@ def verify(traces, frozen, roots, output, file_identity, require, repositories=N
                     declared = immutable.get(name)
                     require(declared == actual if declared is not None else generated.get(name) == actual
                             or cached_publication(path, actual, repository, published)
-                            or generated_input(name, actual, row, matches),
+                            or generated_input(name, actual, row, matches, archive_directory),
                             f"Gradle consumed an unbound file in {row.get('task', build)}: {name}")
                 if row["event"] == "gradle":
                     require(build not in builds, f"duplicate Gradle build capture: {build}")

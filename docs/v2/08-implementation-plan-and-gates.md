@@ -468,6 +468,8 @@ until the committed suite plan and all required runners exist. The Pulsar profil
 runners directly. The Kafka profiles use the same focused runners and raw JUnit attachments. The aggregate checks
 each exact case inventory, source tuple, backend outputs and launch files. Every external runtime file observed by
 the native runners must match the frozen declaration, including the Compose plugin executable resolved by Docker.
+A Gradle task's generated Manifest is checked against the exact JAR retained by digest when that task finishes.
+Later builds can reuse the working path while the earlier archive remains verifiable.
 A Kafka dependency built into the fresh development
 repository can also appear in the Gradle cache if its bytes match the published artifact. The transient Pulsar
 Object WAL credentials are represented by their launch-time identities. The process suite plan is still incomplete.

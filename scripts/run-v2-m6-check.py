@@ -399,6 +399,7 @@ def required_build_logs():
 def verify_build_inputs(output, roots, frozen):
     traces = []
     repositories = {}
+    archive_directory = output / SOURCE.BUILD_ARCHIVE_DIRECTORY
     plans = set(output.rglob("*" + SOURCE.BUILD_PLAN_SUFFIX))
     SOURCE.require(plans == {output / (name + SOURCE.BUILD_PLAN_SUFFIX) for name in required_build_logs()},
                    "Gradle invocation plans differ from the mandatory native suites")
@@ -410,6 +411,8 @@ def verify_build_inputs(output, roots, frozen):
         trace = current_attachment(output, capture["startedNs"], relative + SOURCE.BUILD_TRACE_SUFFIX)
         SOURCE.require(f"-Dnereus.m6.buildInputCapture={trace}" in capture["command"],
                        f"Gradle invocation names a different capture: {plan}")
+        SOURCE.require(f"-Dnereus.m6.buildArchiveDirectory={archive_directory}" in capture["command"],
+                       f"Gradle invocation names a different retained archive directory: {plan}")
         traces.append((capture["startedNs"], trace))
         property_name = "-PnereusDevelopmentRepository="
         supplied = [Path(arg.removeprefix(property_name)) for arg in capture["command"]
@@ -422,7 +425,8 @@ def verify_build_inputs(output, roots, frozen):
     inventory = set(output.rglob("*" + SOURCE.BUILD_TRACE_SUFFIX))
     SOURCE.require(traces and {trace for _, trace in traces} == inventory, "incomplete Gradle capture inventory")
     return BUILD_INPUTS.verify([trace for _, trace in sorted(traces)], frozen, roots, output,
-                               SOURCE.file_identity, SOURCE.require, repositories)
+                               SOURCE.file_identity, SOURCE.require, repositories,
+                               archive_directory=archive_directory)
 
 
 def verify_launcher(root):
