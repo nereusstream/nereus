@@ -2,9 +2,9 @@
 """Exercise M6 completeness and native result rejection against the live scenario registry."""
 
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
-import time
 import unittest
 
 
@@ -27,7 +27,6 @@ class M6CoverageTest(unittest.TestCase):
     def test_wrong_source_and_skipped_native_case_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            started = time.time_ns()
             profile = "kafka-bookkeeper-wal-only"
             test = b'<testsuite name="Suite" tests="1" failures="0" errors="0" skipped="1">' \
                    b'<testcase name="required()" classname="Suite" time="0"><skipped/></testcase></testsuite>'
@@ -51,6 +50,7 @@ class M6CoverageTest(unittest.TestCase):
                 "kafkaRuntime": {"path": "runtime.json", **M6.SOURCE.file_identity(root / "runtime.json")},
                 "developmentRepositorySha256": M6.SOURCE.file_identity(root / "development-repository.json")["sha256"],
             })
+            started = min(file.stat().st_mtime_ns for file in root.rglob("*") if file.is_file())
             cases = {":core:nereusBookKeeperOwnerRelocationRealTest|Suite|required()": ["V2-KAF-PROC-001"]}
             with self.assertRaisesRegex(M6.SOURCE.InputError, "wrong execution inputs"):
                 M6.verify_kafka_result(root, started, profile, cases, {})
@@ -60,7 +60,6 @@ class M6CoverageTest(unittest.TestCase):
     def test_pulsar_process_requires_fresh_raw_attachments_and_exact_checks(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            started = time.time_ns()
             profile = "BOOKKEEPER_WAL_ONLY"
             kind = "BK"
             sources = {
@@ -78,12 +77,19 @@ class M6CoverageTest(unittest.TestCase):
                 "outputs": {backend.name: M6.SOURCE.file_identity(backend)},
                 "generatedLaunchInputs": {launch.name: M6.SOURCE.file_identity(launch)},
             })
+            started = min(backend.stat().st_mtime_ns, launch.stat().st_mtime_ns,
+                          (root / "process-result.json").stat().st_mtime_ns)
             expected = {"official-client": ["V2-PUL-PROC-001"]}
             self.assertEqual(1, M6.verify_pulsar_process(root, started, kind, profile, expected, sources)["checks"])
             with self.assertRaisesRegex(M6.SOURCE.InputError, "frozen source"):
                 M6.verify_pulsar_process(root, started, kind, "OBJECT_WAL", expected, sources)
             with self.assertRaisesRegex(M6.SOURCE.InputError, "check inventory differs"):
                 M6.verify_pulsar_process(root, started, kind, profile, {"different-cut": []}, sources)
+            original = launch.stat()
+            os.utime(launch, ns=(original.st_atime_ns, started - 1_000_000_000))
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "stale or redirected native attachment"):
+                M6.verify_pulsar_process(root, started, kind, profile, expected, sources)
+            os.utime(launch, ns=(original.st_atime_ns, original.st_mtime_ns))
             launch.write_text("managedLedgerDefaultEnsembleSize=1\n")
             with self.assertRaisesRegex(M6.SOURCE.InputError, "attachment differs"):
                 M6.verify_pulsar_process(root, started, kind, profile, expected, sources)
@@ -127,11 +133,11 @@ class M6CoverageTest(unittest.TestCase):
             task = {"event": "task", "build": str(kafka), "produced": True}
             jar_task = {**task, "task": ":core:jar", "outputs": {str(jar): observed}}
             native_task = {**task, "task": ":core:nereusBookKeeperOwnerRelocationRealTest", "outputs": {}}
+            trace.write_bytes(b"".join(M6.SOURCE.INPUTS.canonical(row) for row in (jar_task, native_task)))
             M6.write(out / ("gradle" + M6.SOURCE.BUILD_PLAN_SUFFIX), {
-                "startedNs": time.time_ns(),
+                "startedNs": trace.stat().st_mtime_ns,
                 "command": [f"-Dnereus.m6.buildInputCapture={trace}", f"-Dnereus.m6.buildArchiveDirectory={archives}"],
             })
-            trace.write_bytes(b"".join(M6.SOURCE.INPUTS.canonical(row) for row in (jar_task, native_task)))
             M6.verify_kafka_runtime(result, {"kafka": kafka}, out, {}, out)
             retained.write_bytes(jar.read_bytes())
             with self.assertRaisesRegex(M6.SOURCE.InputError, "differs from its original bytes"):
