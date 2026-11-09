@@ -21,6 +21,7 @@ BK, M4, M6, JUNIT = ASYNC.BK, ASYNC.M4, ASYNC.M6, ASYNC.JUNIT
 VAULT_REF = "hashicorp/vault@sha256:268bb80aa9c6d13d65fcfa05c0c268caca068952240a8087291a6ce0b66e3a10"
 VAULT_ID = "sha256:ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
 PROCESS_TASK = "nereusKafkaObjectWalProcessRealTest"
+READ_DRAIN_TASK = "nereusKafkaObjectWalReadDrainRealTest"
 CASES = {
     "nereusObjectWalAdapterRealTest": (
         "kafka.server.nereus.KafkaObjectWalAdapterRealTest",
@@ -29,6 +30,10 @@ CASES = {
     "nereusKafkaObjectWalAuthorizationRealTest": (
         "kafka.server.nereus.KafkaObjectWalAuthorizationRealTest",
         "nativeObjectWalWaitsForExactAuthorizationAfterLostCasResponse(Path)",
+    ),
+    READ_DRAIN_TASK: (
+        "kafka.server.nereus.KafkaObjectWalReadDrainRealTest",
+        "waitsForOriginalObjectFetchBeforeClosingNativeOwner(Path)",
     ),
     PROCESS_TASK: (
         "kafka.server.nereus.KafkaObjectWalProcessRealTest",
@@ -94,7 +99,7 @@ def result_for(task, kafka, java, out, started, artifacts):
     capture = out / f"{task}-runtime.json"
     M6.require(capture.stat().st_mtime_ns >= started, f"stale Kafka Object WAL runtime capture: {task}")
     runtime = json.loads(capture.read_bytes())
-    launches_process = task == PROCESS_TASK
+    launches_process = task in (READ_DRAIN_TASK, PROCESS_TASK)
     log = str(kafka / "config/log4j2.yaml") if launches_process else None
     M6.require(runtime["schema"] == "NEREUS_V2_M6_KAFKA_RUNTIME_V1"
                and bool(runtime["processClasspath"]) == launches_process and runtime["processLogConfig"] == log
@@ -109,17 +114,19 @@ def result_for(task, kafka, java, out, started, artifacts):
     return {
         "case": case, "xml": {"name": xml.name, **M6.file_identity(out / xml.name)},
         "runtime": {"name": capture.name, **M6.file_identity(capture)},
-        "processLogs": process_logs(out, started) if launches_process else {},
+        "processLogs": process_logs(out, started, task) if launches_process else {},
     }
 
 
-def process_logs(out, started):
+def process_logs(out, started, task):
     directory = out / "kafka-process-logs"
-    required = {f"node-{node}/{name}" for node in range(3)
+    nodes = (0, 2) if task == READ_DRAIN_TASK else range(3)
+    required = {f"node-{node}/{name}" for node in nodes
                 for name in ("server.log", "launcher.log", "format.log", "server.properties")}
-    required.update({"node-2/controller.log", "node-1/foreign-object.log", "node-1/foreign-object.properties",
-                     "node-1/unauthorized-vault.log", "node-1/unauthorized-vault.properties",
-                     "capability.properties", "object-capability"})
+    required.update({"node-2/controller.log", "capability.properties", "object-capability"})
+    if task == PROCESS_TASK:
+        required.update({"node-1/foreign-object.log", "node-1/foreign-object.properties",
+                         "node-1/unauthorized-vault.log", "node-1/unauthorized-vault.properties"})
     result = {}
     for path in sorted(directory.rglob("*")):
         M6.require(not path.is_symlink() and path.resolve() == path, f"redirected Kafka process evidence: {path}")

@@ -387,7 +387,8 @@ def required_build_logs():
         logs.add(f"{name}/m4-gradle")
     for name in (f"{bk}/process", f"{bk}/recovery/internal-compaction", f"{bk}/recovery/recovery", async_object,
                  *(f"{object_wal}/{task}" for task in ("nereusObjectWalAdapterRealTest",
-                     "nereusKafkaObjectWalAuthorizationRealTest", "nereusKafkaObjectWalProcessRealTest"))):
+                     "nereusKafkaObjectWalAuthorizationRealTest", "nereusKafkaObjectWalReadDrainRealTest",
+                     "nereusKafkaObjectWalProcessRealTest"))):
         logs.add(f"{name}/gradle")
     for profile, processes in PULSAR_PROCESSES.items():
         for process in processes:

@@ -40,16 +40,17 @@ gradle.projectsEvaluated {
         throw new GradleException('M6 Kafka runtime capture requires the Kafka build')
     }
     def core = gradle.rootProject.project(':core')
+    def walReadDrain = 'nereusKafkaObjectWalReadDrainRealTest'
     def processTask = bkRecovery ? null : walFixture ? 'nereusKafkaObjectWalProcessRealTest'
         : objectFixture ? 'nereusKafkaAsyncObjectProcessRealTest' : 'nereusBookKeeperOwnerRelocationRealTest'
     def testTasks = bkRecovery ? ['nereusBookKeeperM4AdmissionRealTest']
-        : walFixture ? ['nereusObjectWalAdapterRealTest', 'nereusKafkaObjectWalAuthorizationRealTest', processTask]
+        : walFixture ? ['nereusObjectWalAdapterRealTest', 'nereusKafkaObjectWalAuthorizationRealTest', walReadDrain, processTask]
         : objectFixture ? ['nereusBookKeeperObjectMaterializationRealTest', 'nereusObjectProviderAdmissionRealTest', processTask]
         : [processTask]
     testTasks.each { task ->
         core.tasks.named(task, Test).configure { test ->
             def target = objectFixture || walFixture ? output.resolveSibling(task + '-runtime.json') : output
-            def launchesProcess = task == processTask
+            def launchesProcess = task == processTask || task == walReadDrain
             if (launchesProcess) {
                 test.systemProperty('nereus.nsip.processEvidenceDir', output.resolveSibling('kafka-process-logs').toString())
             }
