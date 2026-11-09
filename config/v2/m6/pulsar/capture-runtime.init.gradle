@@ -17,9 +17,12 @@ gradle.beforeProject { p ->
         p.pluginManager.withPlugin("java") {
             p.tasks.register("m6WriteRuntimeClasspath") {
                 def cp = p.sourceSets.main.runtimeClasspath
+                def destination = new File(System.getProperty("m6.runtime.output"))
                 dependsOn(p.tasks.named("classes"), cp)
+                inputs.files(cp)
+                outputs.file(destination)
                 doLast {
-                    new File(System.getProperty("m6.runtime.output")).text = cp.files.collect { it.absolutePath }.join("\n") + "\n"
+                    destination.text = cp.files.collect { it.absolutePath }.join("\n") + "\n"
                 }
             }
         }

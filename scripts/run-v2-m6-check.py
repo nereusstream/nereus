@@ -27,6 +27,8 @@ KAFKA_PROCESSES = {
 }
 KAFKA_BK_RECOVERY_TASK = "nereusBookKeeperM4AdmissionRealTest"
 KAFKA_BK_RECOVERY_CASE_PREFIX = f":core:{KAFKA_BK_RECOVERY_TASK}|"
+PATH_TOOLS = ("bash", "git", "rg", "docker", "python3", "basename", "cat", "cut", "dirname", "find", "grep",
+              "head", "paste", "sed", "sort", "tail", "tr", "uname", "wc", "xargs")
 PULSAR_PROCESSES = {
     "pulsar-bookkeeper-wal-only": {
         "lifecycle": ("pulsar-bk-process", "BK", "BOOKKEEPER_WAL_ONLY", "--lifecycle"),
@@ -116,7 +118,8 @@ def run(command, cwd, log_path):
 
 def require_runtime_tools(runtime):
     declared = {path.resolve(strict=True) for path in runtime.values()}
-    tools = {"python3": sys.executable, **{name: shutil.which(name) for name in ("bash", "git", "rg", "docker")}}
+    tools = {name: shutil.which(name) for name in PATH_TOOLS}
+    tools.update({"Python interpreter": sys.executable, "wrapper shell": "/bin/sh", "shebang env": "/usr/bin/env"})
     SOURCE.require(tools["docker"], "Docker is required by the native M6 backends")
     plugins = json.loads(subprocess.check_output(
         [tools["docker"], "info", "--format", "{{json .ClientInfo.Plugins}}"], text=True))
@@ -178,6 +181,20 @@ def verify_runtime_file(path, identity, roots, output, frozen, published):
 
 def verify_pulsar_runtime(output, roots, frozen):
     result = read(output / "process-result.json")
+    classpath = {}
+    for name, task in (("native", ":pulsar-broker:m6WriteRuntimeClasspath"),
+                       ("sdk", ":nereus-pulsar-broker:m6WriteRuntimeClasspath")):
+        trace = output / (f"{name}-resolved" + SOURCE.BUILD_TRACE_SUFFIX)
+        with trace.open(encoding="utf-8") as stream:
+            matches = [row for line in stream if (row := json.loads(line)).get("task") == task]
+        SOURCE.require(len(matches) == 1 and matches[0]["produced"], f"missing Pulsar runtime classpath task: {trace}")
+        classpath.update(matches[0]["inputs"])
+    for entry in result["runtime"]:
+        path = Path(entry["path"])
+        for row in entry.get("files", [entry]):
+            file = path / row["path"] if "files" in entry else path
+            SOURCE.require(classpath.get(str(file)) == {key: row[key] for key in ("bytes", "sha256")},
+                           f"Pulsar runtime differs from the built classpath: {file}")
     groups = [result["runtime"], result["launchTools"], [result["compiledProbe"]],
               result.get("sourceInputs", result.get("fixtureInputs", []))]
     if "publicationFault" in result:

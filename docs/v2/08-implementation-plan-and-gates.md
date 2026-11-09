@@ -445,7 +445,7 @@ confirms the existing terminal Head. A separate fault removes its selected NWKCP
 The Broker recreates the same canonical bytes under a new immutable Provider version while preserving the
 original Oxia terminal Head version.
 A separate native read test holds an original MinIO Range GET across client disconnect and Broker shutdown.
-The protocol Head stays at its original revision until the read drains. The focused runner binds that case
+The protocol Head stays in its original state until the read drains. The focused runner binds that case
 and the loaded read classes before launching the compaction fixture. The latter keeps the original physical
 quota until it verifies partial birth reservations and an empty Object output namespace, then admits the
 remaining exact metadata charge. It checks the selected compacted values through two Broker takeovers.
@@ -468,18 +468,21 @@ sources still count against the bounded history budget; automatic source retirem
 ### Planned aggregate boundaries
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
-the affected regression gates from the declared source and runtime inputs. It refuses to run formal acceptance
-until the committed suite plan and all required runners exist. The Pulsar profiles use their source-owned process
-runners directly. The Kafka profiles use the same focused runners and raw JUnit attachments. The aggregate checks
-each exact case inventory, source tuple, backend outputs and launch files. Every external runtime file observed by
-the native runners must match the frozen declaration, including the Compose plugin executable resolved by Docker.
+the affected regression gates from the declared source and runtime inputs. The
+[committed suite plan](../../config/v2/m6/acceptance-suites.json) binds each scenario to its required native cases.
+The Pulsar profiles use their source-owned process runners directly. The Kafka profiles use the focused runners
+and raw JUnit attachments. The aggregate checks each exact case inventory, source tuple, backend output and launch
+file. Observed external runtime files and the tools used by the build wrappers and verification scripts must match
+the frozen declaration, including the Compose plugin executable resolved by Docker.
 A Gradle task's generated Manifest is checked against the exact JAR retained by digest when that task finishes.
 Later builds can reuse the working path while the earlier archive remains verifiable.
 A Kafka runtime JAR built under the checkout must match the retained archive produced before that invocation's
 native test task. The verifier uses the runtime capture and the original Gradle task output for that invocation.
-A Kafka dependency built into the fresh development
-repository can also appear in the Gradle cache if its bytes match the published artifact. The transient Pulsar
-Object WAL credentials are represented by their launch-time identities. The process suite plan is still incomplete.
+Each Pulsar runtime file must match the Gradle classpath input captured before Broker and client launch.
+A Kafka dependency built into the fresh development repository can also appear in the Gradle cache if its bytes
+match the published artifact. The transient Pulsar Object WAL credentials are represented by their launch-time
+identities. The aggregate execution result records the source tuple and qualified profile checks through their
+input and output identities. It does not change the scenario registry.
 `v2M7Check`, `v2M8Check` and `v2FinalCheck` remain design targets. The mandatory boundaries are:
 
 - **M6:** all JSON rows whose milestone includes M6, every applicable cell of the six-row activation matrix, the
@@ -500,10 +503,10 @@ Object WAL credentials are represented by their launch-time identities. The proc
   authority. An older PASS remains evidence for its original source; it does not automatically certify changed paths.
 
 `v2M6KafkaBookKeeperProcessCheck` is the focused Kafka BK process check. It uses the existing fork Gradle suite
-with a clean Kafka checkout and Java 17. It builds a fresh Nereus development Maven repository from the current
-checkout with Java 21. It checks the repository bytes and captures the ordered test and process classpaths, including
-their files, Kafka's Java launcher and Log4j configuration, before and after Kafka runs. It starts and removes its
-own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for each declared native
+with a clean Kafka checkout and the supplied Kafka JDK. It builds a fresh Nereus development Maven repository
+from the current checkout with Java 21. It checks the repository bytes and captures the ordered test and process
+classpaths, including their files, Kafka's Java launcher and Log4j configuration, before and after Kafka runs.
+It starts and removes its own three bookies, ZooKeeper and Oxia, checks the actual image IDs, and requires fresh JUnit for each declared native
 case. The result binds the backend logs and each separate Kafka JVM's configuration and logs. Coverage includes
 a three-Controller election with the old leader offline, a cold Broker starting from a
 Controller snapshot, format rejection at feature level 1, rejection of a mismatched BookKeeper scope, and
@@ -520,10 +523,11 @@ build and runtime dependency graph or complete M6-1. No scenario is promoted by 
 
 The separate `scripts/run-v2-m6-kafka-bk-recovery-check.py` runner rebuilds the current M4 prerequisite and
 executes the required native recovery and compaction cases over real BookKeeper and Oxia. It captures historical
-Fetch and reader drain, lost OPEN/create or ticket responses, fenced takeover, and BK-only internal compaction
-with coordinator recovery. Internal compaction runs in its own fresh BookKeeper and Oxia fixture so its native GC
-capacity is initialized before the first guarded ledger reservation. The aggregate requires both this result and
-the separate production process suite.
+Fetch and reader drain, lost OPEN/create or ticket responses, fenced takeover, and BK-only compaction with
+coordinator recovery. The BK-only compaction case reads sparse producer batches, tombstones and transaction
+markers through Kafka Fetch after physical reclaim and again on a cold Owner. Internal compaction runs in its own
+fresh BookKeeper and Oxia fixture so its native GC capacity is initialized before the first guarded ledger
+reservation. The aggregate requires both this result and the separate production process suite.
 
 `__share_group_state`, online migration, KoP, cross-protocol write-authority migration, compact tombstone deletion and
 allocator orphan GC remain outside these batches. M7 SLO values and M8 baseline/threshold selection are pre-execution
