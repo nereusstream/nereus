@@ -33,7 +33,8 @@ CASES = {
         {f'"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome={case}"'
          for case in ("known", "hot", "cold", "automatic", "stale-registration", "retirement",
                       "background-retirement", "cold-retirement", "shutdown-retirement", "faults", "put-unknown", "semantic")}
-        | {"selectsCompactedSuccessorFromExactObjectAndBookKeeperTail(Path)"},
+        | {"selectsCompactedSuccessorFromExactObjectAndBookKeeperTail(Path)",
+           "asyncBookKeeperAckModesAndRevocationUseCoherentCommit(Path)"},
     ),
     "nereusObjectProviderAdmissionRealTest": (
         "kafka.server.nereus.KafkaObjectProviderAdmissionRealTest",

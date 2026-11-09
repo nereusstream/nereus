@@ -1,0 +1,406 @@
+{
+  "schema": "NEREUS_V2_M6_SUITE_PLAN_V1",
+  "profiles": {
+    "kafka-bookkeeper-wal-only": {
+      "cases": {
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nereus.KafkaBookKeeperAckRealTest|bothAckModesWaitForSharedCommitAndAckZeroHasNoResponse(Path)": [
+          "V2-APP-002",
+          "V2-KAF-DATA-006",
+          "V2-KAF-DATA-009"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nereus.KafkaBookKeeperAckRealTest|delayedNativeFetchWakesOnSharedCommitAndTransactionMarker(Path)": [
+          "V2-KAF-DATA-006",
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-010"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nereus.KafkaBookKeeperAckRealTest|nativeFetchPreservesCompleteCompressedBatchesAcrossViewChanges(Path)": [
+          "V2-KAF-DATA-016"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nereus.KafkaBookKeeperAckRealTest|staleQuorumCallbackCannotPublishAfterNativeOwnerChange(Path)": [
+          "V2-KAF-DATA-017"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nereus.KafkaBookKeeperAckRealTest|unknownBookKeeperResponseFencesOldPublicationAndColdOwnerRecoversExactBatch(Path)": [
+          "V2-KAF-DATA-017",
+          "V2-KAF-DATA-018"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest|coldOwnerContinuesProduceFetchAndTransactionAcrossTwoNativeRelocations()": [
+          "V2-KAF-DATA-003",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-020"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest|liveMetadataDeltaHandoffPreservesGroupAndTransactionCoordinators()": [
+          "V2-KAF-DATA-018"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nsip.KafkaBookKeeperOwnerRelocationRealTest|smallRunsCheckpointAcrossNativeEpoch256AndRepeatedColdTakeover()": [
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-008",
+          "V2-KAF-DATA-015",
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperOwnerRelocationRealTest|kafka.server.nsip.KafkaBookKeeperProcessRealTest|productionLauncherRecoversSnapshotAndRelocatesToColdBroker(Path)": [
+          "V2-KAF-META-004",
+          "V2-KAF-META-005",
+          "V2-KAF-PROC-001",
+          "V2-KAF-PROC-002"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|historicalFetchAcrossRunsAndCachedIndexUsesOnlyLocalControlState()": [
+          "V2-KAF-DATA-015",
+          "V2-KAF-DATA-016",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|concurrentM4OwnerCloseWaitsForItsActualHistoricalReader()": [
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|brokerReconcilesLostPersistedOpenResponseBeforeNativeCreate()": [
+          "V2-KAF-DATA-018"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|twoBrokerTakeoversRetainOneCreatedUnselectedLedger()": [
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|confirmedCreateWithUnresolvedTicketStaysUnselectedUntilSuccessorReconciles()": [
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|lostRecoveredNativeFactsRetainOldWriterTicketUntilNextBroker()": [
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|successorActivatesAfterFencingReservedButNeverCreatedLedger()": [
+          "V2-KAF-DATA-018"
+        ],
+        ":core:nereusBookKeeperM4AdmissionRealTest|kafka.server.nsip.KafkaBookKeeperM4AdmissionRealTest|nativeM5BookKeeperOnlyInternalTopicsCompactReclaimAndRecover()": [
+          "V2-KAF-DATA-008",
+          "V2-KAF-DATA-022"
+        ]
+      }
+    },
+    "kafka-bookkeeper-wal-async-object": {
+      "cases": {
+        ":core:nereusKafkaAsyncObjectProcessRealTest|kafka.server.nereus.KafkaAsyncObjectProcessRealTest|keepsBookKeeperAcksDuringObjectOutageAndRecoversSelectedGeneration(Path)": [
+          "V2-KAF-PROC-002",
+          "V2-KAF-DATA-003",
+          "V2-KAF-DATA-006",
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-009",
+          "V2-KAF-DATA-010",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-020"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=automatic\"": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=background-retirement\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=cold\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=cold-retirement\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=faults\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=hot\"": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=known\"": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=put-unknown\"": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=retirement\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=semantic\"": [
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-008",
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-015",
+          "V2-KAF-DATA-016",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-022"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=shutdown-retirement\"": [
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-013",
+          "V2-KAF-DATA-019"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|\"storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=stale-registration\"": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|selectsCompactedSuccessorFromExactObjectAndBookKeeperTail(Path)": [
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-008",
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-015",
+          "V2-KAF-DATA-016",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-022"
+        ],
+        ":core:nereusObjectProviderAdmissionRealTest|kafka.server.nereus.KafkaObjectProviderAdmissionRealTest|reopensExactRegisteredScopeAndRejectsForeignBucket(Path)": [
+          "V2-KAF-PROC-002"
+        ],
+        ":core:nereusBookKeeperObjectMaterializationRealTest|kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest|asyncBookKeeperAckModesAndRevocationUseCoherentCommit(Path)": [
+          "V2-APP-002",
+          "V2-KAF-DATA-006",
+          "V2-KAF-DATA-009",
+          "V2-KAF-DATA-017",
+          "V2-KAF-DATA-018"
+        ]
+      }
+    },
+    "kafka-object-wal": {
+      "cases": {
+        ":core:nereusObjectWalAdapterRealTest|kafka.server.nereus.KafkaObjectWalAdapterRealTest|publishesOnlyAfterTheExactGrantAndReopensTheExactPhysicalRoot(Path)": [
+          "V2-KAF-DATA-021"
+        ],
+        ":core:nereusKafkaObjectWalAuthorizationRealTest|kafka.server.nereus.KafkaObjectWalAuthorizationRealTest|nativeObjectWalWaitsForExactAuthorizationAfterLostCasResponse(Path)": [
+          "V2-APP-002",
+          "V2-KAF-DATA-009",
+          "V2-KAF-DATA-017",
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-021"
+        ],
+        ":core:nereusKafkaObjectWalReadDrainRealTest|kafka.server.nereus.KafkaObjectWalReadDrainRealTest|waitsForOriginalObjectFetchBeforeClosingNativeOwner(Path)": [
+          "V2-KAF-DATA-012"
+        ],
+        ":core:nereusKafkaObjectWalProcessRealTest|kafka.server.nereus.KafkaObjectWalProcessRealTest|productionObjectWalPublishesAndRecoversOnColdBroker(Path)": [
+          "V2-KAF-PROC-002",
+          "V2-KAF-DATA-003",
+          "V2-KAF-DATA-006",
+          "V2-KAF-DATA-007",
+          "V2-KAF-DATA-008",
+          "V2-KAF-DATA-009",
+          "V2-KAF-DATA-010",
+          "V2-KAF-DATA-012",
+          "V2-KAF-DATA-015",
+          "V2-KAF-DATA-016",
+          "V2-KAF-DATA-018",
+          "V2-KAF-DATA-019",
+          "V2-KAF-DATA-020",
+          "V2-KAF-DATA-022"
+        ]
+      }
+    },
+    "pulsar-bookkeeper-wal-only": {
+      "processes": {
+        "lifecycle": {
+          "official-client": [
+            "V2-PUL-PROC-001"
+          ],
+          "rollover": [
+            "V2-PUL-PROC-001"
+          ],
+          "individual-and-cumulative-ack": [
+            "V2-PUL-PROC-001"
+          ],
+          "native-transfer": [
+            "V2-PUL-PROC-001"
+          ],
+          "cold-read-and-reset": [
+            "V2-PUL-PROC-001"
+          ],
+          "native-restart": [
+            "V2-PUL-PROC-001"
+          ],
+          "missing-binding": [
+            "V2-PUL-PROC-001"
+          ],
+          "unsupported-ownership-backend": [
+            "V2-PUL-PROC-001"
+          ],
+          "held-bookkeeper-read": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-bookkeeper-write": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-bookkeeper-shutdown": [
+            "V2-PUL-PROC-004"
+          ],
+          "cold-read-after-shutdown-drain": [
+            "V2-PUL-PROC-004"
+          ],
+          "independent-foreign-cell": [
+            "V2-PUL-PROC-004"
+          ]
+        }
+      }
+    },
+    "pulsar-bookkeeper-wal-async-object": {
+      "processes": {
+        "lifecycle": {
+          "official-client": [
+            "V2-PUL-PROC-001"
+          ],
+          "rollover": [
+            "V2-PUL-PROC-001"
+          ],
+          "individual-and-cumulative-ack": [
+            "V2-PUL-PROC-001"
+          ],
+          "native-transfer": [
+            "V2-PUL-PROC-001"
+          ],
+          "cold-read-and-reset": [
+            "V2-PUL-PROC-001"
+          ],
+          "native-restart": [
+            "V2-PUL-PROC-001"
+          ],
+          "missing-binding": [
+            "V2-PUL-PROC-001"
+          ],
+          "unsupported-ownership-backend": [
+            "V2-PUL-PROC-001"
+          ],
+          "held-bookkeeper-read": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-bookkeeper-write": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-bookkeeper-shutdown": [
+            "V2-PUL-PROC-004"
+          ],
+          "cold-read-after-shutdown-drain": [
+            "V2-PUL-PROC-004"
+          ],
+          "independent-foreign-cell": [
+            "V2-PUL-PROC-004"
+          ],
+          "enrolled-npd1-npo1": [
+            "V2-PUL-PROC-002"
+          ],
+          "original-put-response-lost": [
+            "V2-PUL-PROC-002"
+          ],
+          "independent-bookkeeper-rollover": [
+            "V2-PUL-PROC-002"
+          ],
+          "original-output-drain-and-resume": [
+            "V2-PUL-PROC-002"
+          ]
+        },
+        "replacement": {
+          "current-native-m4-drain": [
+            "V2-PUL-PROC-002"
+          ],
+          "enrolled-native-offload": [
+            "V2-PUL-PROC-002"
+          ],
+          "native-publication-unknown-settled": [
+            "V2-PUL-PROC-002"
+          ],
+          "active-cell-rejected": [
+            "V2-PUL-PROC-002"
+          ],
+          "actual-fallback-release": [
+            "V2-PUL-PROC-002"
+          ],
+          "native-bookkeeper-intent-and-done": [
+            "V2-PUL-PROC-002"
+          ],
+          "original-physical-delete-unknown-settled": [
+            "V2-PUL-PROC-002"
+          ],
+          "physical-absence": [
+            "V2-PUL-PROC-002"
+          ],
+          "original-native-offload-version-settlement": [
+            "V2-PUL-PROC-002"
+          ],
+          "original-native-object-delete-unknown-settled": [
+            "V2-PUL-PROC-002"
+          ],
+          "cold-official-client-backlog-and-positions": [
+            "V2-PUL-PROC-002"
+          ]
+        }
+      }
+    },
+    "pulsar-object-wal": {
+      "processes": {
+        "lifecycle": {
+          "real-r1-range64": [
+            "V2-PUL-PROC-003"
+          ],
+          "official-client": [
+            "V2-PUL-PROC-003"
+          ],
+          "rollover": [
+            "V2-PUL-PROC-003"
+          ],
+          "individual-and-cumulative-ack": [
+            "V2-PUL-PROC-003"
+          ],
+          "seek-reset-backlog": [
+            "V2-PUL-PROC-003"
+          ],
+          "planned-transfer": [
+            "V2-PUL-PROC-003"
+          ],
+          "cold-read": [
+            "V2-PUL-PROC-003"
+          ],
+          "crash-takeover": [
+            "V2-PUL-PROC-003"
+          ],
+          "original-unknown-key-version": [
+            "V2-PUL-PROC-003"
+          ],
+          "no-native-ledger-id-reuse": [
+            "V2-PUL-PROC-003"
+          ],
+          "independent-foreign-cell": [
+            "V2-PUL-PROC-003"
+          ],
+          "live-physical-run-rollover": [
+            "V2-PUL-PROC-003"
+          ],
+          "unqualified-ownership-rejected": [
+            "V2-PUL-PROC-003"
+          ],
+          "foreign-namespace-rejected": [
+            "V2-PUL-PROC-003"
+          ],
+          "wrong-artifact-rejected": [
+            "V2-PUL-PROC-003"
+          ],
+          "wrong-range64-receipt-rejected": [
+            "V2-PUL-PROC-003"
+          ],
+          "held-read-cancellation-and-unload": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-write-cancellation-and-unload": [
+            "V2-PUL-PROC-004"
+          ],
+          "held-read-cancellation-and-shutdown": [
+            "V2-PUL-PROC-004"
+          ],
+          "cold-read-after-shutdown-drain": [
+            "V2-PUL-PROC-004"
+          ]
+        }
+      }
+    }
+  }
+}
