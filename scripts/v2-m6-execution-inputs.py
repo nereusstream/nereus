@@ -210,7 +210,7 @@ BUILD_TRACE_SUFFIX = ".build-inputs.jsonl"
 BUILD_ARCHIVE_DIRECTORY = "gradle-archives"
 
 
-def gradle_command(command, log):
+def gradle_command(command, log, *, source_root=None):
     """Observe each Gradle invocation during the aggregate without changing standalone runners."""
     evidence_root = os.environ.get(BUILD_EVIDENCE_ROOT)
     if evidence_root is None:
@@ -220,7 +220,8 @@ def gradle_command(command, log):
             f"Gradle execution log is outside its evidence root: {log}")
     trace = log.with_suffix(BUILD_TRACE_SUFFIX)
     require(not trace.exists() and not trace.is_symlink(), f"Gradle evidence already exists: {trace}")
-    script = Path(__file__).resolve().parent.parent / "config/v2/m6/capture-build-inputs.init.gradle"
+    source_root = source_root if source_root is not None else Path(__file__).resolve().parent.parent
+    script = source_root / "config/v2/m6/capture-build-inputs.init.gradle"
     flags = ["--init-script", str(script), f"-Dnereus.m6.buildInputCapture={trace}",
              f"-Dnereus.m6.buildArchiveDirectory={root / BUILD_ARCHIVE_DIRECTORY}"]
     flags.extend(flag for flag in ("--no-build-cache", "--rerun-tasks") if flag not in command)

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -140,6 +141,16 @@ class ExecutionInputsTest(unittest.TestCase):
         produced.write_text("result")
         with self.assertRaisesRegex(M6.InputError, "overlaps source or evidence output"):
             self.capture(runtime={"artifact": produced})
+
+    def test_gradle_observer_uses_the_explicit_execution_worktree(self):
+        self.output.mkdir()
+        log = self.output / "regression.log"
+        with patch.dict(os.environ, {M6.BUILD_EVIDENCE_ROOT: str(self.output)}):
+            command = M6.gradle_command(["./gradlew", "check"], log, source_root=self.root)
+        script = self.root / "config/v2/m6/capture-build-inputs.init.gradle"
+        self.assertEqual(["./gradlew", "--init-script", str(script)], command[:3])
+        plan = json.loads(log.with_suffix(M6.BUILD_PLAN_SUFFIX).read_bytes())
+        self.assertEqual(command, plan["command"])
 
     def test_gradle_consumer_requires_its_exact_earlier_producer(self):
         frozen = self.capture()

@@ -109,9 +109,9 @@ def validate_assignment(cases, pattern, profile):
     return {row for rows in cases.values() for row in rows}
 
 
-def run(command, cwd, log_path):
-    if Path(command[0]).name == "gradlew":
-        command = SOURCE.gradle_command(command, log_path)
+def run(command, cwd, log_path, *, nereus_source=None):
+    if nereus_source is not None:
+        command = SOURCE.gradle_command(command, log_path, source_root=nereus_source)
     with log_path.open("xb") as log:
         subprocess.run(command, cwd=cwd, check=True, stdout=log, stderr=subprocess.STDOUT)
 
@@ -553,10 +553,10 @@ def execute(args):
           ("nereus-storage-object", "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper",
            "nereus-pulsar-offload", "nereus-pulsar-broker", "nereus-metadata-spi")
           for check in ("test", "spotlessCheck", "checkstyleMain", "checkstyleTest")],
-    ], root, out / "nereus-regressions.log")
+    ], root, out / "nereus-regressions.log", nereus_source=root)
     run(["./gradlew", "--offline", "--no-configuration-cache", "--no-daemon",
          ":managed-ledger:test", "--tests", "*ManagedLedgerFactoryShutdownTest", "--tests", "*ManagedLedgerErrorsTest",
-         ":managed-ledger:checkstyleMain"], roots["pulsar"], out / "pulsar-regressions.log")
+         ":managed-ledger:checkstyleMain"], roots["pulsar"], out / "pulsar-regressions.log", nereus_source=root)
     qualified = {}
     for profile in COVERAGE.REQUIRED:
         output = out / profile
