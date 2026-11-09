@@ -322,9 +322,13 @@ The production NWKCP1 backend uses the canonical metadata Head
 `v2/object-wal/shards/<shard>/runs/<runEpoch>/protocol/kafka/nwkcp1-v1/head`, independently of its Root-bound Provider
 Object prefix. Physical successor creation retains that exact terminal Head contract. Separately, NSIP-1's Binding
 authorization Head selects a SHA-named NWKCP1 common-state control record and keeps all protected locators. Only that
-selection clears uncovered recovery debt; physical rollover and Owner takeover preserve it. Authorized cold recovery
-reads the selected common state and only explicit granted tail objects, without LIST discovery. Its source/history
-caps backpressure until separate protected retirement is implemented.
+selection clears uncovered recovery debt; physical rollover and Owner takeover preserve it. Authorized cold replay
+applies only explicit grants. The physical inventory scan has its own bounded LIST path. Source/history caps
+backpressure until separate protected retirement is implemented. If the Binding-selected common-state body
+is absent or fails byte integrity, native Owner recovery seeds Kafka state from the exact immediate
+predecessor's verified terminal checkpoint, or from genesis when all grants are retained. It applies only the
+contiguous authorized suffix during bounded physical recovery. The predecessor's terminal protocol Head, Object
+and independent physical Seal must still verify.
 
 M3 implementation evidence uses two closed, parser-checked TSV artifacts rather than an opaque receipt attachment.
 The WalRun recovery manifest binds the exact control wire, lazy-lane, checkpoint publication/recovery, Seal/successor,

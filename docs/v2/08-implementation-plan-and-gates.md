@@ -439,6 +439,9 @@ checkpoint page response, observes the Produce ACK and then verifies publication
 The dual-Broker test also loses the applied terminal protocol Head CAS response during shutdown. Shutdown
 waits for the exact Oxia version to be reread, with one terminal write. The original Broker then reacquires the
 partition and reads the complete authorized prefix through the sealed predecessors.
+The test removes the selected common-state record from the fixture's Oxia before the new Owner reads it. The
+Broker restores Kafka state from the verified predecessor checkpoint and the authorized current suffix, then
+confirms the existing terminal Head and its selected Provider Object.
 An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
 stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
 In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
