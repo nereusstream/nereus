@@ -132,6 +132,13 @@ public final class KmsCellSession implements AutoCloseable {
         }
     }
 
+    /** Only typed recovery and historical capabilities can reuse an existing closed writer's history slot. */
+    private KmsCellSession forVerifiedRunReadmission(RunKeyCacheIdentity identity) {
+        requireCellBudgetOpen();
+        var current = budget.current;
+        return current.runOwners.get(identity) == RunLifecycleOwner.CLOSED ? current : forRunAdmission();
+    }
+
     /** Generates one random run key and wraps it once; per-Object wrapping is not exposed. */
     public WrappedRunKeyEnvelope createRunKey(RunKeyCacheIdentity runIdentity) {
         try (var operation = beginOperation(runIdentity, null)) {
@@ -409,48 +416,40 @@ public final class KmsCellSession implements AutoCloseable {
 
     /** Checks the admission generation inside the aggregate Provider+KMS recovery-transfer barrier. */
     public void requireRecoveryTransferReady(WalRunLineageRecovery.KmsRecoveryAuthority authority) {
+        Objects.requireNonNull(authority, "authority");
         synchronized (budget) {
-            forRunAdmission().requireRecoveryTransferReadyInGeneration(authority);
+            var identity = authority.runKeyIdentity();
+            forVerifiedRunReadmission(identity)
+                    .requireRecoveryTarget(
+                            identity, authority.wrappedRunKey(), authority.rootSha256(), authority.providerScopeId());
         }
     }
 
-    private void requireRecoveryTransferReadyInGeneration(WalRunLineageRecovery.KmsRecoveryAuthority authority) {
+    private void requireRecoveryTarget(
+            RunKeyCacheIdentity identity, WrappedRunKeyEnvelope key, Sha256Digest rootSha, CellProviderScopeId scope) {
         requireOpen();
-        Objects.requireNonNull(authority, "authority");
-        RunKeyCacheIdentity runIdentity = authority.runKeyIdentity();
-        requireRawRunOwner(runIdentity);
-        requireRunIdle(runIdentity);
-        requireTransferHistoryCapacity();
-        if (cache.containsKey(runIdentity)) {
+        requireVerifiedRunReadmission(identity);
+        if (cache.containsKey(identity)) {
             throw new IllegalStateException("KMS recovery transfer requires a pristine target run cache slot");
         }
-        requireExactKmsAuthority(
-                runIdentity, authority.wrappedRunKey(), authority.rootSha256(), authority.providerScopeId());
+        requireExactKmsAuthority(identity, key, rootSha, scope);
         requireCacheCapacity();
     }
 
     /** Mints the recovery-only lease after the aggregate authority pair has been claimed. */
     public RecoveryLease transferToRecovery(WalRunLineageRecovery.KmsRecoveryTransfer transfer) {
+        Objects.requireNonNull(transfer, "transfer");
         synchronized (budget) {
-            return forRunAdmission().transferToRecoveryInGeneration(transfer);
+            var identity = transfer.runKeyIdentity();
+            return forVerifiedRunReadmission(identity).transferToRecoveryInGeneration(identity, transfer);
         }
     }
 
-    private RecoveryLease transferToRecoveryInGeneration(WalRunLineageRecovery.KmsRecoveryTransfer transfer) {
-        requireOpen();
-        Objects.requireNonNull(transfer, "transfer");
-        RunKeyCacheIdentity runIdentity = transfer.runKeyIdentity();
-        requireRawRunOwner(runIdentity);
-        requireRunIdle(runIdentity);
-        requireTransferHistoryCapacity();
-        if (cache.containsKey(runIdentity)) {
-            throw new IllegalStateException("KMS recovery transfer requires a pristine target run cache slot");
-        }
+    private RecoveryLease transferToRecoveryInGeneration(
+            RunKeyCacheIdentity runIdentity, WalRunLineageRecovery.KmsRecoveryTransfer transfer) {
         WrappedRunKeyEnvelope wrappedRunKey = transfer.wrappedRunKey();
         Sha256Digest rootSha256 = transfer.rootSha256();
-        CellProviderScopeId exactScope = transfer.providerScopeId();
-        requireExactKmsAuthority(runIdentity, wrappedRunKey, rootSha256, exactScope);
-        requireCacheCapacity();
+        requireRecoveryTarget(runIdentity, wrappedRunKey, rootSha256, transfer.providerScopeId());
         RecoveryLease lease = new RecoveryLease(runIdentity, wrappedRunKey, rootSha256);
         transfer.consumeForLease();
         budget.runSlots++;
@@ -492,21 +491,15 @@ public final class KmsCellSession implements AutoCloseable {
         var verified = Objects.requireNonNull(lineage, "lineage").requireSealedPredecessor(reference);
         var identity = new RunKeyCacheIdentity(reference.shardId(), reference.shardRunEpoch());
         synchronized (budget) {
-            requireCellBudgetOpen();
-            var current = budget.current;
-            var admission = current.runOwners.get(identity) == RunLifecycleOwner.CLOSED ? current : forRunAdmission();
-            return admission.openHistoricalInGeneration(identity, verified.root(), reference.rootSha256());
+            return forVerifiedRunReadmission(identity)
+                    .openHistoricalInGeneration(identity, verified.root(), reference.rootSha256());
         }
     }
 
     private HistoricalReadLease openHistoricalInGeneration(
             RunKeyCacheIdentity identity, WalRunRootRecord root, Sha256Digest rootSha256) {
         requireOpen();
-        boolean preserveWriteFence = requireRunOwner(identity, true);
-        requireRunIdle(identity);
-        if (runOwners.get(identity) != RunLifecycleOwner.CLOSED) {
-            requireTransferHistoryCapacity();
-        }
+        boolean preserveWriteFence = requireVerifiedRunReadmission(identity);
         requireExactKmsAuthority(identity, root.wrappedRunKey(), rootSha256, root.providerScopeId());
         var cached = cache.get(identity);
         if (cached == null) {
@@ -523,12 +516,21 @@ public final class KmsCellSession implements AutoCloseable {
         requireRunOwner(runIdentity, false);
     }
 
-    private boolean requireRunOwner(RunKeyCacheIdentity runIdentity, boolean historicalRead) {
+    private boolean requireVerifiedRunReadmission(RunKeyCacheIdentity identity) {
+        boolean preserveWriteFence = requireRunOwner(identity, true);
+        requireRunIdle(identity);
+        if (runOwners.get(identity) != RunLifecycleOwner.CLOSED) {
+            requireTransferHistoryCapacity();
+        }
+        return preserveWriteFence;
+    }
+
+    private boolean requireRunOwner(RunKeyCacheIdentity runIdentity, boolean allowClosedFence) {
         Objects.requireNonNull(runIdentity, "runIdentity");
         boolean preserveWriteFence = false;
         for (var generation : budget.generations) {
             var owner = generation.runOwners.get(runIdentity);
-            boolean closedWriteOwner = historicalRead && owner == RunLifecycleOwner.CLOSED;
+            boolean closedWriteOwner = allowClosedFence && owner == RunLifecycleOwner.CLOSED;
             if (owner != null && !closedWriteOwner
                     || generation != this
                             && (generation.cache.containsKey(runIdentity)
