@@ -329,6 +329,9 @@ is absent or fails byte integrity, native Owner recovery seeds Kafka state from 
 predecessor's verified terminal checkpoint, or from genesis when all grants are retained. It applies only the
 contiguous authorized suffix during bounded physical recovery. The predecessor's terminal protocol Head, Object
 and independent physical Seal must still verify.
+For the current Run with a terminal Head, the recovered state must encode to the exact selected content identity.
+After bounded exact absence proof, the recovery Owner may conditionally create those same bytes and reread the
+Object before it completes the handoff. The existing terminal Head continues to select that identity.
 
 M3 implementation evidence uses two closed, parser-checked TSV artifacts rather than an opaque receipt attachment.
 The WalRun recovery manifest binds the exact control wire, lazy-lane, checkpoint publication/recovery, Seal/successor,

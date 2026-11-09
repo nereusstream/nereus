@@ -441,7 +441,9 @@ waits for the exact Oxia version to be reread, with one terminal write. The orig
 partition and reads the complete authorized prefix through the sealed predecessors.
 The test removes the selected common-state record from the fixture's Oxia before the new Owner reads it. The
 Broker restores Kafka state from the verified predecessor checkpoint and the authorized current suffix, then
-confirms the existing terminal Head and its selected Provider Object.
+confirms the existing terminal Head. A separate fault removes its selected NWKCP1 version from fixture MinIO.
+The Broker recreates the same canonical bytes under a new immutable Provider version while preserving the
+original Oxia terminal Head version.
 An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
 stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
 In the planned handoff, the relay loses the original NWKCP1 PUT response. The departing Broker selects that same
