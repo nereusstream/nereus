@@ -444,6 +444,9 @@ Broker restores Kafka state from the verified predecessor checkpoint and the aut
 confirms the existing terminal Head. A separate fault removes its selected NWKCP1 version from fixture MinIO.
 The Broker recreates the same canonical bytes under a new immutable Provider version while preserving the
 original Oxia terminal Head version.
+A second Controller reassignment supersedes a recovering Broker while its exact Oxia physical checkpoint page
+response is held. The latest Owner recovers on the original Broker and appends before the old response is
+released. Releasing it leaves the superseded Broker unwritable and both old-Run Heads at their exact versions.
 An `acks=0` request commits through the same Object authority without a success reply. A native read-committed Fetch
 stays pending while an open transaction remains visible to read-uncommitted Fetch, then wakes on the original marker.
 The end-of-log multi-partition Fetch also waits with the S3 relay set to reject bucket traffic. Deleting one

@@ -365,6 +365,8 @@ metadata-service I/O and belongs to ACK.
 A Cell can reopen a sealed predecessor through its historical read lease after the former write lease drains.
 The reader uses the same Cell key and operation budget and keeps the former write authority fenced during and
 after the read lease.
+When the pointer still selects the former writer's Root, the current Owner can use the same Cell to recover that
+exact Root after the old lease drains. Recovery produces a stopping session and leaves the former writer fenced.
 
 Acknowledged group objects remain directly readable through the published owner-local active-tail view. Takeover first
 recovers physical inventory, then may publish Binding views independently; unrelated typed gaps do not block B. A new
