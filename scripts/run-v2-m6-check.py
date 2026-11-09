@@ -229,18 +229,44 @@ def verify_object_wal_read_qualification(output, started, result):
         "Kafka Object WAL process did not consume the exact read qualification")
 
 
-def verify_kafka_runtime(result_file, roots, output, frozen):
+def kafka_runtime_archives(capture, task, kafka, archive_directory):
+    directory = capture.parent
+    plan = read(directory / ("gradle" + SOURCE.BUILD_PLAN_SUFFIX))
+    trace = current_attachment(directory, plan["startedNs"], "gradle" + SOURCE.BUILD_TRACE_SUFFIX)
+    SOURCE.require(f"-Dnereus.m6.buildInputCapture={trace}" in plan["command"]
+                   and f"-Dnereus.m6.buildArchiveDirectory={archive_directory}" in plan["command"],
+                   f"Kafka runtime build invocation differs: {capture}")
+    archives = {}
+    with trace.open(encoding="utf-8") as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row["event"] != "task" or row["build"] != str(kafka) or not row["produced"]:
+                continue
+            if row["task"] == ":core:" + task:
+                return archives
+            for name, identity in row["outputs"].items():
+                if generated_kafka_jar(Path(name), kafka) and identity != {"absent": True}:
+                    archives[name] = identity
+    raise SOURCE.InputError(f"Kafka runtime capture has no completed native Gradle task: {capture}")
+
+
+def generated_kafka_jar(path, kafka):
+    return path.suffix == ".jar" and path.is_relative_to(kafka) and "build" in path.relative_to(kafka).parts[:-1]
+
+
+def verify_kafka_runtime(result_file, roots, output, frozen, evidence_root):
     result = read(result_file)
     captures = []
     repository = output / "development-repository"
+    archive_directory = evidence_root / SOURCE.BUILD_ARCHIVE_DIRECTORY
     if "kafkaRuntime" in result:
-        captures.append(output / result["kafkaRuntime"]["path"])
+        captures.append((output / result["kafkaRuntime"]["path"], "nereusBookKeeperOwnerRelocationRealTest"))
     else:
         nested = result["kind"] == "FOCUSED_KAFKA_OBJECT_WAL_CHECK"
         if not nested:
             repository = output / "m4/development-repository"
-        captures.extend(directory / test["runtime"]["name"]
-                        for directory, _, test in kafka_test_runs(result, output))
+        captures.extend((directory / test["runtime"]["name"], task)
+                        for directory, task, test in kafka_test_runs(result, output))
     group = repository / "com/nereusstream"
     published = {}
     for jar in sorted(group.rglob("*.jar")):
@@ -250,7 +276,8 @@ def verify_kafka_runtime(result_file, roots, output, frozen):
         filename = f"{module}-0.2.0-SNAPSHOT.jar"
         SOURCE.require(filename not in published, f"ambiguous generated Kafka dependency: {filename}")
         published[filename] = SOURCE.file_identity(jar)
-    for capture in captures:
+    for capture, task in captures:
+        produced = kafka_runtime_archives(capture, task, roots["kafka"], archive_directory)
         for name, identity in read(capture)["files"].items():
             path = Path(name)
             if identity == {"absent": True}:
@@ -258,6 +285,14 @@ def verify_kafka_runtime(result_file, roots, output, frozen):
                                and path.is_relative_to(roots["kafka"])
                                and "build" in path.relative_to(roots["kafka"]).parts,
                                f"Kafka runtime classpath absence changed: {path}")
+            elif generated_kafka_jar(path, roots["kafka"]):
+                SOURCE.require(produced.get(name) == identity
+                               and SOURCE.INPUTS.SHA.fullmatch(identity["sha256"]),
+                               f"Kafka runtime archive was not built before its native task: {path}")
+                retained = archive_directory / (identity["sha256"] + ".jar")
+                actual = SOURCE.file_identity(retained)
+                SOURCE.require(all(actual[key] == value for key, value in identity.items()),
+                               f"Kafka runtime archive differs from its original bytes: {path}")
             else:
                 verify_runtime_file(path, identity, roots, output, frozen, published)
 
@@ -372,26 +407,26 @@ def verify_kafka_result(output, started, profile, expected, sources):
             "scenarios": sorted({claim for key in actual for claim in expected[key]})}
 
 
-def run_kafka_process(roots, output, profile, expected, frozen):
+def run_kafka_process(roots, output, profile, expected, frozen, evidence_root):
     script, _, receipt = KAFKA_PROCESSES[profile]
     started = time.time_ns()
     run([sys.executable, f"scripts/run-v2-m6-kafka-{script}-check.py", "--kafka-root", str(roots["kafka"]),
          "--kafka-java-home", java_home(), "--output", str(output)],
         roots["nereus"], output.with_suffix(".log"))
     result = verify_kafka_result(output, started, profile, expected, source_pair(frozen, "kafka"))
-    verify_kafka_runtime(output / receipt, roots, output, frozen)
+    verify_kafka_runtime(output / receipt, roots, output, frozen, evidence_root)
     return result
 
 
-def run_kafka_profile(roots, output, profile, expected, frozen):
+def run_kafka_profile(roots, output, profile, expected, frozen, evidence_root):
     if profile != "kafka-bookkeeper-wal-only":
-        return run_kafka_process(roots, output, profile, expected, frozen)
+        return run_kafka_process(roots, output, profile, expected, frozen, evidence_root)
     output.mkdir()
     recovery = {key: rows for key, rows in expected.items() if key.startswith(KAFKA_BK_RECOVERY_CASE_PREFIX)}
     process = {key: rows for key, rows in expected.items() if key not in recovery}
     children = {
-        "process": run_kafka_process(roots, output / "process", profile, process, frozen),
-        "recovery": run_kafka_process(roots, output / "recovery", "kafka-bk-recovery", recovery, frozen),
+        "process": run_kafka_process(roots, output / "process", profile, process, frozen, evidence_root),
+        "recovery": run_kafka_process(roots, output / "recovery", "kafka-bk-recovery", recovery, frozen, evidence_root),
     }
     return {"checks": children, "scenarios": sorted({
         scenario for child in children.values() for scenario in child["scenarios"]
@@ -511,7 +546,7 @@ def execute(args):
         if profile in PULSAR_PROCESSES:
             qualified[profile] = run_pulsar_profile(roots, output, profile, profiles[profile]["processes"], frozen)
         else:
-            qualified[profile] = run_kafka_profile(roots, output, profile, profiles[profile]["cases"], frozen)
+            qualified[profile] = run_kafka_profile(roots, output, profile, profiles[profile]["cases"], frozen, out)
     scenarios = COVERAGE.validate_profiles(root, {key: row["scenarios"] for key, row in qualified.items()})
     build_inputs = verify_build_inputs(out, roots, frozen)
     SOURCE.require(launcher == verify_launcher(root)

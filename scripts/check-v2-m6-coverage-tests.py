@@ -103,6 +103,44 @@ class M6CoverageTest(unittest.TestCase):
             with self.assertRaisesRegex(M6.SOURCE.InputError, "bytes changed"):
                 M6.verify_runtime_file(jar, observed, {}, root / "output", frozen, {})
 
+    def test_kafka_runtime_revalidates_the_original_archive_after_a_later_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            kafka = root / "kafka"
+            out = root / "output"
+            out.mkdir()
+            archives = out / M6.SOURCE.BUILD_ARCHIVE_DIRECTORY
+            archives.mkdir()
+            jar = kafka / "core/build/libs/kafka.jar"
+            jar.parent.mkdir(parents=True)
+            original = b"runtime archive used by the first native test"
+            digest = M6.SOURCE.INPUTS.digest(original)
+            observed = {"bytes": len(original), "sha256": digest}
+            retained = archives / (digest + ".jar")
+            retained.write_bytes(original)
+            jar.write_bytes(b"different runtime archive produced by a later Gradle invocation")
+            capture = out / "runtime.json"
+            M6.write(capture, {"files": {str(jar): observed}})
+            result = out / "process-result.json"
+            M6.write(result, {"kafkaRuntime": {"path": capture.name}})
+            trace = out / ("gradle" + M6.SOURCE.BUILD_TRACE_SUFFIX)
+            task = {"event": "task", "build": str(kafka), "produced": True}
+            jar_task = {**task, "task": ":core:jar", "outputs": {str(jar): observed}}
+            native_task = {**task, "task": ":core:nereusBookKeeperOwnerRelocationRealTest", "outputs": {}}
+            M6.write(out / ("gradle" + M6.SOURCE.BUILD_PLAN_SUFFIX), {
+                "startedNs": time.time_ns(),
+                "command": [f"-Dnereus.m6.buildInputCapture={trace}", f"-Dnereus.m6.buildArchiveDirectory={archives}"],
+            })
+            trace.write_bytes(b"".join(M6.SOURCE.INPUTS.canonical(row) for row in (jar_task, native_task)))
+            M6.verify_kafka_runtime(result, {"kafka": kafka}, out, {}, out)
+            retained.write_bytes(jar.read_bytes())
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "differs from its original bytes"):
+                M6.verify_kafka_runtime(result, {"kafka": kafka}, out, {}, out)
+            retained.write_bytes(original)
+            trace.write_bytes(b"".join(M6.SOURCE.INPUTS.canonical(row) for row in (native_task, jar_task)))
+            with self.assertRaisesRegex(M6.SOURCE.InputError, "was not built before its native task"):
+                M6.verify_kafka_runtime(result, {"kafka": kafka}, out, {}, out)
+
 
 if __name__ == "__main__":
     unittest.main()
