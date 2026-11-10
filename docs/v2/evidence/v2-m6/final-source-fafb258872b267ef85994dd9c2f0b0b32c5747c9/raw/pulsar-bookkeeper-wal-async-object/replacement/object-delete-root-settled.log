@@ -1,0 +1,5 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:47:58 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:47:58,643 INFO  ConnectionManager Creating managed GRPC connection
+PULSAR_M6_ORIGINAL_OBJECT_DELETE_SETTLED 5f71a94ce902545ec981d9610179615ffbe6f3baf77f9bf000372be36c8a65c5

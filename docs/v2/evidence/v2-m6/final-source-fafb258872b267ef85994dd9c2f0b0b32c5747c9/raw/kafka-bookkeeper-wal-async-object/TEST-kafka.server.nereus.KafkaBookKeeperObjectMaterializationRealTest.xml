@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-11-09T20:19:02.079Z" hostname="liusinandeMacBook-Pro.local" time="335.019">
+  <properties/>
+  <testcase name="selectsCompactedSuccessorFromExactObjectAndBookKeeperTail(Path)" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="51.417"/>
+  <testcase name="asyncBookKeeperAckModesAndRevocationUseCoherentCommit(Path)" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="2.818"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=known&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="22.971"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=cold&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="16.004"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=hot&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="18.301"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=automatic&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="15.076"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=stale-registration&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="19.638"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=retirement&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="26.392"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=background-retirement&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="32.591"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=cold-retirement&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="32.401"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=shutdown-retirement&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="27.753"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=faults&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="23.667"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=put-unknown&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="22.581"/>
+  <testcase name="&quot;storesAndVerifiesTheRealNativeSealedPrefix(String, Path).outcome=semantic&quot;" classname="kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest" time="23.376"/>
+  <system-out><![CDATA[Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11754955440655673387/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11754955440655673387/broker_1_data0 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11754955440655673387/broker_0_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:19:03,965] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:19:11,356] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:19:26,412] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.lang.IllegalStateException: native source map is changing during BK rollover
+	at java.base/java.util.concurrent.CompletableFuture.encodeRelay(CompletableFuture.java:368)
+	at java.base/java.util.concurrent.CompletableFuture.completeRelay(CompletableFuture.java:377)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1152)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.IllegalStateException: native source map is changing during BK rollover
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.nativeReadSources(KafkaBookKeeperPartitionV1.java:2436)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.candidate(NereusKafkaAsyncObjectMaterializer.java:184)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.advance(NereusKafkaAsyncObjectMaterializer.java:101)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$1(NereusKafkaAsyncObjectMaterializer.java:89)
+	at kafka.server.nereus.NereusKafkaOwnedProviderRuntime$Opened.ownInputOperation(NereusKafkaOwnedProviderRuntime.java:1075)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$2(NereusKafkaAsyncObjectMaterializer.java:89)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	... 4 more
+[2026-11-10 04:19:49,494] ERROR [Broker id=1] Expected partition native-cold-0 with topic id IBBqg5d-QOeNh-LWs27fXQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:19:50,262] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.lang.IllegalStateException: native BK partition owner is fenced
+	at java.base/java.util.concurrent.CompletableFuture.encodeRelay(CompletableFuture.java:368)
+	at java.base/java.util.concurrent.CompletableFuture.completeRelay(CompletableFuture.java:377)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1152)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.IllegalStateException: native BK partition owner is fenced
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.requireWritable(KafkaBookKeeperPartitionV1.java:2912)
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.nativeReadSources(KafkaBookKeeperPartitionV1.java:2434)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.candidate(NereusKafkaAsyncObjectMaterializer.java:184)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.advance(NereusKafkaAsyncObjectMaterializer.java:101)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$1(NereusKafkaAsyncObjectMaterializer.java:89)
+	at kafka.server.nereus.NereusKafkaOwnedProviderRuntime$Opened.ownInputOperation(NereusKafkaOwnedProviderRuntime.java:1075)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$2(NereusKafkaAsyncObjectMaterializer.java:89)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	... 4 more
+[2026-11-10 04:19:52,488] ERROR [Broker id=0] Expected partition native-cold-0 with topic id IBBqg5d-QOeNh-LWs27fXQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:19:53,363] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-15706957863713307822/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-15706957863713307822/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-15706957863713307822/broker_1_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:19:53,830] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-async-ack'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:19:55,399] ERROR [Broker id=1] Expected partition native-cold-0 with topic id vch7O_rTRW2mscpCJsoL2w to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:19:55,430] ERROR [Broker id=0] Expected partition native-cold-0 with topic id vch7O_rTRW2mscpCJsoL2w to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:19:56,187] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9190603988594390219/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9190603988594390219/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9190603988594390219/broker_1_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:19:56,643] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+Native async Object profile BookKeeper append controlCalls=0
+[2026-11-10 04:20:15,298] ERROR [Broker id=1] Expected partition native-cold-0 with topic id TjpKh3ZeQj6ucD2yhvd1lg to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:20:18,456] ERROR [Broker id=0] Expected partition native-cold-0 with topic id TjpKh3ZeQj6ucD2yhvd1lg to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:20:19,171] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-14266412805993690297/broker_1_data0 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-14266412805993690297/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-14266412805993690297/controller_3000 with metadata.version 4.3-IV0.
+[2026-11-10 04:20:19,624] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:20:31,605] ERROR [Broker id=1] Expected partition native-cold-0 with topic id BB7fI6bvTHul-ZzdF3mSMA to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:20:34,511] ERROR [Broker id=0] Expected partition native-cold-0 with topic id BB7fI6bvTHul-ZzdF3mSMA to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:20:35,180] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9035125183843051017/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9035125183843051017/broker_1_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9035125183843051017/controller_3000 with metadata.version 4.3-IV0.
+[2026-11-10 04:20:35,603] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:20:49,346] ERROR [Broker id=1] Expected partition native-cold-0 with topic id 8_NK8XAOQjOeWULpMw7MGg to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:20:53,500] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-573444277798931267/controller_3000 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-573444277798931267/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-573444277798931267/broker_1_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:20:53,912] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:20:57,492] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:21:05,452] ERROR [Broker id=1] Expected partition native-cold-0 with topic id ISBREMrfQuKQDu1U29q4lg to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:21:08,562] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8034045593322310300/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8034045593322310300/broker_1_data0 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8034045593322310300/controller_3000 with metadata.version 4.3-IV0.
+[2026-11-10 04:21:08,977] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:21:12,593] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:21:13,199] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.lang.IllegalStateException: native M5 input source generation or coherent cut changed
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:315)
+	at java.base/java.util.concurrent.CompletableFuture.completeThrowable(CompletableFuture.java:320)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:649)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.IllegalStateException: native M5 input source generation or coherent cut changed
+	at kafka.server.nereus.NereusKafkaNativeInputV2.requireCurrentLocal(NereusKafkaNativeInputV2.java:763)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$25(NereusKafkaNativeInputV2.java:1064)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:222)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	... 4 more
+[2026-11-10 04:21:24,627] ERROR [Broker id=1] Expected partition native-cold-0 with topic id nT_nza_HRk-mNIfANngKEw to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:21:28,190] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11980250391318330491/controller_3000 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11980250391318330491/broker_1_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11980250391318330491/broker_0_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:21:28,641] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:21:51,372] ERROR [Broker id=1] Expected partition native-cold-0 with topic id MnZHpWcZT82L3I82hWOxKQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:21:53,986] ERROR [Broker id=0] Expected partition native-cold-0 with topic id MnZHpWcZT82L3I82hWOxKQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:21:54,588] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11948966269653213401/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11948966269653213401/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-11948966269653213401/broker_1_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:21:55,031] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:21:58,599] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:22:23,931] ERROR [Broker id=1] Expected partition native-cold-0 with topic id dH4y1tKPQASfgRg28HpkyA to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:22:26,455] ERROR [Broker id=0] Expected partition native-cold-0 with topic id dH4y1tKPQASfgRg28HpkyA to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:22:26,745] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.lang.IllegalStateException: native BK partition owner is fenced
+	at java.base/java.util.concurrent.CompletableFuture.encodeRelay(CompletableFuture.java:368)
+	at java.base/java.util.concurrent.CompletableFuture.completeRelay(CompletableFuture.java:377)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1152)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.IllegalStateException: native BK partition owner is fenced
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.requireWritable(KafkaBookKeeperPartitionV1.java:2912)
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.nativeReadSources(KafkaBookKeeperPartitionV1.java:2434)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.candidate(NereusKafkaAsyncObjectMaterializer.java:184)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.advance(NereusKafkaAsyncObjectMaterializer.java:101)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$1(NereusKafkaAsyncObjectMaterializer.java:89)
+	at kafka.server.nereus.NereusKafkaOwnedProviderRuntime$Opened.ownInputOperation(NereusKafkaOwnedProviderRuntime.java:1075)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$2(NereusKafkaAsyncObjectMaterializer.java:89)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	... 4 more
+[2026-11-10 04:22:27,180] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-3550798575643523386/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-3550798575643523386/broker_1_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-3550798575643523386/broker_0_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:22:27,613] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:22:31,229] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:22:49,353] ERROR [Broker id=1] Expected partition native-cold-0 with topic id xRtUIoNNQTawAfIdwzsguw to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:22:59,581] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8717949795822057536/controller_3000 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8717949795822057536/broker_1_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-8717949795822057536/broker_0_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:23:00,042] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:23:03,594] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:332)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyNow(CompletableFuture.java:674)
+	at java.base/java.util.concurrent.CompletableFuture.uniApplyStage(CompletableFuture.java:662)
+	at java.base/java.util.concurrent.CompletableFuture.thenApply(CompletableFuture.java:2200)
+	at com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient.read(AsyncOxiaConditionalClient.java:37)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$RoutedClient.read(OxiaBindingLifecycleMetadataStoreV2.java:1319)
+	at com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1.read(Oxia09ExactMetadataTransactionStoreV1.java:51)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2.read(OxiaBindingLifecycleMetadataStoreV2.java:288)
+	at com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2$CanonicalView.get(OxiaBindingLifecycleMetadataStoreV2.java:1340)
+	at kafka.server.nereus.NereusKafkaObjectMaterialization.register(NereusKafkaObjectMaterialization.java:248)
+	at kafka.server.nereus.NereusKafkaNativeInputV2$Captured.lambda$registerObjectMaterialization$29(NereusKafkaNativeInputV2.java:1062)
+	at java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:646)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.util.concurrent.TimeoutException: original pending inventory reread hidden
+	at kafka.server.nereus.KafkaBookKeeperObjectMaterializationRealTest$PublicationFault.lambda$wrap$1(KafkaBookKeeperObjectMaterializationRealTest.java:352)
+	at jdk.proxy3/jdk.proxy3.$Proxy40.get(Unknown Source)
+	... 12 more
+[2026-11-10 04:23:23,821] ERROR [Broker id=1] Expected partition native-cold-0 with topic id QRXnrcr_T3OX8Dmzgys0pQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:23:24,800] WARN [AdminClient clientId=adminclient-26] Connection to node -1 (/127.0.0.1:49730) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:23:24,805] WARN [Consumer clientId=consumer-null-21, groupId=null] Connection to node -1 (/127.0.0.1:49730) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:23:24,805] WARN [Consumer clientId=consumer-null-21, groupId=null] Bootstrap broker 127.0.0.1:49730 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:23:26,700] WARN Native Kafka Object materialization did not finish its current task (kafka.server.nereus.NereusKafkaAsyncObjectMaterializer:91)
+java.util.concurrent.CompletionException: java.lang.IllegalStateException: native BK partition owner is fenced
+	at java.base/java.util.concurrent.CompletableFuture.encodeRelay(CompletableFuture.java:368)
+	at java.base/java.util.concurrent.CompletableFuture.completeRelay(CompletableFuture.java:377)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1152)
+	at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.lang.IllegalStateException: native BK partition owner is fenced
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.requireWritable(KafkaBookKeeperPartitionV1.java:2912)
+	at com.nereusstream.kafka.bookkeeper.broker.KafkaBookKeeperPartitionV1.nativeReadSources(KafkaBookKeeperPartitionV1.java:2434)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.candidate(NereusKafkaAsyncObjectMaterializer.java:184)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.advance(NereusKafkaAsyncObjectMaterializer.java:101)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$1(NereusKafkaAsyncObjectMaterializer.java:89)
+	at kafka.server.nereus.NereusKafkaOwnedProviderRuntime$Opened.ownInputOperation(NereusKafkaOwnedProviderRuntime.java:1075)
+	at kafka.server.nereus.NereusKafkaAsyncObjectMaterializer.lambda$tick$2(NereusKafkaAsyncObjectMaterializer.java:89)
+	at java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1150)
+	... 4 more
+[2026-11-10 04:23:27,351] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-13471009679142075749/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-13471009679142075749/broker_1_data0 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-13471009679142075749/controller_3000 with metadata.version 4.3-IV0.
+[2026-11-10 04:23:27,879] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:23:50,999] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9028053680379427656/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9028053680379427656/broker_0_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-9028053680379427656/broker_1_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:23:51,433] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:24:09,152] ERROR [Broker id=1] Expected partition native-cold-0 with topic id hTw34W42STS0ZGH2VIKxJQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:24:12,736] ERROR [Broker id=0] Expected partition native-cold-0 with topic id hTw34W42STS0ZGH2VIKxJQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:24:13,584] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-12867074735633103155/broker_1_data0 with metadata.version 4.3-IV0.
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Bootstrap metadata: BootstrapMetadata(records=[ApiMessageAndVersion(FeatureLevelRecord(name='metadata.version', featureLevel=30) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='eligible.leader.replicas.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='group.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='share.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='streams.version', featureLevel=1) at version 0), ApiMessageAndVersion(FeatureLevelRecord(name='transaction.version', featureLevel=2) at version 0)], metadataVersionLevel=30, source=format command)
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-12867074735633103155/controller_3000 with metadata.version 4.3-IV0.
+Formatting metadata directory /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/kafka-12867074735633103155/broker_0_data0 with metadata.version 4.3-IV0.
+[2026-11-10 04:24:14,030] WARN [QuorumController id=3000] Performing controller activation. The metadata log appears to be empty. Appending 2 bootstrap record(s) in metadata transaction at metadata.version 4.3-IV0 from bootstrap source 'nsip-object-bytes'. (org.apache.kafka.controller.QuorumController:106)
+[2026-11-10 04:24:33,313] ERROR [Broker id=1] Expected partition native-cold-0 with topic id L5XQn9heQwSup4gFou2WSQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:24:36,133] ERROR [Broker id=0] Expected partition native-cold-0 with topic id L5XQn9heQwSup4gFou2WSQ to exist, but it was missing. Creating... (state.change.logger:48)
+[2026-11-10 04:24:36,957] WARN [NodeToControllerChannelManager id=3000 name=registration] Attempting to close NetworkClient that has already been closed. (org.apache.kafka.clients.NetworkClient:744)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

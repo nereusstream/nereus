@@ -1,0 +1,10 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+[2026-11-10 04:07:30,059] INFO Registered `kafka:type=kafka.Log4jController` MBean (kafka.utils.Log4jControllerRegistration$)
+[2026-11-10 04:07:30,227] ERROR Exiting Kafka due to fatal exception (kafka.Kafka$)
+java.lang.IllegalArgumentException: requirement failed: Expected persisted nereus.storage.version=0, but the formatted metadata directory has level 2
+	at scala.Predef$.require(Predef.scala:337)
+	at kafka.server.KafkaRaftServer.<init>(KafkaRaftServer.scala:69)
+	at kafka.Kafka$.buildServer(Kafka.scala:75)
+	at kafka.Kafka$.run(Kafka.scala:104)
+	at kafka.server.nereus.NereusKafka$.main(NereusKafka.scala:39)
+	at kafka.server.nereus.NereusKafka.main(NereusKafka.scala)

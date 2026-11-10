@@ -96,6 +96,20 @@ class ExecutionInputsTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(b"original receipt").hexdigest(),
                          selected["historicalInputs"]["files"][self.archive]["sha256"])
 
+    def test_published_m6_output_retains_git_identity_without_becoming_an_input(self):
+        output = M6.FINAL_OUTPUT / "final-source-example" / "m6-final.json"
+        (self.root / output).parent.mkdir(parents=True)
+        (self.root / output).write_text("published result")
+        self.commit(self.root, "publish M6")
+        with patch.object(M6, "ARCHIVE_BUDGET", len("original receipt")):
+            captured = self.capture(None)
+        self.assertEqual("RETAINED_EXECUTION_OUTPUT",
+                         captured["sourceIdentity"]["nereus"]["files"][str(output)]["classification"])
+        self.assertNotIn(str(output), captured["sourceInputs"]["nereus"])
+        self.assertNotIn(str(output), captured["historicalInputs"]["files"])
+        with self.assertRaisesRegex(M6.InputError, "historical input is absent"):
+            self.capture([str(output)])
+
     def test_capture_and_verify_refuse_runtime_drift_or_wrong_commit(self):
         self.assertEqual(0, self.command("capture"))
         self.assertEqual(0, self.command("verify"))

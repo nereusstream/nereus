@@ -1,0 +1,196 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Starting build with version 4.3.0-SNAPSHOT (commit id unknown) using Gradle 9.2.1, Java 21 and Scala 2.13.18
+Build properties: ignoreFailures=false, maxParallelForks=10, maxScalacThreads=8, maxTestRetries=0
+
+> Task :core:processResources NO-SOURCE
+> Task :clients:processResources
+> Task :clients:createVersionFile
+> Task :coordinator-common:processResources NO-SOURCE
+> Task :group-coordinator:processResources
+> Task :metadata:processResources
+> Task :raft:processResources
+> Task :raft:createVersionFile
+> Task :server:processResources NO-SOURCE
+> Task :server:createVersionFile
+> Task :server-common:processResources NO-SOURCE
+> Task :server-common:createVersionFile
+> Task :share-coordinator:processResources
+> Task :storage:processResources
+> Task :storage:createVersionFile
+> Task :transaction-coordinator:processResources
+> Task :group-coordinator:group-coordinator-api:processResources NO-SOURCE
+> Task :group-coordinator:group-coordinator-api:createVersionFile
+> Task :storage:storage-api:processResources NO-SOURCE
+> Task :storage:storage-api:createVersionFile
+> Task :tools:tools-api:processResources NO-SOURCE
+> Task :tools:tools-api:createVersionFile
+> Task :test-common:test-common-util:compileJava
+> Task :clients:processTestResources
+> Task :server-common:processTestResources
+> Task :coordinator-common:processTestResources
+> Task :group-coordinator:processTestResources
+> Task :raft:processTestResources
+> Task :metadata:processTestResources
+> Task :storage:storage-api:processTestResources
+> Task :server:processTestResources
+> Task :share-coordinator:processTestResources
+> Task :core:processTestResources
+> Task :test-common:test-common-internal-api:processResources NO-SOURCE
+> Task :test-common:test-common-runtime:processResources
+> Task :test-common:test-common-util:processResources
+> Task :test-common:test-common-util:classes
+> Task :test-common:test-common-util:jar
+> Task :generator:compileJava
+> Task :generator:processResources NO-SOURCE
+> Task :generator:classes
+> Task :generator:jar
+
+> Task :metadata:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 27 Kafka message JSON file(s).
+
+> Task :raft:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 1 Kafka message JSON file(s).
+
+> Task :clients:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 197 Kafka message JSON file(s).
+
+> Task :storage:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 5 Kafka message JSON file(s).
+
+> Task :group-coordinator:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 44 Kafka message JSON file(s).
+
+> Task :share-coordinator:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 4 Kafka message JSON file(s).
+
+> Task :transaction-coordinator:processMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 2 Kafka message JSON file(s).
+
+> Task :clients:compileJava
+> Task :group-coordinator:group-coordinator-api:compileJava
+> Task :tools:tools-api:compileJava
+> Task :clients:classes
+> Task :server-common:compileJava
+> Task :storage:storage-api:compileJava
+> Task :storage:compileJava
+> Task :raft:compileJava
+> Task :metadata:compileJava
+> Task :coordinator-common:compileJava
+> Task :clients:shadowJar
+> Task :share-coordinator:compileJava
+> Task :transaction-coordinator:compileJava
+> Task :clients:jar SKIPPED
+> Task :coordinator-common:classes
+> Task :coordinator-common:jar
+> Task :metadata:classes
+> Task :metadata:jar
+> Task :raft:classes
+> Task :raft:jar
+> Task :server-common:classes
+> Task :server-common:jar
+> Task :share-coordinator:classes
+> Task :share-coordinator:jar
+> Task :storage:classes
+> Task :storage:jar
+> Task :transaction-coordinator:classes
+> Task :transaction-coordinator:jar
+> Task :group-coordinator:group-coordinator-api:classes
+> Task :group-coordinator:group-coordinator-api:jar
+> Task :storage:storage-api:classes
+> Task :storage:storage-api:jar
+> Task :tools:tools-api:classes
+> Task :tools:tools-api:jar
+> Task :group-coordinator:compileJava
+
+> Task :clients:processTestMessages
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+MessageGenerator: processed 5 Kafka message JSON file(s).
+
+> Task :group-coordinator:classes
+> Task :group-coordinator:jar
+> Task :server:compileJava
+> Task :core:compileJava NO-SOURCE
+
+> Task :core:compileScala
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+
+> Task :core:classes
+> Task :server:classes
+> Task :server:jar
+> Task :core:copyDependantLibs
+> Task :core:jar
+
+> Task :clients:compileTestJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :clients:testClasses
+> Task :server-common:compileTestJava
+> Task :server-common:testClasses
+
+> Task :coordinator-common:compileTestJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/coordinator-common/src/test/java/org/apache/kafka/coordinator/common/runtime/CoordinatorRuntimeTest.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :coordinator-common:testClasses
+
+> Task :group-coordinator:compileTestJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/group-coordinator/src/test/java/org/apache/kafka/coordinator/group/streams/StreamsGroupTest.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :group-coordinator:testClasses
+> Task :core:checkstyleMain
+> Task :storage:storage-api:compileTestJava
+> Task :storage:storage-api:testClasses
+> Task :test-common:test-common-internal-api:compileJava
+> Task :test-common:test-common-runtime:compileJava
+> Task :raft:compileTestJava
+> Task :raft:testClasses
+
+> Task :server:compileTestJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/server/src/test/java/org/apache/kafka/server/KRaftClusterTest.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :server:testClasses
+> Task :share-coordinator:compileTestJava
+> Task :share-coordinator:testClasses
+> Task :metadata:compileTestJava
+> Task :metadata:testClasses
+> Task :core:compileTestJava NO-SOURCE
+> Task :core:compileTestScala
+> Task :core:testClasses
+
+> Task :core:spotbugsMain
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+
+> Task :core:checkstyleTest
+> Task :test-common:test-common-internal-api:classes
+> Task :test-common:test-common-internal-api:jar
+> Task :test-common:test-common-runtime:classes
+> Task :test-common:test-common-runtime:jar
+
+> Task :core:nereusKafkaObjectWalAuthorizationRealTest
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+
+[Incubating] Problems report is available at: file:///Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 19s
+86 actionable tasks: 86 executed
+The build is running offline. A build scan will not be published at this time, but it can be published if you run the 'buildScanPublishPrevious' task in the next build.

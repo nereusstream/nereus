@@ -1,0 +1,56 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:51:02 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:51:02,740 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:51:02,922 INFO  ConnectionPool Connected to server
+2026-11-10 04:51:03,036 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:51:03,046 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:51:03,058 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:03,059 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:03,059 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:03,156 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:03,159 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:03,159 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:03,159 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:03,363 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:03,371 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:03,371 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:03,371 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:03,754 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:03,764 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:03,764 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:03,764 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:04,535 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:04,542 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:04,542 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:04,542 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:06,121 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:06,127 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:06,128 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:06,128 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:09,268 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:09,275 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:09,275 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:09,275 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:15,846 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:15,852 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:15,853 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:15,853 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:28,336 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:28,340 WARN  ConnectionPool Failed to open connection to
+2026-11-10 04:51:28,341 WARN  ConnectionHandler Error connecting to broker
+2026-11-10 04:51:28,341 WARN  ConnectionHandler Could not get connection to broker - Will try again
+2026-11-10 04:51:53,607 INFO  ConnectionHandler Reconnecting after connection was closed
+2026-11-10 04:51:53,614 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:51:54,603 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:51:54,751 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:51:54,752 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:51:54,753 INFO  ProducerImpl Creating producer
+2026-11-10 04:51:54,759 INFO  ProducerImpl Created producer
+2026-11-10 04:51:54,851 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:51:54,852 INFO  ProducerImpl Closed Producer
+2026-11-10 04:51:54,854 INFO  ConsumerImpl Closed consumer
+PULSAR_OBJECT_WAL_ORIGINAL_UNKNOWN_RECOVERY_PASS
+PULSAR_OBJECT_WAL_CRASH_TAKEOVER_PASS
+2026-11-10 04:51:55,566 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:51:55,567 INFO  ClientCnx Disconnected

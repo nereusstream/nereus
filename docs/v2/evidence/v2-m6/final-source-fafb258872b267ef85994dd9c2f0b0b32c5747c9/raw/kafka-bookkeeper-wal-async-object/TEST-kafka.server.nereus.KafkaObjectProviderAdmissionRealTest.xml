@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="kafka.server.nereus.KafkaObjectProviderAdmissionRealTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-09T20:24:39.089Z" hostname="liusinandeMacBook-Pro.local" time="1.918">
+  <properties/>
+  <testcase name="reopensExactRegisteredScopeAndRejectsForeignBucket(Path)" classname="kafka.server.nereus.KafkaObjectProviderAdmissionRealTest" time="1.918"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

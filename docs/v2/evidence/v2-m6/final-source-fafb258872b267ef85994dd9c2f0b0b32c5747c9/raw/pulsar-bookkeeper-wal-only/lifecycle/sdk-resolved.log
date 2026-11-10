@@ -1,0 +1,289 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :pulsar:build-logic:conventions:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :pulsar:build-logic:conventions:generateExternalPluginSpecBuilders
+> Task :pulsar:build-logic:conventions:extractPrecompiledScriptPluginPlugins
+> Task :pulsar:build-logic:conventions:generateScriptPluginAdapters
+> Task :pulsar:build-logic:conventions:pluginDescriptors
+> Task :pulsar:build-logic:conventions:processResources
+> Task :pulsar:build-logic:conventions:compilePluginsBlocks
+> Task :pulsar:build-logic:conventions:generatePrecompiledScriptPluginAccessors
+> Task :pulsar:build-logic:conventions:compileKotlin
+> Task :pulsar:build-logic:conventions:compileJava NO-SOURCE
+> Task :pulsar:build-logic:conventions:classes
+> Task :pulsar:build-logic:conventions:jar
+> Task :pulsar:pulsar-broker:protobufDummy UP-TO-DATE
+> Task :pulsar:pulsar-client-original:protobufDummy UP-TO-DATE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-pulsar-broker:processResources NO-SOURCE
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-pulsar-offload:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :nereus-storage-object-vault:processResources NO-SOURCE
+> Task :pulsar:pulsar-broker-common:processResources NO-SOURCE
+> Task :pulsar:pulsar-cli-utils:processResources
+> Task :pulsar:pulsar-client-messagecrypto-bc:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-admin-original:processResources
+> Task :pulsar:pulsar-client-original:extractProto
+> Task :pulsar:pulsar-config-validation:processResources NO-SOURCE
+> Task :pulsar:pulsar-docs-tools:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-original:processProtoResources
+> Task :pulsar:pulsar-metadata:processResources
+> Task :pulsar:pulsar-client-admin-api:processResources NO-SOURCE
+> Task :pulsar:pulsar-websocket:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-api:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-proto:processResources NO-SOURCE
+> Task :pulsar:pulsar-client-original:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-instance:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-utils:processResources NO-SOURCE
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-secrets:processResources
+> Task :pulsar:pulsar-io:pulsar-io-core:processResources
+> Task :pulsar:pulsar-package-management:pulsar-package-core:processResources
+> Task :pulsar:pulsar-package-management:pulsar-package-filesystem-storage:processResources NO-SOURCE
+> Task :pulsar:pulsar-transaction:pulsar-transaction-common:processResources
+> Task :pulsar:pulsar-transaction:pulsar-transaction-coordinator:processResources
+> Task :pulsar:pulsar-functions:pulsar-functions-worker:processResources
+> Task :pulsar:pulsar-cli-utils:compileJava
+> Task :pulsar:pulsar-opentelemetry:compileJava
+> Task :pulsar:pulsar-docs-tools:compileJava
+> Task :pulsar:pulsar-opentelemetry:processResources NO-SOURCE
+> Task :pulsar:managed-ledger:generateLightProto
+> Task :pulsar:managed-ledger:processResources NO-SOURCE
+> Task :nereus-storage-api:compileJava
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes
+> Task :nereus-storage-api:jar
+> Task :pulsar:pulsar-transaction:pulsar-transaction-coordinator:generateLightProto
+> Task :pulsar:pulsar-transaction:pulsar-transaction-common:compileJava
+> Task :pulsar:pulsar-config-validation:compileJava
+> Task :pulsar:pulsar-functions:pulsar-functions-proto:generateLightProto
+> Task :pulsar:pulsar-broker:generateLightProto
+> Task :pulsar:pulsar-broker:extractProto
+
+> Task :pulsar:pulsar-client-api:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client-api/src/main/java/org/apache/pulsar/client/api/ProducerBuilder.java:564: warning: [unchecked] Possible heap pollution from parameterized vararg type ProducerInterceptor<T>
+    ProducerBuilder<T> intercept(ProducerInterceptor<T> ... interceptors);
+                                                            ^
+  where T is a type-variable:
+    T extends Object declared in interface ProducerBuilder
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client-api/src/main/java/org/apache/pulsar/client/api/ConsumerBuilder.java:640: warning: [unchecked] Possible heap pollution from parameterized vararg type ConsumerInterceptor<T>
+    ConsumerBuilder<T> intercept(ConsumerInterceptor<T> ...interceptors);
+                                                           ^
+  where T is a type-variable:
+    T extends Object declared in interface ConsumerBuilder
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client-api/src/main/java/org/apache/pulsar/client/api/ReaderBuilder.java:345: warning: [unchecked] Possible heap pollution from parameterized vararg type ReaderInterceptor<T>
+    ReaderBuilder<T> intercept(ReaderInterceptor<T>... interceptors);
+                                                       ^
+  where T is a type-variable:
+    T extends Object declared in interface ReaderBuilder
+3 warnings
+
+> Task :pulsar:pulsar-common:generateLightProto
+> Task :pulsar:pulsar-common:generatePulsarBuildInfo
+> Task :pulsar:pulsar-common:processResources
+> Task :pulsar:pulsar-client-api:processResources
+> Task :nereus-domain:compileJava
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes
+> Task :nereus-domain:jar
+> Task :nereus-storage-bookkeeper:compileJava
+> Task :nereus-storage-bookkeeper:classes
+> Task :nereus-storage-bookkeeper:jar
+> Task :nereus-metadata-spi:compileJava
+> Task :nereus-metadata-spi:classes
+> Task :nereus-metadata-spi:jar
+> Task :pulsar:pulsar-functions:pulsar-functions-proto:compileJava
+> Task :pulsar:pulsar-client-original:extractIncludeProto
+> Task :pulsar:pulsar-client-original:generateProto NO-SOURCE
+> Task :pulsar:pulsar-functions:pulsar-functions-secrets:compileJava
+> Task :pulsar:pulsar-client-admin-api:compileJava
+> Task :pulsar:pulsar-broker:extractIncludeProto
+> Task :pulsar:pulsar-broker:generateProto NO-SOURCE
+> Task :pulsar:pulsar-functions:pulsar-functions-api:compileJava
+> Task :pulsar:pulsar-io:pulsar-io-core:compileJava
+> Task :nereus-storage-object:compileJava
+> Task :nereus-storage-object:classes
+> Task :nereus-storage-object-vault:compileJava
+> Task :nereus-storage-object-vault:classes
+> Task :nereus-storage-object-vault:jar
+> Task :nereus-storage-object:jar
+> Task :nereus-storage-object-s3:compileJava
+> Task :nereus-storage-object-s3:classes
+> Task :nereus-storage-object-s3:jar
+> Task :nereus-metadata-oxia:compileJava
+> Task :nereus-metadata-oxia:classes
+> Task :nereus-metadata-oxia:jar
+
+> Task :pulsar:pulsar-common:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-common/src/main/java/org/apache/pulsar/common/naming/NamespaceName.java:42: warning: [deprecation] expireAfterAccess(long,TimeUnit) in CacheBuilder has been deprecated
+            .expireAfterAccess(30, TimeUnit.MINUTES).build(new CacheLoader<String, NamespaceName>() {
+            ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+1 warning
+
+> Task :pulsar:pulsar-package-management:pulsar-package-core:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-package-management/core/src/main/java/org/apache/pulsar/packages/management/core/common/PackageName.java:52: warning: [deprecation] expireAfterAccess(long,TimeUnit) in CacheBuilder has been deprecated
+            .expireAfterAccess(30, TimeUnit.MINUTES)
+            ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+1 warning
+
+> Task :pulsar:pulsar-client-messagecrypto-bc:compileJava
+> Task :pulsar:pulsar-package-management:pulsar-package-filesystem-storage:compileJava
+
+> Task :pulsar:pulsar-metadata:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStoreProvider.java:85: warning: [removal] batchLinger(Duration) in OxiaClientBuilder has been deprecated and marked for removal
+                    .batchLinger(Duration.of(100, ChronoUnit.MILLIS))
+                    ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStore.java:100: warning: [removal] batchLinger(Duration) in OxiaClientBuilder has been deprecated and marked for removal
+                .batchLinger(Duration.ofMillis(linger))
+                ^
+2 warnings
+
+> Task :pulsar:pulsar-client-original:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client/src/main/java/org/apache/pulsar/client/impl/PulsarClientImpl.java:157: warning: [deprecation] expireAfterAccess(long,TimeUnit) in CacheBuilder has been deprecated
+                    .expireAfterAccess(30, TimeUnit.MINUTES)
+                    ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client/src/main/java/org/apache/pulsar/client/impl/PulsarServiceNameResolver.java:158: warning: [deprecation] threadLocalRandom() in PlatformDependent has been deprecated
+                0 : io.netty.util.internal.PlatformDependent.threadLocalRandom().nextInt(numAddresses);
+                                                            ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client/src/main/java/org/apache/pulsar/client/impl/schema/reader/AbstractMultiVersionReader.java:48: warning: [deprecation] expireAfterAccess(long,TimeUnit) in CacheBuilder has been deprecated
+            .expireAfterAccess(30, TimeUnit.MINUTES).build(new CacheLoader<BytesSchemaVersion, SchemaReader<T>>() {
+            ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-client/src/main/java/org/apache/pulsar/client/impl/schema/generic/MultiVersionSchemaInfoProvider.java:47: warning: [deprecation] expireAfterAccess(long,TimeUnit) in CacheBuilder has been deprecated
+        .expireAfterAccess(30, TimeUnit.MINUTES)
+        ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+4 warnings
+
+> Task :pulsar:pulsar-broker-common:compileJava
+> Task :pulsar:managed-ledger:compileJava
+> Task :pulsar:pulsar-functions:pulsar-functions-utils:compileJava
+
+> Task :pulsar:pulsar-websocket:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-websocket/src/main/java/org/apache/pulsar/websocket/AbstractWebSocketHandler.java:265: warning: [removal] onWebSocketClose(int,String) in Listener has been deprecated and marked for removal
+    public void onWebSocketClose(int statusCode, String reason) {
+                ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-websocket/src/main/java/org/apache/pulsar/websocket/ConsumerHandler.java:99: warning: [deprecation] expireAfterWrite(long,TimeUnit) in CacheBuilder has been deprecated
+            .expireAfterWrite(1, TimeUnit.HOURS)
+            ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+2 warnings
+
+> Task :pulsar:pulsar-transaction:pulsar-transaction-coordinator:compileJava
+
+> Task :pulsar:pulsar-client-admin-original:compileJava
+warning: unknown enum constant RequiredMode.REQUIRED
+  reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode not found
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+  reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode not found
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+  reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode not found
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+  reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode not found
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+  reason: class file for io.swagger.v3.oas.annotations.media.Schema$RequiredMode not found
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+warning: unknown enum constant RequiredMode.REQUIRED
+30 warnings
+
+> Task :nereus-pulsar-offload:compileJava
+> Task :nereus-pulsar-offload:classes
+> Task :nereus-pulsar-offload:jar
+> Task :pulsar:pulsar-functions:pulsar-functions-instance:compileJava
+> Task :pulsar:pulsar-functions:pulsar-functions-runtime:compileJava
+> Task :pulsar:pulsar-functions:pulsar-functions-worker:compileJava
+
+> Task :pulsar:pulsar-broker:compileJava
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/BrokerService.java:577: warning: [deprecation] RCVBUF_ALLOCATOR in ChannelOption has been deprecated
+            bootstrap.childOption(ChannelOption.RCVBUF_ALLOCATOR,
+                                               ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/BrokerService.java:605: warning: [deprecation] RCVBUF_ALLOCATOR in ChannelOption has been deprecated
+        bootstrap.childOption(ChannelOption.RCVBUF_ALLOCATOR,
+                                           ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/scalable/ScalableTopicController.java:1269: warning: [unchecked] unchecked method invocation: method toArray in interface Stream is applied to given types
+                .toArray(CompletableFuture[]::new);
+                        ^
+  required: IntFunction<A[]>
+  found:    IntFunction<CompletableFuture[]>
+  where A is a type-variable:
+    A extends Object declared in method <A>toArray(IntFunction<A[]>)
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/scalable/ScalableTopicController.java:1269: warning: [unchecked] unchecked conversion
+                .toArray(CompletableFuture[]::new);
+                        ^
+  required: CompletableFuture<Boolean>[]
+  found:    CompletableFuture[]
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/loadbalance/impl/SimpleLoadManagerImpl.java:241: warning: [deprecation] expireAfterWrite(long,TimeUnit) in CacheBuilder has been deprecated
+        unloadedHotNamespaceCache = CacheBuilder.newBuilder().expireAfterWrite(entryExpiryTime, TimeUnit.MINUTES)
+                                                             ^
+  where K,V are type-variables:
+    K extends Object declared in class CacheBuilder
+    V extends Object declared in class CacheBuilder
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/LegacyAwareTopicPoliciesService.java:129: warning: [deprecation] registerListener(TopicName,TopicPolicyListener) in TopicPoliciesService has been deprecated
+    public boolean registerListener(TopicName topicName, TopicPolicyListener listener) {
+                   ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/SystemTopicBasedTopicPoliciesService.java:1130: warning: [deprecation] registerListener(TopicName,TopicPolicyListener) in TopicPoliciesService has been deprecated
+    public boolean registerListener(TopicName topicName, TopicPolicyListener listener) {
+                   ^
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/SystemTopicBasedTopicPoliciesService.java:900: warning: [deprecation] getValue() in MutableObject has been deprecated
+        failPendingPolicyCacheInit(namespace, removedInitFuture.getValue());
+                                                               ^
+  where T is a type-variable:
+    T extends Object declared in class MutableObject
+/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/pulsar/pulsar-broker/src/main/java/org/apache/pulsar/broker/service/MetadataStoreTopicPoliciesService.java:139: warning: [deprecation] registerListener(TopicName,TopicPolicyListener) in TopicPoliciesService has been deprecated
+    public boolean registerListener(TopicName topicName, TopicPolicyListener listener) {
+                   ^
+9 warnings
+
+> Task :nereus-pulsar-broker:compileJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/nereus-pulsar-broker/src/main/java/com/nereusstream/pulsar/broker/PulsarM6ObjectWalManagedLedger.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :nereus-pulsar-broker:classes
+> Task :nereus-pulsar-broker:m6WriteRuntimeClasspath
+
+[Incubating] Problems report is available at: file:///Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 42s
+83 actionable tasks: 83 executed

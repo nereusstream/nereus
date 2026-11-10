@@ -1,0 +1,98 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-storage-api",
+    "version": "0.2.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-domain",
+          "version": {
+            "requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-api-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-api-0.2.0-SNAPSHOT.jar",
+          "size": 75486,
+          "sha512": "9553190fe8f179e33832392cb4a6855af418e8351129ee347eca57e127e86e54c4e4847cab5d33297bd3b815ab5850d2b716408fc01d98b3c662c786d6d20342",
+          "sha256": "6823e3d42855e75ab784202e27b9a1e5390f0a46004043fb539a04fc71b72653",
+          "sha1": "889b1cbcaf8ec0fd1dc259cadb46b3dcd6c02c30",
+          "md5": "f23fab336cd98bd0f5c35c9e39dbe895"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-domain",
+          "version": {
+            "requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-api-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-api-0.2.0-SNAPSHOT.jar",
+          "size": 75486,
+          "sha512": "9553190fe8f179e33832392cb4a6855af418e8351129ee347eca57e127e86e54c4e4847cab5d33297bd3b815ab5850d2b716408fc01d98b3c662c786d6d20342",
+          "sha256": "6823e3d42855e75ab784202e27b9a1e5390f0a46004043fb539a04fc71b72653",
+          "sha1": "889b1cbcaf8ec0fd1dc259cadb46b3dcd6c02c30",
+          "md5": "f23fab336cd98bd0f5c35c9e39dbe895"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-storage-api-0.2.0-SNAPSHOT-sources.jar",
+          "url": "nereus-storage-api-0.2.0-SNAPSHOT-sources.jar",
+          "size": 44120,
+          "sha512": "3408be6d6ad5f1e1cb260b3df4cf59aaeea4096c526bda46aa858b351b5f65039cc07e584f8b1fbcfdd42b7bc8b356580741cc99e6f44b66d9a984331a7aacf3",
+          "sha256": "ec5056a3b2927ab0ae7a5e575dc7448ea5e9b63dba284602db9a443225969703",
+          "sha1": "23ea594a038248cd14d6a1199760d2835a110cfa",
+          "md5": "19e511bebe6eb531268f8d9399844dcf"
+        }
+      ]
+    }
+  ]
+}

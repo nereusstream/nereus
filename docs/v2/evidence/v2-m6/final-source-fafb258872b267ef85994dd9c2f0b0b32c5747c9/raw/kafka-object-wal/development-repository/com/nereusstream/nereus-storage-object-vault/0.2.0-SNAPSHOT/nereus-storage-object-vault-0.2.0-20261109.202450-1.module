@@ -1,0 +1,98 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-storage-object-vault",
+    "version": "0.2.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-object-vault-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-object-vault-0.2.0-SNAPSHOT.jar",
+          "size": 19339,
+          "sha512": "2aa2734e0faa0456e2a2d7d9d4ed73447e0269426e232171ef9b37d474649335b329e43d01331a513102e0e1aa32f2b6b397d41e07aa7f608ce9f50315d703cb",
+          "sha256": "f4897897f7751d8f96c824e0a6c1d21535936572d9a7d774d2939bc8c30db4ff",
+          "sha1": "e51d9a222142081e1155e03dda190c885032bea2",
+          "md5": "abfaeb7681e8cb620bc1c8c79a68252c"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-object-vault-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-object-vault-0.2.0-SNAPSHOT.jar",
+          "size": 19339,
+          "sha512": "2aa2734e0faa0456e2a2d7d9d4ed73447e0269426e232171ef9b37d474649335b329e43d01331a513102e0e1aa32f2b6b397d41e07aa7f608ce9f50315d703cb",
+          "sha256": "f4897897f7751d8f96c824e0a6c1d21535936572d9a7d774d2939bc8c30db4ff",
+          "sha1": "e51d9a222142081e1155e03dda190c885032bea2",
+          "md5": "abfaeb7681e8cb620bc1c8c79a68252c"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-storage-object-vault-0.2.0-SNAPSHOT-sources.jar",
+          "url": "nereus-storage-object-vault-0.2.0-SNAPSHOT-sources.jar",
+          "size": 9792,
+          "sha512": "f4c1cbdca8c764ed2e2dcd4e8eb8dc5cf71ad6b8cbdc3a3dd4719833e46c716a67cb007f087e3e3c15af0cd64bc7494b24b18f73e952412f4d1f7d930ed39289",
+          "sha256": "d8c91d9949a0d54a1b0d2e743431965997aa04608df8f04b21790081f059c221",
+          "sha1": "588b90f2e6477452ebe71dfff41ca6a8d7933c3e",
+          "md5": "987ad227960c1362e7e78642df4bbb08"
+        }
+      ]
+    }
+  ]
+}

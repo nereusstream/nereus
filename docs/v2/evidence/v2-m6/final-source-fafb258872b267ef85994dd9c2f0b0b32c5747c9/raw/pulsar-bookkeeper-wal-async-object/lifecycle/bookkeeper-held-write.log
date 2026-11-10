@@ -1,0 +1,49 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:40:23 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:40:23,346 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:40:23,578 INFO  ConnectionPool Connected to server
+2026-11-10 04:40:23,659 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:40:23,669 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:40:23,675 INFO  ProducerImpl Creating producer
+2026-11-10 04:40:24,552 INFO  ProducerImpl Created producer
+PULSAR_NATIVE_BK_POSITIVE_WRITE_QUORUM_HELD 41:1:-1 {"hits":3,"peers":[3181,3182,3183]}
+2026-11-10 04:40:24,839 INFO  ClientCnx Broker notification of closed producer
+2026-11-10 04:40:24,839 INFO  ConnectionHandler Closed connection - Will try again
+2026-11-10 04:40:24,937 INFO  ConnectionHandler Reconnecting after timeout
+2026-11-10 04:40:24,940 INFO  ConnectionPool Connected to server
+2026-11-10 04:40:24,941 INFO  ProducerImpl Creating producer
+2026-11-10 04:40:25,592 INFO  ConnectionPool Connected to server
+2026-11-10 04:40:25,598 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:40:25,598 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:40:25,600 INFO  ProducerImpl Creating producer
+2026-11-10 04:40:25,601 INFO  ProducerImpl Created producer
+2026-11-10 04:40:25,634 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:40:25,634 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:40:25,638 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:40:25,642 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:40:25,651 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:40:25,654 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:40:25,655 INFO  ProducerImpl Closed Producer
+2026-11-10 04:40:25,655 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:40:25,660 INFO  ClientCnx Disconnected
+PULSAR_NATIVE_BK_INDEPENDENT_FOREIGN_CELL_PASS NereusOwnershipId[value=12e3757efab9378d5856110b59e51d67]
+2026-11-10 04:40:27,870 WARN  ClientCnx Received send error from server
+2026-11-10 04:40:27,870 WARN  ClientCnx Producer not found while handling send error
+2026-11-10 04:40:28,039 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:40:28,039 INFO  ProducerImpl Closed Producer (not connected)
+2026-11-10 04:40:28,044 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:40:28,044 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:40:28,045 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:40:29,163 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:40:29,165 INFO  ClientCnx Disconnected
+2026-11-10 04:40:29,165 INFO  ConnectionHandler Closed connection - Will try again
+2026-11-10 04:40:29,271 INFO  ConnectionHandler Reconnecting after timeout
+2026-11-10 04:40:29,273 INFO  ConnectionPool Connected to server
+2026-11-10 04:40:29,274 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:40:29,275 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:40:29,279 INFO  ConsumerImpl Closed consumer
+PULSAR_NATIVE_BK_HELD_WRITE_CANCEL_AND_UNLOAD_PASS
+2026-11-10 04:40:29,389 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:40:29,390 INFO  ClientCnx Disconnected
+2026-11-10 04:40:29,500 INFO  ClientCnx Disconnected

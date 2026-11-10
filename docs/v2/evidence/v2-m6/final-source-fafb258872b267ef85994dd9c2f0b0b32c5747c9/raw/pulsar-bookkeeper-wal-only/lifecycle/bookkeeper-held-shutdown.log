@@ -1,0 +1,29 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:36:02 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:36:02,318 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:36:04,469 INFO  ConnectionPool Connected to server
+2026-11-10 04:36:04,507 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:36:04,516 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:36:04,524 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:36:04,527 INFO  ConsumerImpl Subscribed to topic
+PULSAR_NATIVE_BK_POSITIVE_READ_REPLY_HELD 14:1:-1 {"hits":1,"peers":[3182]}
+2026-11-10 04:36:04,563 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:36:05,388 INFO  ConnectionPool Connected to server
+2026-11-10 04:36:05,411 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:36:05,412 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:36:05,414 INFO  ProducerImpl Creating producer
+2026-11-10 04:36:05,418 INFO  ProducerImpl Created producer
+2026-11-10 04:36:05,533 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:36:05,533 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:36:05,534 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:36:05,536 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:36:05,543 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:36:05,546 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:36:05,547 INFO  ProducerImpl Closed Producer
+2026-11-10 04:36:05,548 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:36:05,549 INFO  ClientCnx Disconnected
+PULSAR_NATIVE_BK_INDEPENDENT_FOREIGN_CELL_PASS NereusOwnershipId[value=fc58c5e1e5e6e528650484a0910f0cfe]
+PULSAR_NATIVE_BK_HELD_READ_CANCEL_AND_SHUTDOWN_PASS
+2026-11-10 04:36:07,816 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:36:07,817 INFO  ClientCnx Disconnected

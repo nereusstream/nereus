@@ -1,0 +1,52 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+2026-11-10 04:41:19,420 INFO  PulsarService Starting Pulsar Broker service
+Nov 10, 2026 4:41:19 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:41:19,566 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:41:19,684 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:41:19,755 ERROR PulsarService Failed to start Pulsar service
+java.lang.IllegalArgumentException: Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM
+	at com.nereusstream.pulsar.broker.PulsarM6ManagedLedgerStorage.initialize(PulsarM6ManagedLedgerStorage.java:117)
+	at org.apache.pulsar.broker.storage.ManagedLedgerStorage.create(ManagedLedgerStorage.java:102)
+	at org.apache.pulsar.broker.PulsarService.newManagedLedgerStorage(PulsarService.java:1189)
+	at org.apache.pulsar.broker.PulsarService.start(PulsarService.java:941)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.call(PulsarBrokerStarter.java:276)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.call(PulsarBrokerStarter.java:130)
+	at picocli.CommandLine.executeUserObject(CommandLine.java:2041)
+	at picocli.CommandLine.access$1500(CommandLine.java:148)
+	at picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2461)
+	at picocli.CommandLine$RunLast.handle(CommandLine.java:2453)
+	at picocli.CommandLine$RunLast.handle(CommandLine.java:2415)
+	at picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2273)
+	at picocli.CommandLine$RunLast.execute(CommandLine.java:2417)
+	at picocli.CommandLine.execute(CommandLine.java:2170)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.start(PulsarBrokerStarter.java:151)
+	at org.apache.pulsar.PulsarBrokerStarter.main(PulsarBrokerStarter.java:371)
+org.apache.pulsar.broker.PulsarServerException: java.lang.IllegalArgumentException: Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM
+	at org.apache.pulsar.broker.PulsarServerException.from(PulsarServerException.java:56)
+	at org.apache.pulsar.broker.PulsarService.start(PulsarService.java:1135)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.call(PulsarBrokerStarter.java:276)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.call(PulsarBrokerStarter.java:130)
+	at picocli.CommandLine.executeUserObject(CommandLine.java:2041)
+	at picocli.CommandLine.access$1500(CommandLine.java:148)
+	at picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2461)
+	at picocli.CommandLine$RunLast.handle(CommandLine.java:2453)
+	at picocli.CommandLine$RunLast.handle(CommandLine.java:2415)
+	at picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2273)
+	at picocli.CommandLine$RunLast.execute(CommandLine.java:2417)
+	at picocli.CommandLine.execute(CommandLine.java:2170)
+	at org.apache.pulsar.PulsarBrokerStarter$BrokerStarter.start(PulsarBrokerStarter.java:151)
+	at org.apache.pulsar.PulsarBrokerStarter.main(PulsarBrokerStarter.java:371)
+Caused by: java.lang.IllegalArgumentException: Nereus BookKeeper requires native Oxia ownership with MetadataStore ELM
+	at com.nereusstream.pulsar.broker.PulsarM6ManagedLedgerStorage.initialize(PulsarM6ManagedLedgerStorage.java:117)
+	at org.apache.pulsar.broker.storage.ManagedLedgerStorage.create(ManagedLedgerStorage.java:102)
+	at org.apache.pulsar.broker.PulsarService.newManagedLedgerStorage(PulsarService.java:1189)
+	at org.apache.pulsar.broker.PulsarService.start(PulsarService.java:941)
+	... 12 more
+2026-11-10 04:41:19,757 INFO  PulsarService Closing PulsarService
+2026-11-10 04:41:19,770 INFO  GracefulExecutorServicesTerminationHandler Starting termination handler
+2026-11-10 04:41:19,770 INFO  GracefulExecutorServicesTerminationHandler Shutdown completed
+2026-11-10 04:41:20,008 INFO  GracefulExecutorServicesTerminationHandler Starting termination handler
+2026-11-10 04:41:20,008 INFO  GracefulExecutorServicesTerminationHandler Shutdown completed
+2026-11-10 04:41:22,057 INFO  PulsarService Closed
+2026-11-10 04:41:22,057 INFO  PulsarBrokerStarter Shut down broker service successfully.

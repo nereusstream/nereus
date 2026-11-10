@@ -1,0 +1,35 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:52:20 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:52:20,746 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:52:21,086 INFO  ConnectionPool Connected to server
+2026-11-10 04:52:21,124 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:52:21,133 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:52:21,140 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:52:21,144 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:52:21,179 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:52:23,336 INFO  ConnectionPool Connected to server
+2026-11-10 04:52:23,358 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:52:23,358 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:52:23,360 INFO  ProducerImpl Creating producer
+2026-11-10 04:52:23,368 INFO  ProducerImpl Created producer
+2026-11-10 04:52:23,414 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:52:23,414 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:52:23,415 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:52:23,417 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:52:23,430 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:52:23,432 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:52:23,433 INFO  ProducerImpl Closed Producer
+2026-11-10 04:52:23,434 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:52:23,435 INFO  ClientCnx Disconnected
+PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS NereusOwnershipId[value=fe08eb7eb2f1c8e48d27d9a267ed0d67]
+2026-11-10 04:52:25,566 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:52:25,566 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:52:25,569 INFO  ConnectionPool Connected to server
+2026-11-10 04:52:25,570 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:52:26,136 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:52:26,153 INFO  ConsumerImpl Closed consumer
+PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_UNLOAD_PASS
+2026-11-10 04:52:26,264 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:52:26,265 INFO  ClientCnx Disconnected
+2026-11-10 04:52:26,265 INFO  ClientCnx Disconnected

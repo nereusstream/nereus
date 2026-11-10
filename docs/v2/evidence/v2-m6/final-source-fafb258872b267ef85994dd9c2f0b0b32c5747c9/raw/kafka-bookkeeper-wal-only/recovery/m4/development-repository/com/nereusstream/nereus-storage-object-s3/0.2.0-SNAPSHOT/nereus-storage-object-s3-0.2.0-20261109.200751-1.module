@@ -1,0 +1,140 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-storage-object-s3",
+    "version": "0.2.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-metadata-spi",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "software.amazon.awssdk",
+          "module": "bom",
+          "version": {
+            "requires": "2.47.5"
+          },
+          "attributes": {
+            "org.gradle.category": "platform"
+          }
+        },
+        {
+          "group": "software.amazon.awssdk",
+          "module": "s3"
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-object-s3-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-object-s3-0.2.0-SNAPSHOT.jar",
+          "size": 50923,
+          "sha512": "0fb08a3fbe530a239aba2f7ab50a5fedb5a6e0dd9a8e5dd539853bd8e25dfbf404672171a868bb1e56136866cf224e0a7b9358426df4584e694b1678865f02a0",
+          "sha256": "8a49d8a32b05ce170fabfc0ef5f38baaf242dca1b460bcc8f84e0fc4745aa2ff",
+          "sha1": "6009c7d17dd09dbf4ce0cdd396996781de4f7014",
+          "md5": "2ac8c858d32087e0f5b26d44cd09e5cd"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-metadata-spi",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "software.amazon.awssdk",
+          "module": "bom",
+          "version": {
+            "requires": "2.47.5"
+          },
+          "attributes": {
+            "org.gradle.category": "platform"
+          }
+        },
+        {
+          "group": "software.amazon.awssdk",
+          "module": "s3"
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-storage-object-s3-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-storage-object-s3-0.2.0-SNAPSHOT.jar",
+          "size": 50923,
+          "sha512": "0fb08a3fbe530a239aba2f7ab50a5fedb5a6e0dd9a8e5dd539853bd8e25dfbf404672171a868bb1e56136866cf224e0a7b9358426df4584e694b1678865f02a0",
+          "sha256": "8a49d8a32b05ce170fabfc0ef5f38baaf242dca1b460bcc8f84e0fc4745aa2ff",
+          "sha1": "6009c7d17dd09dbf4ce0cdd396996781de4f7014",
+          "md5": "2ac8c858d32087e0f5b26d44cd09e5cd"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-storage-object-s3-0.2.0-SNAPSHOT-sources.jar",
+          "url": "nereus-storage-object-s3-0.2.0-SNAPSHOT-sources.jar",
+          "size": 21401,
+          "sha512": "4dab37f81acf91d25150570abe43f88dc6225eb129e57e7c40c26798bc21d316895cb66f8fcb39b5cdcf21ace38dd5be70ce461250bab9cf68d55d5c9745f9de",
+          "sha256": "28f61667113e7efcdf33f9f6e31e9ca4ec86a57a0ee516b45d09264fd9c827d4",
+          "sha1": "9a6ad7363cd27ea2caa27e4248e2cd02aeb1a709",
+          "md5": "6a66740a9328f1f3577c6c659e0dd6ec"
+        }
+      ]
+    }
+  ]
+}

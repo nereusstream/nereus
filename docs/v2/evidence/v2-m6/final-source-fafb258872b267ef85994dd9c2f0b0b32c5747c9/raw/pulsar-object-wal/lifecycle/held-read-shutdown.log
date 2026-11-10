@@ -1,0 +1,28 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:53:14 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:53:14,769 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:53:15,103 INFO  ConnectionPool Connected to server
+2026-11-10 04:53:15,138 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:53:15,146 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:53:15,154 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:53:15,157 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:53:15,224 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:53:16,059 INFO  ConnectionPool Connected to server
+2026-11-10 04:53:16,082 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:53:16,082 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:53:16,084 INFO  ProducerImpl Creating producer
+2026-11-10 04:53:16,088 INFO  ProducerImpl Created producer
+2026-11-10 04:53:16,128 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:53:16,128 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:53:16,129 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:53:16,131 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:53:16,144 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:53:16,146 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:53:16,147 INFO  ProducerImpl Closed Producer
+2026-11-10 04:53:16,148 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:53:16,149 INFO  ClientCnx Disconnected
+PULSAR_OBJECT_WAL_INDEPENDENT_FOREIGN_CELL_PASS NereusOwnershipId[value=fe08eb7eb2f1c8e48d27d9a267ed0d67]
+PULSAR_OBJECT_WAL_HELD_RANGE_CANCEL_AND_SHUTDOWN_PASS
+2026-11-10 04:53:18,307 INFO  ClientCnx Disconnected
+2026-11-10 04:53:18,358 INFO  PulsarClientImpl Client closing. URL

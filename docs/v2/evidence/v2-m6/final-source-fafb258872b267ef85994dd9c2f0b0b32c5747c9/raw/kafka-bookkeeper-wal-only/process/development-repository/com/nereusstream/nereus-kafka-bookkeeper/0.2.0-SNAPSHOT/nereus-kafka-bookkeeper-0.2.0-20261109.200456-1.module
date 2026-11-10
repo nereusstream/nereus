@@ -1,0 +1,140 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-kafka-bookkeeper",
+    "version": "0.2.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-api",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-metadata-spi",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "size": 1376168,
+          "sha512": "d46292e090c583f900dea28f322c4bbcda61eabbfa7189bbdb7e1447bc42bbb3f18ebabbd4ba1d8afa51e830342e29fdfc9ba5fe1f861cebc8c22de18a8289dd",
+          "sha256": "1405fc1e48e6afcd13a074e4207570b355d0d0ca69af0c5d196c711c6d801d2b",
+          "sha1": "93b55c84284bfc29160b9f737e24cc8642577187",
+          "md5": "74acbcb93fb858d1b760baaa48bb399d"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-bookkeeper",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "org.apache.kafka",
+          "module": "kafka-clients",
+          "version": {
+            "requires": "3.9.0"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-api",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-metadata-spi",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        },
+        {
+          "group": "com.nereusstream",
+          "module": "nereus-storage-object",
+          "version": {
+            "requires": "0.2.0-SNAPSHOT"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "url": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT.jar",
+          "size": 1376168,
+          "sha512": "d46292e090c583f900dea28f322c4bbcda61eabbfa7189bbdb7e1447bc42bbb3f18ebabbd4ba1d8afa51e830342e29fdfc9ba5fe1f861cebc8c22de18a8289dd",
+          "sha256": "1405fc1e48e6afcd13a074e4207570b355d0d0ca69af0c5d196c711c6d801d2b",
+          "sha1": "93b55c84284bfc29160b9f737e24cc8642577187",
+          "md5": "74acbcb93fb858d1b760baaa48bb399d"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT-sources.jar",
+          "url": "nereus-kafka-bookkeeper-0.2.0-SNAPSHOT-sources.jar",
+          "size": 547523,
+          "sha512": "a518e7ffe4452d2ce338dd675bc41070140c8b7253b3047b13b2bac8ada84adbac3b345489bd257ed05f8262d127227bea87f9fe75834ce4238197a53f340ba6",
+          "sha256": "7aaf3a9c9c0c4ceddf767ddf8c27a9c90b7883cc408b9a6912d70871169523ad",
+          "sha1": "8a256e8c1d1613fca8bdaaa87c46f605876dadf1",
+          "md5": "d0fff7c63061e4cf143d0f4db897d21f"
+        }
+      ]
+    }
+  ]
+}

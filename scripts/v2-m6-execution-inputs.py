@@ -23,6 +23,7 @@ spec.loader.exec_module(INPUTS)
 REPOSITORIES = INPUTS.REPOSITORIES
 SCHEMA = "NEREUS_V2_M6_EXECUTION_INPUTS_V1"
 HISTORICAL = "docs/v2/evidence/"
+FINAL_OUTPUT = Path("docs/v2/evidence/v2-m6")
 # The Batch 0 tree preserves the published M0–M5 archive bytes, including their original
 # receipts and provenance. This archive identity is separate from the tested commits inside it.
 ARCHIVE_COMMIT = "704dc5a7134425d15bb8a7fdeb9cda757a01711b"
@@ -155,22 +156,27 @@ def capture(roots, output, historical_paths, runtime, runtime_budget):
         files = tree(root, commit)
         versions[key] = {"commit": commit, "tree": revision(root, f"{commit}^{{tree}}"), "files": files}
         archive = {}
+        retained = set()
         if key == "nereus":
             try:
                 git(root, "merge-base", "--is-ancestor", ARCHIVE_COMMIT, commit)
             except subprocess.CalledProcessError as error:
                 raise InputError("source is not descended from the published archive") from error
             archive = tree(root, ARCHIVE_COMMIT, HISTORICAL)
-            require({path: node for path, node in files.items() if path.startswith(HISTORICAL)} == archive,
+            retained = {path for path in files if Path(path).is_relative_to(FINAL_OUTPUT)}
+            require({path: node for path, node in files.items()
+                     if path.startswith(HISTORICAL) and path not in retained} == archive,
                     "tracked evidence differs from the published historical archive")
         # A gate such as the existing documentation aggregate can read the full, explicitly
         # inventoried historical archive. A runtime-only stage uses a narrower exact selection.
         selected = set(archive if historical_paths is None else historical_paths) if key == "nereus" else set()
         require(selected <= archive.keys(), "historical input is absent from its immutable archive origin")
-        eligible = (files.keys() - archive.keys()) | selected
+        eligible = (files.keys() - archive.keys() - retained) | selected
         current = source[key] = {}
         for path, node in files.items():
-            if path in archive:
+            if path in retained:
+                node["classification"] = "RETAINED_EXECUTION_OUTPUT"
+            elif path in archive:
                 if path in selected:
                     archive_bytes += node["bytes"]
                     require(archive_bytes <= ARCHIVE_BUDGET, "historical execution inputs exceed their byte budget")

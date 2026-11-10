@@ -1,0 +1,68 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :nereus-storage-api:compileJava
+> Task :nereus-domain:compileJava
+> Task :nereus-domain:processResources NO-SOURCE
+> Task :nereus-domain:classes
+> Task :nereus-domain:jar
+> Task :nereus-storage-bookkeeper:compileJava
+> Task :nereus-kafka-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:processResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:classes
+> Task :nereus-metadata-spi:compileJava
+> Task :nereus-storage-bookkeeper:compileTestJava
+> Task :nereus-storage-bookkeeper:processTestResources NO-SOURCE
+> Task :nereus-storage-bookkeeper:testClasses
+> Task :nereus-storage-bookkeeper:m5NativeDeleteFaultFixturesJar
+> Task :nereus-kafka-bookkeeper:processTestResources
+> Task :nereus-metadata-spi:processResources NO-SOURCE
+> Task :nereus-metadata-spi:classes
+> Task :nereus-metadata-spi:jar
+> Task :nereus-storage-api:processResources NO-SOURCE
+> Task :nereus-storage-api:classes
+> Task :nereus-storage-api:jar
+> Task :nereus-storage-bookkeeper:jar
+> Task :nereus-kafka-bookkeeper:processRealBookKeeperTestResources NO-SOURCE
+> Task :nereus-metadata-oxia:processResources NO-SOURCE
+> Task :nereus-storage-object-s3:processResources NO-SOURCE
+> Task :nereus-storage-object:compileJava
+> Task :nereus-storage-object:processResources NO-SOURCE
+> Task :nereus-storage-object:classes
+> Task :nereus-kafka-bookkeeper:compileJava
+> Task :nereus-kafka-bookkeeper:classes
+
+> Task :nereus-storage-object:compileTestJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/nereus-storage-object/src/test/java/com/nereusstream/storage/object/read/BindingReadM4KernelV1Test.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :nereus-storage-object:processTestResources
+> Task :nereus-storage-object:testClasses
+> Task :nereus-storage-object:m5DeleteTestFixturesJar
+> Task :nereus-metadata-oxia:compileJava
+> Task :nereus-storage-object:jar
+> Task :nereus-storage-object-s3:compileJava
+> Task :nereus-metadata-oxia:classes
+> Task :nereus-metadata-oxia:jar
+> Task :nereus-storage-object-s3:classes
+> Task :nereus-storage-object-s3:jar
+
+> Task :nereus-kafka-bookkeeper:compileTestJava
+Note: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/nereus-kafka-bookkeeper/src/test/java/com/nereusstream/kafka/bookkeeper/object/publication/KafkaObjectPublicationBridgeV1Test.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :nereus-kafka-bookkeeper:testClasses
+
+> Task :nereus-kafka-bookkeeper:test
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+
+> Task :nereus-kafka-bookkeeper:compileRealBookKeeperTestJava
+> Task :nereus-kafka-bookkeeper:realBookKeeperTestClasses
+
+> Task :nereus-kafka-bookkeeper:v2M5KafkaRunRootsRealTest
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+
+[Incubating] Problems report is available at: file:///Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 48s
+25 actionable tasks: 25 executed

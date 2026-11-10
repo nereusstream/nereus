@@ -1,0 +1,816 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+[2026-11-10 04:31:00,425] INFO Registered `kafka:type=kafka.Log4jController` MBean (kafka.utils.Log4jControllerRegistration$)
+[2026-11-10 04:31:00,596] INFO Registered signal handlers for TERM, INT, HUP (org.apache.kafka.common.utils.LoggingSignalHandler)
+[2026-11-10 04:31:00,598] INFO [BrokerServer id=1] Transition from SHUTDOWN to STARTING (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,598] INFO [SharedServer id=1] Starting SharedServer (kafka.server.SharedServer)
+[2026-11-10 04:31:00,624] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Recovering unflushed segment 0. 0 recovered for __cluster_metadata-0. (org.apache.kafka.storage.internals.log.LogLoader)
+[2026-11-10 04:31:00,625] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Loading producer state till offset 0 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,625] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Reloading from producer snapshot and rebuilding producer state from offset 0 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,626] INFO Deleted producer state snapshot /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs/__cluster_metadata-0/00000000000000000014.snapshot (org.apache.kafka.storage.internals.log.SnapshotFile)
+[2026-11-10 04:31:00,626] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Producer state recovery took 1ms for snapshot load and 0ms for segment recovery from offset 0 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,644] INFO [ProducerStateManager partition=__cluster_metadata-0] Wrote producer snapshot at offset 14 with 0 producer ids in 7 ms. (org.apache.kafka.storage.internals.log.ProducerStateManager)
+[2026-11-10 04:31:00,648] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Loading producer state till offset 14 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,648] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Reloading from producer snapshot and rebuilding producer state from offset 14 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,649] INFO [ProducerStateManager partition=__cluster_metadata-0] Loading producer state from snapshot file 'SnapshotFile(offset=14, file=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs/__cluster_metadata-0/00000000000000000014.snapshot)' (org.apache.kafka.storage.internals.log.ProducerStateManager)
+[2026-11-10 04:31:00,650] INFO [LogLoader partition=__cluster_metadata-0, dir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs] Producer state recovery took 2ms for snapshot load and 0ms for segment recovery from offset 14 (org.apache.kafka.storage.internals.log.UnifiedLog)
+[2026-11-10 04:31:00,657] INFO [RaftLog partition=__cluster_metadata-0] Initialized snapshots with IDs [] from /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs/__cluster_metadata-0 (org.apache.kafka.raft.internals.KafkaRaftLog)
+[2026-11-10 04:31:00,673] INFO [raft-expiration-reaper]: Starting (org.apache.kafka.raft.TimingWheelExpirationService$ExpiredOperationReaper)
+[2026-11-10 04:31:00,679] INFO [RaftManager id=1] Reading KRaft snapshot and log as part of the initialization (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:00,691] INFO [RaftManager id=1] Starting voters are VoterSet(voters={2=VoterNode(voterKey=ReplicaKey(id=2, directoryId=<undefined>), listeners=Endpoints(endpoints={ListenerName(CONTROLLER)=/127.0.0.1:62935}), supportedKRaftVersion=SupportedVersionRange[min_version:0, max_version:0])}) (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:00,693] INFO [RaftManager id=1] Starting request manager with static voters: [127.0.0.1:62935 (id: 2 rack: null isFenced: false)] (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:00,699] INFO [RaftManager id=1] Attempting durable transition to FollowerState(fetchTimeoutMs=2000, epoch=1, leader=2, leaderEndpoints=Endpoints(endpoints={ListenerName(CONTROLLER)=/127.0.0.1:62935}), votedKey=Optional.empty, voters=[2], highWatermark=Optional.empty, fetchingSnapshot=Optional.empty) from null (org.apache.kafka.raft.QuorumState)
+[2026-11-10 04:31:00,714] INFO [RaftManager id=1] Completed transition to FollowerState(fetchTimeoutMs=2000, epoch=1, leader=2, leaderEndpoints=Endpoints(endpoints={ListenerName(CONTROLLER)=/127.0.0.1:62935}), votedKey=Optional.empty, voters=[2], highWatermark=Optional.empty, fetchingSnapshot=Optional.empty) from null (org.apache.kafka.raft.QuorumState)
+[2026-11-10 04:31:00,729] INFO [kafka-1-raft-outbound-request-thread]: Starting (org.apache.kafka.raft.KafkaNetworkChannel$SendThread)
+[2026-11-10 04:31:00,729] INFO [kafka-1-raft-io-thread]: Starting (org.apache.kafka.raft.KafkaRaftClientDriver)
+[2026-11-10 04:31:00,741] INFO [MetadataLoader id=1] initializeNewPublishers: the loader is still catching up because we still don't know the high water mark yet. (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,742] INFO [BrokerServer id=1] Starting broker (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,747] INFO [broker-1-ThrottledChannelReaper-Fetch]: Starting (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:00,748] INFO [broker-1-ThrottledChannelReaper-Produce]: Starting (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:00,748] INFO [broker-1-ThrottledChannelReaper-Request]: Starting (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:00,749] INFO [broker-1-ThrottledChannelReaper-ControllerMutation]: Starting (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:00,786] INFO [BrokerServer id=1] Waiting for controller quorum voters future (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,786] INFO [BrokerServer id=1] Finished waiting for controller quorum voters future (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,788] INFO [broker-1-to-controller-forwarding-channel-manager]: Starting (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,789] INFO Recorded new KRaft controller, from now on will use node 127.0.0.1:62935 (id: 2 rack: null isFenced: false) (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,795] INFO [client-metrics-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,835] INFO [RaftManager id=1] Registered the listener org.apache.kafka.image.loader.MetadataLoader@65149419 (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:00,842] INFO [MetadataLoader id=1] initializeNewPublishers: the loader is still catching up because we still don't know the high water mark yet. (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,877] INFO Updated connection-accept-rate max connection creation rate to 2147483647 (kafka.network.ConnectionQuotas)
+[2026-11-10 04:31:00,883] INFO [RaftManager id=1] High watermark set to Optional[LogOffsetMetadata(offset=17, metadata=Optional.empty)] for the first time for epoch 1 (org.apache.kafka.raft.FollowerState)
+[2026-11-10 04:31:00,884] INFO [RaftManager id=1] Setting the next offset of org.apache.kafka.image.loader.MetadataLoader@65149419 to 0 since there are no snapshots (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:00,886] INFO [MetadataLoader id=1] maybePublishMetadata(LOG_DELTA): The loader is still catching up because we have loaded up to offset 0, but the high water mark is 17 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,888] INFO [SocketServer listenerType=BROKER, nodeId=1] Created data-plane acceptor and processors for endpoint : ListenerName(PLAINTEXT) (kafka.network.SocketServer)
+[2026-11-10 04:31:00,891] INFO [MetadataLoader id=1] maybePublishMetadata(LOG_DELTA): The loader finished catching up to the current high water mark of 17 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,891] INFO [broker-1-to-controller-alter-partition-channel-manager]: Starting (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,891] INFO Recorded new KRaft controller, from now on will use node 127.0.0.1:62935 (id: 2 rack: null isFenced: false) (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,892] INFO [MetadataLoader id=1] InitializeNewPublishers: initializing SnapshotGenerator with a snapshot at offset 16 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,895] INFO [broker-1-to-controller-directory-assignments-channel-manager]: Starting (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,895] INFO Recorded new KRaft controller, from now on will use node 127.0.0.1:62935 (id: 2 rack: null isFenced: false) (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,904] INFO [ExpirationReaper-1-Produce]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,904] INFO [ExpirationReaper-1-Fetch]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,904] INFO [ExpirationReaper-1-DeleteRecords]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,905] INFO [ExpirationReaper-1-RemoteFetch]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,905] INFO [ExpirationReaper-1-RemoteListOffsets]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,905] INFO [ExpirationReaper-1-ShareFetch]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,912] INFO [share-coordinator-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,923] INFO [share-coordinator-event-processor-0]: Starting (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:00,927] INFO [persister-state-manager-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,928] INFO [PersisterStateManager]: Starting (org.apache.kafka.server.share.persister.PersisterStateManager$SendThread)
+[2026-11-10 04:31:00,928] INFO [network-partition-metadata-client-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,929] INFO [group-coordinator-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,934] INFO [group-coordinator-event-processor-1]: Starting (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:00,934] INFO [group-coordinator-event-processor-0]: Starting (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:00,934] INFO [group-coordinator-event-processor-3]: Starting (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:00,934] INFO [group-coordinator-event-processor-2]: Starting (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:00,945] INFO [broker-1-to-controller-heartbeat-channel-manager]: Starting (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,945] INFO Recorded new KRaft controller, from now on will use node 127.0.0.1:62935 (id: 2 rack: null isFenced: false) (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:00,947] INFO [BrokerLifecycleManager id=1] Incarnation fHZ9KGn2QyOhyl99TdF6gA of broker 1 in cluster 7nyqINQyT7e0TEIiUxRHKA is now STARTING. (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:00,951] INFO [BrokerLifecycleManager id=1] Unable to register broker 1 because the controller returned error DUPLICATE_BROKER_REGISTRATION (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:00,953] INFO [share-group-lock-timeout-reaper]: Starting (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:00,962] INFO [ExpirationReaper-1-AlterAcls]: Starting (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:00,975] INFO [BrokerServer id=1] Waiting for the broker metadata publishers to be installed (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,975] INFO [BrokerServer id=1] Finished waiting for the broker metadata publishers to be installed (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,975] INFO [BrokerServer id=1] Waiting for the controller to acknowledge that we are caught up (kafka.server.BrokerServer)
+[2026-11-10 04:31:00,975] INFO [MetadataLoader id=1] InitializeNewPublishers: initializing MetadataVersionPublisher(id=1) with a snapshot at offset 16 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,976] INFO [MetadataLoader id=1] InitializeNewPublishers: initializing BrokerMetadataPublisher with a snapshot at offset 16 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:00,978] INFO [BrokerMetadataPublisher id=1] Publishing initial metadata at offset OffsetAndEpoch[offset=16, epoch=1] with metadata.version Optional[4.2-IV1]. (kafka.server.metadata.BrokerMetadataPublisher)
+[2026-11-10 04:31:00,979] INFO [LogDirFailureHandler]: Starting (kafka.server.ReplicaManager$LogDirFailureHandler)
+[2026-11-10 04:31:00,979] INFO [AddPartitionsToTxnSenderThread-1]: Starting (org.apache.kafka.server.transaction.AddPartitionsToTxnManager)
+[2026-11-10 04:31:00,981] INFO [GroupCoordinator id=1] Starting up. (org.apache.kafka.coordinator.group.GroupCoordinatorService)
+[2026-11-10 04:31:00,981] INFO [GroupCoordinator id=1] Startup complete. (org.apache.kafka.coordinator.group.GroupCoordinatorService)
+[2026-11-10 04:31:00,981] INFO [TransactionCoordinator id=1] Starting up. (kafka.coordinator.transaction.TransactionCoordinator)
+[2026-11-10 04:31:00,982] INFO [TxnMarkerSenderThread-1]: Starting (kafka.coordinator.transaction.TransactionMarkerChannelManager)
+[2026-11-10 04:31:00,982] INFO [TransactionCoordinator id=1] Startup complete. (kafka.coordinator.transaction.TransactionCoordinator)
+[2026-11-10 04:31:00,982] INFO [ShareCoordinator id=1] Starting up. (org.apache.kafka.coordinator.share.ShareCoordinatorService)
+[2026-11-10 04:31:00,982] INFO [ShareCoordinator id=1] Startup complete. (org.apache.kafka.coordinator.share.ShareCoordinatorService)
+[2026-11-10 04:31:00,988] INFO [DynamicConfigPublisher broker id=1] Updating cluster configuration : min.insync.replicas -> 1 (kafka.server.metadata.DynamicConfigPublisher)
+[2026-11-10 04:31:00,990] INFO KafkaConfig values: 
+	add.partitions.to.txn.retry.backoff.max.ms = 100
+	add.partitions.to.txn.retry.backoff.ms = 20
+	advertised.listeners = null
+	alter.config.policy.class.name = null
+	alter.log.dirs.replication.quota.window.num = 11
+	alter.log.dirs.replication.quota.window.size.seconds = 1
+	authorizer.class.name = 
+	auto.create.topics.enable = false
+	auto.leader.rebalance.enable = true
+	background.threads = 10
+	broker.heartbeat.interval.ms = 500
+	broker.id = 1
+	broker.rack = null
+	broker.session.timeout.ms = 3000
+	client.quota.callback.class = null
+	compression.gzip.level = -1
+	compression.lz4.level = 9
+	compression.type = producer
+	compression.zstd.level = 3
+	config.providers = []
+	connection.failed.authentication.delay.ms = 100
+	connections.max.idle.ms = 600000
+	connections.max.reauth.ms = 0
+	controlled.shutdown.enable = true
+	controller.listener.names = [CONTROLLER]
+	controller.performance.always.log.threshold.ms = 2000
+	controller.performance.sample.period.ms = 60000
+	controller.quorum.append.linger.ms = 25
+	controller.quorum.auto.join.enable = false
+	controller.quorum.bootstrap.servers = []
+	controller.quorum.election.backoff.max.ms = 1000
+	controller.quorum.election.timeout.ms = 1000
+	controller.quorum.fetch.timeout.ms = 2000
+	controller.quorum.request.timeout.ms = 2000
+	controller.quorum.retry.backoff.ms = 20
+	controller.quorum.voters = [2@127.0.0.1:62935]
+	controller.quota.window.num = 11
+	controller.quota.window.size.seconds = 1
+	controller.socket.timeout.ms = 30000
+	create.topic.policy.class.name = null
+	default.replication.factor = 1
+	delegation.token.expiry.check.interval.ms = 3600000
+	delegation.token.expiry.time.ms = 86400000
+	delegation.token.max.lifetime.ms = 604800000
+	delegation.token.secret.key = null
+	delete.records.purgatory.purge.interval.requests = 1
+	delete.topic.enable = true
+	early.start.listeners = null
+	fetch.max.bytes = 57671680
+	fetch.purgatory.purge.interval.requests = 1000
+	follower.fetch.last.tiered.offset.enable = false
+	group.consumer.assignors = [uniform, range]
+	group.consumer.heartbeat.interval.ms = 5000
+	group.consumer.max.heartbeat.interval.ms = 15000
+	group.consumer.max.session.timeout.ms = 60000
+	group.consumer.max.size = 2147483647
+	group.consumer.migration.policy = bidirectional
+	group.consumer.min.heartbeat.interval.ms = 5000
+	group.consumer.min.session.timeout.ms = 45000
+	group.consumer.regex.refresh.interval.ms = 600000
+	group.consumer.session.timeout.ms = 45000
+	group.coordinator.append.linger.ms = -1
+	group.coordinator.cached.buffer.max.bytes = 1048588
+	group.coordinator.rebalance.protocols = [classic, consumer, streams]
+	group.coordinator.threads = 4
+	group.initial.rebalance.delay.ms = 3000
+	group.max.session.timeout.ms = 1800000
+	group.max.size = 2147483647
+	group.min.session.timeout.ms = 6000
+	group.share.assignors = [simple]
+	group.share.delivery.count.limit = 5
+	group.share.enable = false
+	group.share.heartbeat.interval.ms = 5000
+	group.share.initialize.retry.interval.ms = 30000
+	group.share.max.heartbeat.interval.ms = 15000
+	group.share.max.record.lock.duration.ms = 60000
+	group.share.max.session.timeout.ms = 60000
+	group.share.max.share.sessions = 2000
+	group.share.max.size = 200
+	group.share.min.heartbeat.interval.ms = 5000
+	group.share.min.record.lock.duration.ms = 15000
+	group.share.min.session.timeout.ms = 45000
+	group.share.partition.max.record.locks = 2000
+	group.share.persister.class.name = org.apache.kafka.server.share.persister.DefaultStatePersister
+	group.share.record.lock.duration.ms = 30000
+	group.share.session.timeout.ms = 45000
+	group.streams.heartbeat.interval.ms = 5000
+	group.streams.initial.rebalance.delay.ms = 3000
+	group.streams.max.heartbeat.interval.ms = 15000
+	group.streams.max.session.timeout.ms = 60000
+	group.streams.max.size = 2147483647
+	group.streams.max.standby.replicas = 2
+	group.streams.min.heartbeat.interval.ms = 5000
+	group.streams.min.session.timeout.ms = 45000
+	group.streams.num.standby.replicas = 0
+	group.streams.session.timeout.ms = 45000
+	initial.broker.registration.timeout.ms = 60000
+	inter.broker.listener.name = PLAINTEXT
+	internal.metadata.delete.delay.millis = 60000
+	internal.metadata.log.segment.bytes = null
+	internal.metadata.max.batch.size.in.bytes = 8388608
+	internal.metadata.max.fetch.size.in.bytes = 8388608
+	kafka.metrics.polling.interval.secs = 10
+	kafka.metrics.reporters = []
+	leader.imbalance.check.interval.seconds = 300
+	listener.security.protocol.map = CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+	listeners = [PLAINTEXT://127.0.0.1:62934]
+	log.cleaner.backoff.ms = 15000
+	log.cleaner.dedupe.buffer.size = 134217728
+	log.cleaner.delete.retention.ms = 86400000
+	log.cleaner.enable = false
+	log.cleaner.io.buffer.load.factor = 0.9
+	log.cleaner.io.buffer.size = 524288
+	log.cleaner.io.max.bytes.per.second = 1.7976931348623157E308
+	log.cleaner.max.compaction.lag.ms = 9223372036854775807
+	log.cleaner.min.cleanable.ratio = 0.5
+	log.cleaner.min.compaction.lag.ms = 0
+	log.cleaner.threads = 1
+	log.cleanup.policy = [delete]
+	log.dir = [/tmp/kafka-logs]
+	log.dir.failure.timeout.ms = 30000
+	log.dirs = [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/logs]
+	log.flush.interval.messages = 9223372036854775807
+	log.flush.interval.ms = null
+	log.flush.offset.checkpoint.interval.ms = 60000
+	log.flush.scheduler.interval.ms = 9223372036854775807
+	log.flush.start.offset.checkpoint.interval.ms = 60000
+	log.index.interval.bytes = 4096
+	log.index.size.max.bytes = 10485760
+	log.initial.task.delay.ms = 30000
+	log.local.retention.bytes = -2
+	log.local.retention.ms = -2
+	log.message.timestamp.after.max.ms = 3600000
+	log.message.timestamp.before.max.ms = 9223372036854775807
+	log.message.timestamp.type = CreateTime
+	log.preallocate = false
+	log.retention.bytes = -1
+	log.retention.check.interval.ms = 300000
+	log.retention.hours = 168
+	log.retention.minutes = null
+	log.retention.ms = null
+	log.roll.hours = 168
+	log.roll.jitter.hours = 0
+	log.roll.jitter.ms = null
+	log.roll.ms = null
+	log.segment.bytes = 1073741824
+	log.segment.delete.delay.ms = 60000
+	max.connection.creation.rate = 2147483647
+	max.connections = 2147483647
+	max.connections.per.ip = 2147483647
+	max.connections.per.ip.overrides = 
+	max.incremental.fetch.session.cache.slots = 1000
+	max.request.partition.size.limit = 2000
+	message.max.bytes = 4096
+	metadata.log.dir = null
+	metadata.log.max.record.bytes.between.snapshots = 20971520
+	metadata.log.max.snapshot.interval.ms = 3600000
+	metadata.log.segment.bytes = 1073741824
+	metadata.log.segment.ms = 604800000
+	metadata.max.idle.interval.ms = 500
+	metadata.max.retention.bytes = 104857600
+	metadata.max.retention.ms = 604800000
+	metric.reporters = [org.apache.kafka.common.metrics.JmxReporter]
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	min.insync.replicas = 1
+	nereus.kafka.bookkeeper.capability.file = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/capability.properties
+	nereus.kafka.storage.activation.required = true
+	nereus.kafka.storage.append.executor.queue.capacity = 4096
+	nereus.kafka.storage.append.executor.threads = 20
+	nereus.kafka.storage.append.inflight.bytes = 536870912
+	nereus.kafka.storage.append.request.bytes = 134217728
+	nereus.kafka.storage.append.timeout.ms = 30000
+	nereus.kafka.storage.bookkeeper.ack.quorum.size = 2
+	nereus.kafka.storage.bookkeeper.allocation.timeout.ms = 20000
+	nereus.kafka.storage.bookkeeper.cluster.alias = nsip-real-bk
+	nereus.kafka.storage.bookkeeper.delete.timeout.ms = 30000
+	nereus.kafka.storage.bookkeeper.deployment.id = Ls3rvfUrRpiPWwLFibMw0g
+	nereus.kafka.storage.bookkeeper.digest.type = CRC32C
+	nereus.kafka.storage.bookkeeper.ensemble.size = 3
+	nereus.kafka.storage.bookkeeper.gc.drain.grace.ms = 300000
+	nereus.kafka.storage.bookkeeper.gc.dry.run = true
+	nereus.kafka.storage.bookkeeper.gc.enabled = false
+	nereus.kafka.storage.bookkeeper.gc.late.create.audit.grace.ms = 604800000
+	nereus.kafka.storage.bookkeeper.gc.max.clock.skew.ms = 30000
+	nereus.kafka.storage.bookkeeper.gc.max.concurrent.deletes = 1
+	nereus.kafka.storage.bookkeeper.m5.gc.audit.policy.file = null
+	nereus.kafka.storage.bookkeeper.m5.gc.grace.ms = 0
+	nereus.kafka.storage.bookkeeper.m5.gc.profile = null
+	nereus.kafka.storage.bookkeeper.max.append.ranges.per.ledger = 1000
+	nereus.kafka.storage.bookkeeper.max.bytes.per.ledger = 268435456
+	nereus.kafka.storage.bookkeeper.max.entries.per.ledger = 100000
+	nereus.kafka.storage.bookkeeper.max.ledger.age.ms = 3600000
+	nereus.kafka.storage.bookkeeper.max.read.bytes.inflight = 67108864
+	nereus.kafka.storage.bookkeeper.max.reader.leases.per.ledger = 64
+	nereus.kafka.storage.bookkeeper.max.reads.inflight = 8
+	nereus.kafka.storage.bookkeeper.max.uncertain.allocations = 32
+	nereus.kafka.storage.bookkeeper.max.writes.inflight = 8
+	nereus.kafka.storage.bookkeeper.metadata.service.uri = zk://127.0.0.1:2181/ledgers
+	nereus.kafka.storage.bookkeeper.operation.timeout.ms = 30000
+	nereus.kafka.storage.bookkeeper.password.file = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/password
+	nereus.kafka.storage.bookkeeper.password.version = bk-k0-no-auth:v1
+	nereus.kafka.storage.bookkeeper.protection.slots.per.range = 8
+	nereus.kafka.storage.bookkeeper.provider.scope.sha256 = 0000000000000000000000000000000000000000000000000000000000000001
+	nereus.kafka.storage.bookkeeper.reader.lease.renew.ms = 30000
+	nereus.kafka.storage.bookkeeper.reader.lease.ttl.ms = 120000
+	nereus.kafka.storage.bookkeeper.retention.page.size = 256
+	nereus.kafka.storage.bookkeeper.retention.scan.interval.ms = 60000
+	nereus.kafka.storage.bookkeeper.seal.timeout.ms = 30000
+	nereus.kafka.storage.bookkeeper.write.quorum.size = 3
+	nereus.kafka.storage.cache.dir = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1/cache
+	nereus.kafka.storage.capability.expiry.ms = 30000
+	nereus.kafka.storage.capability.heartbeat.ms = 5000
+	nereus.kafka.storage.checkpoint.interval.bytes = 1073741824
+	nereus.kafka.storage.checkpoint.interval.ms = 300000
+	nereus.kafka.storage.checkpoint.interval.records = 1000000
+	nereus.kafka.storage.checkpoint.max.bytes = 1073741824
+	nereus.kafka.storage.checkpoint.retained.references = 3
+	nereus.kafka.storage.cluster = 1txgzn7oRjiTde8UetpGXA
+	nereus.kafka.storage.compaction.decode.max.ratio = 100
+	nereus.kafka.storage.compaction.decode.max.uncompressed.bytes = 1073741824
+	nereus.kafka.storage.compaction.enabled = true
+	nereus.kafka.storage.compaction.key.max.bytes = 1048576
+	nereus.kafka.storage.compaction.max.concurrent.tasks = 8
+	nereus.kafka.storage.compaction.spill.dir = null
+	nereus.kafka.storage.compaction.spill.max.bytes = 107374182400
+	nereus.kafka.storage.compaction.task.max.records = 100000000
+	nereus.kafka.storage.compaction.task.max.source.bytes = 8589934592
+	nereus.kafka.storage.compaction.worker.threads = 4
+	nereus.kafka.storage.enabled = true
+	nereus.kafka.storage.fetch.executor.queue.capacity = 4096
+	nereus.kafka.storage.fetch.executor.threads = 40
+	nereus.kafka.storage.fetch.inflight.bytes = 1073741824
+	nereus.kafka.storage.fetch.max.entry.bytes = 67108864
+	nereus.kafka.storage.fetch.max.response.bytes = 134217728
+	nereus.kafka.storage.fetch.operation.max.rereads = 1024
+	nereus.kafka.storage.fetch.timeout.ms = 30000
+	nereus.kafka.storage.lifecycle.executor.queue.capacity = 2048
+	nereus.kafka.storage.lifecycle.executor.threads = 8
+	nereus.kafka.storage.materialization.append.replay.grace.ms = 21600000
+	nereus.kafka.storage.materialization.metadata.audit.grace.ms = 86400000
+	nereus.kafka.storage.materialization.source.retirement.grace.ms = 3600000
+	nereus.kafka.storage.object.bucket = nereus-m6-f61e1068-bc00-4550-ada9-484f88005271
+	nereus.kafka.storage.object.capability.file = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/object-capability
+	nereus.kafka.storage.object.credentials.file = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/object-credentials
+	nereus.kafka.storage.object.endpoint = http://127.0.0.1:62876
+	nereus.kafka.storage.object.path.style.access = true
+	nereus.kafka.storage.object.provider = s3
+	nereus.kafka.storage.object.region = us-east-1
+	nereus.kafka.storage.object.wal.vault.endpoint = http://127.0.0.1:62841
+	nereus.kafka.storage.object.wal.vault.key = vault-transit://transit/keys/nereus-kafka-wal
+	nereus.kafka.storage.object.wal.vault.token.file = /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/unauthorized-vault-token
+	nereus.kafka.storage.oxia.namespace = default
+	nereus.kafka.storage.oxia.service.address = 127.0.0.1:62874
+	nereus.kafka.storage.profile = OBJECT_WAL_SYNC_OBJECT
+	nereus.kafka.storage.readiness.timeout.ms = 300000
+	nereus.kafka.storage.recovery.chunk.bytes = 268435456
+	nereus.kafka.storage.recovery.chunk.records = 100000
+	nereus.kafka.storage.recovery.executor.threads = 8
+	nereus.kafka.storage.recovery.timeout.ms = 60000
+	nereus.kafka.storage.recovery.warn.bytes = 8589934592
+	nereus.kafka.storage.registry.scan.interval.ms = 30000
+	nereus.kafka.storage.registry.scan.page.size = 256
+	nereus.kafka.storage.retention.check.interval.ms = 1000
+	nereus.kafka.storage.session.renew.failure.grace = 2
+	nereus.kafka.storage.session.renew.interval.ms = 5000
+	nereus.kafka.storage.session.ttl.ms = 30000
+	nereus.kafka.storage.shutdown.checkpoint.timeout.ms = 60000
+	nereus.kafka.storage.shutdown.drain.timeout.ms = 120000
+	node.id = 1
+	num.io.threads = 8
+	num.network.threads = 3
+	num.partitions = 1
+	num.recovery.threads.per.data.dir = 2
+	num.replica.alter.log.dirs.threads = null
+	num.replica.fetchers = 1
+	offset.metadata.max.bytes = 4096
+	offsets.commit.timeout.ms = 5000
+	offsets.load.buffer.size = 5242880
+	offsets.retention.check.interval.ms = 600000
+	offsets.retention.minutes = 10080
+	offsets.topic.compression.codec = 0
+	offsets.topic.num.partitions = 1
+	offsets.topic.replication.factor = 1
+	offsets.topic.segment.bytes = 104857600
+	principal.builder.class = class org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder
+	process.roles = [broker]
+	producer.id.expiration.check.interval.ms = 600000
+	producer.id.expiration.ms = 86400000
+	producer.purgatory.purge.interval.requests = 1000
+	queued.max.request.bytes = -1
+	queued.max.requests = 500
+	quota.window.num = 11
+	quota.window.size.seconds = 1
+	remote.fetch.max.wait.ms = 500
+	remote.list.offsets.request.timeout.ms = 30000
+	remote.log.index.file.cache.total.size.bytes = 1073741824
+	remote.log.index.file.cache.ttl.ms = 900000
+	remote.log.manager.copier.thread.pool.size = 10
+	remote.log.manager.copy.max.bytes.per.second = 9223372036854775807
+	remote.log.manager.copy.quota.window.num = 11
+	remote.log.manager.copy.quota.window.size.seconds = 1
+	remote.log.manager.expiration.thread.pool.size = 10
+	remote.log.manager.fetch.max.bytes.per.second = 9223372036854775807
+	remote.log.manager.fetch.quota.window.num = 11
+	remote.log.manager.fetch.quota.window.size.seconds = 1
+	remote.log.manager.follower.thread.pool.size = 2
+	remote.log.manager.task.interval.ms = 30000
+	remote.log.manager.task.retry.backoff.max.ms = 30000
+	remote.log.manager.task.retry.backoff.ms = 500
+	remote.log.manager.task.retry.jitter = 0.2
+	remote.log.manager.thread.pool.size = 2
+	remote.log.metadata.custom.metadata.max.bytes = 128
+	remote.log.metadata.manager.class.name = org.apache.kafka.server.log.remote.metadata.storage.TopicBasedRemoteLogMetadataManager
+	remote.log.metadata.manager.class.path = null
+	remote.log.metadata.manager.impl.prefix = rlmm.config.
+	remote.log.metadata.manager.listener.name = null
+	remote.log.reader.max.pending.tasks = 100
+	remote.log.reader.threads = 10
+	remote.log.storage.manager.class.name = null
+	remote.log.storage.manager.class.path = null
+	remote.log.storage.manager.impl.prefix = rsm.config.
+	remote.log.storage.system.enable = false
+	replica.fetch.backoff.ms = 1000
+	replica.fetch.max.bytes = 1048576
+	replica.fetch.min.bytes = 1
+	replica.fetch.response.max.bytes = 10485760
+	replica.fetch.wait.max.ms = 500
+	replica.high.watermark.checkpoint.interval.ms = 5000
+	replica.lag.time.max.ms = 30000
+	replica.selector.class = null
+	replica.socket.receive.buffer.bytes = 65536
+	replica.socket.timeout.ms = 30000
+	replication.quota.window.num = 11
+	replication.quota.window.size.seconds = 1
+	request.timeout.ms = 30000
+	sasl.client.callback.handler.class = null
+	sasl.enabled.mechanisms = [GSSAPI]
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.principal.to.local.rules = [DEFAULT]
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism.controller.protocol = GSSAPI
+	sasl.mechanism.inter.broker.protocol = GSSAPI
+	sasl.oauthbearer.assertion.algorithm = RS256
+	sasl.oauthbearer.assertion.claim.aud = null
+	sasl.oauthbearer.assertion.claim.exp.seconds = 300
+	sasl.oauthbearer.assertion.claim.iss = null
+	sasl.oauthbearer.assertion.claim.jti.include = false
+	sasl.oauthbearer.assertion.claim.nbf.seconds = 60
+	sasl.oauthbearer.assertion.claim.sub = null
+	sasl.oauthbearer.assertion.file = null
+	sasl.oauthbearer.assertion.private.key.file = null
+	sasl.oauthbearer.assertion.private.key.passphrase = null
+	sasl.oauthbearer.assertion.template.file = null
+	sasl.oauthbearer.client.credentials.client.id = null
+	sasl.oauthbearer.client.credentials.client.secret = null
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = []
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.jwt.retriever.class = class org.apache.kafka.common.security.oauthbearer.DefaultJwtRetriever
+	sasl.oauthbearer.jwt.validator.class = class org.apache.kafka.common.security.oauthbearer.DefaultJwtValidator
+	sasl.oauthbearer.scope = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	sasl.server.callback.handler.class = null
+	sasl.server.max.receive.size = 524288
+	security.inter.broker.protocol = PLAINTEXT
+	security.providers = null
+	server.max.startup.time.ms = 9223372036854775807
+	share.coordinator.append.linger.ms = -1
+	share.coordinator.cached.buffer.max.bytes = 1048588
+	share.coordinator.cold.partition.snapshot.interval.ms = 300000
+	share.coordinator.load.buffer.size = 5242880
+	share.coordinator.snapshot.update.records.per.snapshot = 500
+	share.coordinator.state.topic.compression.codec = 0
+	share.coordinator.state.topic.min.isr = 1
+	share.coordinator.state.topic.num.partitions = 50
+	share.coordinator.state.topic.prune.interval.ms = 300000
+	share.coordinator.state.topic.replication.factor = 1
+	share.coordinator.state.topic.segment.bytes = 104857600
+	share.coordinator.threads = 1
+	share.coordinator.write.timeout.ms = 5000
+	share.fetch.purgatory.purge.interval.requests = 1000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	socket.listen.backlog.size = 50
+	socket.receive.buffer.bytes = 102400
+	socket.request.max.bytes = 104857600
+	socket.send.buffer.bytes = 102400
+	ssl.allow.dn.changes = false
+	ssl.allow.san.changes = false
+	ssl.cipher.suites = []
+	ssl.client.auth = none
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.principal.mapping.rules = DEFAULT
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	telemetry.max.bytes = 1048576
+	transaction.abort.timed.out.transaction.cleanup.interval.ms = 10000
+	transaction.max.timeout.ms = 900000
+	transaction.partition.verification.enable = true
+	transaction.remove.expired.transaction.cleanup.interval.ms = 3600000
+	transaction.state.log.load.buffer.size = 5242880
+	transaction.state.log.min.isr = 1
+	transaction.state.log.num.partitions = 1
+	transaction.state.log.replication.factor = 1
+	transaction.state.log.segment.bytes = 104857600
+	transaction.two.phase.commit.enable = false
+	transactional.id.expiration.ms = 604800000
+	unclean.leader.election.enable = false
+	unclean.leader.election.interval.ms = 300000
+	unstable.api.versions.enable = false
+	unstable.feature.versions.enable = false
+ (org.apache.kafka.common.config.AbstractConfig)
+[2026-11-10 04:31:00,994] INFO [BrokerMetadataPublisher id=1] Feature share.version has been updated to version 1 (kafka.server.metadata.BrokerMetadataPublisher)
+[2026-11-10 04:31:00,994] INFO [MetadataLoader id=1] InitializeNewPublishers: initializing BrokerRegistrationTracker(id=1) with a snapshot at offset 16 (org.apache.kafka.image.loader.MetadataLoader)
+[2026-11-10 04:31:01,106] INFO Creating managed GRPC connection (io.oxia.client.grpc.ConnectionManager)
+[2026-11-10 04:31:01,257] INFO BookKeeper metadata driver manager initialized (org.apache.bookkeeper.meta.MetadataDrivers)
+[2026-11-10 04:31:01,258] INFO Initialize zookeeper metadata driver at metadata service uri (org.apache.bookkeeper.meta.zk.ZKMetadataDriverBase)
+[2026-11-10 04:31:01,263] INFO Client environment:zookeeper.version=3.9.5-293c895a8d966a3ecb92872be4a1daf87d725da2, built on 2026-02-11 20:18 UTC (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,263] INFO Client environment:host.name=localhost (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,263] INFO Client environment:java.version=21.0.9 (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,263] INFO Client environment:java.vendor=Azul Systems, Inc. (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,263] INFO Client environment:java.home=/Users/liusinan/.sdkman/candidates/java/21.0.9-zulu/zulu-21.jdk/Contents/Home (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,263] INFO Client environment:java.class.path=/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/core/build/classes/java/main:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/core/build/classes/scala/main:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/core/build/resources/main:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/server/build/libs/kafka-server-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/group-coordinator/build/libs/kafka-group-coordinator-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/transaction-coordinator/build/libs/kafka-transaction-coordinator-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/share-coordinator/build/libs/kafka-share-coordinator-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/coordinator-common/build/libs/kafka-coordinator-common-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/metadata/build/libs/kafka-metadata-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/raft/build/libs/kafka-raft-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/storage/build/libs/kafka-storage-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/storage/api/build/libs/kafka-storage-api-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/server-common/build/libs/kafka-server-common-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/group-coordinator/group-coordinator-api/build/libs/kafka-group-coordinator-api-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/tools/tools-api/build/libs/kafka-tools-api-4.3.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/clients/build/libs/kafka-clients-4.3.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.typesafe.scala-logging/scala-logging_2.13/3.9.6/f887ff84d87e3e9c89e28f8a4064bf74d1eacbb4/scala-logging_2.13-3.9.6.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.scala-lang/scala-reflect/2.13.18/674f3bd39f5c528d575da69c42a5dff772b9b75c/scala-reflect-2.13.18.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.scala-lang/scala-library/2.13.18/eb2086988c25b08705472cc750654570900362e5/scala-library-2.13.18.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/net.sourceforge.argparse4j/argparse4j/0.7.0/6f0621d0c3888de39e0f06d01f37ba53a798e657/argparse4j-0.7.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-validator/commons-validator/1.10.1/cdf5c2a69aad509c4db54786f19f1e1ccc471bcf/commons-validator-1.10.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.datatype/jackson-datatype-jdk8/2.20.1/6a8bbc260ba834f67220117d9f08510d69c4a3f0/jackson-datatype-jdk8-2.20.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml/2.20.1/e6da043059c9ec631a3429ded461d5d92f240c3f/jackson-dataformat-yaml-2.20.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-metadata-oxia/0.2.0-SNAPSHOT/2cc370fb3fe33600cd9d081321b386a822318317/nereus-metadata-oxia-0.2.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-kafka-bookkeeper/0.2.0-SNAPSHOT/93b55c84284bfc29160b9f737e24cc8642577187/nereus-kafka-bookkeeper-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-storage-bookkeeper/0.2.0-SNAPSHOT/fae94b62c4c6e106c0426dbe1451b29c373e51cf/nereus-storage-bookkeeper-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/bookkeeper-server/4.18.0/ac9d448605297d82b060a338092044af334639bf/bookkeeper-server-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/bookkeeper-tools-framework/4.18.0/a51b41a2c25f9dbb6d4ec5ee857e581717621c27/bookkeeper-tools-framework-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/bookkeeper-common/4.18.0/43472f7fc43c73c8baac215eab9e6838bd5a2c9e/bookkeeper-common-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper.http/http-server/4.18.0/f00018fbe98e6628a55a51cbc1fd818804c76819/http-server-4.18.0.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-core/2.20.1/5734323adfece72111769b0ae38a6cf803e3d178/jackson-core-2.20.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-csv/2.20.1/ffb58a7ca86de15771c039a3751e60e5308538ae/jackson-dataformat-csv-2.20.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.20.1/9586a7fe0e1775de0e54237fa6a2c8455c93ac06/jackson-databind-2.20.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/net.sf.jopt-simple/jopt-simple/5.0.4/4fdac2fbe92dfad86aa6e9301736f6b4342a3f5c/jopt-simple-5.0.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.bitbucket.b_c/jose4j/0.9.6/357a3836bb5da16f314f3a1e954518e5468cd915/jose4j-0.9.6.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.yammer.metrics/metrics-core/2.2.0/f82c035cfa786d3cbec362c38c22a5f5b1bc8724/metrics-core-2.2.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/bookkeeper-common-allocator/4.18.0/e3ca25d5d06616c1f36a42ef8cd27453ee862642/bookkeeper-common-allocator-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/bookkeeper-proto/4.18.0/28cb4f89b15950ca0639d1def1557bbf51cd1bbb/bookkeeper-proto-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/native-io/4.18.0/45cbbf3a21059d28d046bb0502342ec9752a32a2/native-io-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.zookeeper/zookeeper/3.9.5/4f091e2a604d7c6a818ac2a7169e3bad5a5441dc/zookeeper-3.9.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-storage-object-s3/0.2.0-SNAPSHOT/6009c7d17dd09dbf4ce0cdd396996781de4f7014/nereus-storage-object-s3-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/s3/2.47.5/a99670649c731f9f016d5975a2e5c2e4a8c63c40/s3-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/netty-nio-client/2.47.5/4b336dae0091c12d8aef90cadb02042e6498eee7/netty-nio-client-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/aws-xml-protocol/2.47.5/2414ede4df130989cf6f1af5ca5cc519100c2d3f/aws-xml-protocol-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/aws-query-protocol/2.47.5/7fd01611f14008ebd45efae1e73f2dfd84c95c26/aws-query-protocol-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/protocol-core/2.47.5/33a5c7160281d4410fa802ac9b72c0bf4f3fa6f1/protocol-core-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/aws-core/2.47.5/bd7fb571402118a540795abdedc25b8cfd9e8f98/aws-core-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/auth/2.47.5/1b4227e3a7935747a37cb5e8c6bbb7ff08b1c255/auth-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/regions/2.47.5/21bd08dfbcb359b25d90562ba5d78dd56619d052/regions-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/sdk-core/2.47.5/eaad4a5ebbb551afde6a1a25b7e652f50188983e/sdk-core-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/apache5-client/2.47.5/633a0d808e4531ec4b842584531be9a318d8e293/apache5-client-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/arns/2.47.5/174052dcbb163a92e43dca80bf969189748689ad/arns-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/profiles/2.47.5/f19ef891a9204e84e2f2d14077c3c24fa24fdfc7/profiles-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/http-auth/2.47.5/8e119e7669892516048abc9673d65dfc5755844b/http-auth-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/http-auth-aws/2.47.5/baffc4a83e7ccb44ba14c8e8ea2508f55b1a9a5c/http-auth-aws-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/http-auth-spi/2.47.5/6be644cf63af5c883a7149a0c26fc291368a60e1/http-auth-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/identity-spi/2.47.5/c37bd2e0a6dfc58c3f72d52d830f656c99c28b43/identity-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/checksums/2.47.5/99c73f82ea7385ffb90e771979bfea51adbea172/checksums-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/retries/2.47.5/2a2f4a6b2b9a3c90c3f0ff54bf359f10791ae9cf/retries-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/retries-spi/2.47.5/d306a93dbd335c8ae6e01bda6724196a74d0989c/retries-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/http-client-spi/2.47.5/7d7c3f250a67452cdccc484f1d79ac1064c7a2c3/http-client-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/metrics-spi/2.47.5/82a6f3d3c0f881c828d94cfd7abc5838b6e86090/metrics-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/json-utils/2.47.5/c86aefcb7aa50d1dd518473a55656b876d7e293b/json-utils-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/crt-core/2.47.5/84609f968c311eb480f555f538109d8064c15898/crt-core-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/utils/2.47.5/fe301bd8f72e8db4d79735dd615e5aaa49c2cb56/utils-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper.stats/bookkeeper-stats-api/4.18.0/e0ad126132c657889bc322d23955f4a2cab85874/bookkeeper-stats-api-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/native-library-common/4.18.0/9c4e7743364961102f96cebaba976456874cfe0f/native-library-common-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents.client5/httpclient5/5.6.2/10ab45a37a2f4174492045840cdb5eb12c4336e7/httpclient5-5.6.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/2.0.13/80229737f704b121a318bba5d5deacbcf395bc77/slf4j-api-2.0.13.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.re2j/re2j/1.8/12c25e923e9e4fb1575a7640a2698745c6f19a94/re2j-1.8.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-storage-object-vault/0.2.0-SNAPSHOT/e51d9a222142081e1155e03dda190c885032bea2/nereus-storage-object-vault-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/circe-checksum/4.18.0/1d3f73548459dd6f31f8f49e575fc4081966ca3/circe-checksum-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.bookkeeper/cpu-affinity/4.18.0/eb4533e864b211413af0e150678ac578d1049c0e/cpu-affinity-4.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-core/2.25.3/dd9c8ecba5c8dc5e1574804d0bfdc1ef155ad9ea/log4j-core-2.25.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-api/2.25.3/fb385330d89c2d61058ef649403f214633569205/log4j-api-2.25.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.github.ben-manes.caffeine/caffeine/3.2.0/35eba09997476a39492ac7f7b2bb0e8292c09d17/caffeine-3.2.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.jspecify/jspecify/1.0.0/7425a601c1c7ec76645a78d22b8c6a627edee507/jspecify-1.0.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-netty-shaded/1.75.0/fc098b0cad2a1085d17dbef2356f6485d4aab88b/grpc-netty-shaded-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-services/1.75.0/3ed3ebdc3ea91f70e67deb5af8ffca12ca0d2c5d/grpc-services-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-stub/1.75.0/2def36acc24580a2414e17339f94d10b7c057361/grpc-stub-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf/1.75.0/860c62ef62ddf24e0f2b04459d846b269f5fa7b9/grpc-protobuf-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-util/1.75.0/7e947cd64e9419a1d005b22ab39ff04045e931b8/grpc-util-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-core/1.75.0/c042165745c0bb4f80774ec066659dce7064aaef/grpc-core-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf-lite/1.75.0/d6f87ed690a382c7340ff71c521daf4be3f1c7eb/grpc-protobuf-lite-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-context/1.75.0/48b9b21360450b15a734f77d2ed89f1cf67304c0/grpc-context-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-api/1.75.0/18ddd409fb9bc0209d216854ca584d027e68210b/grpc-api-1.75.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java-util/3.25.8/be3cb8bef1415d3b87cf5bf4de0b9149f6a0990/protobuf-java-util-3.25.8.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.guava/guava/32.0.1-jre/6e5d51a72d142f2d40a57dfb897188b36a95b489/guava-32.0.1-jre.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson/2.11.0/527175ca6d81050b53bdd4c457a6d6e017626b0e/gson-2.11.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.errorprone/error_prone_annotations/2.38.0/fc0ae991433e8590ba51cd558421478318a74c8c/error_prone_annotations-2.38.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-beanutils/commons-beanutils/1.11.0/ac03ea606d13de04c2e4508227680faff151f491/commons-beanutils-1.11.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpclient/4.5.13/e5f6cae5ca7ecaac1ec2827a9e2d65ae2869cada/httpclient-4.5.13.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-configuration2/2.12.0/cab81350c85ca35db8c47621a19dcddf128883f/commons-configuration2-2.12.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.3.5/a3fcc5d3c29b2b03433aa2d2f2d2c1b1638924a1/commons-logging-1.3.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-collections/commons-collections/3.2.2/8ad72fe39fa8c91eaaf12aadb21e0c3661fe26d5/commons-collections-3.2.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-digester/commons-digester/2.1/73a8001e7a54a255eef0f03521ec1805dc738ca0/commons-digester-2.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-annotations/2.20/6a5e7291ea3f2b590a7ce400adb7b3aea4d7e12c/jackson-annotations-2.20.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.yaml/snakeyaml/2.4/e0666b825b796f85521f02360e77f4c92c5a7a07/snakeyaml-2.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-storage-object/0.2.0-SNAPSHOT/82437f2e70fad46fed671be0c6dfd5e915717001/nereus-storage-object-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-storage-api/0.2.0-SNAPSHOT/889b1cbcaf8ec0fd1dc259cadb46b3dcd6c02c30/nereus-storage-api-0.2.0-SNAPSHOT.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.nereusstream/nereus-metadata-spi/0.2.0-SNAPSHOT/43172ea7b872c2e753c92ea2cda98c49c9548872/nereus-metadata-spi-0.2.0-SNAPSHOT.jar:/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/kafka/gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2/com/nereusstream/nereus-domain/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-domain-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/checksums-spi/2.47.5/aefdb59462c387f30880eb4393eb7616e4bce7a3/checksums-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/endpoints-spi/2.47.5/ac974d72771b1c64e4fcdd4986457c67e47f3f8d/endpoints-spi-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/http-auth-aws-eventstream/2.47.5/6bce9b7f7e33606cbe2bc85c1caa3ed2da8b9f7f/http-auth-aws-eventstream-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/utils-lite/2.47.5/285fc2faab0828f015796e72e927853cbcfbf963/utils-lite-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/annotations/2.47.5/1bd829f41a6a55a5143ae7b427723c46bbfb335e/annotations-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.reactivex.rxjava3/rxjava/3.0.1/d6fe89808592364fd9fb1bfbffeac67b6f547618/rxjava-3.0.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.reactivestreams/reactive-streams/1.0.4/3864a1320d97d7b045f729a326e1e077661f31b7/reactive-streams-1.0.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.awssdk/third-party-jackson-core/2.47.5/8e593db1ab2a1e49b64e00e85114b76db3022f18/third-party-jackson-core-2.47.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/software.amazon.eventstream/eventstream/1.0.1/6ff8649dffc5190366ada897ba8525a836297784/eventstream-1.0.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.opentelemetry/opentelemetry-api/1.63.0/39c923c0f236417ec8c4e2091f9e3032b4b6fb91/opentelemetry-api-1.63.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.opentelemetry/opentelemetry-context/1.63.0/4af6d513cedbf78dafe104f82f8dce7c7a205f07/opentelemetry-context-1.63.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.opentelemetry/opentelemetry-common/1.63.0/450f8d552f33d51b19457d1336d8f7bdaec35e01/opentelemetry-common-1.63.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-text/1.13.1/88b9f76d465e35a06cd439ddcb8190ff182931e/commons-text-1.13.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.0/65897b3e5731220962e659e001904af3c3cbeba9/commons-lang3-3.20.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.github.merlimat.slog/slog/0.9.9/6666ec1979de70abcfcb17f5a611dd415f8f486b/slog-0.9.9.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.guava/failureaccess/1.0.1/1dcf1de382a0bf95a3d8b0849546c88bac1292c9/failureaccess-1.0.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/b421526c5f297295adef1c886e5246c39d4ac629/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.code.findbugs/jsr305/3.0.2/25ea2e8b0c338a877313bd4672d3fe056ea78f0d/jsr305-3.0.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.33.0/de2b60b62da487644fc11f734e73c8b0b431238f/checker-qual-3.33.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.j2objc/j2objc-annotations/2.8/c85270e307e7b822f1086b93689124b89768e273/j2objc-annotations-2.8.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-epoll/4.2.14.Final/275ee883bdb8ed2c48395bb4736e9e516dac29ff/netty-transport-native-epoll-4.2.14.Final-linux-x86_64.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-epoll/4.2.14.Final/2f1845b350e791506878ee0c24c5da430099586d/netty-transport-native-epoll-4.2.14.Final-linux-aarch_64.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-codec-http2/4.1.135.Final/56375e341f0ca44079b1bfb62030285b9de5d713/netty-codec-http2-4.1.135.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-codec-http/4.1.135.Final/69d785784208bae296fa74d802772687c6947754/netty-codec-http-4.1.135.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-handler/4.2.14.Final/9677e2bbbcc0fe1a32cef5aea7925f2ada7aeb34/netty-handler-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-classes-epoll/4.2.14.Final/6728e8075f82055025261394f385b3342a0c8702/netty-transport-classes-epoll-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-io_uring/4.2.14.Final/9d96b0c4649c6bea21fc70df9196777d20ff069b/netty-transport-native-io_uring-4.2.14.Final-linux-x86_64.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-io_uring/4.2.14.Final/8880ca48a744a5dca216c534cfbcd7f7a6446920/netty-transport-native-io_uring-4.2.14.Final-linux-aarch_64.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-classes-io_uring/4.2.14.Final/4d21a2c5d79676e26e69724dcb1bbef70dd32e2a/netty-transport-classes-io_uring-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-unix-common/4.2.14.Final/5f1012272f0d28a82eeefac48e5352777a559adf/netty-transport-native-unix-common-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-codec-base/4.2.14.Final/2651ac5b0ebef9b5f0baa51e7c06b6f508d5b6f0/netty-codec-base-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-codec/4.1.135.Final/cf36e54dc81aa160a93780478727bdb3c3fa4600/netty-codec-4.1.135.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport/4.2.14.Final/5b29e388af37da2e3f59f4633d4da0b21dd4f687/netty-transport-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-buffer/4.2.14.Final/b6c5212317867fbbe37fe0e511c7afddbf9ca0/netty-buffer-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-resolver/4.2.14.Final/f7c6a20a73085bb99ae56b2ff95804bfc89a0423/netty-resolver-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-common/4.2.14.Final/22c14466886c7c766cb59d69077e9cc309f355db/netty-common-4.2.14.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.jctools/jctools-core-jdk11/4.0.6/7eb378b66a2240b3d44f0f47717640ffedddce59/jctools-core-jdk11-4.0.6.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.jctools/jctools-core/4.0.6/2467452e7631e485b062d5d507ff73cdb04e3f11/jctools-core-4.0.6.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.beust/jcommander/1.82/a7c5fef184d238065de38f81bbc6ee50cca2e21/jcommander-1.82.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.rocksdb/rocksdbjni/9.9.3/bafde79068b9af44dd0230b9e12cccd8acad64e9/rocksdbjni-9.9.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.zookeeper/zookeeper-jute/3.9.5/20135d3521579fd7382fed744f6b74241ecb5b73/zookeeper-jute-3.9.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.yetus/audience-annotations/0.12.0/e0efa60318229590103e31c69ebdaae56d903644/audience-annotations-0.12.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-io/commons-io/2.19.0/1f8d4a99ba72b77aa69101175efc79b0c7dcdd7e/commons-io-2.19.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-tcnative-boringssl-static/2.0.77.Final/d362cc5969c00d1c4cf9dc177283e241fb8d429c/netty-tcnative-boringssl-static-2.0.77.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.netty/netty-tcnative-classes/2.0.77.Final/f58362f70036d0738e995347987b6462f3408204/netty-tcnative-classes-2.0.77.Final.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-cli/commons-cli/1.9.0/e1cdfa8bf40ccbb7440b2d1232f9f45bb20a1844/commons-cli-1.9.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/commons-codec/commons-codec/1.18.0/ee45d1cf6ec2cc2b809ff04b4dc7aec858e0df8f/commons-codec-1.18.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-collections4/4.1/a4cf4688fe1c7e3a63aa636cc96d013af537768e/commons-collections4-4.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.bouncycastle/bc-fips/1.0.2.5/704e65f7e4fe679e5ab2aa8a840f27f8ced4c522/bc-fips-1.0.2.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.13/853b96d3afbb7bf8cc303fe27ee96836a10c1834/httpcore-4.4.13.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.carrotsearch/hppc/0.9.1/4bf4c51e06aec600894d841c4c004566b20dd357/hppc-0.9.1.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.lmax/disruptor/4.0.0/9e77a6b0b1d3d0dac3e9f7f63535dad8ef217cbc/disruptor-4.0.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.github.luben/zstd-jni/1.5.7-3/dc55c256583fb810f9fe3ede271843b68132fb7c/zstd-jni-1.5.7-3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/at.yawk.lz4/lz4-java/1.10.2/1df182cf1b030e347c81ca8768c24dab414a04d8/lz4-java-1.10.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.xerial.snappy/snappy-java/1.1.10.7/3049f95640f4625a945cfab85715f603fa4c8f80/snappy-java-1.1.10.7.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.opentelemetry.proto/opentelemetry-proto/1.3.2-alpha/6b1ebd548f788bdc3c3acd5e5df6902ee7694944/opentelemetry-proto-1.3.2-alpha.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-common-protos/2.59.2/7de5fb9d2ad6cd65e59194ff0cba99c1152e7786/proto-google-common-protos-2.59.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.34.0/304a7708305d3ba2cfdccf5bc92d8129a48b1d93/protobuf-java-4.34.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.pcollections/pcollections/4.0.2/c8398b4443deae11e6eaffbc04a371b4eb8f6b8e/pcollections-4.0.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.hdrhistogram/HdrHistogram/2.2.2/7959933ebcc0f05b2eaa5af0a0c8689fa257b15c/HdrHistogram-2.2.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.dynatrace.hash4j/hash4j/0.22.0/2d61bfb5b38469cb76141b06dc68d36a9007e9ad/hash4j-0.22.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/dev.failsafe/failsafe/3.3.2/738a986f1f0e4b6c6a49d351dddc772d1378c5a8/failsafe-3.3.2.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/jakarta.annotation/jakarta.annotation-api/1.3.5/59eb84ee0d616332ff44aba065f3888cf002cd2d/jakarta.annotation-api-1.3.5.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/net.openhft/zero-allocation-hashing/0.16/ca252f328160ed5d027f100a4fe525d6d21daaf/zero-allocation-hashing-0.16.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents.core5/httpcore5-h2/5.4.3/33bcd37d645539d27c65e17420843fd7f6c0ebf4/httpcore5-h2-5.4.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents.core5/httpcore5/5.4.3/32a0699fbcb103f5621c00983ee8f5aac080e4a6/httpcore5-5.4.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/io.perfmark/perfmark-api/0.27.0/f86f575a41b091786a4b027cd9c0c1d2e3fc1c01/perfmark-api-0.27.0.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.codehaus.mojo/animal-sniffer-annotations/1.24/aa9ba58d30e0aad7f1808fce9c541ea3760678d8/animal-sniffer-annotations-1.24.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/com.google.android/annotations/4.1.1.4/a1678ba907bf92691d879fef34e1a187038f9259/annotations-4.1.1.4.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-1.2-api/2.25.3/a7e550e638a5e534fd944616c5ae665a67e9501e/log4j-1.2-api-2.25.3.jar:/Users/liusinan/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-slf4j2-impl/2.25.3/8d1aca17817adb4a15720e64b98caf9cb3b2cc51/log4j-slf4j2-impl-2.25.3.jar (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:java.library.path=/Users/liusinan/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:. (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:java.io.tmpdir=/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/ (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:java.compiler=<NA> (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.name=Mac OS X (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.arch=aarch64 (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.version=14.8.9 (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:user.name=liusinan (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:user.home=/Users/liusinan (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:user.dir=/private/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12670999013839702103/node-1 (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.memory.free=24MB (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.memory.max=8192MB (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,264] INFO Client environment:os.memory.total=100MB (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,266] INFO Initiating client connection, connectString=127.0.0.1:2181 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@29f15d3c (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:01,274] INFO Setting -D jdk.tls.rejectClientInitiatedRenegotiation=true to disable client-initiated TLS renegotiation (org.apache.zookeeper.common.X509Util)
+[2026-11-10 04:31:01,333] INFO Default TLS protocol is TLSv1.3, supported TLS protocols are [TLSv1.3, TLSv1.2, TLSv1.1, TLSv1, SSLv3, SSLv2Hello] (org.apache.zookeeper.common.X509Util)
+[2026-11-10 04:31:01,335] INFO jute.maxbuffer value is 1048575 Bytes (org.apache.zookeeper.ClientCnxnSocket)
+[2026-11-10 04:31:01,338] INFO zookeeper.request.timeout value is 0. feature enabled=false (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:01,343] INFO Opening socket connection to server localhost/127.0.0.1:2181. (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:01,344] INFO SASL config status: Will not attempt to authenticate using SASL (unknown error) (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:01,344] INFO Socket connection established, initiating session, client: /127.0.0.1:62958, server: localhost/127.0.0.1:2181 (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:01,349] INFO Session establishment complete on server localhost/127.0.0.1:2181, session id = 0x100012cf5890010, negotiated timeout = 10000 (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:01,350] INFO ZooKeeper client is connected now. (org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase)
+[2026-11-10 04:31:01,380] WARN Failed to initialize DNS Resolver, used default subnet resolver (org.apache.bookkeeper.client.RackawareEnsemblePlacementPolicyImpl)
+[2026-11-10 04:31:01,391] INFO Initialize rackaware ensemble placement policy (org.apache.bookkeeper.client.RackawareEnsemblePlacementPolicyImpl)
+[2026-11-10 04:31:01,391] INFO Not weighted (org.apache.bookkeeper.client.RackawareEnsemblePlacementPolicyImpl)
+[2026-11-10 04:31:01,397] INFO Weighted ledger placement is not enabled (org.apache.bookkeeper.client.BookKeeper)
+[2026-11-10 04:31:01,410] INFO Update BookieInfoCache (writable bookie) (org.apache.bookkeeper.discover.ZKRegistrationClient)
+[2026-11-10 04:31:01,410] INFO Update BookieInfoCache (writable bookie) (org.apache.bookkeeper.discover.ZKRegistrationClient)
+[2026-11-10 04:31:01,410] INFO Update BookieInfoCache (writable bookie) (org.apache.bookkeeper.discover.ZKRegistrationClient)
+[2026-11-10 04:31:01,411] INFO Adding a new node (org.apache.bookkeeper.net.NetworkTopologyImpl)
+[2026-11-10 04:31:01,411] INFO Adding a new node (org.apache.bookkeeper.net.NetworkTopologyImpl)
+[2026-11-10 04:31:01,411] INFO Adding a new node (org.apache.bookkeeper.net.NetworkTopologyImpl)
+[2026-11-10 04:31:01,454] INFO [BrokerLifecycleManager id=1] Unable to register broker 1 because the controller returned error DUPLICATE_BROKER_REGISTRATION (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:01,990] INFO [BrokerLifecycleManager id=1] Successfully registered broker 1 with broker epoch 19 (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:02,001] INFO [BrokerLifecycleManager id=1] The broker has caught up. Transitioning from STARTING to RECOVERY. (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:02,003] INFO [BrokerServer id=1] Finished waiting for the controller to acknowledge that we are caught up (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,003] INFO [BrokerServer id=1] Waiting for the initial broker metadata update to be published (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,003] INFO [BrokerServer id=1] Finished waiting for the initial broker metadata update to be published (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,003] INFO [BrokerServer id=1] Waiting for the broker storage runtime to become ready (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,005] ERROR [BrokerServer id=1] Received a fatal error while waiting for the broker storage runtime to become ready (kafka.server.BrokerServer)
+com.nereusstream.storage.object.vault.VaultTransitException: Vault Transit rejected authorization
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.request(VaultTransitRunKeyKms.java:324)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.readKeyMetadata(VaultTransitRunKeyKms.java:271)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.wrapChecked(VaultTransitRunKeyKms.java:103)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.generateAndWrap(VaultTransitRunKeyKms.java:90)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.verifyRoundTrip(NereusKafkaObjectWalKms.java:106)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.open(NereusKafkaObjectWalKms.java:75)
+	at kafka.server.nereus.NereusKafkaObjectWalCell.start(NereusKafkaObjectWalCell.java:126)
+	at kafka.server.nereus.NereusKafkaObjectWalBroker.start(NereusKafkaObjectWalBroker.java:49)
+	at kafka.server.nereus.NereusBrokerStorageRuntime.$anonfun$start$1(NereusBrokerStorageRuntime.scala:43)
+	at java.base/java.util.concurrent.CompletableFuture$UniRun.tryFire(CompletableFuture.java:787)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1810)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+[2026-11-10 04:31:02,006] INFO [BrokerServer id=1] Transition from STARTING to STARTED (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,007] ERROR [BrokerServer id=1] Fatal error during broker startup. Prepare to shutdown (kafka.server.BrokerServer)
+java.lang.RuntimeException: Received a fatal error while waiting for the broker storage runtime to become ready
+	at org.apache.kafka.server.util.FutureUtils.waitWithLogging(FutureUtils.java:72)
+	at kafka.server.BrokerServer.startup(BrokerServer.scala:620)
+	at kafka.server.KafkaRaftServer.$anonfun$startup$2(KafkaRaftServer.scala:111)
+	at kafka.server.KafkaRaftServer.$anonfun$startup$2$adapted(KafkaRaftServer.scala:111)
+	at scala.Option.foreach(Option.scala:437)
+	at kafka.server.KafkaRaftServer.startup(KafkaRaftServer.scala:111)
+	at kafka.Kafka$.run(Kafka.scala:129)
+	at kafka.server.nereus.NereusKafka$.main(NereusKafka.scala:39)
+	at kafka.server.nereus.NereusKafka.main(NereusKafka.scala)
+Caused by: com.nereusstream.storage.object.vault.VaultTransitException: Vault Transit rejected authorization
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.request(VaultTransitRunKeyKms.java:324)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.readKeyMetadata(VaultTransitRunKeyKms.java:271)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.wrapChecked(VaultTransitRunKeyKms.java:103)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.generateAndWrap(VaultTransitRunKeyKms.java:90)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.verifyRoundTrip(NereusKafkaObjectWalKms.java:106)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.open(NereusKafkaObjectWalKms.java:75)
+	at kafka.server.nereus.NereusKafkaObjectWalCell.start(NereusKafkaObjectWalCell.java:126)
+	at kafka.server.nereus.NereusKafkaObjectWalBroker.start(NereusKafkaObjectWalBroker.java:49)
+	at kafka.server.nereus.NereusBrokerStorageRuntime.$anonfun$start$1(NereusBrokerStorageRuntime.scala:43)
+	at java.base/java.util.concurrent.CompletableFuture$UniRun.tryFire(CompletableFuture.java:787)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1810)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+[2026-11-10 04:31:02,007] INFO [BrokerServer id=1] Transition from STARTED to SHUTTING_DOWN (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,007] INFO [BrokerServer id=1] shutting down (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,011] INFO [BrokerLifecycleManager id=1] Skipping controlled shutdown because we are in state RECOVERY. (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:02,011] INFO [BrokerLifecycleManager id=1] beginShutdown: shutting down event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,011] INFO [BrokerLifecycleManager id=1] Transitioning from RECOVERY to SHUTTING_DOWN. (kafka.server.BrokerLifecycleManager)
+[2026-11-10 04:31:02,011] INFO [broker-1-to-controller-heartbeat-channel-manager]: Shutting down (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,011] INFO [broker-1-to-controller-heartbeat-channel-manager]: Stopped (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,011] INFO [SocketServer listenerType=BROKER, nodeId=1] Stopping socket server request processors (kafka.network.SocketServer)
+[2026-11-10 04:31:02,011] INFO [broker-1-to-controller-heartbeat-channel-manager]: Shutdown completed (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,014] INFO Node to controller channel manager for heartbeat shutdown (org.apache.kafka.server.NodeToControllerChannelManagerImpl)
+[2026-11-10 04:31:02,016] INFO [SocketServer listenerType=BROKER, nodeId=1] Stopped socket server request processors (kafka.network.SocketServer)
+[2026-11-10 04:31:02,017] INFO [data-plane Kafka Request Handler on Broker 1] shutting down (kafka.server.KafkaRequestHandlerPool)
+[2026-11-10 04:31:02,017] INFO [data-plane Kafka Request Handler on Broker 1] shut down completely (kafka.server.KafkaRequestHandlerPool)
+[2026-11-10 04:31:02,018] INFO [ExpirationReaper-1-AlterAcls]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,018] INFO [ExpirationReaper-1-AlterAcls]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,018] INFO [ExpirationReaper-1-AlterAcls]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,019] INFO [KafkaApi-1] Shutdown complete. (kafka.server.KafkaApis)
+[2026-11-10 04:31:02,019] INFO [TransactionCoordinator id=1] Shutting down. (kafka.coordinator.transaction.TransactionCoordinator)
+[2026-11-10 04:31:02,020] INFO [Transaction State Manager 1]: Shutdown complete (kafka.coordinator.transaction.TransactionStateManager)
+[2026-11-10 04:31:02,020] INFO [TxnMarkerSenderThread-1]: Shutting down (kafka.coordinator.transaction.TransactionMarkerChannelManager)
+[2026-11-10 04:31:02,020] INFO [TxnMarkerSenderThread-1]: Stopped (kafka.coordinator.transaction.TransactionMarkerChannelManager)
+[2026-11-10 04:31:02,020] INFO [TxnMarkerSenderThread-1]: Shutdown completed (kafka.coordinator.transaction.TransactionMarkerChannelManager)
+[2026-11-10 04:31:02,021] INFO [TransactionCoordinator id=1] Shutdown complete. (kafka.coordinator.transaction.TransactionCoordinator)
+[2026-11-10 04:31:02,021] INFO [GroupCoordinator id=1] Shutting down. (org.apache.kafka.coordinator.group.GroupCoordinatorService)
+[2026-11-10 04:31:02,021] INFO [GroupCoordinator id=1] Closing coordinator runtime. (org.apache.kafka.coordinator.common.runtime.CoordinatorRuntime)
+[2026-11-10 04:31:02,021] INFO [group-coordinator-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,022] INFO [GroupCoordinator id=1] Shutting down event processor. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-2]: Shutting down. Draining the remaining events. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-0]: Shutting down. Draining the remaining events. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-3]: Shutting down. Draining the remaining events. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-1]: Shutting down. Draining the remaining events. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-2]: Shutdown completed (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-0]: Shutdown completed (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-3]: Shutdown completed (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [group-coordinator-event-processor-1]: Shutdown completed (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,022] INFO [GroupCoordinator id=1] Event processor closed. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor)
+[2026-11-10 04:31:02,023] INFO [GroupCoordinator id=1] Coordinator runtime closed. (org.apache.kafka.coordinator.common.runtime.CoordinatorRuntime)
+[2026-11-10 04:31:02,024] INFO [GroupCoordinator id=1] Shutdown complete. (org.apache.kafka.coordinator.group.GroupCoordinatorService)
+[2026-11-10 04:31:02,024] INFO [network-partition-metadata-client-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [network-partition-metadata-client-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [network-partition-metadata-client-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [ShareCoordinator id=1] Shutting down. (org.apache.kafka.coordinator.share.ShareCoordinatorService)
+[2026-11-10 04:31:02,024] INFO [ShareCoordinator id=1] Closing coordinator runtime. (org.apache.kafka.coordinator.common.runtime.CoordinatorRuntime)
+[2026-11-10 04:31:02,024] INFO [share-coordinator-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [share-coordinator-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [share-coordinator-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,024] INFO [ShareCoordinator id=1] Shutting down event processor. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor)
+[2026-11-10 04:31:02,025] INFO [share-coordinator-event-processor-0]: Shutting down. Draining the remaining events. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,025] INFO [share-coordinator-event-processor-0]: Shutdown completed (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor$EventProcessorThread)
+[2026-11-10 04:31:02,025] INFO [ShareCoordinator id=1] Event processor closed. (org.apache.kafka.coordinator.common.runtime.MultiThreadedEventProcessor)
+[2026-11-10 04:31:02,025] INFO [ShareCoordinator id=1] Coordinator runtime closed. (org.apache.kafka.coordinator.common.runtime.CoordinatorRuntime)
+[2026-11-10 04:31:02,025] INFO [ShareCoordinator id=1] Shutdown complete. (org.apache.kafka.coordinator.share.ShareCoordinatorService)
+[2026-11-10 04:31:02,026] INFO [AssignmentsManager id=1]KafkaEventQueue#close: shutting down event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,026] INFO [AssignmentsManager id=1] shutting down. (org.apache.kafka.server.AssignmentsManager)
+[2026-11-10 04:31:02,026] INFO [broker-1-to-controller-directory-assignments-channel-manager]: Shutting down (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,026] INFO [broker-1-to-controller-directory-assignments-channel-manager]: Stopped (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,026] INFO [broker-1-to-controller-directory-assignments-channel-manager]: Shutdown completed (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,026] INFO Node to controller channel manager for directory-assignments shutdown (org.apache.kafka.server.NodeToControllerChannelManagerImpl)
+[2026-11-10 04:31:02,026] INFO [AssignmentsManager id=1]closed event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,026] INFO [ReplicaManager broker=1] Shutting down (kafka.server.ReplicaManager)
+[2026-11-10 04:31:02,027] INFO [LogDirFailureHandler]: Shutting down (kafka.server.ReplicaManager$LogDirFailureHandler)
+[2026-11-10 04:31:02,027] INFO [LogDirFailureHandler]: Shutdown completed (kafka.server.ReplicaManager$LogDirFailureHandler)
+[2026-11-10 04:31:02,027] INFO [LogDirFailureHandler]: Stopped (kafka.server.ReplicaManager$LogDirFailureHandler)
+[2026-11-10 04:31:02,027] INFO [ReplicaFetcherManager on broker 1] shutting down (kafka.server.ReplicaFetcherManager)
+[2026-11-10 04:31:02,027] INFO [ReplicaFetcherManager on broker 1] shutdown completed (kafka.server.ReplicaFetcherManager)
+[2026-11-10 04:31:02,028] INFO [ReplicaAlterLogDirsManager on broker 1] shutting down (kafka.server.ReplicaAlterLogDirsManager)
+[2026-11-10 04:31:02,028] INFO [ReplicaAlterLogDirsManager on broker 1] shutdown completed (kafka.server.ReplicaAlterLogDirsManager)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-Fetch]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-Fetch]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-Fetch]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-RemoteFetch]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-RemoteFetch]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-RemoteFetch]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,028] INFO [ExpirationReaper-1-RemoteListOffsets]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-RemoteListOffsets]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-RemoteListOffsets]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-Produce]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-Produce]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-Produce]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-DeleteRecords]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-DeleteRecords]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-DeleteRecords]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,029] INFO [ExpirationReaper-1-ShareFetch]: Shutting down (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,030] INFO [ExpirationReaper-1-ShareFetch]: Stopped (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,030] INFO [ExpirationReaper-1-ShareFetch]: Shutdown completed (org.apache.kafka.server.purgatory.DelayedOperationPurgatory$ExpiredOperationReaper)
+[2026-11-10 04:31:02,030] INFO [AddPartitionsToTxnSenderThread-1]: Shutting down (org.apache.kafka.server.transaction.AddPartitionsToTxnManager)
+[2026-11-10 04:31:02,030] INFO [AddPartitionsToTxnSenderThread-1]: Stopped (org.apache.kafka.server.transaction.AddPartitionsToTxnManager)
+[2026-11-10 04:31:02,030] INFO [AddPartitionsToTxnSenderThread-1]: Shutdown completed (org.apache.kafka.server.transaction.AddPartitionsToTxnManager)
+[2026-11-10 04:31:02,031] INFO [ReplicaManager broker=1] Shut down completely (kafka.server.ReplicaManager)
+[2026-11-10 04:31:02,031] INFO [broker-1-to-controller-alter-partition-channel-manager]: Shutting down (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,033] INFO [broker-1-to-controller-alter-partition-channel-manager]: Stopped (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,034] INFO [broker-1-to-controller-alter-partition-channel-manager]: Shutdown completed (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,034] INFO Node to controller channel manager for alter-partition shutdown (org.apache.kafka.server.NodeToControllerChannelManagerImpl)
+[2026-11-10 04:31:02,035] INFO [broker-1-to-controller-forwarding-channel-manager]: Shutting down (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,035] INFO [broker-1-to-controller-forwarding-channel-manager]: Shutdown completed (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,035] INFO [broker-1-to-controller-forwarding-channel-manager]: Stopped (org.apache.kafka.server.NodeToControllerRequestThread)
+[2026-11-10 04:31:02,035] INFO Node to controller channel manager for forwarding shutdown (org.apache.kafka.server.NodeToControllerChannelManagerImpl)
+[2026-11-10 04:31:02,036] INFO Shutting down. (kafka.log.LogManager)
+[2026-11-10 04:31:02,038] INFO Shutdown complete. (kafka.log.LogManager)
+[2026-11-10 04:31:02,042] WARN The mainWorkerPool did not shutdown cleanly (org.apache.bookkeeper.client.BookKeeper)
+[2026-11-10 04:31:02,149] INFO EventThread shut down for session: 0x100012cf5890010 (org.apache.zookeeper.ClientCnxn)
+[2026-11-10 04:31:02,149] INFO Session: 0x100012cf5890010 closed (org.apache.zookeeper.ZooKeeper)
+[2026-11-10 04:31:02,267] INFO [broker-1-ThrottledChannelReaper-Fetch]: Shutting down (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Fetch]: Stopped (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Fetch]: Shutdown completed (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Produce]: Shutting down (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Produce]: Stopped (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Produce]: Shutdown completed (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Request]: Shutting down (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Request]: Stopped (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-Request]: Shutdown completed (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-ControllerMutation]: Shutting down (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-ControllerMutation]: Stopped (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,269] INFO [broker-1-ThrottledChannelReaper-ControllerMutation]: Shutdown completed (org.apache.kafka.server.quota.ClientQuotaManager$ThrottledChannelReaper)
+[2026-11-10 04:31:02,270] INFO [SocketServer listenerType=BROKER, nodeId=1] Shutting down socket server (kafka.network.SocketServer)
+[2026-11-10 04:31:02,282] INFO [SocketServer listenerType=BROKER, nodeId=1] Shutdown completed (kafka.network.SocketServer)
+[2026-11-10 04:31:02,283] INFO Broker and topic stats closed (org.apache.kafka.storage.log.metrics.BrokerTopicStats)
+[2026-11-10 04:31:02,283] INFO [share-group-lock-timeout-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,283] INFO [share-group-lock-timeout-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,283] INFO [share-group-lock-timeout-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,284] INFO [PersisterStateManager]: Shutting down (org.apache.kafka.server.share.persister.PersisterStateManager$SendThread)
+[2026-11-10 04:31:02,284] INFO [PersisterStateManager]: Shutdown completed (org.apache.kafka.server.share.persister.PersisterStateManager$SendThread)
+[2026-11-10 04:31:02,284] INFO [PersisterStateManager]: Stopped (org.apache.kafka.server.share.persister.PersisterStateManager$SendThread)
+[2026-11-10 04:31:02,284] INFO [persister-state-manager-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,284] INFO [persister-state-manager-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,284] INFO [persister-state-manager-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,285] INFO [BrokerLifecycleManager id=1] closed event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,285] INFO [client-metrics-reaper]: Shutting down (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,285] INFO [client-metrics-reaper]: Stopped (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,285] INFO [client-metrics-reaper]: Shutdown completed (org.apache.kafka.server.util.timer.SystemTimerReaper$Reaper)
+[2026-11-10 04:31:02,286] INFO [SharedServer id=1] Stopping SharedServer (kafka.server.SharedServer)
+[2026-11-10 04:31:02,286] INFO [MetadataLoader id=1] beginShutdown: shutting down event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,286] INFO [SnapshotGenerator id=1] close: shutting down event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,286] INFO [SnapshotGenerator id=1] closed event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,286] INFO [MetadataLoader id=1] closed event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,287] INFO [SnapshotGenerator id=1] closed event queue. (org.apache.kafka.queue.KafkaEventQueue)
+[2026-11-10 04:31:02,287] INFO [raft-expiration-reaper]: Shutting down (org.apache.kafka.raft.TimingWheelExpirationService$ExpiredOperationReaper)
+[2026-11-10 04:31:02,332] INFO [raft-expiration-reaper]: Shutdown completed (org.apache.kafka.raft.TimingWheelExpirationService$ExpiredOperationReaper)
+[2026-11-10 04:31:02,332] INFO [raft-expiration-reaper]: Stopped (org.apache.kafka.raft.TimingWheelExpirationService$ExpiredOperationReaper)
+[2026-11-10 04:31:02,332] INFO [kafka-1-raft-io-thread]: Shutting down (org.apache.kafka.raft.KafkaRaftClientDriver)
+[2026-11-10 04:31:02,332] INFO [RaftManager id=1] Beginning graceful shutdown (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:02,333] INFO [RaftManager id=1] Graceful shutdown completed (org.apache.kafka.raft.KafkaRaftClient)
+[2026-11-10 04:31:02,333] INFO [RaftManager id=1] Completed graceful shutdown of RaftClient (org.apache.kafka.raft.KafkaRaftClientDriver)
+[2026-11-10 04:31:02,333] INFO [kafka-1-raft-io-thread]: Stopped (org.apache.kafka.raft.KafkaRaftClientDriver)
+[2026-11-10 04:31:02,333] INFO [kafka-1-raft-io-thread]: Shutdown completed (org.apache.kafka.raft.KafkaRaftClientDriver)
+[2026-11-10 04:31:02,339] INFO [kafka-1-raft-outbound-request-thread]: Shutting down (org.apache.kafka.raft.KafkaNetworkChannel$SendThread)
+[2026-11-10 04:31:02,340] INFO [kafka-1-raft-outbound-request-thread]: Stopped (org.apache.kafka.raft.KafkaNetworkChannel$SendThread)
+[2026-11-10 04:31:02,340] INFO [kafka-1-raft-outbound-request-thread]: Shutdown completed (org.apache.kafka.raft.KafkaNetworkChannel$SendThread)
+[2026-11-10 04:31:02,344] INFO [ProducerStateManager partition=__cluster_metadata-0] Wrote producer snapshot at offset 21 with 0 producer ids in 4 ms. (org.apache.kafka.storage.internals.log.ProducerStateManager)
+[2026-11-10 04:31:02,350] INFO Metrics scheduler closed (org.apache.kafka.common.metrics.Metrics)
+[2026-11-10 04:31:02,350] INFO Closing reporter org.apache.kafka.common.metrics.JmxReporter (org.apache.kafka.common.metrics.Metrics)
+[2026-11-10 04:31:02,350] INFO Metrics reporters closed (org.apache.kafka.common.metrics.Metrics)
+[2026-11-10 04:31:02,351] INFO App info kafka.server for 1 unregistered (org.apache.kafka.common.utils.AppInfoParser)
+[2026-11-10 04:31:02,351] INFO [BrokerServer id=1] Transition from SHUTTING_DOWN to SHUTDOWN (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,351] INFO [BrokerServer id=1] shut down completed (kafka.server.BrokerServer)
+[2026-11-10 04:31:02,351] ERROR Exiting Kafka due to fatal exception during startup. (kafka.Kafka$)
+java.lang.RuntimeException: Received a fatal error while waiting for the broker storage runtime to become ready
+	at org.apache.kafka.server.util.FutureUtils.waitWithLogging(FutureUtils.java:72)
+	at kafka.server.BrokerServer.startup(BrokerServer.scala:620)
+	at kafka.server.KafkaRaftServer.$anonfun$startup$2(KafkaRaftServer.scala:111)
+	at kafka.server.KafkaRaftServer.$anonfun$startup$2$adapted(KafkaRaftServer.scala:111)
+	at scala.Option.foreach(Option.scala:437)
+	at kafka.server.KafkaRaftServer.startup(KafkaRaftServer.scala:111)
+	at kafka.Kafka$.run(Kafka.scala:129)
+	at kafka.server.nereus.NereusKafka$.main(NereusKafka.scala:39)
+	at kafka.server.nereus.NereusKafka.main(NereusKafka.scala)
+Caused by: com.nereusstream.storage.object.vault.VaultTransitException: Vault Transit rejected authorization
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.request(VaultTransitRunKeyKms.java:324)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.readKeyMetadata(VaultTransitRunKeyKms.java:271)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.wrapChecked(VaultTransitRunKeyKms.java:103)
+	at com.nereusstream.storage.object.vault.VaultTransitRunKeyKms.generateAndWrap(VaultTransitRunKeyKms.java:90)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.verifyRoundTrip(NereusKafkaObjectWalKms.java:106)
+	at kafka.server.nereus.NereusKafkaObjectWalKms.open(NereusKafkaObjectWalKms.java:75)
+	at kafka.server.nereus.NereusKafkaObjectWalCell.start(NereusKafkaObjectWalCell.java:126)
+	at kafka.server.nereus.NereusKafkaObjectWalBroker.start(NereusKafkaObjectWalBroker.java:49)
+	at kafka.server.nereus.NereusBrokerStorageRuntime.$anonfun$start$1(NereusBrokerStorageRuntime.scala:43)
+	at java.base/java.util.concurrent.CompletableFuture$UniRun.tryFire(CompletableFuture.java:787)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1810)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+[2026-11-10 04:31:02,352] INFO App info kafka.server for 1 unregistered (org.apache.kafka.common.utils.AppInfoParser)

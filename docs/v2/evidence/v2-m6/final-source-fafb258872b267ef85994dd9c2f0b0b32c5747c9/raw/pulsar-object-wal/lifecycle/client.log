@@ -1,0 +1,51 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:50:37 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:50:37,468 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:50:38,327 WARN  BaseResource Failed to perform http put request
+PULSAR_NATIVE_MISSING_BINDING_REJECTED
+2026-11-10 04:50:38,376 INFO  ConnectionPool Connected to server
+2026-11-10 04:50:38,402 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:50:38,411 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:50:38,416 INFO  ProducerImpl Creating producer
+2026-11-10 04:50:38,422 INFO  ProducerImpl Created producer
+2026-11-10 04:50:38,668 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:50:38,669 INFO  ProducerImpl Closed Producer
+confirmedPositions=[4611686018427387904:0:-1, 4611686018427387904:1:-1, 4611686018427387905:0:-1, 4611686018427387905:1:-1, 4611686018427387906:0:-1, 4611686018427387906:1:-1]
+2026-11-10 04:50:38,687 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:50:38,688 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:50:38,691 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:50:38,702 INFO  ConsumerImpl Subscribed to topic
+confirmedAck=4611686018427387904:0:-1 attempts=1
+confirmedAck=4611686018427387904:1:-1 attempts=1
+2026-11-10 04:50:38,776 INFO  ConsumerImpl Closed consumer
+ownershipBefore=NereusOwnershipWitness[serviceUnit=public/m6-native/0x00000000_0xffffffff, localBrokerId=127.0.0.1:64933, brokerIncarnationId=NereusOwnershipId[value=afd8a694aaa31175edd5ea81fb98f1c6], acquisitionId=NereusOwnershipId[value=bce012ca19aeba430c109a4e3d682e59], canonicalStoredBytes=7b227374617465223a224f776e6564222c2264737442726f6b6572223a223132372e302e302e313a3634393333222c22666f726365223a66616c73652c2274696d657374616d70223a313739343235373433373938312c2276657273696f6e4964223a322c2262726f6b6572496e6361726e6174696f6e4964223a226166643861363934616161333131373565646435656138316662393866316336222c226163717569736974696f6e4964223a226263653031326361313961656261343330633130396134653364363832653539227d, canonicalStoredDigest=76af5446fc3610573587b544eb3b657c8813fda62a812fa17702013ff4d85598, backendVersion=16]
+2026-11-10 04:50:38,925 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:50:38,925 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:50:38,927 INFO  ConnectionPool Connected to server
+2026-11-10 04:50:38,929 INFO  ProducerImpl Creating producer
+2026-11-10 04:50:39,455 INFO  ProducerImpl Created producer
+ownershipAfter=NereusOwnershipWitness[serviceUnit=public/m6-native/0x00000000_0xffffffff, localBrokerId=127.0.0.1:64934, brokerIncarnationId=NereusOwnershipId[value=7e230e78433ae106279c16c9653c1497], acquisitionId=NereusOwnershipId[value=2ce33d76e97ada790501704c980483b3], canonicalStoredBytes=7b227374617465223a224f776e6564222c2264737442726f6b6572223a223132372e302e302e313a3634393334222c22736f7572636542726f6b6572223a223132372e302e302e313a3634393333222c22666f726365223a66616c73652c2274696d657374616d70223a313739343235373433383931312c2276657273696f6e4964223a352c2262726f6b6572496e6361726e6174696f6e4964223a223765323330653738343333616531303632373963313663393635336331343937222c226163717569736974696f6e4964223a223263653333643736653937616461373930353031373034633938303438336233227d, canonicalStoredDigest=821653ae6e0279829f124db2992e0dfe522441c10c4aa87f3405fc5253b77634, backendVersion=32]
+2026-11-10 04:50:39,598 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:50:39,599 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:50:39,600 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:50:39,602 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:50:39,640 INFO  ConsumerImpl Seeking subscription to
+2026-11-10 04:50:39,643 INFO  ClientCnx Broker notification of closed consumer
+2026-11-10 04:50:39,643 INFO  ConnectionHandler Closed connection - Will try again
+2026-11-10 04:50:39,648 INFO  ConsumerImpl Successfully reset subscription to
+2026-11-10 04:50:39,741 INFO  ConnectionHandler Reconnecting after timeout
+2026-11-10 04:50:39,743 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:50:39,745 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:50:39,796 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:50:39,801 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:50:39,801 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:50:39,803 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:50:39,804 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:50:39,864 INFO  ConsumerImpl Closed consumer
+PULSAR_NATIVE_BK_PROTOCOL_SEMANTICS_PASS 4611686018427387904:0:-1 4611686018427387907:0:-1
+2026-11-10 04:50:39,870 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:50:39,871 INFO  ProducerImpl Closed Producer
+2026-11-10 04:50:39,976 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:50:39,978 INFO  ClientCnx Disconnected
+2026-11-10 04:50:39,978 INFO  ClientCnx Disconnected

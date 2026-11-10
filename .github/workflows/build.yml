@@ -36,6 +36,19 @@ jobs:
         run: ./gradlew v2M0Check
       - name: V2 M6 execution input contracts
         run: ./gradlew v2M6ExecutionInputsContractTest v2M6CoverageContractTest
+      - name: V2 M6 Final governance contracts
+        run: python3 scripts/check-v2-m6-final-tests.py
+      - name: V2 M6 committed Final
+        if: github.ref_name == 'nereus/v2-m6-native-pulsar-object-wal' || hashFiles('docs/v2/evidence/v2-m6/**/m6-final.json') != ''
+        run: |
+          for repo in kafka pulsar; do
+            commit="$(python3 -c 'import runpy, sys; print(runpy.run_path("scripts/check-v2-m6-final.py")["COMMITS"][sys.argv[1]])' "$repo")"
+            git init --bare --quiet --initial-branch=evidence "$RUNNER_TEMP/m6-$repo"
+            git -C "$RUNNER_TEMP/m6-$repo" fetch --quiet --depth=1 --no-tags \
+              "https://github.com/nereusstream/$repo.git" "$commit:refs/heads/evidence"
+          done
+          python3 scripts/check-v2-m6-final.py \
+            --kafka-root "$RUNNER_TEMP/m6-kafka" --pulsar-root "$RUNNER_TEMP/m6-pulsar"
 
   m1-fast-source:
     runs-on: ubuntu-latest

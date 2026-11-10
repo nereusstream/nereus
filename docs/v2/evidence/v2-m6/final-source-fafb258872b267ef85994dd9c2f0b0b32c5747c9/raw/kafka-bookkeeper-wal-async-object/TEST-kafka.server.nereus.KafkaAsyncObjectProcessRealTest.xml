@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="kafka.server.nereus.KafkaAsyncObjectProcessRealTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-09T20:18:02.712Z" hostname="liusinandeMacBook-Pro.local" time="57.257">
+  <properties/>
+  <testcase name="keepsBookKeeperAcksDuringObjectOutageAndRecoversSelectedGeneration(Path)" classname="kafka.server.nereus.KafkaAsyncObjectProcessRealTest" time="57.257"/>
+  <system-out><![CDATA[node-2: PID 24155, kafka.tools.StorageTool [format, --config, /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-2/server.properties, --cluster-id, veV9F2QKQyiLzmwHTtYYgg, --feature, nereus.storage.version=2]
+node-0: PID 24156, kafka.tools.StorageTool [format, --config, /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-0/server.properties, --cluster-id, veV9F2QKQyiLzmwHTtYYgg, --feature, nereus.storage.version=2]
+node-1: PID 24175, kafka.tools.StorageTool [format, --config, /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-1/server.properties, --cluster-id, veV9F2QKQyiLzmwHTtYYgg, --feature, nereus.storage.version=2]
+node-2: PID 24178, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-2/server.properties]
+node-0: PID 24179, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-0/server.properties]
+[2026-11-10 04:18:06,204] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:06,300] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:06,402] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:06,607] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:07,117] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:08,036] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:09,470] WARN [Producer clientId=producer-1] Got error produce response with correlation id 6 on topic-partition native-cold-0, retrying (2147483646 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:18:09,470] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+[2026-11-10 04:18:09,573] WARN [Producer clientId=producer-1] Got error produce response with correlation id 8 on topic-partition native-cold-0, retrying (2147483645 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:18:09,573] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+[2026-11-10 04:18:09,785] WARN [Producer clientId=producer-1] Got error produce response with correlation id 10 on topic-partition native-cold-0, retrying (2147483644 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:18:09,785] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+[2026-11-10 04:18:10,152] WARN [Producer clientId=producer-1] Got error produce response with correlation id 12 on topic-partition native-cold-0, retrying (2147483643 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:18:10,152] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+node-1: PID 24506, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-1/foreign-object.properties]
+node-1: PID 24546, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-12754929546078486361/node-1/server.properties]
+[2026-11-10 04:18:44,702] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:44,805] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:45,008] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:45,513] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:46,222] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:47,234] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:48,244] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:49,255] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:50,267] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:51,280] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:52,194] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:53,105] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:54,119] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:55,034] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:56,048] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:57,060] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:18:58,067] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:57525) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+Native delayed Fetch woke at the original transaction marker
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

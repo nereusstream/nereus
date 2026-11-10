@@ -1,0 +1,19 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US
+Nov 10, 2026 4:53:28 AM io.opentelemetry.api.GlobalOpenTelemetry maybeAutoConfigureAndSetGlobal
+INFO: AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-11-10 04:53:28,917 INFO  ConnectionManager Creating managed GRPC connection
+2026-11-10 04:53:29,093 INFO  ConnectionPool Connected to server
+2026-11-10 04:53:29,217 INFO  ConsumerStatsRecorderImpl Starting Pulsar consumer status recorder with config
+2026-11-10 04:53:29,228 INFO  ConsumerStatsRecorderImpl Pulsar client config
+2026-11-10 04:53:29,259 INFO  ConsumerImpl Subscribing to topic
+2026-11-10 04:53:29,888 INFO  ConsumerImpl Subscribed to topic
+2026-11-10 04:53:30,021 INFO  ProducerStatsRecorderImpl Starting Pulsar producer perf with config
+2026-11-10 04:53:30,021 INFO  ProducerStatsRecorderImpl Pulsar client config
+2026-11-10 04:53:30,023 INFO  ProducerImpl Creating producer
+2026-11-10 04:53:30,029 INFO  ProducerImpl Created producer
+2026-11-10 04:53:30,129 INFO  ProducerStatsRecorderImpl Publish stats
+2026-11-10 04:53:30,131 INFO  ProducerImpl Closed Producer
+PULSAR_NATIVE_BK_RESTART_PASS
+2026-11-10 04:53:30,133 INFO  ConsumerImpl Closed consumer
+2026-11-10 04:53:30,239 INFO  PulsarClientImpl Client closing. URL
+2026-11-10 04:53:30,241 INFO  ClientCnx Disconnected

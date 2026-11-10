@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="kafka.server.nereus.KafkaObjectWalReadDrainRealTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-09T20:29:21.137Z" hostname="liusinandeMacBook-Pro.local" time="13.229">
+  <properties/>
+  <testcase name="waitsForOriginalObjectFetchBeforeClosingNativeOwner(Path)" classname="kafka.server.nereus.KafkaObjectWalReadDrainRealTest" time="13.229"/>
+  <system-out><![CDATA[node-2: PID 31591, kafka.tools.StorageTool [format, --config, /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-10399831847611878954/node-2/server.properties, --cluster-id, JMkrXm8LS-WuIKonKzfN8w, --feature, nereus.storage.version=2]
+node-0: PID 31592, kafka.tools.StorageTool [format, --config, /var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-10399831847611878954/node-0/server.properties, --cluster-id, JMkrXm8LS-WuIKonKzfN8w, --feature, nereus.storage.version=2]
+node-2: PID 31611, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-10399831847611878954/node-2/server.properties]
+node-0: PID 31612, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-10399831847611878954/node-0/server.properties]
+[2026-11-10 04:29:23,820] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:23,915] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:23,980] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:23,980] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:24,091] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,091] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:24,119] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,195] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,195] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:24,408] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,408] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:24,426] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,879] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:24,879] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:24,936] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:25,820] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:25,821] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:25,854] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:27,005] WARN [Producer clientId=producer-1] Got error produce response with correlation id 7 on topic-partition native-cold-0, retrying (2147483646 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:29:27,006] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+[2026-11-10 04:29:27,117] WARN [Producer clientId=producer-1] Got error produce response with correlation id 9 on topic-partition native-cold-0, retrying (2147483645 attempts left). Error: KAFKA_STORAGE_ERROR (org.apache.kafka.clients.producer.internals.Sender:693)
+[2026-11-10 04:29:27,117] WARN [Producer clientId=producer-1] Received invalid metadata error in produce request on partition native-cold-0 due to org.apache.kafka.common.errors.KafkaStorageException: Disk error when trying to access log file on the disk. Going to request metadata update now (org.apache.kafka.clients.producer.internals.Sender:719)
+[2026-11-10 04:29:28,562] WARN [Producer clientId=producer-1] Connection to node 0 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:28,572] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:28,778] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:28,778] WARN [Producer clientId=producer-1] Connection to node 0 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:28,982] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:29,196] WARN [Producer clientId=producer-1] Connection to node 0 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:29,197] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:29,198] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+node-0: PID 31656, kafka.server.nereus.NereusKafka [/var/folders/vk/l_r0z80j1dj93fsrjx3zqv4r0000gn/T/junit-10399831847611878954/node-0/server.properties]
+[2026-11-10 04:29:29,316] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:29,980] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:29,980] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:30,133] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:30,982] WARN [Producer clientId=producer-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+[2026-11-10 04:29:30,982] WARN [Producer clientId=producer-1] Bootstrap broker 127.0.0.1:62687 (id: -1 rack: null isFenced: false) disconnected (org.apache.kafka.clients.NetworkClient:1255)
+[2026-11-10 04:29:31,153] WARN [AdminClient clientId=adminclient-1] Connection to node -1 (/127.0.0.1:62687) could not be established. Node may not be available. (org.apache.kafka.clients.NetworkClient:899)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

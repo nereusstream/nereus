@@ -1,0 +1,192 @@
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Creating 
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Creating 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Created 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Created 
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Created 
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Created 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Creating 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Created 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Creating 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Creating 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Creating 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Created 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Created 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Created 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Starting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Started 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Starting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Starting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Starting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Started 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Started 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Started 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Healthy 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Stopping 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Stopping 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Stopping 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Stopped 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Removing 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-2-1 Removed 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Stopped 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Removing 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-0-1 Removed 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Stopped 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Removing 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-bookie-1-1 Removed 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Stopping 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Stopped 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Removing 
+ Container nereus-m6-kafka-bk-5a62a0f9a84c-metadata-service-1 Removed 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Removing 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Removing 
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Removing 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Removing 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Removing 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-2-data Removed 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-0-data Removed 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_bookie-1-data Removed 
+ Volume nereus-m6-kafka-bk-5a62a0f9a84c_metadata-data Removed 
+ Network nereus-m6-kafka-bk-5a62a0f9a84c_default Removed 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Creating 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Creating 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Created 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Created 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Created 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Created 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Creating 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Created 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Creating 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Creating 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Creating 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Created 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Created 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Created 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Starting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Started 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Starting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Starting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Starting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Started 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Started 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Started 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Waiting 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Healthy 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Healthy 
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 49832)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 500, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 488, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/liusinan/.codex/worktrees/m6-nsip1-resumed/nereus/scripts/v2-m6-kafka-object-fault-proxy.py", line 211, in relay
+    conn.request(self.command, self.path, body=body, headers=headers)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1386, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1432, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1381, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1141, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1105, in send
+    self.sock.sendall(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Stopping 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Stopping 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Stopping 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Stopped 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Removing 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-0-1 Removed 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Stopped 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Removing 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-2-1 Removed 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Stopped 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Removing 
+ Container nereus-m6-kafka-bk-331fa5c9432f-bookie-1-1 Removed 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Stopping 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Stopped 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Removing 
+ Container nereus-m6-kafka-bk-331fa5c9432f-metadata-service-1 Removed 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Removing 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Removing 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Removing 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Removing 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Removing 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_metadata-data Removed 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-1-data Removed 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-0-data Removed 
+ Volume nereus-m6-kafka-bk-331fa5c9432f_bookie-2-data Removed 
+ Network nereus-m6-kafka-bk-331fa5c9432f_default Removed 
+Current Kafka M4 read qualification passed: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/evidence/v2-m6-acceptance-current-1794254525/kafka-bookkeeper-wal-async-object/m4
+16 native Kafka async Object checks passed: /Users/liusinan/.codex/worktrees/m6-nsip1-resumed/evidence/v2-m6-acceptance-current-1794254525/kafka-bookkeeper-wal-async-object

@@ -226,7 +226,7 @@ def kafka_test_runs(result, output):
     return [(output / task if nested else output, task, test) for task, test in result["tests"].items()]
 
 
-def verify_object_wal_read_qualification(output, started, result):
+def verify_object_wal_read_qualification(output, started, result, recorded_output=None):
     drain = "nereusKafkaObjectWalReadDrainRealTest"
     process = "nereusKafkaObjectWalProcessRealTest"
     expected = f"{drain}/object-wal-read-qualification.json"
@@ -242,7 +242,8 @@ def verify_object_wal_read_qualification(output, started, result):
     original = result["tests"][drain]
     SOURCE.require(qualification["evidence"] == {
         original[key]["name"]: original[key]["sha256"] for key in ("runtime", "xml")
-    } and f"-Pv2M6ObjectWalReadAdmissionFile={path}" in result["tests"][process]["command"],
+    } and f"-Pv2M6ObjectWalReadAdmissionFile={(recorded_output or output) / expected}"
+        in result["tests"][process]["command"],
         "Kafka Object WAL process did not consume the exact read qualification")
 
 
@@ -373,7 +374,7 @@ def run_pulsar_profile(roots, output, profile, expected, frozen):
     })}
 
 
-def verify_kafka_result(output, started, profile, expected, sources):
+def verify_kafka_result(output, started, profile, expected, sources, recorded_output=None):
     _, kind, receipt = KAFKA_PROCESSES[profile]
     result_file = current_attachment(output, started, receipt)
     result = read(result_file)
@@ -399,7 +400,7 @@ def verify_kafka_result(output, started, profile, expected, sources):
         if profile != "kafka-object-wal":
             verify_named(output, result["m4Qualification"], "path")
         else:
-            verify_object_wal_read_qualification(output, started, result)
+            verify_object_wal_read_qualification(output, started, result, recorded_output)
         if profile == "kafka-bookkeeper-wal-async-object":
             verify_attachment_map(output, started, result["backendFiles"])
             verify_attachment_map(output / "kafka-process-logs", started, result["processLogs"])
