@@ -1041,15 +1041,23 @@ def scenario_rows(root):
     return rows
 
 
-def validate_scenarios(root, final_path):
+def validate_scenarios(root, final_path, *, historical=False):
     rows = scenario_rows(root)
     for identity in PROMOTED:
         require(identity in rows and rows[identity].get("status") == "PASSED_CURRENT_SOURCE"
                 and rows[identity].get("evidenceReceipt") == str(final_path),
                 f"scenario {identity} does not bind the complete M5 Final")
-    for identity in DEFERRED:
-        require(identity in rows and rows[identity].get("status") == "PLANNED"
-                and rows[identity].get("evidenceReceipt") is None, "M6-deferred scenario was promoted by M5")
+    deferred = all(identity in rows and rows[identity].get("status") == "PLANNED"
+                   and rows[identity].get("evidenceReceipt") is None for identity in DEFERRED)
+    if historical and not deferred:
+        # M5's current-source gate still requires its original deferred state. The historical
+        # reader accepts only the separately governed, complete M6 registration.
+        m6 = module("m6_coverage", "v2-m6-coverage.py")
+        try:
+            deferred = set(DEFERRED) <= m6.registration(root)
+        except (m6.CoverageError, OSError, ValueError, KeyError, TypeError) as error:
+            raise EvidenceError(f"M6-deferred scenario lacks a complete M6 registration: {error}") from error
+    require(deferred, "M6-deferred scenario was promoted by M5")
     require({identity for identity, row in rows.items() if row.get("evidenceReceipt") == str(final_path)} == set(PROMOTED),
             "Final scenario receipt is borrowed by another predicate")
     require(all("docs/v2/evidence/v2-m5/children/" not in str(row.get("evidenceReceipt")) for row in rows.values()),
@@ -1065,7 +1073,7 @@ def current_final_path(root):
     return path
 
 
-def historical_source_commits(root):
+def historical_source_commits(root, *, allow_m6_registration=True):
     """Verify the published M5 dependency's source tuple without certifying the current checkout."""
     path = current_final_path(root)
     value = load(read(root, str(path), MAX_JSON))
@@ -1095,7 +1103,7 @@ def historical_source_commits(root):
             "CI Final Root commit differs from its complete input tree")
     subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", commits["nereus"], "HEAD"],
                    check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    validate_scenarios(root, path)
+    validate_scenarios(root, path, historical=allow_m6_registration)
     validate_package(package, value, inputs, commits)
     return commits
 
@@ -1107,7 +1115,7 @@ def historical_pulsar_commit(root):
 
 def ci_pulsar_commit(root):
     """Retain the original selector's strict current-source successor requirement."""
-    commits = historical_source_commits(root)
+    commits = historical_source_commits(root, allow_m6_registration=False)
     validate_descendants(root, commits["nereus"])
     return commits["pulsar"]
 

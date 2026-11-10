@@ -24,11 +24,11 @@ INPUTS = SOURCE.INPUTS
 require = SOURCE.require
 
 COMMITS = {
-    "nereus": "fafb258872b267ef85994dd9c2f0b0b32c5747c9",
+    "nereus": RUN.COVERAGE.TESTED_NEREUS,
     "kafka": "c2f151b16726b65555d423eb1220170c19034981",
     "pulsar": "7decbf7f9fb540a4a0ec8ada3df5538ab498b0f0",
 }
-RECEIPT = SOURCE.FINAL_OUTPUT / f"final-source-{COMMITS['nereus']}" / "m6-final.json"
+RECEIPT = RUN.COVERAGE.RECEIPT
 RECEIPT_SHA = "5e5647c3a9404ccd1006cb0e4e73744079a44b7655074b7b4bc0bee96baec2a1"
 RESULT = "m6-execution-result.json"
 EXECUTION_INPUTS = "execution-inputs.json"
@@ -50,6 +50,8 @@ GOVERNANCE = {
     "docs/v2/NSIP/nsip-1.md",
     "docs/v2/README.md",
     "docs/v2/architecture.md",
+    "docs/v2/detailed_design/m5/m5-current-contracts.md",
+    "docs/v2/detailed_design/m5/README.md",
     "docs/v2/open-questions.md",
     "docs/v2/v2-scenarios.json",
     "scripts/check-v2-documentation.sh",
@@ -128,6 +130,17 @@ def original_output(raw):
     require(len(names) == 1 and names[0].is_absolute()
             and names[0].name == "nereus-regressions.build-inputs.jsonl", "missing original Gradle capture root")
     return names[0].parent
+
+
+def verify_scenario_contracts(root, scenarios):
+    registry = RUN.COVERAGE.REGISTRY
+
+    def contracts(document):
+        return {row["id"]: {key: value for key, value in row.items() if key not in ("status", "evidenceReceipt")}
+                for row in document["scenarios"] if row["id"] in scenarios}
+
+    baseline = INPUTS.load(SOURCE.git(root, "show", f"{COMMITS['nereus']}:{registry}"))
+    require(contracts(RUN.read(root / registry)) == contracts(baseline), "M6 scenario contracts changed after execution")
 
 
 def verify_native(root, raw, original, result, frozen):
@@ -219,6 +232,7 @@ def verify_build_records(raw, files, original, result):
 def receipt(root, raw, roots, git_nodes=None):
     result, frozen = execution(raw)
     verify_sources(roots, frozen)
+    verify_scenario_contracts(root, result["scenarios"])
     files = inventory(raw, git_nodes)
     original = original_output(raw)
     verify_native(root, raw, original, result, frozen)
@@ -286,6 +300,7 @@ def check(root, roots):
     raw_nodes = {Path(name).relative_to(prefix).as_posix(): node for name, node in nodes.items()}
     expected = receipt(root, package / "raw", roots, raw_nodes)
     require(value == expected, "M6 Final receipt or attachment inventory differs")
+    require(RUN.COVERAGE.registration(root) == set(value["scenarios"]), "M6 Final scenario registration differs")
     return value
 
 

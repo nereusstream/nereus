@@ -333,4 +333,4 @@ a successor preserves its SHA lineage. Checkpoint selection persists the existin
 control record and releases only the exact covered debt. Recovery reads selected references rather than granting from
 LIST; member closure does not close the shared physical WalRun. See [NSIP-1 §6.4](NSIP/nsip-1.md#64-object-启用前必须定稿的唯一协议)
 for fault ordering and first-batch limits. The [M5 Final](detailed_design/m5/m5-current-contracts.md) now covers its
-declared lifecycle scope; native Object Broker compatibility and the M6-deferred scenarios remain separate gates.
+declared lifecycle scope. The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) covers native Object Broker integration and the three Kafka scenarios deferred by M5.

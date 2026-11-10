@@ -2,6 +2,7 @@
 """Verify failure modes of the M6 publication boundary without native backend runs."""
 
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -64,6 +65,33 @@ class FinalTest(unittest.TestCase):
         attachment.unlink()
         with self.assertRaisesRegex(FINAL.SOURCE.InputError, "missing committed M6 attachments"):
             FINAL.inventory(raw, nodes)
+
+    def test_scenario_registration_is_exact_and_cannot_borrow_receipts(self):
+        coverage = FINAL.RUN.COVERAGE
+        ids = sorted(set().union(*coverage.REQUIRED.values()))
+        matrix, registry, receipt = (self.root / path for path in
+                                     (coverage.MATRIX, coverage.REGISTRY, coverage.RECEIPT))
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("{}")
+        link = f"[M6 Final]({coverage.RECEIPT.relative_to('docs/v2')})"
+        rows = [{"id": name, "milestone": "M6", "status": "PASSED_CURRENT_SOURCE",
+                 "evidenceReceipt": str(coverage.RECEIPT)} for name in ids]
+        registry.write_text(json.dumps({"scenarios": rows}))
+        matrix.write_text("".join(f"| {name} | M6 | contract | {link} | PASSED_CURRENT_SOURCE |\n" for name in ids))
+        self.assertEqual(set(ids), coverage.registration(self.root))
+        receipt.unlink()
+        with self.assertRaisesRegex(coverage.CoverageError, "all 25"):
+            coverage.registration(self.root)
+        receipt.write_text("{}")
+        rows[-1]["evidenceReceipt"] = "docs/v2/evidence/v2-m5/final/m5-final.json"
+        registry.write_text(json.dumps({"scenarios": rows}))
+        with self.assertRaisesRegex(coverage.CoverageError, "all 25"):
+            coverage.registration(self.root)
+        rows[-1]["evidenceReceipt"] = str(coverage.RECEIPT)
+        registry.write_text(json.dumps({"scenarios": rows}))
+        matrix.write_text(matrix.read_text().replace(link, "", 1))
+        with self.assertRaisesRegex(coverage.CoverageError, "Markdown M6"):
+            coverage.registration(self.root)
 
     def test_rejects_altered_original_verdict(self):
         (self.root / FINAL.RESULT).write_bytes(b'{"promotionEligible":true}\n')

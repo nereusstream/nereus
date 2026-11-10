@@ -18,6 +18,9 @@ Extents; it does not introduce a universal logical offset or a second native wri
 
 ## Documentation
 
+The [M6 acceptance record](docs/v2/08-implementation-plan-and-gates.md#current-m6-final) covers 25 scenarios
+across six native Kafka and Pulsar paths.
+
 Current V2 authority:
 
 1. [V2 design index](docs/v2/README.md)

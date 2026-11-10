@@ -981,17 +981,19 @@ active_contracts=(
     "$repo_root/docs/v2/domain"
 )
 
+# The original process configurations are evidence bytes, outside the active contract scan.
+m6_raw_archive='!**/evidence/v2-m6/**/raw/**'
 for stale in OBJECT_WAL_SYNC_OBJECT OBJECT_WAL_ASYNC_OBJECT BOOKKEEPER_WAL_SYNC_OBJECT; do
-    if rg -Fn -- "$stale" "${active_contracts[@]}"; then
+    if rg -Fn --glob "$m6_raw_archive" -- "$stale" "${active_contracts[@]}"; then
         fail "active V2 contracts contain removed profile $stale"
     fi
 done
 
-if rg -Fn -- "release/0.1" "${active_contracts[@]}"; then
+if rg -Fn --glob "$m6_raw_archive" -- "release/0.1" "${active_contracts[@]}"; then
     fail "active V2 contracts contain the obsolete V1 release branch name"
 fi
 
-if rg -Fn -- "V2-OPEN-PUL-01" "${active_contracts[@]}"; then
+if rg -Fn --glob "$m6_raw_archive" -- "V2-OPEN-PUL-01" "${active_contracts[@]}"; then
     fail "active V2 contracts still treat native Pulsar position mapping as open"
 fi
 
@@ -1003,6 +1005,7 @@ for unconfirmed_design_symbol in \
     pendingClosureAnchors \
     BatchMetadataRetirementAuthority; do
     if rg -Fn \
+        --glob "$m6_raw_archive" \
         --glob '!**/open-questions.md' \
         --glob '!**/grill-notes/**' \
         -- "$unconfirmed_design_symbol" \
@@ -1017,6 +1020,7 @@ for unconfirmed_design_symbol in \
 done
 
 if rg -Fn \
+    --glob "$m6_raw_archive" \
     --glob '!**/open-questions.md' \
     --glob '!**/grill-notes/**' \
     --glob '!**/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md' \
@@ -2049,8 +2053,16 @@ if passed_m5:
     # v2M5FinalSourceCheck separately retains the strict current-source successor gate.
     m5_contract.historical_pulsar_commit(root)
 
+m6_spec = importlib.util.spec_from_file_location("m6_coverage", root / "scripts/v2-m6-coverage.py")
+m6_coverage = importlib.util.module_from_spec(m6_spec)
+m6_spec.loader.exec_module(m6_coverage)
+try:
+    passed_m6 = m6_coverage.registration(root)
+except m6_coverage.CoverageError as error:
+    fail(str(error))
+
 recognized_current = (promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2
-                      | promotable_m3 | promotable_m4 | promotable_m5)
+                      | promotable_m3 | promotable_m4 | promotable_m5 | passed_m6)
 unexpected_current = passed_current - recognized_current
 if unexpected_current:
     fail(f"current-source scenario promotion lacks a closed receipt group: {sorted(unexpected_current)}")

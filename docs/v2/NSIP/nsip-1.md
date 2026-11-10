@@ -2,18 +2,24 @@
 
 **方案日期：2026-09-26；本地整理：2026-09-27。**
 
-**M5 当前状态（2026-10-23）：既定实现和同源整体验收已完成，C4 已通过。**
+## M6 正式验收（2026-11-10）
 
-[当前 commit-bound Final](../evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json) 绑定 Nereus `2b413d6268108309123917fbb3c7c63ed692db4a`、Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`、Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`。五阶段566／1332／39／63／736，共2736项，零失败、错误或跳过；17项义务与五个子项均通过。Native BK replacement／expiry、真实UNKNOWN对账、实际缺失与D／Cell结算、Native DONE及backlog已验证；Object GC有独立证据。14项场景绑定当前Final；3项M6延后场景、READ15及原生Object Broker／生产部署等边界保持。完整NSIP-1及M6/M7/M8不据此宣称完成。
+[M6 Final](../evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) 绑定原始三仓源码、完整输入清单及六条原生 Kafka/Pulsar 路径的执行附件。
+[场景矩阵](../09-scenario-evidence-matrix.md#current-m6-process-acceptance)已登记全部 25 项，其中
+`V2-KAF-DATA-012`、`V2-KAF-DATA-013` 和 `V2-KAF-DATA-022` 由本次 M6 验收覆盖。
+[实施计划](../08-implementation-plan-and-gates.md#current-m6-final)记录源码、摘要和复核方法。
+M7 运维交接、M8 规模及兼容性基线、生产部署仍有各自的验收边界。
+
+**M5 历史交付（2026-10-23）：既定实现和同源整体验收已完成，C4 已通过。**
+
+[当前 commit-bound Final](../evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json) 绑定 Nereus `2b413d6268108309123917fbb3c7c63ed692db4a`、Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`、Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`。五阶段566／1332／39／63／736，共2736项，零失败、错误或跳过；17项义务与五个子项均通过。Native BK replacement／expiry、真实UNKNOWN对账、实际缺失与D／Cell结算、Native DONE及backlog已验证；Object GC有独立证据。14 项场景绑定 M5 Final。M5 当时将三项 Kafka 场景和原生 Object Broker 验收留给 M6。READ15 和生产部署边界仍适用。
 
 本次限定校验层后继的源码输入为 `8598b8d2c76dca9fb2aed08f2585c95b88bd01f2cfc58ad5c46fd9a148572339`；COMPONENTS 在该根新执行，四个后端原始记录保留 `c06ff0b9179c15e169378e00921454bc2058596b1f577d417982870aed6c78c9` 的根、时间、命令和全部附件，由已复核的 input-only 证明与新的治理补验绑定。原同批后端结果没有重跑或改标。 CI 校验后继保留原 700d 完整候选及 c06 证明，三个 job 固定实际 Python 3.14.7，M1 仅接纳八个精确治理脚本路径；原 AST 等价／指纹、完整源码树与输入上限保持。新的治理补验通过，远端 CI 按实际交付提交单独报告。
 
 ## M5 后第 0 批设计修订（2026-10-28）
 
-本批修订当前规范、计划与场景归属，并完成必要的文档/CI 历史凭据读取接线，不启动 M6 产品实现。
-当前基线为已交付的 M5 Final；M3 的 allocator
-选型已关闭为 `RANGE_64`。以下正文中的早期局部状态和未完成项应按各自时间理解，不能覆盖当前 Final，
-也不自动成为下一批任务。
+本节保留第 0 批的设计范围和当时的状态。该批更新规范、计划、场景归属和文档/CI 历史凭据入口。
+当时的基线是 M5 Final，M3 allocator 选型已关闭为 `RANGE_64`。
 
 - Kafka 当前唯一提交主线为 RF=1/minISR=1、有效共享提交、一致发布及关闭合法历史后的冷恢复。
   场景 006/009/018/019 改按此模型验收；旧 Follower/Observation/Applied 凭据保留原来源，不改标通过。
@@ -29,10 +35,9 @@
 - 文档门与 CI 的 SDK 选择通过明确的历史入口校验原 M5 完整来源和归档，不把当前设计修改视为 M5
   执行证据。原 `ci-pulsar-commit` 及 `v2M5Check` 的当前源码严格校验保留，原证据后继白名单不扩展。
 
-完整实施顺序、每批出口、未来 `v2M6Check/M7Check/M8Check` 的聚合范围和输入规则统一位于
-[实施计划](../08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance)，状态统一位于
-[场景矩阵](../09-scenario-evidence-matrix.md#nsip-1-scenario-ownership-after-m5)及其 JSON。这些未来聚合入口
-尚未实现。M7 的数值恢复目标、M8 的精确基线与阈值须在相应执行前固定；share groups、tombstone 删除、
+各批范围、聚合入口和输入规则见[实施计划](../08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance)，
+场景状态见[场景矩阵](../09-scenario-evidence-matrix.md#current-m6-process-acceptance)及其 JSON。
+`v2M6Check` 已执行，M7/M8 聚合入口仍处于规划阶段。M7 的数值恢复目标、M8 的精确基线与阈值须在相应执行前固定；share groups、tombstone 删除、
 allocator orphan GC 和生产部署不因本批修订获得准入。
 
 ## 交付前执行历史
@@ -1276,7 +1281,7 @@ GroupEncodingPlanV1 已支持 NONE，以及只在更小时采用并验证往返�
 | M3 | Object 唯一授权协议、历史关闭、多 Binding；成功 PUT 证据复用；checkpoint 异步与短锁 | NWG1、目录/frame/AEAD 基础和物理连续性；可复用的 checkpoint 表达 | 精确持久化与授权分别成立；旧历史有界且不可再扩展 |
 | M4 | 新 HW/LSO 来源及 Owner/source 变化失效；有序 route 查找和同快照统计复用；按实际重复读取证据决定请求内去重 | generation、fallback、pin、真实取消/drain；未测量支持的 committed cache/预取不作为验收前提 | 不暴露未提交或已被语义压缩移除的数据，GC 不越过活跃读取 |
 | M5 | 既定 A–E 及 NSIP 变更已由当前 Final 验收；作为后续集成依赖 | 原生 source/owner/offload 资格、共享成员引用、精确删除、永久身份和有界预算 | 当前 Final 的 17 义务、五子项、14 场景；不外推到 M6 |
-| M6 | 按启用矩阵完成 Kafka BK、Kafka Object profiles、Pulsar BK/offload 和 Pulsar Object WAL 四批进程集成 | 已完成的最小 Controller 接管、M5 生命周期及 RANGE_64；Kafka/Pulsar 原生 broker/controller/coordinator | 真实客户端请求、冷恢复及实际 drain；过期 ready 不激活，新 native 输出有出生和引用准入 |
+| M6 | 四批进程集成已验收，覆盖 Kafka 和 Pulsar 的六条路径，登记 25 项场景 | 已完成的最小 Controller 接管、M5 生命周期及 RANGE_64；Kafka/Pulsar 原生 broker/controller/coordinator | 真实客户端请求、冷恢复及实际 drain；过期 ready 不激活，新 native 输出有出生和引用准入 |
 | M7 | 计划 handoff、非计划故障、Controller/Broker/存储隔离和重启处理 | 已定稿的 Owner 历史及存储恢复接口 | 运维故障时序与资源退出行为明确 |
 | M8 | 完整语义范围、规模恢复、性能、长期空间和元数据增长 | 既有源版本锁定与可重现测量方式 | 相同持久化条件下的结果和明确剩余限制 |
 
@@ -1300,7 +1305,7 @@ Kafka Object WAL 的实际入口、独立进程验证方式及仍待验收的边
 | T5：完成整个 M5 | 完成现有未完成义务与 NSIP 变更；全部 A–E、native source/owner/offload 资格、M4 RELEASED、恢复退休及 publish/release/delete/UNKNOWN 组合 | focused BK/Object slice 不等于整个 M5；全部实际验收通过后才进入 M6 及以后里程碑 |
 | T6：M5 与读取成本优化 | REFERENCE_REUSE 去重、流式内存、已提交缓存、range 去重、有序索引查找、按测量决定的 BK 有界读取、同 key 加载合并与实际释放量调度 | 与 T2–T5 中独立部分并行；局部浪费先修，复杂并发/缓存按测量推进，不统一阻塞 M5 收尾 |
 | T7：随所属阶段清理旧职责 | M1–M4 首次提交前移除已被单 Owner 闭环替代的 Follower replication/journal/election-adoption 当前代码、参数和测试；M5 后续只处理其生命周期实际仍依赖的旧义务 | 按实际调用者清理，不建立兼容适配层；冻结历史证据保持原样 |
-| T8：完成剩余 M6/M7/M8 | 请求与 coordinator、进程 drain、运维故障和规模性能验证；根据测量决定后续优化 | 不因推进后续里程碑而跳过 T4/T5 的安全与真实组合要求 |
+| T8：M6 已验收，M7/M8 待验收 | M6 覆盖请求、coordinator 和进程 drain。运维故障、规模性能按 M7/M8 范围另行验证 | 不因推进后续里程碑而跳过 T4/T5 的安全与真实组合要求 |
 
 优先推进的顺序是：
 

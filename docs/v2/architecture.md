@@ -17,9 +17,10 @@ disconnected-response retry, persistent group offsets, superseded recovery and t
 normal native real-cluster task passes. The first native slice supports only BOOKKEEPER_WAL_ONLY. NSIP-1 T4's Object
 core now separates exact upload from a per-partition Binding/Owner Head CAS grant, closes legal history on that same
 key, and restores common checkpoint plus the explicitly authorized tail. Real MinIO/Oxia covers shared-member closure,
-response loss and two fresh partition-state takeovers. Native Object Broker profiles remain fail-closed. The
-[M5 Final](detailed_design/m5/m5-current-contracts.md) covers its lifecycle scope; native process integration, complete
-Kafka compatibility and performance qualification remain M6–M8 work.
+response loss and two fresh partition-state takeovers. The
+[M5 Final](detailed_design/m5/m5-current-contracts.md) covers its lifecycle scope. The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) covers
+qualified native process integration for Kafka and Pulsar across the three profiles. The admission checks still
+reject unqualified sources. Operational handoff and complete compatibility and performance qualification belong to M7 and M8.
 
 ## 1. Product objective
 

@@ -9,9 +9,50 @@ sourceTuple: v2-m1
 
 # Implementation plan and gates
 
-## Current M5 Final
+## Current M6 Final
 
-The [current Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json) binds the complete five-stage result and exact three-repository source tuple, with explicit original backend provenance and a freshly verified governance-only successor. All2736 tests,17 obligations and five children pass;14 M5 scenarios are promoted. The original three M6-deferred rows, READ15 and production boundaries remain. Later status updates are evidence-only successors; they do not trigger another product validation cycle.
+The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) registers all 25 scenarios for the six native process paths. The execution used Nereus
+`fafb258872b267ef85994dd9c2f0b0b32c5747c9`, Kafka `c2f151b16726b65555d423eb1220170c19034981` and
+Pulsar `7decbf7f9fb540a4a0ec8ada3df5538ab498b0f0`. The receipt binds each commit and tree, the input
+root `ba6aa6b7edccaf367b55abe89ce9f3aaf88536fe1030544f6081343fe1230e33`, and the original raw archive.
+
+| Native path | Passing cases or checks |
+| --- | ---: |
+| Kafka BookKeeper WAL only | 17 |
+| Kafka BookKeeper WAL with async Object | 16 |
+| Kafka Object WAL | 4 |
+| Pulsar BookKeeper WAL only | 13 |
+| Pulsar BookKeeper WAL with async Object | 28 |
+| Pulsar Object WAL | 20 |
+
+The receipt SHA-256 is `5e5647c3a9404ccd1006cb0e4e73744079a44b7655074b7b4bc0bee96baec2a1`.
+The archive retains the original execution result, complete input manifest, 25 Gradle captures
+with 2,751 task records, and native suites and process attachments. The execution result retains
+`promotionEligible=false`; the Final supplies the separate registration authority. The three Kafka
+rows `V2-KAF-DATA-012`, `V2-KAF-DATA-013` and `V2-KAF-DATA-022` are part of this M6 acceptance.
+Their M5 deferral remains in the historical receipt.
+
+For independent verification from this checkout, supply local Git repositories at the exact Kafka and
+Pulsar commits. A bare repository with `HEAD` at the pinned commit also works. Verification reads
+the committed archive and source identities without starting the backends.
+
+```bash
+python3 scripts/check-v2-m6-final.py --kafka-root <kafka-repo> --pulsar-root <pulsar-repo>
+```
+
+The executed source passed [Nereus Build](https://github.com/nereusstream/nereus/actions/runs/42675379628)
+and [Pulsar CI](https://github.com/nereusstream/pulsar/actions/runs/42694483176). The earlier
+[Pulsar Broker Group 5 run](https://github.com/nereusstream/pulsar/actions/runs/42685523273) recorded
+a timeout in `ReplicatorTest.testResumptionAfterBacklogRelaxed[2]` on the same source. Kafka has native
+execution and static-check evidence. The fork exposed no Actions workflows or run for that commit.
+
+The acceptance scope is the admitted RF=1/minISR=1 Kafka paths and the Pulsar profiles in the activation
+matrix. M7 operations, M8 parity/performance, online migration, and production deployment remain outside
+this receipt. The M3 allocator selection stays `RANGE_64` and the published M1–M5 results retain their source scopes.
+
+## Published M5 Final
+
+The [current Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json) binds the complete five-stage result and exact three-repository source tuple, with explicit original backend provenance and a freshly verified governance-only successor. All2736 tests,17 obligations and five children pass;14 M5 scenarios are promoted. M5 deferred three Kafka rows to M6. READ15 and production boundaries remain. Later status updates are evidence-only successors; they do not trigger another product validation cycle.
 
 ## Historical NSIP-1 first batch
 
@@ -268,10 +309,10 @@ remain required; M6-deferred activation rows cannot be promoted by these checks.
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
 | M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **Promotion-derived: implementation and pure-V2 prune are complete; current completion is exactly the trusted N3 receipts/scenario state accepted by `v2M1FinalCheck`** | `v2M1FinalCheck` |
 | M2 | Original source-bound BK/Pulsar storage primitives, NBKE2, coherent producer/transaction/locator publication, targeted read and bounded checkpoint-tail recovery; the original Kafka Follower descriptor/Observed/Applied kernel is superseded by NSIP-1 shared commit and cold Owner takeover | Historical M2 Final remains bound to its exact tested source. Current BK T2/T3 single-Owner path has separate limited-scope native BK/Controller acceptance; the old Follower kernel is absent from current source | Historical `v2M2Check`; current NSIP checks |
-| M3 | Original NWG1 Object WAL, Root-bound NWKCP1, publication and recovery; NSIP-1 adds exact persistent authorization, closed Owner history, asynchronous physical checkpoint and KMS Cell lock/lease correction | Historical M3 Final retains its exact-source scope. Current NSIP Object core and KMS slice have limited-scope real MinIO/Oxia coordination acceptance; native Object Broker/process wiring remains M6 | Historical `v2M3Check`; current NSIP checks |
+| M3 | Original NWG1 Object WAL, Root-bound NWKCP1, publication and recovery; NSIP-1 adds exact persistent authorization, closed Owner history, asynchronous physical checkpoint and KMS Cell lock/lease correction | Historical M3 Final retains its exact-source scope. The NSIP Object core and KMS slice have separate focused MinIO/Oxia evidence. The M6 Final covers native Object Broker integration | Historical `v2M3Check`; current NSIP checks |
 | M4 | Original Binding read view, source planning, generation hazards, exact interval verification and protection release; NSIP-1 adapts Kafka HW/LSO from the captured root, direct Kafka/Pulsar ordered route lookup, and BK per-snapshot lookup statistics | Historical M4 Final retains exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` and its five M4-only scenario promotions. Current NSIP M4-local read adaptation has separate limited-scope acceptance; complete M5 release/delete and native Object process work remain outside it | Historical `v2M4Check`; current NSIP checks |
-| M5 | deterministic materialization with Object-WAL reuse/index-only/rewrite selection; immutable generation and selector publication; Kafka-semantic compaction plus complete index rebuild; typed logical retention and exact reference-free proof; consume exact `RELEASED`; irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction and final Pulsar aggregate tombstone; final provider/source revalidation; per-Cell admission/isolation; conditional Object, root/data/multipart, BookKeeper, orphan, and GC execution | **VERIFIED current-source M5 Final:** five stages,17 obligations/five children and2736 passing tests; exact14-row promotion. Frozen design/older focused receipts retain their original scope; M6-deferred rows, READ15 and production boundaries remain. [Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json). | `v2M5Check` |
-| M6 | four integration batches under the protocol/profile activation matrix: Kafka BK, Kafka Object profiles, Pulsar BK/offload, Pulsar Object WAL | Acceptance requires all 25 scenarios and six real process paths; no mandatory logical Follower observation, journal, ISR eligibility or election-adoption mode | `v2M6Check` requires exact current-source inputs, dependencies and outputs for the full gate below |
+| M5 | deterministic materialization with Object-WAL reuse/index-only/rewrite selection; immutable generation and selector publication; Kafka-semantic compaction plus complete index rebuild; typed logical retention and exact reference-free proof; consume exact `RELEASED`; irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction and final Pulsar aggregate tombstone; final provider/source revalidation; per-Cell admission/isolation; conditional Object, root/data/multipart, BookKeeper, orphan, and GC execution | **VERIFIED at its published M5 source:** five stages,17 obligations/five children and2736 passing tests; exact14-row promotion. Frozen design and focused receipts retain their original scope. M6 owns the three deferred rows. READ15 and production boundaries remain. [Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json). | `v2M5Check` |
+| M6 | four integration batches under the protocol/profile activation matrix: Kafka BK, Kafka Object profiles, Pulsar BK/offload, Pulsar Object WAL | Verified at the published source. All 25 scenarios are registered from six real native paths | `v2M6Check` executes the source-bound suites. `check-v2-m6-final.py` verifies the published Final |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | Planned `v2M7Check`, scope below; no executable aggregate yet |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | Planned `v2M8Check` and `v2FinalCheck`, scope below; no executable aggregates yet |
 
@@ -305,10 +346,10 @@ it does not weaken or replace current-source `v2M4Check`.
 
 ## Post-M5 sequence and acceptance
 
-Batch 0 reconciles the current normative contracts, scenario ownership and evidence rules only. Its exit is one Kafka
+Batch 0 reconciled the normative contracts, scenario ownership and evidence rules. Its exit is one Kafka
 RF=1/minISR=1 shared-commit model, profile-specific ACK accounting, explicit unsupported-path rejection, matching
 Markdown/JSON scenarios and a passing documentation gate. It changes no runtime, frozen design, historical receipt,
-scenario PASS or production authority. The following batches require separate implementation work.
+scenario PASS or production authority. The four implementation batches below subsequently passed their M6 acceptance.
 
 Batch 0 also includes the authorized minimal governance adjustment: `v2DocumentationCheck` and CI SDK selection use
 M5's `historical_pulsar_commit` / `historical-pulsar-commit` entry. It validates the original complete source tree,
@@ -463,9 +504,9 @@ from the old Run, verifies the original Fetch response and offsets, and checks t
 It then reads both sides of the boundary in one Fetch. Native OffsetForLeaderEpoch checks the first and second
 Owners' boundaries on the third acquisition and rejects a stale client leader epoch after the physical Run rolls.
 Retained
-sources still count against the bounded history budget; automatic source retirement and the aggregate exit remain open.
+sources still count against the bounded history budget. General automatic source retirement is outside this focused check. The M6 aggregate exit is recorded in the Final above.
 
-### Planned aggregate boundaries
+### Aggregate boundaries
 
 `v2M6Check` checks the exact 25-scenario and six-profile inventory, then runs the committed native suites and
 the affected regression gates from the declared source and runtime inputs. The
@@ -536,7 +577,7 @@ prefetch, read concurrency and scheduling changes require measurements and are n
 
 ### Source, execution inputs and evidence outputs
 
-M6 must distinguish these three inventories before its first formal execution. Existing M5 capture still has a
+M6 keeps three distinct inventories. Existing M5 capture still has a
 1-GiB aggregate input cap; tracked historical evidence already exceeds it. Do not change that cap, delete evidence or
 apply a blanket `docs/v2/evidence` exclusion to make the current capture pass.
 
@@ -557,7 +598,8 @@ apply a blanket `docs/v2/evidence` exclusion to make the current capture pass.
 [`v2-m6-execution-inputs.py`](../../scripts/v2-m6-execution-inputs.py) implements the inventory and byte verification.
 It inventories every Git path with its mode and blob, and checks the tracked M0–M5 archive against the immutable
 Batch 0 tree at `704dc5a7134425d15bb8a7fdeb9cda757a01711b`. That tree identifies the published archive files; the
-original execution origins remain in their respective receipts. Each gate declares its historical paths (or the
+original execution origins remain in their respective receipts. Published M6 outputs retain their Git node
+identity and use the separate `RETAINED_EXECUTION_OUTPUT` classification. Each gate declares its historical paths (or the
 full archive if it reads across the archive) and supplies its actual external dependency paths and expected SHA-256
 hashes. The tool checks checkout bytes and dependencies, binds the three complete Git identities, applies separate
 source, historical and runtime budgets, and writes the input record outside the source and runtime paths. The
@@ -584,7 +626,7 @@ Finals, source locks and original provenance remain byte-for-byte unchanged.
 | Release boundary | exact M4 protection key/generation/value in `RELEASED`; no inferred substitute |
 | Metadata retirement families | Object-WAL batch `FULL_V1 -> RETIRED_V1`; Pulsar full aggregate to permanent incarnation tombstone after physical cleanup |
 | M5-promotable rows | exact 14-row set frozen in M5-E, still `PLANNED` here |
-| M6-deferred shared rows | `V2-KAF-DATA-012/013/022`, still `PLANNED` |
+| M6-deferred shared rows | `V2-KAF-DATA-012/013/022` were `PLANNED` at the M5 design freeze |
 | Open gate | `V2-OPEN-READ-15` remains active for optional tombstone deletion; 0.2 permanent tombstones are frozen |
 | Design result | `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` |
 | Accepted M5-C amendment | ADR 0146 plus `m5-design-amendment-1.json`: durable ticket/fence serialization and exact single-key CAS; M5-C implementation complete, source-bound child not run |

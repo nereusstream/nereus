@@ -13,7 +13,8 @@ sourceTuple: v2-m1
 
 ADR0148 and the [current contract view](detailed_design/m5/m5-current-contracts.md) are implemented and verified by the [current M5 Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json):17 obligations, five children and2736 passing tests. The frozen writer/acceptance matrices preserve their original design-time OPEN records; they are not outstanding current M5 execution work.
 
-Native activation remains M6, operational handoff M7 and scale/parity M8. The three M6-deferred Kafka rows, V2-OPEN-READ-15 and production-deployment exclusions remain unchanged; historical M3/M4 evidence is not reinterpreted.
+The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) covers native activation and the three Kafka scenarios deferred by M5. Operational handoff
+and scale/parity remain M7 and M8 work. V2-OPEN-READ-15 and production deployment retain their separate boundaries.
 
 ## Post-M5 design frontier (2026-10-28)
 

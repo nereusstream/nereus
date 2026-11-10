@@ -16,8 +16,8 @@
       "milestone": "M1/M3/M6",
       "contract": "append metadata accounting is protocol/profile specific: BookKeeper primary has zero per-append control I/O while Kafka Object authorization remains inside ACK",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-APP-003",
@@ -133,16 +133,16 @@
       "milestone": "M6",
       "contract": "the complete Kafka broker/controller process formats and restarts only with the exact M1 feature-2 metadata authority",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-META-005",
       "milestone": "M6",
       "contract": "Produce/Fetch/Admin and full snapshot/catch-up remain compatible while using the M1 record/image authority",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-POSITION-001",
@@ -699,8 +699,8 @@
       "milestone": "M2/M6",
       "contract": "response loss plus native PID epoch sequence duplicate handling converges without storage digest protocol semantics",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-004",
@@ -723,40 +723,40 @@
       "milestone": "M2/M6",
       "contract": "RF=1 Fetch uses one coherent legal shared-commit view with LEO/HW/LSO isolation bounds and no Follower progress prerequisite",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-007",
       "milestone": "M2/M6",
       "contract": "read committed stops at LSO and returns native batches plus aborted transaction metadata",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-008",
       "milestone": "M2/M6",
       "contract": "aborted transactional data and control batches preserve native read committed behavior across leader change and materialization",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-009",
       "milestone": "M6",
       "contract": "RF=1/minISR=1 acks=1 and acks=all both require complete profile durability, legal shared commit and coherent publication",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-010",
       "milestone": "M2/M6",
       "contract": "delayed Fetch is lost wakeup safe and waits on the isolation specific local frontier without provider polling",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-011",
@@ -771,16 +771,16 @@
       "milestone": "M2/M4/M5/M6",
       "contract": "a Fetch pins one coherent generation plan and does not replan when Object BookKeeper source selection changes",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-013",
       "milestone": "M4/M5/M6",
       "contract": "verified Object preferred plus protected BookKeeper fallback remains readable until exact view and protection retirement",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-014",
@@ -795,64 +795,64 @@
       "milestone": "M2/M3/M6",
       "contract": "Kafka leader epoch is persisted in each BK and Object commit context and survives run and source changes",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-016",
       "milestone": "M2/M6",
       "contract": "random Fetch targets one complete RecordBatch while sequential Fetch uses a revalidated byte bounded disposable cursor",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-017",
       "milestone": "M2/M3/M6",
       "contract": "a stale durability callback cannot pass fenced coherent publication or advance LEO",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-018",
       "milestone": "M2/M6",
       "contract": "a current Controller-selected Owner activates only after closed legal history and checkpoint plus tail recover complete Kafka state",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-019",
       "milestone": "M2/M6",
       "contract": "immutable closed Owner history and exact recovery-source protection survive repeated cold takeover without Follower journals or Observed/Applied authority",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-020",
       "milestone": "M2/M6",
       "contract": "native duplicate identity remains separate from ingress stored and storage attempt digests",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-021",
       "milestone": "M2/M3/M6",
       "contract": "Object WAL protocol checkpoints recover through fenced terminal KafkaProtocolCheckpointHeadV1 selected NWKCP1 plus bounded NWG1 suffix without changing physical checkpoint authority",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-DATA-022",
       "milestone": "M2/M5/M6",
       "contract": "Kafka compaction preserves protocol semantics across partial sparse empty control and tombstone rewrites",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-READ-001",
@@ -987,48 +987,48 @@
       "milestone": "M6",
       "contract": "native Kafka BK processes preserve request and coordinator semantics through bootstrap, snapshot and cold relocation",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-KAF-PROC-002",
       "milestone": "M6",
       "contract": "Kafka routes all admitted profiles by immutable Binding and Storage Epoch while preserving ACK and Cell authority",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-PUL-PROC-001",
       "milestone": "M6",
       "contract": "native Pulsar BK profiles serve official client operations through qualified Broker ownership and ManagedLedger factories",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-PUL-PROC-002",
       "milestone": "M6",
       "contract": "an enrolled Pulsar factory admits new native NPD1/NPO1 output with actual birth quota and complete member references before publication",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-PUL-PROC-003",
       "milestone": "M6",
       "contract": "Pulsar Object WAL activates in the Broker only with qualified ownership, namespace and exact RANGE_64 artifacts and receipt",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-PUL-PROC-004",
       "milestone": "M6",
       "contract": "Pulsar unload and shutdown stop admission and wait for actual terminal source use before releasing the owning Cell resources",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json"
     },
     {
       "id": "V2-HO-001",

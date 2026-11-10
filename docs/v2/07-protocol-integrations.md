@@ -199,7 +199,7 @@ receipt is inherited as V2 parity evidence.
 
 ## M6 process activation matrix
 
-This is the accepted integration target after M5. In the focused native Kafka path, a BK-only deployment admits
+This is the source-bound M6 integration scope. In the focused native Kafka path, a BK-only deployment admits
 `BOOKKEEPER_WAL_ONLY`; an async Object deployment also admits `BOOKKEEPER_WAL_ASYNC_OBJECT` with a qualified
 Object provider. The bounded Object WAL path admits `OBJECT_WAL` and BK-only bindings with a qualified Object
 provider and Vault Transit key. An explicit unadmitted profile fails CreateTopics, including validate-only, without
@@ -258,8 +258,8 @@ deletion. Cold backlog must remain readable after source replacement/deletion. M
 cannot certify this new production path, and an NMS1 plan cannot be substituted for native NPD1/NPO1 identity.
 
 The [implementation plan](08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance) assigns batch exits.
-The [scenario matrix](09-scenario-evidence-matrix.md) and JSON own scenario status; all new process rows are
-`PLANNED` with no receipt. M8's complete parity matrix does not replace these M6 process checks.
+The [scenario matrix](09-scenario-evidence-matrix.md) and JSON register the 25 scenarios against the [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json).
+M8 covers the separate complete parity matrix.
 
 ## Kafka/Pulsar secondary access and authority migration
 

@@ -16,18 +16,21 @@ performance-first BookKeeper WAL.
 
 ## Current status
 
+- The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) records 25 scenarios across six native Kafka and Pulsar paths. Its source tuple,
+  original inputs, CI and scope are in the [implementation plan](08-implementation-plan-and-gates.md#current-m6-final).
+  M7 handoff, M8 parity/performance and production deployment remain separate.
 - The [post-M5 design revision](08-implementation-plan-and-gates.md#post-m5-sequence-and-acceptance) aligns NSIP-1
   with the accepted M5 scope and fixes the [M6 protocol/profile matrix](07-protocol-integrations.md#m6-process-activation-matrix),
-  process scenarios and future aggregate/input boundaries. Documentation/CI dependency selection now validates M5 as
-  historical evidence while its current-source gate stays strict. This revision does not implement or promote M6–M8.
+  process scenarios and aggregate/input boundaries. The Batch 0 documentation and CI changes established a historical
+  M5 reader and preserved its strict current-source gate. The subsequent M6 Final supplies the process evidence.
   M3 allocator selection remains closed at `RANGE_64`.
-- M5 implementation and current-source acceptance are verified by the [commit-bound Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json): all five stages,2736 passing tests,17 obligations and five children. Source commits are Nereus `2b413d6268108309123917fbb3c7c63ed692db4a`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`, Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`.
+- M5 implementation and acceptance at its published source are verified by the [commit-bound Final](evidence/v2-m5/final/final-source-2b413d6268108309123917fbb3c7c63ed692db4a/m5-final.json): all five stages,2736 passing tests,17 obligations and five children. Source commits are Nereus `2b413d6268108309123917fbb3c7c63ed692db4a`, Kafka `6221e3955f4eeeda0ba05a995df3918e6eca7667`, Pulsar `d52ab36ba099ba114f27d5842b9064f428dac5e8`.
 - The governance-only source successor runs new COMPONENTS at700d and preserves all four original c06 backend records and complete attachments through the reviewed input-only proof.
-- Exactly14 M5 scenarios now point to that Final. V2-KAF-DATA-012/013/022, V2-OPEN-READ-15, native Object process activation and M6/M7/M8 retain their prior boundaries; no production deployment or complete NSIP-1 claim follows. Historical M1–M4 receipts and frozen design inputs remain bound to their original sources.
+- Exactly 14 scenarios point to the M5 Final. M6 owns the later acceptance of V2-KAF-DATA-012/013/022. V2-OPEN-READ-15 remains open. Historical M1–M4 receipts and frozen design inputs retain their original source scopes.
 
 ## Historical implementation snapshots
 
-The following focused statuses describe their original execution boundary. The current M5 result is the Final above; earlier OPEN/incomplete statements do not override it.
+The following focused statuses describe their original execution boundary. The published M5 and M6 Finals above give the current acceptance status.
 
 - [NSIP-1](NSIP/nsip-1.md) is the current Kafka single-Owner contract: RF=1/minISR=1, complete shared commit for
   BK ACK/HW, checkpoint-plus-tail cold takeover, and a persisted grant for the Object core. The native BK
@@ -256,8 +259,8 @@ The following focused statuses describe their original execution boundary. The c
   locator/protocol publication, one legal shared commit under RF=1/minISR=1, profile-neutral BK/Object protocol
   checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
   semantic compaction. The original M2/M3 Final receipts retain their tested-source bounds; the current BK
-  checkpoint-plus-tail and Object authorization paths have separate limited-scope validation. Native Object
-  transport/process activation remains M6 work.
+  checkpoint-plus-tail and Object authorization paths have separate limited-scope validation. The M6 Final
+  covers the admitted native Object transport and process paths.
 - ADR 0088, [ADR 0089's exact Header amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
   accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) freeze the exact
   256-byte Header offsets, 116/104/96/48-byte NWG1 rows, strict code/cap/crypto tables, six-vector/114-component A corpus,
@@ -269,8 +272,8 @@ The following focused statuses describe their original execution boundary. The c
   `e5e53e62865c21845621037bea5f18c092bd4259` supplies canonical V5 `RANGE_SELECTED(RANGE_64)`, all eleven fresh Final
   children, 26 scenario promotions, and immutable M3 Final
   `docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json` with SHA-256
-  `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M3 is closed and hard-frozen; native
-  broker/controller activation remains M6.
+  `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M3 is closed and hard-frozen. The M6 Final separately covers native
+  broker/controller activation.
 - The accepted [M4 design index](detailed_design/m4/README.md) and M4-A/B/C/D preserve the complete fixed-reviewer
   responses from Grills 32 through 35 and hard-freeze the logical read view, typed source plan, hazard lifetime,
   read-quiescence proof, exact protection-generation release, M4/M5 ownership, and evidence hierarchy. Runtime,

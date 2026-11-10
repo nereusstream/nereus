@@ -13,10 +13,9 @@ NSIP-1 T4's first Kafka Object batch uses exact Provider persistence plus a dura
 grant. The same key orders grants, common checkpoint selection and Owner closure. Real MinIO/Oxia covers response
 loss, shared-member closure, physical rollover and repeated cold partition-state recovery. This amends the earlier
 cached-Owner-only completion assumption below; the historical M3 receipts retain their original source/contract.
-Native Object Broker profiles remain fail-closed. The current NSIP-1 M4 read adaptation has limited-scope coordination acceptance;
-the [M5 Final](detailed_design/m5/m5-current-contracts.md) now closes its declared retirement/lifecycle obligations.
-Native Object process activation, the three M6-deferred Kafka scenarios and performance qualification remain pending.
-The historical M3/M4 Finals are unchanged.
+The [M5 Final](detailed_design/m5/m5-current-contracts.md) covers its declared retirement and lifecycle obligations.
+The [M6 Final](evidence/v2-m6/final-source-fafb258872b267ef85994dd9c2f0b0b32c5747c9/m6-final.json) covers qualified native Object process activation and the three Kafka scenarios M5 deferred.
+Admission still fails closed for unqualified sources. Performance qualification remains in M8.
 
 ## Cost model and group commit
 
@@ -158,8 +157,8 @@ one slot and creates a random key/wrapped envelope on the private current genera
 that candidate through UNKNOWN and transfers its key handle with Provider authority into the WalRun lease. Admission
 selects a private successor generation when the old generation's CLOSED history is full, while live run leases continue
 and old raw references remain fenced. Focused real MinIO/Oxia publication now creates a new key per run and verifies
-stored objects through fresh unwrap; the transport is a local KMS test substitute. Native Broker/process
-and long-running integration remain M6 work. A shard-owned segmented active-tail index may
+stored objects through fresh unwrap with a local KMS test substitute. The later M6 Final includes the native
+Broker process with Vault Transit. A shard-owned segmented active-tail index may
 aggregate locators by binding, extent, contiguous typed coverage, and contiguous directory-row span using
 Kafka-offset-range or Pulsar-ledger/entry-range structures. A generic `ProtocolCoverage` TreeMap is forbidden on the
 normal append/ACK hot path, and the index need not allocate one heavyweight object per Binding or append unit.
